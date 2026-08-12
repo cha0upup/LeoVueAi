@@ -1,77 +1,57 @@
 <template>
   <div class="scan-workbench">
     <div class="scan-shell">
-      <!-- 顶部横向 tab 条 -->
-      <nav class="scan-tab-bar">
-        <button
-          type="button"
-          class="tab-item"
-          :class="{ active: activeTab === 'host-reachability' }"
-          @click="activeTab = 'host-reachability'"
+      <header class="scan-toolbar">
+        <div class="scan-heading">
+          <span class="scan-heading__icon">
+            <Icon :icon="iconMap.scan" />
+          </span>
+          <div>
+            <h2>扫描与探测</h2>
+            <span>{{ activePageMeta.label }}</span>
+          </div>
+        </div>
+
+        <nav
+          class="scan-tab-bar"
+          aria-label="扫描工具"
         >
-          <el-icon><Icon :icon="iconMap.connection" /></el-icon>
-          主机探活
-          <span
-            v-if="hostReachabilityTasks.length > 0"
-            class="tab-badge"
-          >{{ hostReachabilityTasks.length }}</span>
-        </button>
-        <button
-          type="button"
-          class="tab-item"
-          :class="{ active: activeTab === 'port-scan' }"
-          @click="activeTab = 'port-scan'"
+          <div
+            v-for="group in scanTabGroups"
+            :key="group.label"
+            class="tab-group"
+          >
+            <span class="tab-group__label">{{ group.label }}</span>
+            <div class="tab-group__items">
+              <button
+                v-for="tab in group.items"
+                :key="tab.key"
+                type="button"
+                class="tab-item"
+                :class="{ active: activeTab === tab.key }"
+                :aria-current="activeTab === tab.key ? 'page' : undefined"
+                @click="activeTab = tab.key"
+              >
+                <el-icon><Icon :icon="tab.icon" /></el-icon>
+                <span>{{ tab.label }}</span>
+                <span
+                  v-if="getTabBadge(tab.key) > 0"
+                  class="tab-badge"
+                  :class="{ 'tab-badge--active': tab.key !== 'host-reachability' }"
+                >{{ getTabBadge(tab.key) }}</span>
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        <div
+          v-if="allActiveBadge > 0"
+          class="scan-activity"
         >
-          <el-icon><Icon :icon="iconMap.scan" /></el-icon>
-          端口扫描
-          <span
-            v-if="portScanActiveBadge > 0"
-            class="tab-badge tab-badge--active"
-          >{{ portScanActiveBadge }}</span>
-        </button>
-        <div class="tab-sep" />
-        <button
-          type="button"
-          class="tab-item"
-          :class="{ active: activeTab === 'fingerprint-tcp' }"
-          @click="activeTab = 'fingerprint-tcp'"
-        >
-          <el-icon><Icon :icon="iconMap.fingerprint" /></el-icon>
-          TCP 指纹
-        </button>
-        <button
-          type="button"
-          class="tab-item"
-          :class="{ active: activeTab === 'fingerprint-http' }"
-          @click="activeTab = 'fingerprint-http'"
-        >
-          <el-icon><Icon :icon="iconMap.fingerprint" /></el-icon>
-          HTTP 指纹
-        </button>
-        <button
-          type="button"
-          class="tab-item"
-          :class="{ active: activeTab === 'fingerprint-recon' }"
-          @click="activeTab = 'fingerprint-recon'"
-        >
-          <el-icon><Icon :icon="iconMap.search" /></el-icon>
-          侦察扫描
-        </button>
-        <div class="tab-sep" />
-        <button
-          type="button"
-          class="tab-item"
-          :class="{ active: activeTab === 'all' }"
-          @click="activeTab = 'all'"
-        >
-          <el-icon><Icon :icon="iconMap.list" /></el-icon>
-          全部任务
-          <span
-            v-if="allActiveBadge > 0"
-            class="tab-badge tab-badge--active"
-          >{{ allActiveBadge }}</span>
-        </button>
-      </nav>
+          <span class="scan-activity__dot" />
+          {{ allActiveBadge }} 个任务运行中
+        </div>
+      </header>
 
       <!-- 内容区 -->
       <section class="scan-main">
@@ -84,7 +64,7 @@
             <header class="pane-header">
               <div>
                 <strong>探活配置</strong>
-                <span>批量检测 IP、网段或域名的可达性</span>
+                <span>{{ hostReachabilityTasks.length }} 个历史任务</span>
               </div>
               <span class="pane-step">01</span>
             </header>
@@ -99,7 +79,7 @@
             <header class="pane-header">
               <div>
                 <strong>探活任务</strong>
-                <span>查看可达主机与执行结果</span>
+                <span>{{ isHostScanning ? '正在探测' : '等待任务' }}</span>
               </div>
               <span class="pane-step">02</span>
             </header>
@@ -123,7 +103,7 @@
             <header class="pane-header">
               <div>
                 <strong>扫描配置</strong>
-                <span>设置目标、端口范围和并发参数</span>
+                <span>目标与执行参数</span>
               </div>
               <span class="pane-step">01</span>
             </header>
@@ -138,7 +118,7 @@
             <header class="pane-header">
               <div>
                 <strong>扫描任务</strong>
-                <span>跟踪进度并继续进行指纹识别</span>
+                <span>{{ scanTasks.length }} 个任务</span>
               </div>
               <span class="pane-step">02</span>
             </header>
@@ -196,7 +176,7 @@
             <header class="pane-header">
               <div>
                 <strong>全部扫描任务</strong>
-                <span>集中查看端口、指纹和侦察任务</span>
+                <span>{{ allTasksMerged.length }} 个任务</span>
               </div>
             </header>
             <div class="pane-body">
@@ -272,6 +252,35 @@ const httpScanRef = ref(null)
 const reconScanRef = ref(null)
 const sessionIdRef = toRef(props, 'sessionId')
 
+const scanTabGroups = [
+  {
+    label: '发现',
+    items: [
+      { key: 'host-reachability', label: '主机探活', icon: iconMap.connection },
+      { key: 'port-scan', label: '端口扫描', icon: iconMap.scan }
+    ]
+  },
+  {
+    label: '识别',
+    items: [
+      { key: 'fingerprint-tcp', label: 'TCP 指纹', icon: iconMap.fingerprint },
+      { key: 'fingerprint-http', label: 'HTTP 指纹', icon: iconMap.fingerprint },
+      { key: 'fingerprint-recon', label: '侦察扫描', icon: iconMap.search }
+    ]
+  },
+  {
+    label: '任务',
+    items: [
+      { key: 'all', label: '全部任务', icon: iconMap.list }
+    ]
+  }
+]
+
+const activePageMeta = computed(() => (
+  scanTabGroups.flatMap(group => group.items).find(tab => tab.key === activeTab.value) ||
+  scanTabGroups[0].items[0]
+))
+
 const {
   tasks: scanTasks,
   isStarting,
@@ -300,6 +309,13 @@ const portScanActiveBadge = computed(() => countActiveScanTasks(scanTasks.value)
 
 // badge: 所有活跃任务数（用于"全部任务"tab）
 const allActiveBadge = computed(() => countActiveScanTasks(allTasksMerged.value))
+
+const getTabBadge = key => {
+  if (key === 'host-reachability') return hostReachabilityTasks.value.length
+  if (key === 'port-scan') return portScanActiveBadge.value
+  if (key === 'all') return allActiveBadge.value
+  return 0
+}
 
 // Dispatch actions for the "全部" aggregated view
 const handleAllDispatch = (action, { taskId, kind }) => {
@@ -501,82 +517,149 @@ watch(
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 12px;
+  background: var(--app-page-background);
+  container-name: scan-workbench;
+  container-type: inline-size;
 }
 
 .scan-shell {
   --scan-surface: var(--app-card-background);
   --scan-soft-surface: var(--app-control-background-soft);
-  --scan-border: color-mix(in srgb, var(--el-border-color) 16%, transparent);
+  --scan-border: var(--app-surface-border-subtle);
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 0;
   overflow: hidden;
+  border: 1px solid var(--scan-border);
+  border-radius: var(--app-panel-radius);
+  background: var(--scan-surface);
 }
 
-/* 顶部 tab 条 */
-.scan-tab-bar {
+.scan-toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 22px;
+  min-height: 76px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--scan-border);
+  background: var(--scan-surface);
+  flex-shrink: 0;
+}
+
+.scan-heading {
   display: flex;
   align-items: center;
-  gap: 1px;
-  min-height: 42px;
-  padding: 4px 8px;
-  background: var(--scan-soft-surface);
-  border: 0;
-  border-bottom: 1px solid var(--scan-border);
-  border-radius: 0;
-  flex-shrink: 0;
-  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 156px;
 }
 
-.tab-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--scan-border);
-  margin: 0 4px;
+.scan-heading__icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--el-color-primary) 22%, var(--scan-border));
+  border-radius: var(--app-control-radius);
+  background: var(--app-brand-background);
+  color: var(--el-color-primary);
+  font-size: 20px;
+}
+
+.scan-heading h2 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--el-text-color-primary);
+}
+
+.scan-heading span:not(.scan-heading__icon) {
+  display: block;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+}
+
+.scan-tab-bar {
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.scan-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-group {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tab-group + .tab-group::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  bottom: 2px;
+  left: -7px;
+  width: 1px;
+  background: var(--scan-border);
+}
+
+.tab-group__label {
+  padding-left: 5px;
+  color: var(--el-text-color-placeholder);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.tab-group__items {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--app-control-radius);
+  background: var(--scan-soft-surface);
 }
 
 .tab-item {
-  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 30px;
-  padding: 5px 10px;
-  border: none;
-  border-radius: var(--radius-control);
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--app-control-radius);
   background: transparent;
-  font-size: 13px;
-  font-weight: 600;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 550;
   color: var(--el-text-color-regular);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
   white-space: nowrap;
 }
 
 .tab-item:hover {
-  background: color-mix(in srgb, var(--el-border-color) 10%, transparent);
+  background: var(--app-control-background-hover);
   color: var(--el-text-color-primary);
 }
 
 .tab-item.active {
-  background: color-mix(in srgb, var(--el-color-primary) 9%, var(--scan-surface));
+  border-color: color-mix(in srgb, var(--el-color-primary) 18%, var(--scan-border));
+  background: var(--scan-surface);
   color: var(--el-color-primary);
-  box-shadow: none;
-}
-
-.tab-item.active::after {
-  content: '';
-  position: absolute;
-  right: 10px;
-  bottom: -5px;
-  left: 10px;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: var(--el-color-primary);
 }
 
 .tab-item .el-icon {
@@ -603,14 +686,34 @@ watch(
   color: var(--el-color-primary);
 }
 
-/* 内容区 */
+.scan-activity {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: max-content;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--el-color-success) 22%, var(--scan-border));
+  border-radius: var(--app-control-radius);
+  color: var(--el-text-color-regular);
+  font-size: 11px;
+  background: color-mix(in srgb, var(--el-color-success) 6%, var(--scan-surface));
+}
+
+.scan-activity__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--el-color-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-success) 14%, transparent);
+}
+
 .scan-main {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 8px 0 0;
+  padding: 12px;
   background: var(--app-page-background);
 }
 
@@ -618,8 +721,8 @@ watch(
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.18fr);
-  gap: 0;
+  grid-template-columns: minmax(360px, 0.88fr) minmax(0, 1.12fr);
+  gap: 12px;
 }
 
 .workspace-grid-single {
@@ -627,18 +730,17 @@ watch(
 }
 
 .workspace-grid--host {
-  grid-template-columns: minmax(400px, 0.82fr) minmax(0, 1.18fr);
+  grid-template-columns: minmax(380px, 0.88fr) minmax(0, 1.12fr);
   grid-template-rows: minmax(0, 1fr);
 }
 
 .workspace-grid--stacked {
-  grid-template-columns: minmax(400px, 0.82fr) minmax(0, 1.18fr);
+  grid-template-columns: minmax(380px, 0.88fr) minmax(0, 1.12fr);
   grid-template-rows: minmax(0, 1fr);
 }
 
 .workspace-grid--host .workspace-pane + .workspace-pane,
 .workspace-grid--stacked .workspace-pane + .workspace-pane {
-  border-top: 0;
   border-left: 1px solid var(--scan-border);
 }
 
@@ -646,8 +748,8 @@ watch(
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-radius: 0;
-  border: 0;
+  border: 1px solid var(--scan-border);
+  border-radius: var(--app-panel-radius);
   background: var(--scan-surface);
   overflow: hidden;
 }
@@ -660,7 +762,6 @@ watch(
   align-self: stretch;
   height: 100%;
   max-height: none;
-  border-bottom: 1px solid var(--scan-border);
 }
 
 .workspace-pane--config .pane-body {
@@ -672,12 +773,12 @@ watch(
 }
 
 .pane-header {
-  min-height: 48px;
+  min-height: 54px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 7px 12px;
+  padding: 9px 13px;
   border-bottom: 1px solid var(--scan-border);
   background: color-mix(in srgb, var(--scan-soft-surface) 72%, var(--scan-surface));
 }
@@ -691,27 +792,34 @@ watch(
 
 .pane-header strong {
   color: var(--el-text-color-primary);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
 }
 
 .pane-header span {
   color: var(--el-text-color-secondary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .pane-step {
   flex-shrink: 0;
   font-family: var(--app-font-mono, monospace);
-  color: color-mix(in srgb, var(--el-color-primary) 60%, var(--el-text-color-placeholder)) !important;
-  font-size: 12px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  border-radius: var(--app-control-radius);
+  background: var(--app-brand-background);
+  color: var(--el-color-primary) !important;
+  font-size: 11px !important;
   font-weight: 700;
 }
 
 .pane-body {
   flex: 1;
   min-height: 0;
-  padding: 10px 12px;
+  padding: 14px;
   overflow: auto;
 }
 
@@ -724,9 +832,19 @@ watch(
   background: transparent;
 }
 
-@media (max-width: 1100px) {
+@container scan-workbench (max-width: 820px) {
+  .scan-toolbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .scan-activity {
+    display: none;
+  }
+
   .workspace-grid {
     grid-template-columns: 1fr;
+    overflow-y: auto;
   }
 
   .workspace-grid--host,
@@ -736,22 +854,78 @@ watch(
 
   .workspace-grid--host .workspace-pane + .workspace-pane,
   .workspace-grid--stacked .workspace-pane + .workspace-pane {
-    border-top: 1px solid var(--scan-border);
     border-left: 0;
+  }
+
+  .workspace-grid--host,
+  .workspace-grid--stacked {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+
+  .workspace-grid--host .workspace-pane,
+  .workspace-grid--stacked .workspace-pane {
+    min-height: 0;
+    flex: 0 0 auto;
+  }
+
+  .workspace-grid--host .workspace-pane--config,
+  .workspace-grid--stacked .workspace-pane--config {
+    height: auto;
+  }
+
+  .workspace-grid--host .workspace-pane:not(.workspace-pane--config),
+  .workspace-grid--stacked .workspace-pane:not(.workspace-pane--config) {
+    min-height: 260px;
   }
 }
 
-@media (max-width: 768px) {
+@container scan-workbench (max-width: 768px) {
+  .scan-shell {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .scan-toolbar {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px 12px 8px;
+  }
+
+  .scan-heading__icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .scan-tab-bar {
+    margin: 0 -12px;
+    padding: 0 12px 2px;
+  }
+
+  .scan-main {
+    padding: 8px;
+    overflow-y: auto;
+  }
+
   .workspace-pane--config {
     height: auto;
   }
 
-  .scan-shell {
-    padding: 4px;
-  }
   .tab-item {
-    padding: 6px 9px;
+    padding: 0 8px;
     font-size: 12px;
+  }
+
+  .pane-body {
+    padding: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .scan-workbench {
+    padding: 0;
   }
 }
 </style>

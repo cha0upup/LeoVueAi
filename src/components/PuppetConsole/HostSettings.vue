@@ -24,24 +24,6 @@
             <div class="tab-pane-body">
               <div class="general-settings-grid">
                 <div class="settings-card">
-                  <div class="card-header stacked">
-                    <div>
-                      <div class="card-title">
-                        会话控制
-                      </div>
-                      <p class="card-subtitle">
-                        切换当前会话绑定的 HostId，变更后控制台会自动刷新。
-                      </p>
-                    </div>
-                  </div>
-                  <HostIdManager
-                    :session-id="currentSessionId"
-                    label="当前 HostId"
-                    @hostid-changed="emit('hostid-changed')"
-                  />
-                </div>
-
-                <div class="settings-card">
                   <div class="card-header stacked compact-card-header">
                     <div>
                       <div class="card-title">
@@ -241,7 +223,6 @@ import { Icon } from '@iconify/vue'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { getLoadedComponentsApi, reloadComponentApi, loadComponentApi } from '@/services/api.js'
 import { icons } from '@/utils/icons.js'
-import HostIdManager from '@/components/PuppetConsole/HostIdManager.vue'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 import { PUPPET_CONSOLE_SETTINGS_STORAGE_KEY } from '@/constants/app.js'
@@ -253,7 +234,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['hostid-changed', 'update:settings'])
+const emit = defineEmits(['update:settings'])
 
 const iconMap = icons
 const activeTab = ref('general')

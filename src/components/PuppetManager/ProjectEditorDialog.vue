@@ -99,6 +99,14 @@
     <template #footer>
       <div class="project-dialog-actions">
         <button
+          v-if="editing"
+          type="button"
+          class="project-lifecycle-action delete"
+          @click="remove"
+        >
+          <el-icon><Icon icon="mdi:trash-can-outline" /></el-icon>删除项目
+        </button>
+        <button
           v-if="editing && form.status !== 'archived'"
           type="button"
           class="project-lifecycle-action archive"
@@ -135,7 +143,7 @@ import { reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { ElMessageBox } from 'element-plus'
 
-import { addProjectApi, archiveProjectApi, updateProjectApi } from '@/services/api.js'
+import { addProjectApi, archiveProjectApi, deleteProjectApi, updateProjectApi } from '@/services/api.js'
 import { showSuccess } from '@/utils/messageUtils.js'
 import { icons } from '@/utils/icons.js'
 
@@ -208,6 +216,27 @@ const archive = async () => {
     showSuccess('项目已归档')
     visible.value = false
     emit('saved', response.data)
+  } finally {
+    saving.value = false
+  }
+}
+
+const remove = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `删除项目“${form.projectName}”后，主机资产和会话仍会保留，但项目归属将被解除。此操作不可恢复。`,
+      '删除项目',
+      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'error' }
+    )
+  } catch {
+    return
+  }
+  saving.value = true
+  try {
+    await deleteProjectApi(form.projectId)
+    showSuccess('项目已删除')
+    visible.value = false
+    emit('saved')
   } finally {
     saving.value = false
   }
@@ -391,5 +420,9 @@ defineExpose({ open })
 
 .project-lifecycle-action.restore {
   color: var(--el-color-success-dark-2);
+}
+
+.project-lifecycle-action.delete {
+  color: var(--el-color-danger);
 }
 </style>

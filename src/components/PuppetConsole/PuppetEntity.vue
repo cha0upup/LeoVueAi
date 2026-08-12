@@ -170,7 +170,7 @@ import PuppetConsoleHeader from '@/components/PuppetConsole/PuppetConsoleHeader.
 import TabBar from '@/components/Workspace/TabBar.vue'
 import CommandPalette from '@/components/Workspace/CommandPalette.vue'
 import AiDock from '@/components/Workspace/AiDock.vue'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { showError } from '@/utils/messageUtils.js'
 import { taskEngine } from '@/components/PuppetConsole/File/TaskEngine.js'
 import { TaskStatus } from '@/constants/task.js'
 import { PUPPET_CONSOLE_SETTINGS_STORAGE_KEY } from '@/constants/app.js'
@@ -384,7 +384,6 @@ const getModuleProps = (moduleKey) => {
 const getModuleListeners = (moduleKey) => {
   if (moduleKey === 'settings') {
     return {
-      'hostid-changed': handleHostIdChanged,
       'update:settings': (val) => Object.assign(puppetSettings, val)
     }
   }
@@ -509,13 +508,6 @@ const initializeComponent = async () => {
     errorMessage.value = error.message
     showError(`初始化失败: ${error.message}`)
   }
-}
-
-const handleHostIdChanged = () => {
-  refreshKey.value++
-  fetchConnLinkChain()
-  fetchCurrentHostId()
-  showSuccess('HostId 已切换，主机控制台正在重新加载...')
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────

@@ -16,6 +16,10 @@ export function archiveProjectApi(projectId) {
   return http.post('/platform/projects/archive', { projectId })
 }
 
+export function deleteProjectApi(projectId) {
+  return http.post('/platform/projects/delete', { projectId })
+}
+
 export function getProjectPuppetsApi(projectId) {
   return http.get(`/platform/projects/${encodeURIComponent(projectId)}/puppets`)
 }

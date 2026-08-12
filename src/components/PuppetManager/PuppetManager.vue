@@ -307,6 +307,7 @@
       @open-session="openExistingSession"
       @create-session="createNewSession"
     />
+    <HostSelectionDialog ref="hostSelectionDialog" />
   </ManagerLayout>
 </template>
 
@@ -348,6 +349,8 @@ import ProjectAssignmentDialog from './ProjectAssignmentDialog.vue'
 import ProjectEditorDialog from './ProjectEditorDialog.vue'
 import ProjectSwitcher from './ProjectSwitcher.vue'
 import SessionPickerDialog from './SessionPickerDialog.vue'
+import HostSelectionDialog from './HostSelectionDialog.vue'
+import { useHostSelection } from './useHostSelection.js'
 import { resolvePuppetSessionEntry } from './puppetSessionEntry.js'
 import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import { buildPuppetTransferBundle, encodePuppetTransferPayload } from '@/utils/puppetTransfer.js'
@@ -374,6 +377,7 @@ const addChildPuppet = ref(null)
 const projectEditor = ref(null)
 const projectAssignment = ref(null)
 const sessionPicker = ref(null)
+const hostSelectionDialog = ref(null)
 const puppetTable = ref(null)
 const tableKey = ref(0)
 
@@ -411,6 +415,7 @@ const {
   loadProjects,
   selectProject
 } = useProjectDirectory()
+const hostSelection = useHostSelection(hostSelectionDialog, activeProjectId)
 const assignableProjects = computed(() =>
   projects.value.filter(
     (project) =>
@@ -553,7 +558,7 @@ const selectSession = (session) => {
 const openExistingSession = (session) => {
   if (!session?.sessionId) return
   activeSessionId.value = session.sessionId
-  emit('addPuppetEntity', {
+  const params = {
     puppetName: session.puppetName,
     sessionId: session.sessionId,
     projectId: session.projectId || activeProjectId.value,
@@ -564,8 +569,10 @@ const openExistingSession = (session) => {
       '',
     connLink: session.connLink,
     cacheMode: Boolean(session.cacheMode),
-    capabilities: Array.isArray(session.capabilities) ? session.capabilities : []
-  })
+    capabilities: Array.isArray(session.capabilities) ? session.capabilities : [],
+    currentHostId: session.currentHostId || ''
+  }
+  emit('addPuppetEntity', params)
 }
 
 const getLiveSessions = async () => {
@@ -803,9 +810,12 @@ const createNewSession = async (row) => {
     return
   }
   cacheCheckResult.value = null
+  const selected = await hostSelection.open(row)
+  if (!selected?.selectedHostId) return
+
   await executeRequest(
     async () => {
-      const resp = await initPuppetApi(row.puppetId, activeProjectId.value)
+      const resp = await initPuppetApi(row.puppetId, activeProjectId.value, selected.selectedHostId)
       const sessionId = resp.data.sessionId
       const connLink = row.connLink
 
@@ -829,7 +839,7 @@ const createNewSession = async (row) => {
       return resp
     },
     {
-      successMessage: '主机初始化成功',
+      successMessage: null,
       errorMessage: null,
       onError: async () => {
         // 连接失败时检查是否有本地缓存
@@ -868,8 +878,10 @@ const addPuppetEntity = (row) => {
   createNewSession(row)
 }
 
-const openCacheSession = async (row) => {
-  const resp = await initPuppetCacheApi(row.puppetId, activeProjectId.value)
+const openCacheSession = async (row, selected = null) => {
+  const chosen = selected || await hostSelection.open(row, 'cache')
+  if (!chosen?.selectedHostId) return false
+  const resp = await initPuppetCacheApi(row.puppetId, activeProjectId.value, chosen.selectedHostId)
   const sessionId = resp.data.sessionId
   emit('addPuppetEntity', {
     puppetName: row.puppetName,
@@ -882,6 +894,7 @@ const openCacheSession = async (row) => {
   })
   cacheCheckResult.value = null
   showSuccess('已进入缓存模式')
+  return true
 }
 
 const enterCacheMode = async () => {

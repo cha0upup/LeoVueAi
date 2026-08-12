@@ -41,6 +41,15 @@
             {{ session.projectName || getProjectLabel(session.projectId) }} ·
             最近活动 {{ formatSessionTime(session.lastActiveTime || session.updateTime) }}
           </small>
+          <code
+            v-if="session.currentHostId"
+            class="session-picker-host-id"
+            :title="session.currentHostId"
+          >HostId: {{ session.currentHostId }}</code>
+          <span
+            v-else
+            class="session-picker-host-id session-picker-host-id--empty"
+          >HostId: 未绑定</span>
         </span>
         <el-icon class="session-picker-item__arrow">
           <Icon :icon="iconMap.arrowRight" />
@@ -231,6 +240,23 @@ defineExpose({ open })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.session-picker-host-id {
+  max-width: 100%;
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--el-text-color-secondary);
+  font-family: var(--el-font-family-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-picker-host-id--empty {
+  color: var(--el-text-color-placeholder);
+  font-family: var(--el-font-family);
 }
 
 .session-picker-item__arrow {

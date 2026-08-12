@@ -1,8 +1,14 @@
 import http from '../http.js'
 
-export function initPuppetApi(puppetId, projectId) {
+export function initPuppetApi(puppetId, projectId, hostId) {
   return http.get('/puppet-node/init', {
-    params: { puppetId, ...(projectId ? { projectId } : {}) }
+    params: { puppetId, ...(projectId ? { projectId } : {}), ...(hostId ? { hostId } : {}) }
+  })
+}
+
+export function discoverPuppetHostsApi(puppetId, projectId, force = false) {
+  return http.get('/puppet-node/discover-hosts', {
+    params: { puppetId, ...(projectId ? { projectId } : {}), ...(force ? { force: true } : {}) }
   })
 }
 
@@ -10,8 +16,14 @@ export function checkPuppetCacheApi(puppetId) {
   return http.get(`/puppet-node/check-cache?puppetId=${puppetId}`)
 }
 
-export function initPuppetCacheApi(puppetId, projectId) {
+export function initPuppetCacheApi(puppetId, projectId, hostId) {
   return http.get('/puppet-node/init-cache', {
+    params: { puppetId, ...(projectId ? { projectId } : {}), ...(hostId ? { hostId } : {}) }
+  })
+}
+
+export function getPuppetCacheHostsApi(puppetId, projectId) {
+  return http.get('/puppet-node/cache-hosts', {
     params: { puppetId, ...(projectId ? { projectId } : {}) }
   })
 }

@@ -244,11 +244,16 @@ const handleExportAll = () => {
 
 .empty-tasks {
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: flex-start;
-  padding: 6px 4px;
-  min-height: 0;
+  padding: 28px 18px;
+  min-height: 168px;
   background: var(--app-page-background);
+}
+
+.empty-tasks :deep(.scan-empty-state) {
+  max-width: 520px;
+  background: var(--app-card-background);
 }
 
 .task-list {

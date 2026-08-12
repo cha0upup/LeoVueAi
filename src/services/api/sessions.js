@@ -16,14 +16,6 @@ export function getCurrentHostIdApi(params) {
   return http.post('/platform/session/current-host-id', params)
 }
 
-export function setCurrentHostIdApi(params) {
-  return http.post('/platform/session/current-host-id/set', params)
-}
-
-export function getAllHostIdsApi(params) {
-  return http.post('/platform/session/all-host-ids', params)
-}
-
 // ─── 侦察摘要 ─────────────────────────────────────────────────────────────────
 
 export function getReconSummaryApi(params) {

@@ -412,6 +412,8 @@ watch(
   flex-direction: column;
   gap: 0;
   height: auto;
+  container-name: scan-config;
+  container-type: inline-size;
 }
 
 /* ── 分组 ─────────────────────────────────────────────────────────────── */
@@ -606,7 +608,7 @@ watch(
   min-width: 72px;
 }
 
-@media (min-width: 1800px) {
+@container scan-config (min-width: 700px) {
   .cfg-form > :deep(.el-form) {
     display: grid;
     grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.35fr);

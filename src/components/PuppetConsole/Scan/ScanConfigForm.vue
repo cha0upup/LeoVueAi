@@ -411,6 +411,8 @@ const handleResetForm = () => {
   flex-direction: column;
   gap: 0;
   height: auto;
+  container-name: scan-config;
+  container-type: inline-size;
 }
 
 /* ── 分组 ─────────────────────────────────────────────────────────────── */
@@ -642,7 +644,7 @@ const handleResetForm = () => {
   flex: none;
 }
 
-@media (min-width: 1800px) {
+@container scan-config (min-width: 700px) {
   .cfg-form > :deep(.el-form) {
     display: grid;
     grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.75fr);

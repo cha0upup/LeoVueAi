@@ -472,11 +472,11 @@ defineExpose({ tasks, queryResult, remove, batchRemove, refresh, pause, resume, 
 <style scoped>
 /* ── 布局 ─────────────────────────────────────────────────────────────── */
 .recon-workspace {
-  --scan-section-border: color-mix(in srgb, var(--el-border-color) 16%, transparent);
+  --scan-section-border: var(--app-surface-border-subtle);
   display: grid;
-  grid-template-columns: minmax(400px, 0.82fr) minmax(0, 1.18fr);
+  grid-template-columns: minmax(380px, 0.88fr) minmax(0, 1.12fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 0;
+  gap: 12px;
   min-height: 0;
   height: 100%;
   background: var(--app-page-background);
@@ -486,13 +486,14 @@ defineExpose({ tasks, queryResult, remove, batchRemove, refresh, pause, resume, 
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 10px 12px;
+  padding: 14px;
   overflow: auto;
-  background: var(--app-page-background);
+  border: 1px solid var(--scan-section-border);
+  border-radius: var(--app-panel-radius);
+  background: var(--app-card-background);
 }
 
 .workspace-section + .workspace-section {
-  border-top: 0;
   border-left: 1px solid var(--scan-section-border);
 }
 
@@ -500,8 +501,7 @@ defineExpose({ tasks, queryResult, remove, batchRemove, refresh, pause, resume, 
   align-self: stretch;
   height: 100%;
   max-height: none;
-  border-bottom: 1px solid var(--scan-section-border);
-  background: var(--app-page-background);
+  background: var(--app-card-background);
 }
 
 .section-heading {
@@ -509,9 +509,9 @@ defineExpose({ tasks, queryResult, remove, batchRemove, refresh, pause, resume, 
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: -10px -12px 4px;
-  min-height: 48px;
-  padding: 7px 12px;
+  margin: -14px -14px 8px;
+  min-height: 54px;
+  padding: 9px 13px;
   border-bottom: 1px solid var(--scan-section-border);
   background: color-mix(in srgb, var(--app-control-background-soft) 72%, var(--app-card-background));
 }
@@ -523,19 +523,27 @@ defineExpose({ tasks, queryResult, remove, batchRemove, refresh, pause, resume, 
 }
 
 .section-heading strong {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
   color: var(--el-text-color-primary);
 }
 
 .section-heading span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 
 .section-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  border-radius: var(--app-control-radius);
+  background: var(--app-brand-background);
   font-family: var(--app-font-mono, monospace);
-  color: color-mix(in srgb, var(--el-color-primary) 60%, var(--el-text-color-placeholder)) !important;
+  color: var(--el-color-primary) !important;
+  font-size: 11px !important;
   font-weight: 700;
 }
 
@@ -547,6 +555,8 @@ defineExpose({ tasks, queryResult, remove, batchRemove, refresh, pause, resume, 
   height: auto;
   overflow: visible;
   min-height: 0;
+  container-name: scan-config;
+  container-type: inline-size;
 }
 
 /* ── 分组 ─────────────────────────────────────────────────────────────── */
@@ -766,7 +776,7 @@ defineExpose({ tasks, queryResult, remove, batchRemove, refresh, pause, resume, 
   min-width: 72px;
 }
 
-@media (min-width: 1800px) {
+@container scan-config (min-width: 700px) {
   .cfg-form > :deep(.el-form) {
     display: grid;
     grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.25fr);
@@ -808,19 +818,19 @@ defineExpose({ tasks, queryResult, remove, batchRemove, refresh, pause, resume, 
   }
 }
 
-@media (max-width: 1200px) {
+@container scan-workbench (max-width: 820px) {
   .recon-workspace {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
+    overflow-y: auto;
+  }
+
+  .workspace-section {
+    min-height: 420px;
   }
 
   .workspace-section:first-child {
     height: auto;
-  }
-
-  .workspace-section + .workspace-section {
-    border-top: 1px solid var(--scan-section-border);
-    border-left: 0;
   }
 }
 
