@@ -1,0 +1,39 @@
+.detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.detail-actions .el-button,
+.detail-card .detail-actions .el-button {
+  height: 30px;
+  margin: 0;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.detail-actions .el-dropdown {
+  flex: 0 0 auto;
+}
+
+.detail-card .detail-actions {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.more-btn {
+  width: 30px;
+  padding: 0;
+}
+
+.danger-item {
+  color: var(--el-color-danger);
+}
+
+.danger-item .el-icon {
+  color: var(--el-color-danger);
+}

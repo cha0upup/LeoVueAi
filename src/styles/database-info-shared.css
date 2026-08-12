@@ -1,0 +1,191 @@
+.database-info-shell {
+  --database-inspector-muted-surface: var(--app-control-background-soft);
+  --database-inspector-panel-surface: var(--app-card-background);
+  --database-inspector-soft-border: color-mix(in srgb, var(--el-border-color) 18%, transparent);
+  height: 100%;
+  overflow-y: auto;
+  background: transparent;
+}
+
+:global(html:not(.dark) .database-info-shell),
+:global(html[data-theme='light'] .database-info-shell) {
+  --database-inspector-panel-surface: var(--app-card-background);
+  --database-inspector-muted-surface: var(--app-control-background-soft);
+  --database-inspector-soft-border: color-mix(in srgb, var(--el-border-color) 16%, transparent);
+}
+
+:global(html.dark .database-info-shell),
+:global(html[data-theme='dark'] .database-info-shell) {
+  --database-inspector-muted-surface: var(--app-control-background-soft);
+  --database-inspector-panel-surface: var(--app-card-background);
+  --database-inspector-soft-border: color-mix(in srgb, var(--el-border-color) 18%, transparent);
+}
+
+.database-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 6px 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--database-inspector-muted-surface) 90%, transparent);
+  border: 0;
+  box-shadow: none;
+  flex-wrap: wrap;
+}
+
+.database-info-title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--el-spacing-small);
+  font-size: var(--el-font-size-large);
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.database-info-title-icon {
+  color: var(--el-text-color-secondary);
+  font-size: 1.25rem;
+}
+
+.database-info-toolbar {
+  display: flex;
+  gap: var(--el-spacing-base);
+  flex-wrap: wrap;
+}
+
+.database-info-card {
+  margin: 0 6px 10px;
+  border-radius: 14px;
+  background: var(--database-inspector-panel-surface);
+  border: 1px solid var(--database-inspector-soft-border);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--el-text-color-primary) 3%, transparent);
+}
+
+.database-info-card:last-child {
+  margin-bottom: 0;
+}
+
+.database-info-card .el-card__header {
+  background: color-mix(in srgb, var(--database-inspector-muted-surface) 90%, transparent);
+  border-bottom: 1px solid var(--database-inspector-soft-border);
+}
+
+.database-info-card .el-card__body {
+  background: var(--database-inspector-panel-surface);
+}
+
+.database-info-card-header {
+  font-weight: 600;
+  font-size: var(--el-font-size-base);
+  color: var(--el-text-color-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--el-spacing-base);
+}
+
+.database-info-descriptions {
+  margin: 0 6px 10px;
+}
+
+.database-info-shell .el-descriptions__label {
+  font-weight: 600;
+  background: var(--database-inspector-muted-surface);
+}
+
+.database-info-shell .el-descriptions__table,
+.database-info-shell .el-descriptions__body,
+.database-info-shell .el-descriptions__cell,
+.database-info-shell .el-descriptions__content {
+  background: var(--database-inspector-panel-surface);
+}
+
+.database-info-shell .el-table {
+  --el-table-header-bg-color: var(--database-inspector-muted-surface);
+  --el-table-tr-bg-color: var(--database-inspector-panel-surface);
+  --el-table-row-hover-bg-color: color-mix(
+    in srgb,
+    var(--database-inspector-panel-surface) 92%,
+    var(--el-border-color-extra-light)
+  );
+}
+
+.database-info-shell .el-tag {
+  --el-tag-bg-color: var(--database-inspector-muted-surface);
+  --el-tag-border-color: transparent;
+  --el-tag-text-color: var(--el-text-color-regular);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.database-info-shell .el-button--primary.is-link,
+.database-info-shell .el-button--danger.is-link,
+.database-info-shell .el-button--warning.is-link,
+.database-info-shell .el-button--success.is-link {
+  font-weight: 600;
+}
+
+.database-info-shell .el-button--primary.is-link {
+  color: var(--el-color-primary-dark-2);
+}
+
+.database-info-shell .el-button--success.is-link {
+  color: var(--el-color-success-dark-2);
+}
+
+.database-info-shell .el-button--warning.is-link {
+  color: var(--el-color-warning-dark-2);
+}
+
+.database-info-shell .el-button--danger.is-link {
+  color: var(--el-color-danger-dark-2);
+}
+
+.database-info-section {
+  margin: 0 6px 10px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--database-inspector-muted-surface) 84%, transparent);
+  border: 1px solid var(--database-inspector-soft-border);
+  border-radius: 14px;
+}
+
+.database-info-section-title {
+  margin: 0 0 var(--el-spacing-base);
+  font-size: var(--el-font-size-large);
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.database-info-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--el-spacing-base);
+  margin-bottom: var(--el-spacing-base);
+}
+
+.database-info-mono-text {
+  font-family: var(--el-font-family-mono, monospace);
+}
+
+@media (max-width: 768px) {
+  .database-info-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .database-info-toolbar {
+    justify-content: flex-start;
+  }
+
+  .database-info-toolbar .el-button {
+    flex: 1;
+    min-width: 0;
+  }
+}

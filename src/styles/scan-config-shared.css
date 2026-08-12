@@ -1,0 +1,70 @@
+.scan-config-surface {
+  --scan-config-border: color-mix(in srgb, var(--el-border-color) 22%, transparent);
+  --scan-config-section-bg: color-mix(
+    in srgb,
+    var(--app-control-background-soft) 72%,
+    var(--app-card-background)
+  );
+  min-height: 100%;
+}
+
+.scan-config-surface > .el-form {
+  row-gap: 8px;
+}
+
+.scan-config-surface .cfg-divider {
+  display: none;
+}
+
+.scan-config-surface .cfg-section {
+  min-width: 0;
+  padding: 10px 12px !important;
+  border: 1px solid var(--scan-config-border);
+  border-radius: var(--radius-control);
+  background: var(--scan-config-section-bg);
+}
+
+.scan-config-surface .cfg-section-label {
+  margin-bottom: 8px;
+  color: var(--el-text-color-primary);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.4;
+  text-transform: none;
+}
+
+.scan-config-surface .cfg-subsection-label {
+  margin-bottom: 6px;
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scan-config-surface .cfg-hint {
+  margin-top: 5px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.45;
+}
+
+.scan-config-surface > .cfg-actions {
+  position: static;
+  margin-top: 8px !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--scan-config-border);
+  border-radius: var(--radius-control);
+  background: var(--scan-config-section-bg);
+  box-shadow: none;
+}
+
+.scan-config-surface :is(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner) {
+  background: var(--app-card-background);
+}
+
+@media (max-width: 899px) {
+  .scan-config-surface > .el-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+}

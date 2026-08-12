@@ -1,0 +1,45 @@
+{
+  "name": "leovue",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "preview": "vite preview",
+    "format": "prettier --write \"src/**/*.{js,ts,vue,css,scss,md}\"",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "@iconify/vue": "^5.0.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-search": "^0.15.0",
+    "@xterm/addon-web-links": "^0.11.0",
+    "@xterm/xterm": "^5.5.0",
+    "axios": "^1.18.1",
+    "dompurify": "^3.4.11",
+    "element-plus": "^2.8.0",
+    "marked": "^15.0.0",
+    "monaco-editor": "^0.52.2",
+    "uuid": "^11.1.1",
+    "vue": "^3.5.0",
+    "vue-router": "^4.4.2",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "eslint": "^10.8.0",
+    "eslint-plugin-vue": "^10.0.0",
+    "prettier": "^3.3.3",
+    "sass": "^1.77.8",
+    "vite": "^8.1.4",
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "form-data": "^4.0.6"
+  }
+}

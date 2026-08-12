@@ -1,0 +1,132 @@
+.plugin-form {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.dialog-layout {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.info-pane {
+  flex: 0 0 36%;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.info-pane .form-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-pane {
+  flex: 1 1 64%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--el-spacing-large);
+  min-height: 100%;
+}
+
+.form-section {
+  margin-bottom: var(--el-spacing-large);
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  margin-bottom: var(--el-spacing-base);
+  padding-bottom: var(--el-spacing-small);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.form-tip {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.code-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-editor-wrapper {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+  overflow: hidden;
+  max-height: 32vh;
+  flex: 1;
+}
+
+.code-editor-header {
+  padding: var(--el-spacing-small) var(--el-spacing-base);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: var(--el-bg-color-page);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.code-editor-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.code-editor-desc {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.code-editor-body {
+  padding: var(--el-spacing-base);
+  height: 100%;
+}
+
+.no-padding-item .el-form-item__content {
+  padding: 0;
+}
+
+.code-textarea .el-textarea__inner,
+.bytecode-input .el-textarea__inner {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  line-height: 1.6;
+}
+
+.plugin-form .el-select__wrapper,
+.plugin-form .el-input__wrapper,
+.plugin-form .el-textarea__inner {
+  border-radius: 10px;
+}
+
+.form-inline-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.submit-btn,
+.cancel-btn {
+  font-size: var(--el-font-size-base);
+  font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+  .dialog-layout {
+    flex-direction: column;
+  }
+
+  .info-pane,
+  .code-pane {
+    flex: 1 1 auto;
+    min-width: 100%;
+  }
+}

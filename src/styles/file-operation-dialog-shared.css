@@ -1,0 +1,138 @@
+:global(.file-dialog-shell .el-dialog__header) {
+  padding: 16px 20px 10px;
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--file-dialog-soft-border, rgba(30, 41, 59, 0.1)) 76%, transparent);
+}
+
+:global(.file-dialog-shell.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--file-dialog-soft-border, rgba(30, 41, 59, 0.1));
+  background: var(--app-dialog-background);
+  box-shadow: var(--app-shell-shadow-strong);
+}
+
+:global(.file-dialog-shell .el-dialog__title) {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--el-text-color-primary);
+}
+
+:global(.file-dialog-shell .el-dialog__body) {
+  padding: 12px 20px 16px;
+}
+
+:global(.file-dialog-shell .el-dialog__footer) {
+  padding: 0 18px 14px;
+  border-top: 1px solid
+    color-mix(in srgb, var(--file-dialog-soft-border, rgba(30, 41, 59, 0.1)) 88%, transparent);
+}
+
+.file-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.file-dialog-file-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px;
+  background: var(--file-dialog-muted-surface);
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--file-dialog-soft-border) 88%, transparent);
+}
+
+.file-dialog-file-info .file-icon {
+  flex-shrink: 0;
+}
+
+.file-dialog-file-info .file-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-dialog-file-info .file-name {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  word-break: break-all;
+}
+
+.file-dialog-file-info .file-path {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  word-break: break-all;
+}
+
+.file-dialog-file-info .file-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.file-dialog-file-info .file-meta .el-tag,
+.file-dialog-path-info .el-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.file-dialog-file-info .file-meta .el-icon,
+.file-dialog-path-info .el-icon {
+  font-size: 12px;
+}
+
+.file-dialog-form-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+}
+
+.file-dialog-form-tip .el-icon {
+  font-size: 14px;
+  color: var(--el-color-info);
+}
+
+.file-dialog-path-preview {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-dialog-path-info {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.file-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 768px) {
+  .file-dialog-shell {
+    width: 90% !important;
+    max-width: 500px;
+  }
+
+  .file-dialog-file-info {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 16px;
+  }
+
+  .file-dialog-footer {
+    flex-direction: column;
+  }
+}

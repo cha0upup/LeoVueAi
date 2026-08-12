@@ -1,0 +1,114 @@
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 36%, transparent);
+  flex-shrink: 0;
+}
+
+.list-title-group {
+  min-width: 0;
+}
+
+.list-kicker {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--el-text-color-placeholder);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.list-title-group h2 {
+  margin: 0;
+  color: var(--el-text-color-primary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.action-add {
+  flex-shrink: 0;
+  margin: 0;
+  border-radius: 6px;
+}
+
+.scope-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px 0;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.scope-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--app-control-background-soft) 70%, transparent);
+  color: var(--el-text-color-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: color var(--motion-fast) var(--motion-easing),
+              border-color var(--motion-fast) var(--motion-easing),
+              background var(--motion-fast) var(--motion-easing);
+}
+
+.scope-tab span,
+.scope-tab-count {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.scope-tab:hover:not(.is-active) {
+  color: var(--el-text-color-primary);
+  background: var(--el-fill-color-light);
+}
+
+.scope-tab.is-active {
+  color: var(--el-color-primary);
+  border-color: color-mix(in srgb, var(--el-color-primary) 28%, transparent);
+  background: var(--app-card-background);
+}
+
+.toolbar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+}
+
+.toolbar-row .search-input {
+  min-width: 0;
+}
+
+.search-input .el-input__wrapper {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 11px;
+  flex-shrink: 0;
+}

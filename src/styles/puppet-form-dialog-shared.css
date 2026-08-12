@@ -1,0 +1,339 @@
+:global(.puppet-dialog) {
+  --dialog-surface-raised: color-mix(
+    in srgb,
+    var(--app-control-background-soft) 88%,
+    var(--el-bg-color-overlay)
+  );
+  --dialog-surface-muted: color-mix(
+    in srgb,
+    var(--app-control-background) 94%,
+    var(--el-bg-color-overlay)
+  );
+  --dialog-border-soft: color-mix(in srgb, var(--el-border-color) 42%, transparent);
+}
+
+:global(.puppet-dialog.el-dialog) {
+  width: min(900px, calc(100vw - 32px));
+  max-height: calc(100vh - 8vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dialog-border-soft);
+  border-radius: 18px;
+  background: var(--app-dialog-background);
+}
+
+:global(.puppet-dialog .el-dialog__header) {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 14px 18px 12px;
+  background: var(--dialog-surface-raised);
+  border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 30%, transparent);
+}
+
+:global(.puppet-dialog .el-dialog__headerbtn) {
+  top: 28px;
+  right: 32px;
+  width: 32px;
+  height: 32px;
+}
+
+:global(.puppet-dialog .el-dialog__body) {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 16px 22px 14px;
+  overflow: hidden;
+}
+
+:global(.puppet-dialog .el-dialog__footer) {
+  flex: 0 0 auto;
+  padding: 12px 22px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--el-border-color) 45%, transparent);
+  background: var(--dialog-surface-raised);
+}
+
+:global(.puppet-dialog .dialog-header-intro) {
+  align-items: center;
+  min-height: 42px;
+  margin-bottom: 0;
+  padding: 0 44px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+:global(.puppet-dialog .dialog-header-intro h3) {
+  margin-bottom: 0;
+  font-size: 17px;
+}
+
+:global(.puppet-dialog .dialog-header-intro .intro-title-row) {
+  align-items: center;
+}
+
+:global(.puppet-dialog .dialog-header-intro .intro-icon) {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+.dialog-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--el-border-color) 72%, transparent);
+  background: var(--app-dialog-intro-background);
+}
+
+.intro-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.intro-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-color-primary);
+  background: color-mix(in srgb, var(--el-color-primary) 12%, var(--app-control-background));
+  border: 1px solid color-mix(in srgb, var(--el-color-primary-light-7) 58%, transparent);
+}
+
+.dialog-intro h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.dialog-intro p {
+  margin: 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.intro-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.intro-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--dialog-surface-muted);
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.host-form {
+  max-height: calc(100vh - 250px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+}
+
+.form-section {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow-x: hidden;
+}
+
+.host-form .el-form-item {
+  margin-bottom: 18px;
+}
+
+.host-form .el-input__wrapper,
+.host-form .el-textarea__inner,
+.host-form .el-select__wrapper,
+.host-form .el-input-number,
+.host-form .el-input-number .el-input__wrapper {
+  border-radius: 14px;
+}
+
+.host-form .el-textarea__inner {
+  min-height: 108px !important;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.form-tip {
+  margin-top: 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.field-label-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.field-help-icon {
+  color: var(--el-text-color-secondary);
+  cursor: help;
+  font-size: 14px;
+}
+
+.option-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.option-icon {
+  font-size: var(--el-font-size-medium);
+  color: var(--el-color-primary);
+}
+
+.headers-textarea {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+}
+
+.form-inline-actions {
+  margin-top: 20px;
+  padding-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--el-border-color) 70%, transparent);
+}
+
+.dialog-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dialog-footer-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-test-result {
+  --pm-green: var(--el-color-success);
+  --pm-red: var(--el-color-danger);
+  --pm-muted: var(--el-text-color-secondary);
+  --pm-ink: var(--el-text-color-primary);
+  --pm-panel-strong: var(--app-card-background);
+  text-align: left;
+}
+
+.test-btn {
+  min-width: 112px;
+  height: 40px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.submit-btn {
+  min-width: 132px;
+  font-size: var(--el-font-size-base);
+  font-weight: 600;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.cancel-btn {
+  font-size: var(--el-font-size-base);
+  font-weight: 600;
+  min-width: 108px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.el-switch {
+  --el-switch-on-color: var(--el-color-primary);
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.section-heading--spaced {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--el-border-color) 45%, transparent);
+}
+
+.section-heading strong {
+  display: block;
+  color: var(--app-text-primary);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.disguise-required-panel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.host-form .el-row {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.host-form .el-col {
+  min-width: 0;
+}
+
+.host-form::-webkit-scrollbar {
+  width: 6px;
+}
+
+.host-form::-webkit-scrollbar-track {
+  background: var(--el-border-color-extra-light);
+  border-radius: var(--el-border-radius-small);
+}
+
+.host-form::-webkit-scrollbar-thumb {
+  background: var(--el-border-color);
+  border-radius: var(--el-border-radius-small);
+}
+
+.host-form::-webkit-scrollbar-thumb:hover {
+  background: var(--el-text-color-secondary);
+}
+
+@media (max-width: 768px) {
+  :global(.puppet-dialog.el-dialog) {
+    width: 95% !important;
+  }
+
+  .dialog-intro {
+    flex-direction: column;
+  }
+
+  .form-inline-actions {
+    flex-direction: column;
+  }
+
+  .dialog-footer-actions {
+    flex-direction: column;
+  }
+
+  .submit-btn,
+  .cancel-btn {
+    width: 100%;
+  }
+}

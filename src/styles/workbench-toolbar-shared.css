@@ -1,0 +1,49 @@
+.toolbar-stats {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.toolbar-stats .toolbar-tag,
+.workbench-type-tag {
+  border: 1px solid
+    var(--workbench-border-soft, color-mix(in srgb, var(--el-border-color) 38%, transparent));
+  background: color-mix(
+    in srgb,
+    var(--workbench-surface-muted, var(--app-control-background)) 78%,
+    white
+  );
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 38%, transparent);
+}
+
+.toolbar-stats .toolbar-tag-info,
+.workbench-type-tag.el-tag--info {
+  background: color-mix(in srgb, var(--el-color-info-light-8) 78%, white);
+  border-color: color-mix(in srgb, var(--el-color-info) 34%, transparent);
+  color: var(--el-color-info-dark-2);
+}
+
+.toolbar-stats .toolbar-tag-success,
+.workbench-type-tag.el-tag--success {
+  background: color-mix(in srgb, var(--el-color-success-light-8) 80%, white);
+  border-color: color-mix(in srgb, var(--el-color-success) 36%, transparent);
+  color: var(--el-color-success-dark-2);
+}
+
+.toolbar-stats .toolbar-tag-primary,
+.workbench-type-tag.el-tag--primary {
+  background: color-mix(in srgb, var(--el-color-primary-light-8) 82%, white);
+  border-color: color-mix(in srgb, var(--el-color-primary) 38%, transparent);
+  color: var(--el-color-primary-dark-2);
+}
+
+.toolbar-stats .toolbar-tag-warning,
+.workbench-type-tag.el-tag--warning {
+  background: color-mix(in srgb, var(--el-color-warning-light-8) 82%, white);
+  border-color: color-mix(in srgb, var(--el-color-warning) 38%, transparent);
+  color: var(--el-color-warning-dark-2);
+}

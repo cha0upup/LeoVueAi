@@ -1,0 +1,52 @@
+.dialog-content {
+  padding: 1.25rem;
+  background: var(--el-bg-color);
+}
+
+.field-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.field-name {
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+  font-size: 0.875rem;
+}
+
+.field-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.field-type {
+  font-size: 0.75rem;
+  color: var(--el-text-color-placeholder);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.required-tag,
+.optional-tag {
+  font-size: 0.6875rem;
+  padding: 0 0.375rem;
+  height: 1.25rem;
+  line-height: 1.25rem;
+}
+
+.form-inline-actions {
+  margin: 1rem 1.5rem 0;
+  padding-bottom: 1rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.submit-btn,
+.cancel-btn {
+  font-size: var(--el-font-size-base);
+  font-weight: 500;
+  min-width: clamp(5rem, 6.25vw, 6.25rem);
+}

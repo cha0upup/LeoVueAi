@@ -1,0 +1,33 @@
+.context-list-card,
+.context-summary-card {
+  border: 1px solid
+    var(--container-soft-border, color-mix(in srgb, var(--el-border-color) 16%, transparent));
+  border-radius: 16px;
+  background: var(--container-strong-surface, var(--el-bg-color-overlay));
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+}
+
+.context-list-card .el-card__body {
+  padding: var(--el-spacing-base);
+  height: calc(100% - 57px);
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(0.9375rem, 1vw, 1rem);
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.card-header .el-icon {
+  font-size: clamp(1rem, 1.125vw, 1.125rem);
+  color: var(--el-text-color-secondary);
+}
+
+.mono-text {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+}

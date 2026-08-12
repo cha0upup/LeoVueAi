@@ -1,0 +1,360 @@
+/*
+ * design-tokens.css —— 功能模块统一视觉语言
+ *
+ * 这里只补充 global.css 之外、用于「模块级布局/交互」的 token。
+ * 字号阶梯、颜色、阴影等基础令牌已在 global.css 定义，请勿在此重复。
+ *
+ * 命名空间：所有 token 以 --module- / --panel- / --list- / --motion- / --z- 等开头，
+ * 避免与 Element Plus（--el-）和 app 全局（--app-）冲突。
+ */
+
+:root {
+  /* ============================================================
+   * 基础语义层：页面、文字、排版与密度
+   * ============================================================ */
+  --app-brand-color: var(--el-color-primary);
+  --app-page-background: var(--el-bg-color-page);
+  --app-container-background: var(--el-bg-color-overlay);
+  --app-hover-background: color-mix(
+    in srgb,
+    var(--el-color-primary) 5%,
+    var(--el-bg-color-overlay)
+  );
+  --app-selected-background: color-mix(
+    in srgb,
+    var(--el-color-primary) 9%,
+    var(--el-bg-color-overlay)
+  );
+  --app-text-primary: var(--el-text-color-primary);
+  --app-text-secondary: var(--el-text-color-regular);
+  --app-text-muted: var(--el-text-color-secondary);
+  --app-text-placeholder: var(--el-text-color-placeholder);
+  --app-divider-color: var(--el-border-color-lighter);
+  --app-border-color: var(--el-border-color);
+
+  --font-size-page-title: 18px;
+  --font-size-section-title: 15px;
+  --font-size-body: 13px;
+  --font-size-label: 12px;
+  --font-size-helper: 12px;
+  --font-size-table: 13px;
+  --font-size-code: 12px;
+  --font-weight-title: 600;
+  --font-weight-medium: 500;
+  --font-family-code: var(--el-font-family-mono);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --control-height-sm: 28px;
+  --control-height: 32px;
+  --control-height-lg: 36px;
+  --table-row-height: 40px;
+  --table-row-height-compact: 36px;
+  --radius-control: 6px;
+  --radius-tag: 4px;
+  --radius-container: 8px;
+  --radius-overlay: 10px;
+  --border-default: 1px solid var(--app-border-color);
+  --shadow-overlay: 0 8px 24px color-mix(in srgb, var(--el-text-color-primary) 10%, transparent);
+
+  /* ============================================================
+   * 模块级布局
+   * ============================================================
+   * 各功能模块（list+detail、tree+editor、form 等）共用的尺寸约定。
+   */
+
+  /* 顶栏（page-toolbar）紧凑高度——容纳 icon + h1 + stats 的最小高度 */
+  --module-header-height: 32px;
+  /* 顶栏与主体的间距 */
+  --module-gap: var(--space-3);
+  /* 模块内边距（home-content 之内） */
+  --module-padding: 0;
+
+  /* ============================================================
+   * 面板（list-panel / detail-panel）
+   * ============================================================ */
+
+  --panel-radius: var(--radius-container);
+  --panel-border-color: var(
+    --workbench-border-soft,
+    color-mix(in srgb, var(--el-border-color) 42%, transparent)
+  );
+  --panel-border: 1px solid var(--panel-border-color);
+  --panel-bg: color-mix(in srgb, var(--app-card-background) 82%, transparent);
+
+  /* 面板内边距（垂直 / 水平），用于 panel-header / toolbar-stack / list-scroll */
+  --panel-padding-y: 10px;
+  --panel-padding-x: 14px;
+
+  /* 面板头部（h2 + 操作按钮） */
+  --panel-header-height: 40px;
+  --panel-header-fs: 13px;
+  --panel-header-fw: 600;
+
+  /* ============================================================
+   * 列表项（skill-item / disguise-item / 等）
+   * ============================================================ */
+
+  --list-item-padding-y: 8px;
+  --list-item-padding-x: 12px;
+  --list-item-gap-vertical: 4px; /* 项间距 */
+  --list-item-gap-horizontal: 10px; /* 项内 icon/main/aside 间距 */
+  --list-item-radius: var(--radius-control);
+  --list-item-icon-size: 28px; /* 项左侧 icon 容器尺寸 */
+  --list-item-icon-radius: var(--radius-control);
+
+  /* 列表项交互态——三态颜色用 mix 让主题切换平滑 */
+  --list-item-hover-border: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-border-color));
+  --list-item-hover-bg: color-mix(in srgb, var(--el-color-primary) 3%, var(--app-card-background));
+  --list-item-active-border: color-mix(in srgb, var(--el-color-primary) 50%, transparent);
+  --list-item-active-bg: color-mix(in srgb, var(--el-color-primary) 7%, var(--app-card-background));
+  --list-item-active-bar: color-mix(in srgb, var(--el-color-primary) 80%, transparent);
+  --list-item-selected-border: color-mix(in srgb, var(--el-color-primary) 40%, transparent);
+  --list-item-selected-bg: color-mix(
+    in srgb,
+    var(--el-color-primary) 5%,
+    var(--app-card-background)
+  );
+
+  /* ============================================================
+   * 详情面板头部（detail-header）
+   * ============================================================ */
+
+  --detail-header-padding-y: 10px;
+  --detail-header-padding-x: 16px;
+  --detail-title-fs: 16px;
+  --detail-title-fw: 600;
+
+  /* ============================================================
+   * 状态指示
+   * ============================================================ */
+
+  /* 禁用项：饱和度 + 透明度同时降低，让禁用态语义更鲜明 */
+  --disabled-opacity: 0.55;
+  --disabled-saturation: 0.4;
+  --disabled-opacity-hover: 0.85;
+  --disabled-saturation-hover: 0.7;
+
+  /* 未保存（dirty）指示色 */
+  --dirty-color: var(--el-color-warning);
+  --dirty-bg: var(--el-color-warning-light-9);
+
+  /* ============================================================
+   * 动效
+   * ============================================================
+   * 三档常用过渡时长。除非有特殊节奏需求，请勿手写时间。
+   */
+  --motion-fast: 0.12s; /* 鼠标 hover 反馈、按钮按下 */
+  --motion-base: 0.18s; /* 一般状态切换 */
+  --motion-slow: 0.24s; /* 折叠/展开等大块切换 */
+  --motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-easing-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ============================================================
+   * 焦点/可访问性
+   * ============================================================ */
+  --focus-outline: 2px solid var(--el-color-primary);
+  --focus-outline-offset: 1px;
+
+  /* ============================================================
+   * 状态语义
+   * ============================================================
+   * primary: 进行中/已配置，success: 成功完成，warning: 需关注或等待，
+   * danger: 失败，info: 未启用、未测试、已取消等中性状态。
+   */
+  --status-primary-color: var(--el-color-primary);
+  --status-primary-bg: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
+  --status-primary-border: color-mix(in srgb, var(--el-color-primary) 24%, var(--el-border-color));
+  --status-success-color: var(--el-color-success);
+  --status-success-bg: color-mix(in srgb, var(--el-color-success) 11%, transparent);
+  --status-success-border: color-mix(in srgb, var(--el-color-success) 26%, var(--el-border-color));
+  --status-warning-color: var(--el-color-warning);
+  --status-warning-bg: color-mix(in srgb, var(--el-color-warning) 12%, transparent);
+  --status-warning-border: color-mix(in srgb, var(--el-color-warning) 28%, var(--el-border-color));
+  --status-danger-color: var(--el-color-danger);
+  --status-danger-bg: color-mix(in srgb, var(--el-color-danger) 11%, transparent);
+  --status-danger-border: color-mix(in srgb, var(--el-color-danger) 26%, var(--el-border-color));
+  --status-info-color: var(--el-text-color-secondary);
+  --status-info-bg: var(--app-control-background-soft);
+  --status-info-border: var(--app-surface-border-subtle);
+
+  /* ============================================================
+   * 层级 z-index
+   * ============================================================
+   * 应用层统一管理，避免各组件随意 z-index: 9999。
+   */
+  --z-base: 1;
+  --z-toolbar: 10;
+  --z-dropdown: 100;
+  --z-sticky-bar: 200; /* 批量操作条等 */
+  --z-overlay: 1000; /* drag-over 蒙层 */
+  --z-dialog: 2000; /* 走 ElementPlus 弹窗 */
+  --z-tooltip: 3000;
+  --z-toast: 4000;
+
+  /* ============================================================
+   * 工具按钮（list 项 hover action / panel icon button）
+   * ============================================================ */
+  --icon-btn-size: 26px;
+  --icon-btn-size-sm: 22px;
+  --icon-btn-radius: 4px;
+  --icon-btn-color: var(--el-text-color-secondary);
+  --icon-btn-bg-hover: var(--el-fill-color);
+  --icon-btn-color-hover: var(--el-color-primary);
+}
+
+/* ============================================================
+ * 动效工具类——直接挂在元素上，省去重复写 transition 声明
+ * ============================================================ */
+
+.u-transition-color {
+  transition:
+    color var(--motion-fast) var(--motion-easing),
+    background-color var(--motion-fast) var(--motion-easing);
+}
+
+.u-transition-border {
+  transition:
+    border-color var(--motion-base) var(--motion-easing),
+    background var(--motion-base) var(--motion-easing);
+}
+
+.u-transition-all {
+  transition: all var(--motion-base) var(--motion-easing);
+}
+
+/* 旋转动画（刷新按钮 loading 等） */
+.u-spin {
+  animation: u-spin 0.9s linear infinite;
+}
+
+@keyframes u-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================
+ * 通用 icon 按钮——不依赖 ElementPlus，扁平化、可访问
+ * ============================================================
+ * 用法：<button class="u-icon-btn">...</button>
+ */
+
+.u-icon-btn {
+  width: var(--icon-btn-size);
+  height: var(--icon-btn-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--icon-btn-radius);
+  background: transparent;
+  color: var(--icon-btn-color);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-easing),
+    color var(--motion-fast) var(--motion-easing);
+}
+
+.u-icon-btn:hover:not(:disabled) {
+  background: var(--icon-btn-bg-hover);
+  color: var(--icon-btn-color-hover);
+}
+
+.u-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.u-icon-btn:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
+.u-icon-btn--sm {
+  width: var(--icon-btn-size-sm);
+  height: var(--icon-btn-size-sm);
+}
+
+.u-icon-btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--el-color-danger) 12%, transparent);
+  color: var(--el-color-danger);
+}
+
+/* ============================================================
+ * 焦点辅助——给 role="button" 的 div 用
+ * ============================================================ */
+
+.u-focusable:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
+/* ============================================================
+ * 禁用态视觉降权——通用类，挂在卡片/列表项根上
+ * ============================================================ */
+
+.u-disabled {
+  opacity: var(--disabled-opacity);
+  filter: saturate(var(--disabled-saturation));
+}
+
+/* ============================================================
+ * 通用状态徽标
+ * ============================================================ */
+
+.status-badge,
+.el-tag.status-badge {
+  --status-badge-color: var(--status-info-color);
+  --status-badge-bg: var(--status-info-bg);
+  --status-badge-border: var(--status-info-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--status-badge-border);
+  background: var(--status-badge-bg);
+  color: var(--status-badge-color);
+  box-shadow: none;
+}
+
+.status-badge--primary {
+  --status-badge-color: var(--status-primary-color);
+  --status-badge-bg: var(--status-primary-bg);
+  --status-badge-border: var(--status-primary-border);
+}
+
+.status-badge--success {
+  --status-badge-color: var(--status-success-color);
+  --status-badge-bg: var(--status-success-bg);
+  --status-badge-border: var(--status-success-border);
+}
+
+.status-badge--warning {
+  --status-badge-color: var(--status-warning-color);
+  --status-badge-bg: var(--status-warning-bg);
+  --status-badge-border: var(--status-warning-border);
+}
+
+.status-badge--danger {
+  --status-badge-color: var(--status-danger-color);
+  --status-badge-bg: var(--status-danger-bg);
+  --status-badge-border: var(--status-danger-border);
+}
+
+.status-badge--info {
+  --status-badge-color: var(--status-info-color);
+  --status-badge-bg: var(--status-info-bg);
+  --status-badge-border: var(--status-info-border);
+}
+
+.u-disabled:hover {
+  opacity: var(--disabled-opacity-hover);
+  filter: saturate(var(--disabled-saturation-hover));
+}

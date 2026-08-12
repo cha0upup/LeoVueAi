@@ -1,0 +1,108 @@
+.search-input {
+  flex: 1;
+  min-width: 220px;
+  max-width: 420px;
+}
+
+.container-table-card {
+  height: 100%;
+  min-height: 0;
+  border: 1px solid
+    var(--container-soft-border, color-mix(in srgb, var(--el-border-color) 12%, transparent));
+  border-radius: 16px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.035);
+  background: var(--container-strong-surface, var(--el-bg-color-overlay));
+}
+
+.container-table-card .el-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.asset-table-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+}
+
+.asset-table {
+  flex: 1;
+  min-height: 0;
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.mono-text {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+}
+
+.text-muted {
+  color: var(--el-text-color-placeholder);
+  font-size: 12px;
+}
+
+.el-table {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.el-table th {
+  background: color-mix(
+    in srgb,
+    var(--container-muted-surface, var(--el-fill-color-light)) 86%,
+    var(--el-bg-color-page)
+  );
+  font-weight: 700;
+  color: var(--el-text-color-primary);
+}
+
+.el-table td {
+  background: transparent;
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td {
+  background: color-mix(
+    in srgb,
+    var(--container-muted-surface, var(--el-fill-color-light)) 72%,
+    transparent
+  );
+}
+
+.asset-table .el-tag {
+  --el-tag-bg-color: var(
+    --container-muted-surface,
+    var(--app-control-background-soft, var(--el-fill-color-lighter))
+  );
+  --el-tag-border-color: transparent;
+  --el-tag-text-color: var(--el-text-color-regular);
+  border-color: transparent;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.asset-table .url-pattern-tag {
+  --el-tag-bg-color: color-mix(
+    in srgb,
+    var(--container-muted-surface, var(--el-fill-color-lighter)) 90%,
+    var(--el-color-primary) 10%
+  );
+  --el-tag-text-color: var(--el-text-color-regular);
+}
+
+.el-button--danger {
+  --el-button-hover-text-color: var(--el-color-danger);
+  --el-button-hover-bg-color: var(--el-color-danger-light-9);
+  --el-button-hover-border-color: var(--el-color-danger-light-7);
+}
