@@ -44,6 +44,14 @@ const TOOL_LABELS = Object.freeze({
   completeplan: '完成执行计划'
 })
 
+/** Internal protocol tools are useful for audit but should stay invisible in the chat timeline. */
+export const isInternalToolNode = node => {
+  return Boolean(node)
+    && node.kind === 'tool'
+    && node.businessTool === false
+    && String(node.toolKind ?? '').toUpperCase() === 'CONTROL'
+}
+
 export function getToolDisplayName(name) {
   const raw = String(name ?? '').trim()
   if (!raw) return '工具调用'

@@ -63,6 +63,7 @@
                   :key="node.id"
                   :node="node"
                   collapse-process
+                  @answer-user-input="answerUserInput"
                 />
               </div>
             </div>
@@ -75,6 +76,7 @@
                 v-for="node in conclusionNodes"
                 :key="node.id"
                 :node="node"
+                @answer-user-input="answerUserInput"
               />
             </div>
           </template>
@@ -83,6 +85,7 @@
               v-for="node in visibleNodes"
               :key="node.id"
               :node="node"
+              @answer-user-input="answerUserInput"
             />
           </template>
         </div>
@@ -231,7 +234,7 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { formatElapsedLabel } from '@/utils/ai.js'
 import { formatRuntimeMs } from '@/utils/aiRuntime.js'
-import { groupConsecutiveToolNodes } from '@/utils/aiProcessPresentation.js'
+import { groupConsecutiveToolNodes, isInternalToolNode } from '@/utils/aiProcessPresentation.js'
 // aiTurnModel node factories are no longer needed here — nodes are built upstream
 import TaskNode from './TaskNode.vue'
 import AiUserInputCard from './AiUserInputCard.vue'
@@ -262,6 +265,7 @@ const hasUserInput = computed(() => nodes.value.some(node => node?.kind === 'use
 const visibleNodes = computed(() => (
   groupConsecutiveToolNodes(nodes.value.filter(node => {
     if (node.kind === 'plan' || node.kind === 'user_input') return false
+    if (isInternalToolNode(node)) return false
     // 问题卡片已经完整表达问题与选项，不再展示模型生成的重复说明。
     return !hasUserInput.value || !['text', 'narration'].includes(node.kind)
   }))
@@ -308,6 +312,7 @@ const processSummary = computed(() => {
   let controlCount = 0
   let contextCount = 0
   const countTool = (node) => {
+    if (isInternalToolNode(node)) return
     if (node.businessTool !== false) toolCount += 1
     else if (node.toolKind === 'CONTROL') controlCount += 1
     else contextCount += 1

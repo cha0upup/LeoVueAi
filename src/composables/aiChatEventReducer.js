@@ -200,10 +200,12 @@ function nodeAdaptSubtaskEvent(msg, data, seq) {
     else if (kind === 'text') nodeAdaptTextSegment(childMsg, eventData, childSeq)
     else if (kind === 'tool') nodeAdaptTool(childMsg, eventData?.toolName ?? 'tool', eventData, childSeq)
     else if (kind === 'plan') node.plan = normalizePlan(eventData, childSeq)
+    else if (kind === 'user_input') nodeAdaptUserInput({ pendingUserInput: null, sending: false, status: 'running' }, childMsg, eventData, childSeq)
   } else if (eventName === 'patch') {
     const kind = eventData?.kind
     if (kind === 'tool') nodeAdaptTool(childMsg, eventData?.toolName ?? 'tool', eventData, childSeq)
     else if (kind === 'plan') node.plan = normalizePlan(eventData, childSeq)
+    else if (kind === 'user_input') nodeAdaptUserInput({ pendingUserInput: null, sending: false, status: 'running' }, childMsg, eventData, childSeq)
   } else if (eventName === 'plan') {
     node.plan = normalizePlan(eventData, childSeq)
   } else if (eventName === 'warn') {

@@ -67,4 +67,40 @@ describe('aiChatEventReducer Puppet AI subtask', () => {
       success: true
     })
   })
+
+  it('keeps delegated child user input inside the subtask children', () => {
+    const state = {
+      messages: [createAssistantMessage()],
+      status: 'running',
+      lastEventSeq: 0,
+      lastHeartbeatAt: null
+    }
+    const reducer = createAiChatEventReducer({
+      ensureState: () => state,
+      getActiveKey: () => 'platform-thread'
+    })
+    const handlers = reducer.makeLogHandlers('platform-thread', 0)
+    handlers.onNode({ kind: 'subtask', subagentInvocationId: 'inv-2', status: 'running' }, 1)
+    handlers.onSubagentEvent({
+      subagentInvocationId: 'inv-2',
+      eventName: 'node',
+      eventData: {
+        kind: 'user_input',
+        questionId: 'question-child-1',
+        prompt: '确认执行删除',
+        status: 'pending',
+        type: 'CONFIRMATION',
+        options: []
+      },
+      childSeq: 2
+    }, 2)
+
+    const subtask = state.messages[0].nodes[0]
+    expect(subtask.children).toHaveLength(1)
+    expect(subtask.children[0]).toMatchObject({
+      kind: 'user_input',
+      questionId: 'question-child-1',
+      status: 'pending'
+    })
+  })
 })

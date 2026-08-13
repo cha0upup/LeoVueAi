@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getToolDisplayName,
   groupConsecutiveToolNodes,
+  isInternalToolNode,
   summarizeToolNode
 } from './aiProcessPresentation.js'
 
@@ -15,6 +16,19 @@ describe('aiProcessPresentation', () => {
     expect(getToolDisplayName('inspectWebRuntime')).toBe('检查 Web Runtime')
     expect(getToolDisplayName('removeWebRuntimeComponent')).toBe('移除 Web Runtime 组件')
     expect(getToolDisplayName('customTool')).toBe('customTool')
+  })
+
+  it('identifies the invisible operation assessment protocol tool', () => {
+    expect(isInternalToolNode({
+      kind: 'tool', name: 'assess_operation', businessTool: false, toolKind: 'CONTROL'
+    })).toBe(true)
+    expect(isInternalToolNode({
+      kind: 'tool', name: 'anything', businessTool: false, toolKind: 'CONTROL'
+    })).toBe(true)
+    expect(isInternalToolNode({ name: 'assess_operation' })).toBe(false)
+    expect(isInternalToolNode({
+      kind: 'tool', name: 'exec', businessTool: false, toolKind: 'COMMAND'
+    })).toBe(false)
   })
 
   it('summarizes common tool results', () => {

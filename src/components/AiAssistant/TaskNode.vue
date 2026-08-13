@@ -91,7 +91,7 @@
       </span>
       <span class="process-main">
         <span class="process-title tool-name">{{ toolDisplayName }}</span>
-        <span class="process-caption">连续 {{ node.children.length }} 次调用</span>
+        <span class="process-caption">连续 {{ visibleChildren.length }} 次调用</span>
       </span>
       <span class="process-status is-success">完成</span>
     </button>
@@ -100,7 +100,7 @@
       class="tool-group-body"
     >
       <TaskNode
-        v-for="child in node.children"
+        v-for="child in visibleChildren"
         :key="child.id"
         :node="child"
         :collapse-process="collapseProcess"
@@ -189,14 +189,15 @@
         {{ node.task }}
       </div>
       <div
-        v-if="node.children?.length"
+        v-if="visibleChildren.length"
         class="subtask-timeline"
       >
         <TaskNode
-          v-for="child in node.children"
+          v-for="child in visibleChildren"
           :key="child.id"
           :node="child"
           :collapse-process="collapseProcess"
+          @answer-user-input="$emit('answer-user-input', $event)"
         />
       </div>
       <div
@@ -206,12 +207,25 @@
       />
     </div>
   </div>
+
+  <!-- 子 Agent 的输入请求先作为状态节点展示；回答路由需要 childThreadId 专用接口。 -->
+  <div
+    v-else-if="node.kind === 'user_input'"
+    class="task-node task-node--subtask-input"
+  >
+    <Icon icon="mdi:shield-alert-outline" />
+    <span>{{ node.type === 'CONFIRMATION' ? '子 Puppet AI 正在等待操作确认' : '子 Puppet AI 正在等待补充信息' }}</span>
+  </div>
 </template>
 
 <script setup>
 import { computed, inject, nextTick, onUnmounted, ref, watch } from 'vue'
 import { renderAssistantMarkdown } from '@/utils/ai.js'
-import { getToolDisplayName, summarizeToolNode } from '@/utils/aiProcessPresentation.js'
+import {
+  getToolDisplayName,
+  isInternalToolNode,
+  summarizeToolNode
+} from '@/utils/aiProcessPresentation.js'
 import { getShellResultApi } from '@/services/api/shell-generator.js'
 import TaskToolDetails from './TaskToolDetails.vue'
 import {
@@ -379,6 +393,8 @@ const props = defineProps({
   }
 })
 
+defineEmits(['answer-user-input'])
+
 // ── Collapsed / expanded state ────────────────────────────────────
 // thinking + tool: closed by default; others open
 const open = ref(getInitialNodeOpenState(props.node.kind))
@@ -460,6 +476,11 @@ const toolStatusLabel = computed(() => getToolStatusLabel(props.node))
 const subtaskPresentation = computed(() => getSubtaskPresentation(props.node.status))
 const subtaskTone = computed(() => subtaskPresentation.value.tone)
 const subtaskStatusLabel = computed(() => subtaskPresentation.value.label)
+const visibleChildren = computed(() => (
+  Array.isArray(props.node.children)
+    ? props.node.children.filter(child => !isInternalToolNode(child))
+    : []
+))
 
 </script>
 

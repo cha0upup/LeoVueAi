@@ -25,7 +25,7 @@ describe('platformAiAssistantModel', () => {
       content: 'final answer',
       timestamp: '2026-07-15T00:00:00Z',
       nodes: [
-        { kind: 'tool', seq: 3, toolCallId: 'tool-1', toolName: 'scan', status: 'running' },
+        { kind: 'tool', seq: 3, toolCallId: 'tool-1', toolName: 'scan', status: 'running', businessTool: false, toolKind: 'CONTEXT' },
         { kind: 'thinking', seq: 1, content: 'think' },
         { kind: 'subtask', seq: 4, subagentInvocationId: 'sub-1', task: 'inspect', status: 'running' },
         { kind: 'text', seq: 2, content: 'answer' },
@@ -35,7 +35,7 @@ describe('platformAiAssistantModel', () => {
     }])
 
     expect(message.nodes.map(node => node.kind)).toEqual(['thinking', 'text', 'tool', 'subtask'])
-    expect(message.nodes[2]).toMatchObject({ status: 'done', success: true, result: 'ok' })
+    expect(message.nodes[2]).toMatchObject({ status: 'done', success: true, result: 'ok', businessTool: false, toolKind: 'CONTEXT' })
     expect(message.nodes[3]).toMatchObject({ status: 'completed', summary: 'done' })
     expect(message.startedAt).toBe(Date.parse('2026-07-15T00:00:00Z'))
   })

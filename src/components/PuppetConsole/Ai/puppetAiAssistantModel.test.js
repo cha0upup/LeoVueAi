@@ -8,12 +8,12 @@ import {
 describe('puppetAiAssistantModel', () => {
   it('rebuilds ordered nodes and merges tool patches by call id', () => {
     const [message] = mapPersistedThreadMessages([{ role: 'assistant', content: 'final answer', timestamp: 1, nodes: [
-      { kind: 'tool', seq: 2, toolCallId: 'c1', toolName: 'exec', status: 'running' },
+      { kind: 'tool', seq: 2, toolCallId: 'c1', toolName: 'exec', status: 'running', businessTool: false, toolKind: 'COMMAND' },
       { kind: 'thinking', seq: 1, content: 'think' },
       { kind: 'tool', seq: 3, toolCallId: 'c1', success: true, resultPreview: 'ok' }
     ] }])
     expect(message.nodes.map(node => node.kind)).toEqual(['thinking', 'tool', 'narration'])
-    expect(message.nodes[1]).toMatchObject({ status: 'done', success: true, result: 'ok' })
+    expect(message.nodes[1]).toMatchObject({ status: 'done', success: true, result: 'ok', businessTool: false, toolKind: 'COMMAND' })
   })
 
   it('does not append the final narration when persisted text segments exist', () => {
