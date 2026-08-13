@@ -3,7 +3,6 @@ import { Icon } from '@iconify/vue'
 
 import App from './App.vue'
 import router from '@/router.js'
-import { setupMonacoEnvironment } from '@/utils/monacoEnvironment.js'
 import { setupElementPlus } from '@/plugins/element-plus.js'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import './assets/global.css'
@@ -13,8 +12,6 @@ import { showError } from '@/utils/messageUtils.js'
 import { createLogger } from '@/utils/logger.js'
 
 const logger = createLogger('Vue')
-
-setupMonacoEnvironment()
 
 const app = createApp(App)
 

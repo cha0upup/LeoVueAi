@@ -3,6 +3,7 @@ import { ROUTE_NAMES, ROUTE_PATHS } from '@/constants/app.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { resolveAuthNavigation } from '@/routerGuards.js'
 import { installChunkLoadRecovery } from '@/utils/chunkLoadRecovery.js'
+import { configureHttpErrorHandling } from '@/services/http.js'
 
 // 路由按需加载，减小首屏包体积
 const Main = () => import('@/views/MainView.vue')
@@ -53,6 +54,12 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+configureHttpErrorHandling({
+  getCurrentRoute: () => router.currentRoute.value,
+  replaceRoute: target => router.replace(target),
+  resetAuth: () => useAuth().resetAuth()
 })
 
 /**

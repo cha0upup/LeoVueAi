@@ -192,7 +192,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, reactive, ref, toRaw, watch } from 'vue'
 
-import * as monaco from 'monaco-editor'
+import { monaco } from '@/utils/monaco.js'
 import { icons } from '@/utils/icons.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'

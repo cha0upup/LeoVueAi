@@ -37,6 +37,12 @@ export default defineConfig({
   },
   plugins: [vue()],
   build: {
+    modulePreload: {
+      resolveDependencies(_filename, deps) {
+        // 编辑器按实际功能入口加载，避免路由和普通页面仅因共享依赖而预取近 4 MB 的 Monaco。
+        return deps.filter(dep => !dep.includes('vendor-editor') && !dep.includes('codicon'))
+      }
+    },
     // Monaco/editor 与导出能力是明确的大型工作台依赖，当前分包已按稳定边界收敛。
     // 保留真实异常空间，避免每次构建都被已知的大型 vendor chunk 噪声淹没。
     chunkSizeWarningLimit: 4200,

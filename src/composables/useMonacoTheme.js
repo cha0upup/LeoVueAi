@@ -1,5 +1,5 @@
 import { computed, toRaw, watch } from 'vue'
-import * as monaco from 'monaco-editor'
+import { monaco } from '@/utils/monaco.js'
 import { useTheme } from '@/stores/theme'
 
 export function useMonacoTheme() {

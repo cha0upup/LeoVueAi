@@ -132,7 +132,7 @@
 import { computed, nextTick, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
-import { getProfileApi, updateProfileApi } from '@/services/api.js'
+import { getProfileApi, updateProfileApi } from '@/services/api/auth.js'
 import { icons } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 

@@ -1,7 +1,5 @@
 import axios from 'axios'
-import { useAuth } from '@/composables/useAuth.js'
 import { ROUTE_PATHS } from '@/constants/app.js'
-import router from '@/router.js'
 import { normalizeHttpError } from './httpError.js'
 import { resolveApiBaseUrl } from './apiBaseUrl.js'
 
@@ -10,13 +8,23 @@ const ERROR_REDIRECT_MAP = {
   403: ROUTE_PATHS.main
 }
 
+let errorNavigation = {
+  getCurrentRoute: () => null,
+  replaceRoute: null,
+  resetAuth: null
+}
+
+export const configureHttpErrorHandling = (handlers = {}) => {
+  errorNavigation = { ...errorNavigation, ...handlers }
+}
+
 const resolveErrorRedirect = (code, payload) => {
   if (code === 403 && payload?.data?.passwordChangeRequired === true) {
     return ROUTE_PATHS.changePassword
   }
   if (code !== 401) return ERROR_REDIRECT_MAP[code]
 
-  const currentRoute = router.currentRoute.value
+  const currentRoute = errorNavigation.getCurrentRoute?.()
   if (!currentRoute?.fullPath || currentRoute.path === ROUTE_PATHS.login) {
     return ROUTE_PATHS.login
   }
@@ -28,17 +36,18 @@ const resolveErrorRedirect = (code, payload) => {
 }
 
 const resetCachedAuth = () => {
-  useAuth().resetAuth()
+  errorNavigation.resetAuth?.()
 }
 
 const redirectForError = (target) => {
   if (!target) return
 
   const targetPath = typeof target === 'string' ? target : target.path
-  if (router.currentRoute.value?.path === targetPath) return
+  if (errorNavigation.getCurrentRoute?.()?.path === targetPath) return
+  if (!errorNavigation.replaceRoute) return
 
   // 鉴权失败属于状态纠正而非用户导航，replace 避免返回键再次进入失效页面。
-  Promise.resolve(router.replace(target)).catch(() => {
+  Promise.resolve(errorNavigation.replaceRoute(target)).catch(() => {
     // 路由切换期间可能已有其他请求完成了相同跳转，忽略重复导航结果。
   })
 }

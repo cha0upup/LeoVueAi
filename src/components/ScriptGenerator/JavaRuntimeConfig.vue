@@ -236,7 +236,7 @@
       <summary>
         <span>
           <strong>高级配置</strong>
-          <small>类名、Servlet API、模块兼容等低频选项</small>
+          <small>{{ advancedConfigDescription }}</small>
         </span>
         <Icon :icon="iconMap.arrowDown" />
       </summary>
@@ -261,6 +261,7 @@
             />
           </el-form-item>
           <el-form-item
+            v-if="showServletNamespace"
             label="Servlet API"
             required
           >
@@ -276,11 +277,11 @@
           </el-form-item>
           <el-form-item
             v-if="selectedInjectorCapability?.supportsUrlPattern !== false"
-            :label="form.protocol === 'websocket' ? 'Endpoint 路径' : 'URL 匹配范围'"
+            :label="routeField.label"
           >
             <el-input
               v-model="form.urlPattern"
-              :placeholder="form.protocol === 'websocket' ? '例如 /leo，不支持通配符' : '默认 /*'"
+              :placeholder="routeField.placeholder"
             />
           </el-form-item>
           <div class="switch-options">
@@ -303,9 +304,13 @@
 import { computed } from 'vue'
 import { icons } from '@/utils/icons.js'
 import {
+  getInjectorRouteField,
+  getInjectorSupportedPackers,
   getPackerCompatibilityWarning,
+  isInjectorPackerCompatible,
   isPackerTargetCompatible,
-  isServletNamespaceCompatible
+  isServletNamespaceCompatible,
+  usesServletNamespace
 } from './scriptGeneratorCompatibility.js'
 
 const iconMap = icons
@@ -347,11 +352,11 @@ const servletNamespaceLabel = namespace => {
   return namespace === 'jakarta' ? 'Jakarta Servlet' : 'Javax Servlet'
 }
 const isPackerCompatible = packer => {
-  const supported = selectedInjectorCapability.value?.supportedPackers
-  const injectorAllowsPacker = !Array.isArray(supported)
-    || (supported.length === 0 && packer !== 'AgentJarBase64')
-    || supported.includes(packer)
-  return injectorAllowsPacker && isPackerTargetCompatible(
+  return isInjectorPackerCompatible(
+    selectedInjectorCapability.value,
+    form.value.serverVersion,
+    packer
+  ) && isPackerTargetCompatible(
     props.packerCompatibility?.[packer], form.value.targetJavaVersion
   )
 }
@@ -399,6 +404,18 @@ const selectedInjectorCapability = computed(() => props.injectorCapabilities.fin
     && item?.protocol === form.value.protocol
     && item?.injectorName === form.value.shellType
 ))
+const selectedInjectorPackers = computed(() => getInjectorSupportedPackers(
+  selectedInjectorCapability.value,
+  form.value.serverVersion
+))
+const showServletNamespace = computed(() => usesServletNamespace(selectedInjectorCapability.value))
+const advancedConfigDescription = computed(() => showServletNamespace.value
+  ? '类名、Servlet API、模块兼容等低频选项'
+  : '类名、模块兼容等低频选项')
+const routeField = computed(() => getInjectorRouteField(
+  selectedInjectorCapability.value,
+  form.value.protocol
+))
 const isInjectorNamespaceCompatible = namespace => {
   const resolved = namespace === 'auto' ? 'javax' : namespace
   const supported = selectedInjectorCapability.value?.servletNamespaces
@@ -411,7 +428,7 @@ const handleInjectorChange = () => {
   } else if (!Array.isArray(versions) || !versions.includes(form.value.serverVersion)) {
     form.value.serverVersion = versions?.length === 1 ? versions[0] : ''
   }
-  const supportedPackers = selectedInjectorCapability.value?.supportedPackers
+  const supportedPackers = selectedInjectorPackers.value
   if (Array.isArray(supportedPackers) && supportedPackers.length > 0
       && !supportedPackers.includes(form.value.packerType)) {
     form.value.packerType = supportedPackers.length === 1 ? supportedPackers[0] : ''

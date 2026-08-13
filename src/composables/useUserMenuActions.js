@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 
 import { DEFAULT_USERNAME, MAIN_TAB_STORAGE_KEYS, ROUTE_PATHS } from '@/constants/app.js'
-import { logoutApi } from '@/services/api.js'
+import { logoutApi } from '@/services/api/auth.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'

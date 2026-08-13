@@ -124,7 +124,7 @@ import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
 import { icons } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
 import { validateForm, handleFormSubmit, resetForm as resetFormUtil } from '@/utils/formUtils.js'
-import { changePasswordApi } from '@/services/api.js'
+import { changePasswordApi } from '@/services/api/auth.js'
 
 const dialog = useDialog()
 const changePasswordVisible = dialog.visible

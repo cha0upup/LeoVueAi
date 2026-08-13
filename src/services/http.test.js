@@ -27,24 +27,18 @@ vi.mock('axios', () => ({
   }
 }))
 
-vi.mock('@/router.js', () => ({
-  default: {
-    currentRoute: mocks.currentRoute,
-    replace: mocks.replace
-  }
-}))
-
-vi.mock('@/composables/useAuth.js', () => ({
-  useAuth: () => ({ resetAuth: mocks.resetAuth })
-}))
-
 vi.mock('./apiBaseUrl.js', () => ({
   resolveApiBaseUrl: () => 'http://localhost'
 }))
 
 globalThis.window = { location: { origin: 'http://localhost' } }
 
-await import('./http.js')
+const { configureHttpErrorHandling } = await import('./http.js')
+configureHttpErrorHandling({
+  getCurrentRoute: () => mocks.currentRoute.value,
+  replaceRoute: mocks.replace,
+  resetAuth: mocks.resetAuth
+})
 
 describe('HTTP response redirect handling', () => {
   beforeEach(() => {

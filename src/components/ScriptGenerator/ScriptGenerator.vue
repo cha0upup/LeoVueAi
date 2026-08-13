@@ -47,7 +47,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRaw, watch } from 'vue'
 
-import * as monaco from 'monaco-editor'
+import { monaco } from '@/utils/monaco.js'
 import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
@@ -78,8 +78,12 @@ import {
   snapshotBuildForm
 } from './scriptGeneratorBuildModel.js'
 import {
+  getInjectorRouteField,
+  getInjectorSupportedPackers,
+  isInjectorPackerCompatible,
   isPackerTargetCompatible,
-  isServletNamespaceCompatible
+  isServletNamespaceCompatible,
+  usesServletNamespace
 } from './scriptGeneratorCompatibility.js'
 import {
   filterPackerTypesStructure,
@@ -231,11 +235,19 @@ const injectorServerVersionCompatible = computed(() => {
     && capability.serverVersions.includes(form.serverVersion)
 })
 const injectorPackerCompatible = computed(() => {
-  const supported = selectedInjectorCapability.value?.supportedPackers
-  return (!Array.isArray(supported)
-    || (supported.length === 0 && form.packerType !== 'AgentJarBase64')
-    || supported.includes(form.packerType)
+  return isInjectorPackerCompatible(
+    selectedInjectorCapability.value,
+    form.serverVersion,
+    form.packerType
   )
+})
+const showServletNamespace = computed(() => usesServletNamespace(selectedInjectorCapability.value))
+const routeField = computed(() => getInjectorRouteField(selectedInjectorCapability.value, form.protocol))
+const configuredRouteValue = computed(() => {
+  if (selectedInjectorCapability.value?.mountType === 'dubbo-service' && form.urlPattern === '/*') {
+    return '自动生成'
+  }
+  return form.urlPattern || selectedInjectorCapability.value?.defaultUrlPattern || '-'
 })
 
 const memorySelectionCompatible = computed(() => {
@@ -291,8 +303,16 @@ const configSummary = computed(() => {
       ...(selectedInjectorCapability.value?.requiresServerVersion
         ? [{ label: '宿主版本', value: form.serverVersion || '-' }]
         : []),
+      ...(selectedInjectorCapability.value?.mountLabel
+        ? [{ label: '挂载类型', value: selectedInjectorCapability.value.mountLabel }]
+        : []),
       { label: 'Packer', value: form.packerType || '-' },
-      { label: 'Servlet API', value: form.servletNamespace || 'auto' },
+      ...(showServletNamespace.value
+        ? [{ label: 'Servlet API', value: form.servletNamespace || 'auto' }]
+        : []),
+      ...(selectedInjectorCapability.value?.supportsUrlPattern !== false
+        ? [{ label: routeField.value.label, value: configuredRouteValue.value }]
+        : []),
       { label: 'Lambda 后缀', value: form.lambdaSuffix ? '开启' : '关闭' },
       ...(selectedInjectorCapability.value?.supportsStaticInitialize === false
         ? []
@@ -354,9 +374,17 @@ const resultMeta = computed(() => {
       ? [{ label: '宿主版本', value: memoryMetadata.value?.serverVersion || form.serverVersion }]
       : []),
     { label: '注入器', value: memoryMetadata.value?.shellType || form.shellType || '-' },
+    ...(selectedInjectorCapability.value?.mountLabel
+      ? [{ label: '挂载类型', value: selectedInjectorCapability.value.mountLabel }]
+      : []),
     { label: 'Packer', value: memoryMetadata.value?.packerType || form.packerType || '-' },
     { label: '目标 JDK', value: memoryMetadata.value?.targetJavaVersion || form.targetJavaVersion || 'auto' },
-    { label: 'Servlet API', value: memoryMetadata.value?.servletNamespace || form.servletNamespace || 'javax' },
+    ...(showServletNamespace.value
+      ? [{ label: 'Servlet API', value: memoryMetadata.value?.servletNamespace || form.servletNamespace || 'javax' }]
+      : []),
+    ...(selectedInjectorCapability.value?.supportsUrlPattern !== false
+      ? [{ label: routeField.value.label, value: memoryMetadata.value?.urlPattern || form.urlPattern || '-' }]
+      : []),
     { label: '模块兼容', value: memoryMetadata.value?.byPassJavaModule ? '开启' : '关闭' },
     { label: 'Lambda 后缀', value: memoryMetadata.value?.lambdaSuffix ? '开启' : '关闭' },
     { label: '静态初始化', value: memoryMetadata.value?.staticInitialize ? '开启' : '关闭' },
@@ -580,10 +608,11 @@ const reconcileInjectorCapability = () => {
       ? capability.serverVersions[0]
       : ''
   }
-  if (Array.isArray(capability.supportedPackers)
-      && capability.supportedPackers.length === 1
-      && !capability.supportedPackers.includes(form.packerType)) {
-    form.packerType = capability.supportedPackers[0]
+  const supportedPackers = getInjectorSupportedPackers(capability, form.serverVersion)
+  if (Array.isArray(supportedPackers)
+      && supportedPackers.length > 0
+      && !supportedPackers.includes(form.packerType)) {
+    form.packerType = supportedPackers.length === 1 ? supportedPackers[0] : ''
   }
 }
 
@@ -804,6 +833,7 @@ const handleKeydown = (e) => {
 
 watch(() => form.protocol, handleProtocolChange)
 watch(selectedInjectorCapability, reconcileInjectorCapability)
+watch(() => form.serverVersion, reconcileInjectorCapability)
 watch(
   [protocolServerInjectorTypes, packerTypesFlat],
   reconcileMemorySelections,

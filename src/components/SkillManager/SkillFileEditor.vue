@@ -164,7 +164,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, toRaw, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import * as monaco from 'monaco-editor'
+import { monaco } from '@/utils/monaco.js'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { icons } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'

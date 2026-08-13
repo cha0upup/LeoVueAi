@@ -5,6 +5,8 @@
     :class="{ active: platformAiDrawer }"
     :title="aiAvailable ? '平台 AI' : (aiUnavailableReason || '平台 AI（未配置）')"
     aria-label="打开平台 AI"
+    @mouseenter="warmPlatformAiAssistant"
+    @focus="warmPlatformAiAssistant"
     @click="onPlatformAiClick"
   >
     <Icon
@@ -48,6 +50,10 @@ import { icons } from '@/utils/icons.js'
 const PlatformAiAssistant = defineAsyncComponent(
   () => import('@/components/PlatformAi/PlatformAiAssistant.vue')
 )
+
+const warmPlatformAiAssistant = () => {
+  if (aiAvailable.value) import('@/components/PlatformAi/PlatformAiAssistant.vue')
+}
 
 const iconMap = icons
 const platformAiDrawer = ref(false)

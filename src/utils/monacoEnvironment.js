@@ -1,10 +1,22 @@
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
-import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
-import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
-import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
-import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
+import editorWorkerUrl from 'monaco-editor/esm/vs/editor/editor.worker?worker&url'
+import jsonWorkerUrl from 'monaco-editor/esm/vs/language/json/json.worker?worker&url'
+import cssWorkerUrl from 'monaco-editor/esm/vs/language/css/css.worker?worker&url'
+import htmlWorkerUrl from 'monaco-editor/esm/vs/language/html/html.worker?worker&url'
+import tsWorkerUrl from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker&url'
 
 let configured = false
+
+const workerUrlByLabel = {
+  json: jsonWorkerUrl,
+  css: cssWorkerUrl,
+  scss: cssWorkerUrl,
+  less: cssWorkerUrl,
+  html: htmlWorkerUrl,
+  handlebars: htmlWorkerUrl,
+  razor: htmlWorkerUrl,
+  typescript: tsWorkerUrl,
+  javascript: tsWorkerUrl
+}
 
 export function setupMonacoEnvironment() {
   if (configured) {
@@ -13,23 +25,10 @@ export function setupMonacoEnvironment() {
 
   globalThis.MonacoEnvironment = {
     getWorker(_, label) {
-      if (label === 'json') {
-        return new jsonWorker()
-      }
-
-      if (label === 'css' || label === 'scss' || label === 'less') {
-        return new cssWorker()
-      }
-
-      if (label === 'html' || label === 'handlebars' || label === 'razor') {
-        return new htmlWorker()
-      }
-
-      if (label === 'typescript' || label === 'javascript') {
-        return new tsWorker()
-      }
-
-      return new editorWorker()
+      return new globalThis.Worker(workerUrlByLabel[label] || editorWorkerUrl, {
+        name: `monaco-${label || 'editor'}`,
+        type: 'module'
+      })
     }
   }
 

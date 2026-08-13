@@ -1,5 +1,5 @@
 import { toRaw } from 'vue'
-import * as monaco from 'monaco-editor'
+import { monaco } from '@/utils/monaco.js'
 
 export function useMonacoEditorInstance() {
   const disposeEditorInstance = (editorRef, { disposeModel = false } = {}) => {

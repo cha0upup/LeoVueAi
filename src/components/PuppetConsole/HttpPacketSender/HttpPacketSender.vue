@@ -317,7 +317,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import * as monaco from 'monaco-editor'
+import { monaco } from '@/utils/monaco.js'
 import { sendRawHttpApi, startFuzzApi, queryFuzzApi, stopFuzzApi } from '@/services/api.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
