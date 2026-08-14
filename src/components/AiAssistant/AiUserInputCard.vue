@@ -122,7 +122,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['answer'])
-const customAnswerOpen = ref(false)
+// 澄清问题直接展示输入框；确认问题由 canUseCustomAnswer 自动隐藏。
+const customAnswerOpen = ref(true)
 const customAnswer = ref('')
 
 const confirmation = computed(() => props.request?.type === 'CONFIRMATION')
@@ -230,6 +231,10 @@ function cancelCustom() {
   color: var(--el-text-color-secondary);
   font-size: 12px;
   line-height: 1.55;
+}
+
+.user-input-card__action {
+  white-space: pre-line;
 }
 
 .user-input-card__options {
