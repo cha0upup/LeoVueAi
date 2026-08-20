@@ -164,82 +164,82 @@
       <div class="code-grid">
         <article class="code-panel">
           <div class="panel-header panel-header-with-actions">
-            <span>encodeBody</span>
+            <span>trafficEncodeBody</span>
             <div class="code-actions">
               <span>Java</span>
               <button
                 type="button"
                 class="panel-tool-btn"
-                :disabled="!disguise.encodeBody"
-                title="复制 encodeBody"
-                @click="copyText(disguise.encodeBody, 'encodeBody 已复制')"
+                :disabled="!disguise.trafficEncodeBody"
+                title="复制 trafficEncodeBody"
+                @click="copyText(disguise.trafficEncodeBody, 'trafficEncodeBody 已复制')"
               >
                 <el-icon><Icon :icon="iconMap.copy" /></el-icon>
               </button>
             </div>
           </div>
-          <pre><code>{{ disguise.encodeBody || '暂无代码' }}</code></pre>
+          <pre><code>{{ disguise.trafficEncodeBody || '暂无代码' }}</code></pre>
         </article>
 
         <article class="code-panel">
           <div class="panel-header panel-header-with-actions">
-            <span>decodeBody</span>
+            <span>trafficDecodeBody</span>
             <div class="code-actions">
               <span>Java</span>
               <button
                 type="button"
                 class="panel-tool-btn"
-                :disabled="!disguise.decodeBody"
-                title="复制 decodeBody"
-                @click="copyText(disguise.decodeBody, 'decodeBody 已复制')"
+                :disabled="!disguise.trafficDecodeBody"
+                title="复制 trafficDecodeBody"
+                @click="copyText(disguise.trafficDecodeBody, 'trafficDecodeBody 已复制')"
               >
                 <el-icon><Icon :icon="iconMap.copy" /></el-icon>
               </button>
             </div>
           </div>
-          <pre><code>{{ disguise.decodeBody || '暂无代码' }}</code></pre>
+          <pre><code>{{ disguise.trafficDecodeBody || '暂无代码' }}</code></pre>
         </article>
 
         <article
-          v-if="disguise.phpEncodeBody"
+          v-if="disguise.phpTrafficEncodeBody"
           class="code-panel"
         >
           <div class="panel-header panel-header-with-actions">
-            <span>phpEncodeBody</span>
+            <span>phpTrafficEncodeBody</span>
             <div class="code-actions">
               <span>PHP</span>
               <button
                 type="button"
                 class="panel-tool-btn"
-                title="复制 phpEncodeBody"
-                @click="copyText(disguise.phpEncodeBody, 'phpEncodeBody 已复制')"
+                title="复制 phpTrafficEncodeBody"
+                @click="copyText(disguise.phpTrafficEncodeBody, 'phpTrafficEncodeBody 已复制')"
               >
                 <el-icon><Icon :icon="iconMap.copy" /></el-icon>
               </button>
             </div>
           </div>
-          <pre><code>{{ disguise.phpEncodeBody }}</code></pre>
+          <pre><code>{{ disguise.phpTrafficEncodeBody }}</code></pre>
         </article>
 
         <article
-          v-if="disguise.phpDecodeBody"
+          v-if="disguise.phpTrafficDecodeBody"
           class="code-panel"
         >
           <div class="panel-header panel-header-with-actions">
-            <span>phpDecodeBody</span>
+            <span>phpTrafficDecodeBody</span>
             <div class="code-actions">
               <span>PHP</span>
               <button
                 type="button"
                 class="panel-tool-btn"
-                title="复制 phpDecodeBody"
-                @click="copyText(disguise.phpDecodeBody, 'phpDecodeBody 已复制')"
+                title="复制 phpTrafficDecodeBody"
+                @click="copyText(disguise.phpTrafficDecodeBody, 'phpTrafficDecodeBody 已复制')"
               >
                 <el-icon><Icon :icon="iconMap.copy" /></el-icon>
               </button>
             </div>
           </div>
-          <pre><code>{{ disguise.phpDecodeBody }}</code></pre>
+          <pre><code>{{ disguise.phpTrafficDecodeBody }}</code></pre>
         </article>
       </div>
     </div>

@@ -88,8 +88,8 @@
             <div class="code-panel-header">
               <span
                 class="code-title"
-                title="完整 Java 方法，输入 HashMap params，返回 byte[]"
-              >encodeBody</span>
+                title="完整 Java 方法，输入不透明 byte[]，返回包装后的 byte[]"
+              >trafficEncodeBody</span>
             </div>
             <div
               ref="encodeEditorContainer"
@@ -101,8 +101,8 @@
             <div class="code-panel-header">
               <span
                 class="code-title"
-                title="完整 Java 方法，输入 byte[] data，返回 HashMap"
-              >decodeBody</span>
+                title="完整 Java 方法，输入包装后的 byte[]，返回原始 byte[]"
+              >trafficDecodeBody</span>
             </div>
             <div
               ref="decodeEditorContainer"
@@ -115,14 +115,14 @@
             class="code-panel"
           >
             <div class="code-panel-header">
-              <span class="code-title">phpEncodeBody</span>
+              <span class="code-title">phpTrafficEncodeBody</span>
             </div>
             <el-input
-              v-model="formData.phpEncodeBody"
+              v-model="formData.phpTrafficEncodeBody"
               class="php-source-input"
               type="textarea"
               resize="none"
-              placeholder="函数体：接收 $payload，返回字符串"
+              placeholder="函数体：接收不透明 $payload，返回包装后的字符串"
             />
           </div>
 
@@ -131,21 +131,20 @@
             class="code-panel"
           >
             <div class="code-panel-header">
-              <span class="code-title">phpDecodeBody</span>
+              <span class="code-title">phpTrafficDecodeBody</span>
             </div>
             <el-input
-              v-model="formData.phpDecodeBody"
+              v-model="formData.phpTrafficDecodeBody"
               class="php-source-input"
               type="textarea"
               resize="none"
-              placeholder="函数体：接收 $body，返回数组"
+              placeholder="函数体：接收包装后的 $body，返回不透明字节"
             />
           </div>
         </div>
 
         <DisguisePreviewPanel
           v-show="activeTab === 'test'"
-          v-model:params-text="previewParamsText"
           :loading="previewLoading"
           :result="previewResult"
           :runtime-result="runtimeValidationResult"
@@ -207,8 +206,8 @@ import DisguisePreviewPanel from './DisguisePreviewPanel.vue'
 import DisguiseTemplatePicker from './DisguiseTemplatePicker.vue'
 import {
   DEFAULT_DISGUISE_HEADERS,
-  DEFAULT_PHP_DECODE,
-  DEFAULT_PHP_ENCODE,
+  DEFAULT_PHP_TRAFFIC_DECODE,
+  DEFAULT_PHP_TRAFFIC_ENCODE,
   applyDisguiseTemplate,
   buildDisguisePayload,
   buildDisguisePreviewPayload,
@@ -290,7 +289,6 @@ const previewLoading = ref(false)
 const previewResult = ref(null)
 const runtimeValidationResult = ref(null)
 const previewError = ref('')
-const previewParamsText = ref('{"testKey":"hello_world","sessionId":"preview"}')
 let previewRequestSequence = 0
 
 function switchToTestTab() {
@@ -298,23 +296,21 @@ function switchToTestTab() {
 }
 
 async function runPreview() {
-  if (!formData.encodeBody?.trim() || !formData.decodeBody?.trim()) return
+  if (!formData.trafficEncodeBody?.trim() || !formData.trafficDecodeBody?.trim()) return
   const requestSequence = ++previewRequestSequence
   const formSnapshot = snapshotForm()
-  const paramsSnapshot = previewParamsText.value
   const isCurrentPreview = () =>
     requestSequence === previewRequestSequence &&
-    formSnapshot === snapshotForm() &&
-    paramsSnapshot === previewParamsText.value
-  const payload = buildDisguisePreviewPayload(formData, previewParamsText.value)
+    formSnapshot === snapshotForm()
+  const payload = buildDisguisePreviewPayload(formData)
   const runtimePayload = phpEnabled.value
     ? {
         ...payload,
-        schemaVersion: 2,
-        protocolVersion: 2,
+        schemaVersion: formData.schemaVersion,
+        protocolVersion: formData.protocolVersion,
         supportedRuntimes: normalizeDisguiseRuntimes(formData.supportedRuntimes),
-        phpEncodeBody: formData.phpEncodeBody,
-        phpDecodeBody: formData.phpDecodeBody
+        phpTrafficEncodeBody: formData.phpTrafficEncodeBody,
+        phpTrafficDecodeBody: formData.phpTrafficDecodeBody
       }
     : null
   previewLoading.value = true
@@ -351,10 +347,8 @@ const phpEnabled = computed(() => formData.supportedRuntimes.includes('php'))
 
 watch(phpEnabled, (enabled) => {
   if (!enabled) return
-  if (!formData.phpEncodeBody) formData.phpEncodeBody = DEFAULT_PHP_ENCODE
-  if (!formData.phpDecodeBody) formData.phpDecodeBody = DEFAULT_PHP_DECODE
-  formData.schemaVersion = 2
-  formData.protocolVersion = 2
+  if (!formData.phpTrafficEncodeBody) formData.phpTrafficEncodeBody = DEFAULT_PHP_TRAFFIC_ENCODE
+  if (!formData.phpTrafficDecodeBody) formData.phpTrafficDecodeBody = DEFAULT_PHP_TRAFFIC_DECODE
 })
 
 function snapshotForm() {
@@ -365,13 +359,13 @@ function snapshotForm() {
     headersText: formData.headersText,
     description: formData.description,
     remark: formData.remark,
-    encodeBody: formData.encodeBody,
-    decodeBody: formData.decodeBody,
+    trafficEncodeBody: formData.trafficEncodeBody,
+    trafficDecodeBody: formData.trafficDecodeBody,
     schemaVersion: formData.schemaVersion,
     protocolVersion: formData.protocolVersion,
     supportedRuntimes: [...formData.supportedRuntimes],
-    phpEncodeBody: formData.phpEncodeBody,
-    phpDecodeBody: formData.phpDecodeBody
+    phpTrafficEncodeBody: formData.phpTrafficEncodeBody,
+    phpTrafficDecodeBody: formData.phpTrafficDecodeBody
   })
 }
 
@@ -447,19 +441,19 @@ function initEditors() {
 
   encodeEditor.value = monaco.editor.create(
     toRaw(encodeEditorContainer.value),
-    createEditorOptions(formData.encodeBody)
+    createEditorOptions(formData.trafficEncodeBody)
   )
   decodeEditor.value = monaco.editor.create(
     toRaw(decodeEditorContainer.value),
-    createEditorOptions(formData.decodeBody)
+    createEditorOptions(formData.trafficDecodeBody)
   )
 
   toRaw(encodeEditor.value).onDidChangeModelContent(() => {
-    formData.encodeBody = toRaw(encodeEditor.value).getValue()
+    formData.trafficEncodeBody = toRaw(encodeEditor.value).getValue()
   })
 
   toRaw(decodeEditor.value).onDidChangeModelContent(() => {
-    formData.decodeBody = toRaw(decodeEditor.value).getValue()
+    formData.trafficDecodeBody = toRaw(decodeEditor.value).getValue()
   })
 }
 
@@ -480,10 +474,10 @@ function createEditorOptions(value) {
 
 function syncEditors() {
   if (encodeEditor.value) {
-    toRaw(encodeEditor.value).setValue(formData.encodeBody)
+    toRaw(encodeEditor.value).setValue(formData.trafficEncodeBody)
   }
   if (decodeEditor.value) {
-    toRaw(decodeEditor.value).setValue(formData.decodeBody)
+    toRaw(decodeEditor.value).setValue(formData.trafficDecodeBody)
   }
 }
 
@@ -501,20 +495,20 @@ function insertHeaderExample() {
 
 function handleSubmit() {
   if (props.loading) return
-  formData.encodeBody = encodeEditor.value
+  formData.trafficEncodeBody = encodeEditor.value
     ? toRaw(encodeEditor.value).getValue()
-    : formData.encodeBody
-  formData.decodeBody = decodeEditor.value
+    : formData.trafficEncodeBody
+  formData.trafficDecodeBody = decodeEditor.value
     ? toRaw(decodeEditor.value).getValue()
-    : formData.decodeBody
+    : formData.trafficDecodeBody
 
-  if (!formData.encodeBody.trim() || !formData.decodeBody.trim()) {
-    showWarning('encodeBody 和 decodeBody 不能为空')
+  if (!formData.trafficEncodeBody.trim() || !formData.trafficDecodeBody.trim()) {
+    showWarning('trafficEncodeBody 和 trafficDecodeBody 不能为空')
     return
   }
 
-  if (phpEnabled.value && (!formData.phpEncodeBody.trim() || !formData.phpDecodeBody.trim())) {
-    showWarning('PHP encode/decode 函数体需要同时填写')
+  if (phpEnabled.value && (!formData.phpTrafficEncodeBody.trim() || !formData.phpTrafficDecodeBody.trim())) {
+    showWarning('PHP traffic 编解码函数体需要同时填写')
     return
   }
 

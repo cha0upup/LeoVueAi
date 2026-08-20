@@ -15,7 +15,8 @@ export function createPuppetDialogRules(options = {}) {
     nameRequiredMessage = '请输入主机名称',
     connLinkPattern = null,
     connLinkPatternMessage = '请输入有效的连接地址',
-    requireDisguises = false
+    requireDisguises = false,
+    requirePayloadKeyForJava = null
   } = options
 
   const nameRules =
@@ -49,6 +50,19 @@ export function createPuppetDialogRules(options = {}) {
   if (requireDisguises) {
     rules.reqDisguiseId = [{ required: true, message: '请选择请求伪装', trigger: 'change' }]
     rules.respDisguiseId = [{ required: true, message: '请选择响应伪装', trigger: 'change' }]
+  }
+
+  if (requirePayloadKeyForJava) {
+    rules.payloadKey = [{
+      validator: (rule, value, callback) => {
+        if (requirePayloadKeyForJava() && !String(value || '').trim()) {
+          callback(new Error('请输入 Java 节点 AES 密钥'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur'
+    }]
   }
 
   return rules

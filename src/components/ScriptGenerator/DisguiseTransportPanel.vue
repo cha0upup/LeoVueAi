@@ -50,18 +50,45 @@
           :max="599"
         />
       </el-form-item>
+      <el-form-item
+        label="PayloadCodec AES 密钥"
+        required
+      >
+        <el-input
+          v-model="form.payloadKey"
+          clearable
+          placeholder="请输入用户自定义 AES 密钥"
+        >
+          <template #append>
+            <el-button
+              class="payload-key-random-btn"
+              title="生成随机 AES 密钥"
+              aria-label="生成随机 AES 密钥"
+              @click="form.payloadKey = generatePayloadKey()"
+            >
+              <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
+            </el-button>
+          </template>
+        </el-input>
+      </el-form-item>
     </div>
   </section>
 </template>
 
 <script setup>
+import { icons } from '@/utils/icons.js'
+import { generatePayloadKey } from '@/utils/payloadKey.js'
+
 const form = defineModel('form', { type: Object, required: true })
 defineProps({ disguises: { type: Array, default: () => [] } })
+
+const iconMap = icons
 </script>
 
 <style scoped>
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 10px; }
 .group-heading { margin-bottom: 9px; }
 .group-heading strong { color: var(--sg-ink); font-size: 12px; }
+.payload-key-random-btn { width: 32px; padding: 0; }
 @media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }
 </style>

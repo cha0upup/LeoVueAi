@@ -7,10 +7,13 @@ export function isScriptGeneratorFormValid(form) {
     const outputMode = form.phpOutputMode || 'compact'
     return Boolean(
       form.respCode &&
+      Boolean(String(form.payloadKey || '').trim()) &&
       ['compact', 'packed', 'portable'].includes(outputMode) &&
       Boolean(headerName) === Boolean(headerValue)
     )
   }
+
+  if (!String(form.payloadKey || '').trim()) return false
 
   if (form.generateType === 'webshell') {
     const requiresProtocol = form.shellType === 'JSP' || form.shellType === 'JSPX'

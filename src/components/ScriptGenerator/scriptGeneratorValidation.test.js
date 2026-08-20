@@ -6,8 +6,11 @@ const base = {
   generateType: 'webshell',
   reqDisguiseId: 'request',
   respDisguiseId: 'response',
+  payloadKey: 'test-key',
   shellType: 'JSP',
   protocol: 'http',
+  headerName: 'X-Key',
+  headerValue: 'secret',
   respCode: 200
 }
 
@@ -21,6 +24,10 @@ describe('isScriptGeneratorFormValid', () => {
 
   it('requires protocol for JSP and JSPX', () => {
     expect(isScriptGeneratorFormValid({ ...base, protocol: '' })).toBe(false)
+  })
+
+  it('requires an AES key for Java generation', () => {
+    expect(isScriptGeneratorFormValid({ ...base, payloadKey: ' ' })).toBe(false)
   })
 
   it('requires all HTTP memory-shell trigger fields', () => {
@@ -62,5 +69,6 @@ describe('isScriptGeneratorFormValid', () => {
     expect(isScriptGeneratorFormValid({ ...php, phpOutputMode: 'unknown' })).toBe(false)
     expect(isScriptGeneratorFormValid({ ...php, headerName: 'X-Key', headerValue: '' })).toBe(false)
     expect(isScriptGeneratorFormValid({ ...php, headerName: 'X-Key', headerValue: 'token' })).toBe(true)
+    expect(isScriptGeneratorFormValid({ ...php, payloadKey: ' ' })).toBe(false)
   })
 })

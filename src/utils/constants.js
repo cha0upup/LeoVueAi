@@ -45,6 +45,7 @@ const DEFAULT_PUPPET = {
   connLink: '',
   reqDisguiseId: '',
   respDisguiseId: '',
+  payloadKey: '',
   headers: '',
   permission: 'private',
   proxyEnabled: 0,

@@ -12,6 +12,7 @@ describe('script generator build model', () => {
     const form = { ...createScriptGeneratorForm(), runtime: 'php', shellType: 'PHP', phpOutputMode: 'packed' }
     form.reqDisguiseId = 'req'
     form.respDisguiseId = 'resp'
+    form.payloadKey = 'php-secret'
     form.headerName = ' X-Key '
     form.headerValue = ' token '
 
@@ -20,7 +21,7 @@ describe('script generator build model', () => {
     expect(request.resultKey).toBe('content')
     expect(request.params).toMatchObject({
       runtime: 'php', artifactType: 'webshell', outputMode: 'packed',
-      headerName: 'X-Key', headerValue: 'token'
+      headerName: 'X-Key', headerValue: 'token', payloadKey: 'php-secret'
     })
   })
 
@@ -28,12 +29,17 @@ describe('script generator build model', () => {
     const web = createScriptGeneratorForm()
     web.reqDisguiseId = 'req'
     web.respDisguiseId = 'resp'
+    web.payloadKey = 'java-secret'
     web.jspObfuscationSteps = ['STEP_A']
     expect(createBuildRequest(web)).toMatchObject({
       channel: BUILD_CHANNEL.WEB,
       resultKey: 'shell',
-      params: { protocol: 'http', jspObfuscationSteps: ['STEP_A'] }
+      params: {
+        protocol: 'http',
+        jspObfuscationSteps: ['STEP_A']
+      }
     })
+    expect(createBuildRequest(web).params.payloadKey).toBe('java-secret')
 
     const memory = {
       ...web,
@@ -58,6 +64,7 @@ describe('script generator build model', () => {
       staticInitialize: true,
       shrink: false
     })
+    expect(request.params.payloadKey).toBe('java-secret')
   })
 
   it('tracks build-relevant form changes without serializing reactive state', () => {

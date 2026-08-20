@@ -1,9 +1,9 @@
 const DEFAULT_DISGUISE_VERSION = '1.0.0'
-export const DEFAULT_DISGUISE_HEADERS = '{\n  "ContentType": "text/plain;charset=utf-8"\n}'
-const DEFAULT_DISGUISE_ENCODE = `public byte[] encode(java.util.HashMap params) throws Exception {\n    String text = String.valueOf(params.getOrDefault("data", ""));\n    return text.getBytes(java.nio.charset.StandardCharsets.UTF_8);\n}`
-const DEFAULT_DISGUISE_DECODE = `public java.util.HashMap decode(byte[] data) throws Exception {\n    java.util.HashMap result = new java.util.HashMap();\n    result.put("data", new String(data, java.nio.charset.StandardCharsets.UTF_8));\n    return result;\n}`
-export const DEFAULT_PHP_ENCODE = `$json = json_encode(leo_wire_encode($payload), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);\nif ($json === false) { throw new RuntimeException('JSON encode failed'); }\nreturn base64_encode($json);`
-export const DEFAULT_PHP_DECODE = `$json = base64_decode(preg_replace('/\\s+/', '', $body), true);\nif ($json === false) { throw new RuntimeException('Invalid base64 request'); }\n$decoded = json_decode($json, true);\nif (!is_array($decoded)) { throw new RuntimeException('Invalid JSON request'); }\nreturn leo_wire_decode($decoded);`
+export const DEFAULT_DISGUISE_HEADERS = '{\n  "Content-Type": "application/octet-stream"\n}'
+const DEFAULT_TRAFFIC_ENCODE = `public byte[] encodeTraffic(byte[] data) throws Exception {\n    if (data == null) throw new IllegalArgumentException("payload不能为空");\n    return java.util.Base64.getEncoder().encode(data);\n}`
+const DEFAULT_TRAFFIC_DECODE = `public byte[] decodeTraffic(byte[] data) throws Exception {\n    if (data == null) throw new IllegalArgumentException("body不能为空");\n    return java.util.Base64.getDecoder().decode(data);\n}`
+export const DEFAULT_PHP_TRAFFIC_ENCODE = `if (!is_string($payload)) { throw new InvalidArgumentException('Payload must be binary'); }\nreturn rtrim(strtr(base64_encode($payload), '+/', '-_'), '=');`
+export const DEFAULT_PHP_TRAFFIC_DECODE = `if (!is_string($body)) { throw new InvalidArgumentException('Body must be binary'); }\n$token = strtr($body, '-_', '+/');\n$remainder = strlen($token) % 4;\nif ($remainder !== 0) { $token .= str_repeat('=', 4 - $remainder); }\n$decoded = base64_decode($token, true);\nif ($decoded === false) { throw new InvalidArgumentException('Invalid base64 body'); }\nreturn $decoded;`
 
 export function normalizeDisguiseRuntimes(runtimes) {
   const normalized = new Set(['java'])
@@ -57,13 +57,13 @@ export function createDisguiseEditorForm(disguise = null) {
     headersText: stringifyDisguiseHeaders(disguise?.headers),
     description: disguise?.description || '',
     remark: disguise?.remark || '',
-    encodeBody: disguise?.encodeBody || DEFAULT_DISGUISE_ENCODE,
-    decodeBody: disguise?.decodeBody || DEFAULT_DISGUISE_DECODE,
-    schemaVersion: disguise?.schemaVersion || 2,
-    protocolVersion: disguise?.protocolVersion || 2,
+    trafficEncodeBody: disguise?.trafficEncodeBody || DEFAULT_TRAFFIC_ENCODE,
+    trafficDecodeBody: disguise?.trafficDecodeBody || DEFAULT_TRAFFIC_DECODE,
+    schemaVersion: disguise?.schemaVersion || 3,
+    protocolVersion: disguise?.protocolVersion || 3,
     supportedRuntimes: runtimes,
-    phpEncodeBody: disguise?.phpEncodeBody || (phpEnabled ? DEFAULT_PHP_ENCODE : ''),
-    phpDecodeBody: disguise?.phpDecodeBody || (phpEnabled ? DEFAULT_PHP_DECODE : '')
+    phpTrafficEncodeBody: disguise?.phpTrafficEncodeBody || (phpEnabled ? DEFAULT_PHP_TRAFFIC_ENCODE : ''),
+    phpTrafficDecodeBody: disguise?.phpTrafficDecodeBody || (phpEnabled ? DEFAULT_PHP_TRAFFIC_DECODE : '')
   }
 }
 
@@ -96,31 +96,22 @@ export function buildDisguisePayload(form) {
     headers: JSON.stringify(headers),
     description: form.description?.trim() || '',
     remark: form.remark?.trim() || '',
-    encodeBody: form.encodeBody?.trim(),
-    decodeBody: form.decodeBody?.trim(),
-    schemaVersion: phpEnabled ? 2 : form.schemaVersion,
-    protocolVersion: phpEnabled ? 2 : form.protocolVersion,
+    trafficEncodeBody: form.trafficEncodeBody?.trim(),
+    trafficDecodeBody: form.trafficDecodeBody?.trim(),
+    schemaVersion: form.schemaVersion,
+    protocolVersion: form.protocolVersion,
     supportedRuntimes,
-    phpEncodeBody: phpEnabled ? form.phpEncodeBody?.trim() : null,
-    phpDecodeBody: phpEnabled ? form.phpDecodeBody?.trim() : null,
-    requirements: phpEnabled ? { php: { minVersion: '7.4', extensions: ['json'] } } : {}
+    phpTrafficEncodeBody: phpEnabled ? form.phpTrafficEncodeBody?.trim() : null,
+    phpTrafficDecodeBody: phpEnabled ? form.phpTrafficDecodeBody?.trim() : null,
+    requirements: phpEnabled ? { php: { minVersion: '5.6', extensions: ['json'] } } : {}
   }
 }
 
-export function buildDisguisePreviewPayload(form, testParamsText) {
-  const payload = {
-    encodeBody: form.encodeBody.trim(),
-    decodeBody: form.decodeBody.trim()
+export function buildDisguisePreviewPayload(form) {
+  return {
+    trafficEncodeBody: form.trafficEncodeBody.trim(),
+    trafficDecodeBody: form.trafficDecodeBody.trim()
   }
-  try {
-    const testParams = JSON.parse(testParamsText)
-    if (testParams && typeof testParams === 'object' && !Array.isArray(testParams)) {
-      payload.testParams = testParams
-    }
-  } catch {
-    // The preview endpoint supplies deterministic defaults for invalid input JSON.
-  }
-  return payload
 }
 
 export function filterSystemDisguiseTemplates(disguises) {

@@ -1,14 +1,8 @@
 <template>
   <div class="test-panel">
     <div class="test-input-row">
-      <span class="test-input-label">测试参数 (JSON)</span>
-      <el-input
-        v-model="paramsText"
-        size="small"
-        class="test-input"
-        placeholder="{&quot;testKey&quot;:&quot;hello&quot;}"
-        clearable
-      />
+      <span class="test-input-label">测试载荷</span>
+      <code class="opaque-sample">8 字节不透明二进制样本</code>
       <el-button
         size="small"
         :loading="loading"
@@ -66,8 +60,8 @@
           <code class="test-code test-b64">{{ result.encodedBase64?.substring(0, 120) }}{{ (result.encodedBase64?.length ?? 0) > 120 ? '…' : '' }}</code>
         </div>
         <div class="test-result-row">
-          <span class="test-label">decode 结果</span>
-          <code class="test-code">{{ result.decoded }}</code>
+          <span class="test-label">解码 Base64</span>
+          <code class="test-code">{{ result.decodedBase64 || '-' }}</code>
         </div>
       </div>
     </template>
@@ -76,7 +70,7 @@
       v-else-if="!loading && !error"
       class="test-hint"
     >
-      填写测试参数后点击「运行」，验证 encode → decode 互逆是否正确。
+      点击「运行」验证 traffic 编解码对不透明二进制的互逆性。
     </div>
   </div>
 </template>
@@ -93,7 +87,6 @@ defineProps({
 })
 
 const emit = defineEmits(['run'])
-const paramsText = defineModel('paramsText', { type: String, default: '' })
 </script>
 
 <style scoped>
@@ -117,8 +110,15 @@ const paramsText = defineModel('paramsText', { type: String, default: '' })
   white-space: nowrap;
   flex-shrink: 0;
 }
-.test-input {
+.opaque-sample {
   flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  color: var(--el-text-color-secondary);
+  background: var(--el-fill-color-light);
+  font-size: 11px;
 }
 .test-status-bar {
   display: flex;

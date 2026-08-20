@@ -53,6 +53,7 @@ import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
+import { generatePayloadKey } from '@/utils/payloadKey.js'
 import {
   getDisguisesApi,
   getShellGeneratorSupportedTypesApi,
@@ -99,7 +100,10 @@ const { disposeEditorInstance, recreateEditorInstance } = useMonacoEditorInstanc
 const { monacoTheme, watchMonacoTheme } = useMonacoTheme()
 
 // 表单数据
-const form = reactive(createScriptGeneratorForm())
+const form = reactive({
+  ...createScriptGeneratorForm(),
+  payloadKey: generatePayloadKey()
+})
 
 // 数据
 const Disguises = ref([])
@@ -142,7 +146,7 @@ const availableDisguises = computed(() => {
   return Disguises.value.filter((item) =>
     Array.isArray(item.supportedRuntimes)
       ? item.supportedRuntimes.some((runtime) => String(runtime).toLowerCase() === 'php')
-      : Boolean(item.phpEncodeBody && item.phpDecodeBody)
+      : Boolean(item.phpTrafficEncodeBody && item.phpTrafficDecodeBody)
   )
 })
 
@@ -279,6 +283,7 @@ const configSummary = computed(() => {
       { label: '输出模式', value: `${PHP_OUTPUT_MODES[form.phpOutputMode]?.label || form.phpOutputMode} ${PHP_OUTPUT_MODES[form.phpOutputMode]?.title || ''}`.trim() },
       { label: '请求伪装', value: findDisguiseLabel(form.reqDisguiseId) },
       { label: '响应伪装', value: findDisguiseLabel(form.respDisguiseId) },
+      { label: 'PayloadCodec AES 密钥', value: form.payloadKey || '-' },
       { label: '响应码', value: form.respCode || '-' },
       { label: '按需加载组件', value: '全部' },
       { label: 'Header 校验', value: form.headerName ? `${form.headerName}: ${form.headerValue}` : '关闭' }
@@ -292,6 +297,7 @@ const configSummary = computed(() => {
     { label: '类型', value: form.shellType || '-' },
     { label: '请求伪装', value: findDisguiseLabel(form.reqDisguiseId) },
     { label: '响应伪装', value: findDisguiseLabel(form.respDisguiseId) },
+    { label: 'PayloadCodec AES 密钥', value: form.payloadKey || '-' },
     { label: '响应码', value: form.respCode || '-' },
     { label: '目标 JDK', value: form.targetJavaVersion || 'auto' },
     { label: '核心类名', value: form.coreClassName || '随机生成' }
@@ -408,7 +414,7 @@ const getAllDisguises = async () => {
     // 设置默认值
     if (Disguises.value.length > 0) {
       const defaultDisguise =
-        Disguises.value.find((d) => d.disguiseId === 'inner_AESBin_1.0.0') || Disguises.value[0]
+        Disguises.value.find((d) => d.disguiseId === 'inner_Java_Base64_1.0.0') || Disguises.value[0]
       form.reqDisguiseId = defaultDisguise.disguiseId
       form.respDisguiseId = defaultDisguise.disguiseId
     }
@@ -540,7 +546,7 @@ const setRuntime = (runtime) => {
   form.jspObfuscationSteps = []
   if (runtime === 'php') {
     form.shellType = 'PHP'
-    const portable = Disguises.value.find((item) => item.disguiseId === 'inner_PHP_JSON_Base64_1.0.0')
+    const portable = Disguises.value.find((item) => item.disguiseId === 'inner_PHP_JSON_API_1.0.0')
       || availableDisguises.value[0]
     form.reqDisguiseId = portable?.disguiseId || ''
     form.respDisguiseId = portable?.disguiseId || ''
@@ -551,7 +557,7 @@ const setRuntime = (runtime) => {
     form.shellType = 'JSP'
     form.headerName = ''
     form.headerValue = ''
-    const javaDisguise = Disguises.value.find((item) => item.disguiseId === 'inner_AESBin_1.0.0')
+    const javaDisguise = Disguises.value.find((item) => item.disguiseId === 'inner_Java_Base64_1.0.0')
       || Disguises.value[0]
     form.reqDisguiseId = javaDisguise?.disguiseId || ''
     form.respDisguiseId = javaDisguise?.disguiseId || ''

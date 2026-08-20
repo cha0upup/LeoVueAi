@@ -226,6 +226,24 @@
               </el-form-item>
             </el-col>
           </el-row>
+          <el-row :gutter="20">
+            <el-col
+              v-if="childPuppet.type === 'java'"
+              :span="12"
+            >
+              <el-form-item
+                label="AES 密钥"
+                prop="payloadKey"
+                required
+              >
+                <el-input
+                  v-model="childPuppet.payloadKey"
+                  clearable
+                  placeholder="请输入连接对应的 PayloadCodec AES 密钥"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
         </div>
 
         <el-row :gutter="20">
@@ -415,7 +433,8 @@ const rules = createPuppetDialogRules({
   nameRequiredMessage: '请输入寄生主机名称',
   connLinkPattern: /^https?:\/\/.+/,
   connLinkPatternMessage: '请输入有效的连接地址',
-  requireDisguises: true
+  requireDisguises: true,
+  requirePayloadKeyForJava: () => childPuppet.type === 'java'
 })
 
 const formRef = ref(null)

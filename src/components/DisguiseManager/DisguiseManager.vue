@@ -448,7 +448,7 @@ async function handleTestDisguise(payload) {
   testLoading.value = true
   try {
     await testDisguiseApi(payload)
-    showSuccess('测试通过：encode 和 decode 可以正确互逆')
+    showSuccess('测试通过：traffic 编解码可以正确互逆')
   } catch (error) {
     handleError(error, { defaultMessage: '伪装逻辑测试失败' })
   } finally {
@@ -457,11 +457,14 @@ async function handleTestDisguise(payload) {
 }
 
 async function handleTestFromDetail(disguise) {
-  if (!disguise?.encodeBody || !disguise?.decodeBody) {
-    showWarning('当前伪装缺少完整的 encodeBody 或 decodeBody')
+  if (!disguise?.trafficEncodeBody || !disguise?.trafficDecodeBody) {
+    showWarning('当前伪装缺少完整的 traffic 编解码实现')
     return
   }
-  await handleTestDisguise({ encodeBody: disguise.encodeBody, decodeBody: disguise.decodeBody })
+  await handleTestDisguise({
+    trafficEncodeBody: disguise.trafficEncodeBody,
+    trafficDecodeBody: disguise.trafficDecodeBody
+  })
 }
 
 async function handleDeleteDisguise(disguise) {

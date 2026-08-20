@@ -139,7 +139,10 @@ const allDisguises = ref([])
 // 使用默认值创建puppet对象
 const puppet = reactive(createDefaultPuppet())
 
-const rules = createPuppetDialogRules({ requireDisguises: true })
+const rules = createPuppetDialogRules({
+  requireDisguises: true,
+  requirePayloadKeyForJava: () => puppet.type === 'java'
+})
 
 const buildPuppetPayload = () => ({
   ...puppet,

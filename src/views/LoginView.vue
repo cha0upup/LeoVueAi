@@ -35,7 +35,7 @@
               type="primary"
               class="version-tag"
             >
-              v2.0.2
+              v2.1.0
             </el-tag>
           </div>
 

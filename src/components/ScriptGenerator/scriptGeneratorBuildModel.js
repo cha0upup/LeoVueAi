@@ -26,7 +26,7 @@ export const PHP_OUTPUT_MODES = Object.freeze({
 })
 
 const SNAPSHOT_KEYS = Object.freeze([
-  'runtime', 'generateType', 'reqDisguiseId', 'respDisguiseId', 'shellType',
+  'runtime', 'generateType', 'reqDisguiseId', 'respDisguiseId', 'payloadKey', 'shellType',
   'protocol', 'coreClassName', 'respCode', 'serverType', 'serverVersion', 'packerType',
   'headerName', 'headerValue', 'urlPattern', 'injectorClassName',
   'shellClassName', 'isAbstractTranslet', 'byPassJavaModule', 'targetJavaVersion',
@@ -39,6 +39,7 @@ export function createScriptGeneratorForm() {
     generateType: 'webshell',
     reqDisguiseId: '',
     respDisguiseId: '',
+    payloadKey: '',
     shellType: 'JSP',
     protocol: 'http',
     targetJavaVersion: 'auto',
@@ -87,6 +88,7 @@ export function createBuildRequest(form, { isJspGroupPacker = () => false } = {}
       outputMode: form.phpOutputMode || 'compact'
     }
     appendHeaderPair(params, form)
+    appendTrimmed(params, 'payloadKey', form.payloadKey)
     return { channel: BUILD_CHANNEL.RUNTIME, params, resultKey: 'content' }
   }
 
@@ -98,6 +100,7 @@ export function createBuildRequest(form, { isJspGroupPacker = () => false } = {}
       targetJavaVersion: form.targetJavaVersion || 'auto',
       respCode: form.respCode
     }
+    appendTrimmed(params, 'payloadKey', form.payloadKey)
     if (form.shellType === 'JSP' || form.shellType === 'JSPX') {
       params.protocol = form.protocol || 'http'
       params.jspObfuscationSteps = [...(form.jspObfuscationSteps || [])]
@@ -124,6 +127,7 @@ export function createBuildRequest(form, { isJspGroupPacker = () => false } = {}
     staticInitialize: Boolean(form.staticInitialize),
     shrink: form.shrink !== false
   }
+  appendTrimmed(params, 'payloadKey', form.payloadKey)
   if (protocol !== 'websocket') appendHeaderPair(params, form)
   appendTrimmed(params, 'coreClassName', form.coreClassName)
   appendTrimmed(params, 'injectorClassName', form.injectorClassName)

@@ -190,6 +190,24 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-row :gutter="20">
+          <el-col
+            v-if="puppet.type === 'java'"
+            :span="12"
+          >
+            <el-form-item
+              label="AES 密钥"
+              prop="payloadKey"
+              required
+            >
+              <el-input
+                v-model="puppet.payloadKey"
+                clearable
+                placeholder="请输入连接对应的 PayloadCodec AES 密钥"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </div>
 
       <el-row :gutter="20">

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_PHP_DECODE,
-  DEFAULT_PHP_ENCODE,
+  DEFAULT_PHP_TRAFFIC_DECODE,
+  DEFAULT_PHP_TRAFFIC_ENCODE,
   applyDisguiseTemplate,
   buildDisguisePayload,
   buildDisguisePreviewPayload,
@@ -18,8 +18,8 @@ describe('disguiseEditorModel', () => {
     expect(normalizeDisguiseRuntimes(['PHP', 'unknown'])).toEqual(['java', 'php'])
     const form = createDisguiseEditorForm({ supportedRuntimes: ['php'] })
     expect(form.supportedRuntimes).toEqual(['java', 'php'])
-    expect(form.phpEncodeBody).toBe(DEFAULT_PHP_ENCODE)
-    expect(form.phpDecodeBody).toBe(DEFAULT_PHP_DECODE)
+    expect(form.phpTrafficEncodeBody).toBe(DEFAULT_PHP_TRAFFIC_ENCODE)
+    expect(form.phpTrafficDecodeBody).toBe(DEFAULT_PHP_TRAFFIC_DECODE)
   })
 
   it('normalizes headers and reports structural errors', () => {
@@ -41,12 +41,16 @@ describe('disguiseEditorModel', () => {
     expect(payload).toMatchObject({
       disguiseName: 'demo',
       supportedRuntimes: ['java', 'php'],
-      schemaVersion: 2,
-      protocolVersion: 2,
-      requirements: { php: { minVersion: '7.4', extensions: ['json'] } }
+      trafficEncodeBody: expect.stringContaining('encodeTraffic'),
+      trafficDecodeBody: expect.stringContaining('decodeTraffic'),
+      schemaVersion: 3,
+      protocolVersion: 3,
+      requirements: { php: { minVersion: '5.6', extensions: ['json'] } }
     })
-    expect(buildDisguisePreviewPayload(form, '{"x":1}').testParams).toEqual({ x: 1 })
-    expect(buildDisguisePreviewPayload(form, '[]').testParams).toBeUndefined()
+    expect(buildDisguisePreviewPayload(form)).toMatchObject({
+      trafficEncodeBody: expect.stringContaining('encodeTraffic'),
+      trafficDecodeBody: expect.stringContaining('decodeTraffic')
+    })
   })
 
   it('applies templates while retaining the current primary key', () => {

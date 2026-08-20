@@ -66,7 +66,7 @@
             </el-checkbox>
           </el-checkbox-group>
           <div class="field-tip">
-            PHP 伪装使用 protocol v2，并同时保留平台侧 Java 编解码实现。
+            Java 伪装使用 protocol v3，traffic 编解码只处理不透明 byte[]。
           </div>
         </el-form-item>
 
@@ -90,7 +90,7 @@
             type="textarea"
             :autosize="{ minRows: 4, maxRows: 12 }"
             resize="none"
-            placeholder="{&quot;ContentType&quot;:&quot;text/plain;charset=utf-8&quot;}"
+            placeholder="{&quot;Content-Type&quot;:&quot;application/octet-stream&quot;}"
           />
           <div
             class="field-tip"
