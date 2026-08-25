@@ -30,12 +30,16 @@ describe('script generator build model', () => {
     web.reqDisguiseId = 'req'
     web.respDisguiseId = 'resp'
     web.payloadKey = 'java-secret'
+    web.headerName = 'X-Key'
+    web.headerValue = 'token'
     web.jspObfuscationSteps = ['STEP_A']
     expect(createBuildRequest(web)).toMatchObject({
       channel: BUILD_CHANNEL.WEB,
       resultKey: 'shell',
       params: {
         protocol: 'http',
+        headerName: 'X-Key',
+        headerValue: 'token',
         jspObfuscationSteps: ['STEP_A']
       }
     })

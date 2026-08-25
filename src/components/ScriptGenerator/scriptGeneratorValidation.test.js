@@ -26,6 +26,12 @@ describe('isScriptGeneratorFormValid', () => {
     expect(isScriptGeneratorFormValid({ ...base, protocol: '' })).toBe(false)
   })
 
+  it('requires a complete Header gate for JSP and JSPX WebShells', () => {
+    expect(isScriptGeneratorFormValid({ ...base, headerName: '' })).toBe(false)
+    expect(isScriptGeneratorFormValid({ ...base, headerValue: ' ' })).toBe(false)
+    expect(isScriptGeneratorFormValid({ ...base, shellType: 'JSPX' })).toBe(true)
+  })
+
   it('requires an AES key for Java generation', () => {
     expect(isScriptGeneratorFormValid({ ...base, payloadKey: ' ' })).toBe(false)
   })

@@ -17,9 +17,12 @@ export function isScriptGeneratorFormValid(form) {
 
   if (form.generateType === 'webshell') {
     const requiresProtocol = form.shellType === 'JSP' || form.shellType === 'JSPX'
+    const validHeaderGuard = form.headerName?.trim()
+      && String(form.headerValue ?? '').trim() !== ''
     return Boolean(
       form.shellType &&
         form.respCode &&
+        validHeaderGuard &&
         (!requiresProtocol || form.protocol)
     )
   }

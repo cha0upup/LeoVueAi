@@ -199,13 +199,13 @@
     </section>
 
     <section
-      v-if="form.generateType === 'memoryshell'"
+      v-if="form.generateType === 'webshell' || form.generateType === 'memoryshell'"
       class="form-group header-gate-panel"
     >
       <div class="group-heading">
         <strong>{{ form.protocol === 'websocket' ? 'WebSocket 查询门禁' : 'Header 门禁' }}</strong>
         <button
-          v-if="selectedInjectorCapability?.supportsHeaderGate !== false"
+          v-if="form.generateType === 'webshell' || selectedInjectorCapability?.supportsHeaderGate !== false"
           class="random-button"
           type="button"
           @click="emit('generate-random-header')"
@@ -215,7 +215,7 @@
         </button>
       </div>
       <div
-        v-if="selectedInjectorCapability?.supportsHeaderGate !== false"
+        v-if="form.generateType === 'webshell' || selectedInjectorCapability?.supportsHeaderGate !== false"
         class="header-pair"
       >
         <el-input

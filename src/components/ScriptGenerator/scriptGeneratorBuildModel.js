@@ -101,6 +101,7 @@ export function createBuildRequest(form, { isJspGroupPacker = () => false } = {}
       respCode: form.respCode
     }
     appendTrimmed(params, 'payloadKey', form.payloadKey)
+    appendHeaderPair(params, form)
     if (form.shellType === 'JSP' || form.shellType === 'JSPX') {
       params.protocol = form.protocol || 'http'
       params.jspObfuscationSteps = [...(form.jspObfuscationSteps || [])]

