@@ -321,7 +321,6 @@ import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { createLogger } from '@/utils/logger.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 import {
-  getChildrenByParentPuppetIdApi,
   getPuppetsApi,
   deletePuppetApi,
   initPuppetApi,
@@ -333,7 +332,7 @@ import {
   getSessionsApi,
   exportPuppetsApi,
   getProjectPuppetsApi,
-  getProjectPuppetChildrenApi,
+  getWorkspacePuppetChildrenApi,
   getUnassignedPuppetsApi,
   detachProjectPuppetsApi,
   getPuppetProjectMembershipsApi
@@ -992,9 +991,7 @@ const getPuppets = async () => {
 
 const loadChildren = async (tree, treeNode, resolve) => {
   try {
-    const resp = isUnassignedProject.value
-      ? await getChildrenByParentPuppetIdApi({ parentPuppetId: tree.puppetId })
-      : await getProjectPuppetChildrenApi(activeProjectId.value, tree.puppetId)
+    const resp = await getWorkspacePuppetChildrenApi(activeProjectId.value, tree.puppetId)
     const children = (resp.data || []).map((item) => ({
       ...item,
       hasChildren: true,

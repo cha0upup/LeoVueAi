@@ -34,6 +34,14 @@ export function getProjectPuppetChildrenApi(projectId, parentPuppetId) {
   })
 }
 
+export function getWorkspacePuppetChildrenApi(projectId, parentPuppetId) {
+  const normalizedProjectId = String(projectId || '').trim()
+  if (!normalizedProjectId) {
+    return http.post('/platform/puppet-manage/children', { parentPuppetId })
+  }
+  return getProjectPuppetChildrenApi(normalizedProjectId, parentPuppetId)
+}
+
 export function attachProjectPuppetsApi(projectId, puppetIds, options = {}) {
   return http.post('/platform/projects/hosts/attach', { projectId, puppetIds, ...options })
 }
