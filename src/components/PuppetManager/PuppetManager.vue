@@ -15,7 +15,9 @@
           <div class="list-title-line">
             <h2>主机与会话</h2>
             <span class="directory-summary">
-              <span><strong>{{ totalCount }}</strong> 主机</span>
+              <span
+                ><strong>{{ totalCount }}</strong> 主机</span
+              >
               <i />
               <span :class="{ 'has-live': liveSessions.length }">
                 <strong>{{ liveSessions.length }}</strong> 会话
@@ -56,10 +58,7 @@
         @edit="projectEditor?.open($event)"
       />
 
-      <div
-        v-if="activeProject?.status === 'archived'"
-        class="project-context-notice"
-      >
+      <div v-if="activeProject?.status === 'archived'" class="project-context-notice">
         <el-icon><Icon icon="mdi:archive-outline" /></el-icon>
         <span>归档项目保留主机与会话视图，不再创建新归属或新会话。</span>
         <button
@@ -84,26 +83,12 @@
           </template>
         </el-input>
 
-        <el-select
-          v-model="sortMode"
-          class="sort-select"
-          size="small"
-          aria-label="排序方式"
-        >
-          <el-option
-            label="按更新时间"
-            value="updateTime"
-          />
-          <el-option
-            label="按名称"
-            value="name"
-          />
+        <el-select v-model="sortMode" class="sort-select" size="small" aria-label="排序方式">
+          <el-option label="按更新时间" value="updateTime" />
+          <el-option label="按名称" value="name" />
         </el-select>
 
-        <el-tooltip
-          content="刷新列表"
-          placement="top"
-        >
+        <el-tooltip content="刷新列表" placement="top">
           <button
             class="u-icon-btn"
             type="button"
@@ -151,16 +136,10 @@
       </div>
 
       <Transition name="batch-bar">
-        <div
-          v-if="batchMode"
-          class="batch-action-bar"
-        >
+        <div v-if="batchMode" class="batch-action-bar">
           <span class="batch-bar-count">已选 {{ selectedCount }} 台</span>
           <div class="batch-bar-actions">
-            <el-tooltip
-              content="批量测试连接"
-              placement="top"
-            >
+            <el-tooltip content="批量测试连接" placement="top">
               <button
                 class="bar-btn"
                 type="button"
@@ -180,16 +159,8 @@
               <el-icon><Icon :icon="iconMap.folderAdd" /></el-icon>
               加入项目
             </button>
-            <el-dropdown
-              trigger="click"
-              placement="top-end"
-              @command="handleBatchCommand"
-            >
-              <button
-                class="bar-btn bar-btn--icon"
-                type="button"
-                aria-label="更多批量操作"
-              >
+            <el-dropdown trigger="click" placement="top-end" @command="handleBatchCommand">
+              <button class="bar-btn bar-btn--icon" type="button" aria-label="更多批量操作">
                 <el-icon><Icon :icon="iconMap.more" /></el-icon>
               </button>
               <template #dropdown>
@@ -198,24 +169,13 @@
                     <el-icon><Icon :icon="allSelected ? iconMap.cancel : checkIcon" /></el-icon>
                     {{ allSelected ? '取消全选' : '选择当前列表' }}
                   </el-dropdown-item>
-                  <el-dropdown-item
-                    command="export"
-                    :disabled="batchExportLoading"
-                  >
+                  <el-dropdown-item command="export" :disabled="batchExportLoading">
                     <el-icon><Icon :icon="iconMap.download" /></el-icon>导出选中主机
                   </el-dropdown-item>
-                  <el-dropdown-item
-                    v-if="activeProject?.contentEditable"
-                    command="detach"
-                    divided
-                  >
+                  <el-dropdown-item v-if="activeProject?.contentEditable" command="detach" divided>
                     <el-icon><Icon :icon="iconMap.close" /></el-icon>从当前项目移出
                   </el-dropdown-item>
-                  <el-dropdown-item
-                    command="delete"
-                    divided
-                    class="batch-danger-item"
-                  >
+                  <el-dropdown-item command="delete" divided class="batch-danger-item">
                     <el-icon><Icon :icon="iconMap.delete" /></el-icon>删除主机资产
                   </el-dropdown-item>
                 </el-dropdown-menu>
@@ -275,26 +235,12 @@
       />
     </template>
 
-    <AddPuppet
-      ref="addPuppet"
-      :project-id="activeProjectId"
-      @refresh="refresh"
-    />
-    <ImportPuppet
-      ref="importPuppet"
-      :project-id="activeProjectId"
-      @refresh="refresh"
-    />
-    <EditPuppet
-      ref="editPuppet"
-      @refresh="refresh"
-    />
+    <AddPuppet ref="addPuppet" :project-id="activeProjectId" @refresh="refresh" />
+    <ImportPuppet ref="importPuppet" :project-id="activeProjectId" @refresh="refresh" />
+    <EditPuppet ref="editPuppet" @refresh="refresh" />
     <SharePuppet ref="sharePuppet" />
     <AddChildPuppet ref="addChildPuppet" />
-    <ProjectEditorDialog
-      ref="projectEditor"
-      @saved="handleProjectSaved"
-    />
+    <ProjectEditorDialog ref="projectEditor" @saved="handleProjectSaved" />
     <ProjectAssignmentDialog
       ref="projectAssignment"
       :projects="projects"
@@ -351,6 +297,7 @@ import SessionPickerDialog from './SessionPickerDialog.vue'
 import HostSelectionDialog from './HostSelectionDialog.vue'
 import { useHostSelection } from './useHostSelection.js'
 import { resolvePuppetSessionEntry } from './puppetSessionEntry.js'
+import { resolvePuppetRuntimeStatus } from './puppetRuntimeStatus.js'
 import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import { buildPuppetTransferBundle, encodePuppetTransferPayload } from '@/utils/puppetTransfer.js'
 
@@ -878,7 +825,7 @@ const addPuppetEntity = (row) => {
 }
 
 const openCacheSession = async (row, selected = null) => {
-  const chosen = selected || await hostSelection.open(row, 'cache')
+  const chosen = selected || (await hostSelection.open(row, 'cache'))
   if (!chosen?.selectedHostId) return false
   const resp = await initPuppetCacheApi(row.puppetId, activeProjectId.value, chosen.selectedHostId)
   const sessionId = resp.data.sessionId
@@ -1004,8 +951,39 @@ const loadChildren = async (tree, treeNode, resolve) => {
   }
 }
 
+const getPuppetRuntimeStatus = (row) =>
+  resolvePuppetRuntimeStatus({
+    puppet: row,
+    sessions: sessionsByPuppetId.value[row?.puppetId] || [],
+    isTesting: testingPuppetIds.value.includes(row?.puppetId),
+    connectionResult: connectionTestResults.value[row?.puppetId] || null
+  })
+
+const getLoadedPuppet = (puppetId) => {
+  if (!puppetId) return null
+  return (
+    allPuppet.value.find((item) => item.puppetId === puppetId) ||
+    puppetTable.value?.getLoadedPuppet?.(puppetId) ||
+    null
+  )
+}
+
+const getParentHostContext = (row) => {
+  const parentPuppetId = row?.parentPuppetId
+  if (!parentPuppetId || parentPuppetId === 'root') return null
+  const host = getLoadedPuppet(parentPuppetId)
+  if (!host) {
+    return {
+      host: { puppetId: parentPuppetId },
+      status: 'unconfigured',
+      label: '状态未知'
+    }
+  }
+  return { host, ...getPuppetRuntimeStatus(host) }
+}
+
 const openEditPuppetDialog = (row) => {
-  editPuppet.value?.openEditPuppetDialog(row)
+  editPuppet.value?.openEditPuppetDialog(row, getParentHostContext(row))
 }
 
 const openSharePuppetDialog = (row) => {
@@ -1090,7 +1068,11 @@ const handleBatchCommand = (command) => {
 
 const openAddPuppetDialog = () => {
   if (!isCurrentWorkspaceWritable.value) {
-    showWarning(activeProject.value?.status === 'archived' ? '已归档项目不再接收新主机' : '当前项目为只读工作区')
+    showWarning(
+      activeProject.value?.status === 'archived'
+        ? '已归档项目不再接收新主机'
+        : '当前项目为只读工作区'
+    )
     return
   }
   addPuppet.value?.openAddPuppet()
@@ -1150,7 +1132,7 @@ const detachFromCurrentProject = async () => {
 }
 
 const parasiticPuppet = (row) => {
-  addChildPuppet.value?.openAddChildPuppet(row.puppetId, row.connLink || '', row.puppetName || '')
+  addChildPuppet.value?.openAddChildPuppet(row, getPuppetRuntimeStatus(row))
 }
 
 const deletePuppet = async (row) => {

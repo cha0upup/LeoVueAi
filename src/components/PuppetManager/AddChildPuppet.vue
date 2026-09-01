@@ -15,7 +15,7 @@
             <Icon :icon="iconMap.parasite" />
           </el-icon>
           <div>
-            <h3>添加寄生主机</h3>
+            <h3>添加子节点主机</h3>
           </div>
         </div>
       </div>
@@ -30,23 +30,11 @@
       class="host-form"
       @submit.prevent="handleSubmit"
     >
-      <!-- 父主机信息 -->
-      <div class="form-section parent-info">
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <div class="parent-item">
-              <span class="parent-label">父主机名称：</span>
-              <span class="parent-value">{{ parentPuppetName || '未选择' }}</span>
-            </div>
-          </el-col>
-          <el-col :span="12">
-            <div class="parent-item">
-              <span class="parent-label">父主机地址：</span>
-              <span class="parent-value">{{ parentConnLink || '未选择' }}</span>
-            </div>
-          </el-col>
-        </el-row>
-      </div>
+      <ParentHostSummary
+        :host="parentPuppet"
+        :status="parentRuntimeStatus.status"
+        :status-label="parentRuntimeStatus.label"
+      />
 
       <div class="form-section">
         <div class="section-heading">
@@ -56,25 +44,19 @@
         </div>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item
-              label="主机名称"
-              prop="puppetName"
-            >
+            <el-form-item label="主机名称" prop="puppetName">
               <el-input
                 v-model="childPuppet.puppetName"
-                placeholder="请输入寄生主机名称"
+                placeholder="请输入子节点主机名称"
                 clearable
               />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item
-              label="连接地址"
-              prop="connLink"
-            >
+            <el-form-item label="连接地址" prop="connLink">
               <el-input
                 v-model="childPuppet.connLink"
-                placeholder="请输入寄生主机连接地址"
+                placeholder="请输入子节点主机连接地址"
                 clearable
               />
             </el-form-item>
@@ -83,10 +65,7 @@
 
         <el-row :gutter="20">
           <el-col :span="8">
-            <el-form-item
-              label="传输协议"
-              prop="protocol"
-            >
+            <el-form-item label="传输协议" prop="protocol">
               <el-select
                 v-model="childPuppet.protocol"
                 placeholder="请选择传输协议"
@@ -109,10 +88,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item
-              label="节点类型"
-              prop="type"
-            >
+            <el-form-item label="节点类型" prop="type">
               <el-select
                 v-model="childPuppet.type"
                 placeholder="请选择节点类型"
@@ -135,10 +111,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item
-              label="访问权限"
-              prop="permission"
-            >
+            <el-form-item label="访问权限" prop="permission">
               <el-select
                 v-model="childPuppet.permission"
                 placeholder="请选择访问权限"
@@ -152,18 +125,9 @@
                 >
                   <div class="option-content">
                     <el-icon class="option-icon">
-                      <Icon
-                        v-if="item.value === 'public'"
-                        :icon="iconMap.check"
-                      />
-                      <Icon
-                        v-else-if="item.value === 'team'"
-                        :icon="iconMap.user"
-                      />
-                      <Icon
-                        v-else-if="item.value === 'private'"
-                        :icon="iconMap.lock"
-                      />
+                      <Icon v-if="item.value === 'public'" :icon="iconMap.check" />
+                      <Icon v-else-if="item.value === 'team'" :icon="iconMap.user" />
+                      <Icon v-else-if="item.value === 'private'" :icon="iconMap.lock" />
                     </el-icon>
                     <span>{{ item.label }}</span>
                   </div>
@@ -182,11 +146,7 @@
         <div class="disguise-required-panel">
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item
-                label="请求伪装"
-                prop="reqDisguiseId"
-                required
-              >
+              <el-form-item label="请求伪装" prop="reqDisguiseId" required>
                 <el-select
                   v-model="childPuppet.reqDisguiseId"
                   placeholder="请选择请求伪装"
@@ -204,11 +164,7 @@
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item
-                label="响应伪装"
-                prop="respDisguiseId"
-                required
-              >
+              <el-form-item label="响应伪装" prop="respDisguiseId" required>
                 <el-select
                   v-model="childPuppet.respDisguiseId"
                   placeholder="请选择响应伪装"
@@ -227,19 +183,12 @@
             </el-col>
           </el-row>
           <el-row :gutter="20">
-            <el-col
-              v-if="childPuppet.type === 'java'"
-              :span="12"
-            >
-              <el-form-item
-                label="AES 密钥"
-                prop="payloadKey"
-                required
-              >
+            <el-col v-if="childPuppet.type === 'java'" :span="12">
+              <el-form-item label="AES 密钥" prop="payloadKey" required>
                 <el-input
                   v-model="childPuppet.payloadKey"
                   clearable
-                  placeholder="请输入连接对应的 PayloadCodec AES 密钥"
+                  placeholder="请输入 AES 密钥"
                 />
               </el-form-item>
             </el-col>
@@ -248,10 +197,7 @@
 
         <el-row :gutter="20">
           <el-col :span="24">
-            <el-form-item
-              label="请求头信息"
-              prop="headers"
-            >
+            <el-form-item label="请求头信息" prop="headers">
               <el-input
                 v-model="childPuppet.headers"
                 type="textarea"
@@ -271,9 +217,7 @@
 
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item
-              prop="maxReqCount"
-            >
+            <el-form-item prop="maxReqCount">
               <template #label>
                 <span class="field-label-with-help">
                   最大请求数
@@ -314,10 +258,7 @@
         <template v-if="proxyEnabled">
           <el-row :gutter="20">
             <el-col :span="8">
-              <el-form-item
-                label="代理类型"
-                prop="proxyType"
-              >
+              <el-form-item label="代理类型" prop="proxyType">
                 <el-select
                   v-model="childPuppet.proxyType"
                   placeholder="请选择代理类型"
@@ -333,22 +274,12 @@
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item
-                label="代理地址"
-                prop="proxyHost"
-              >
-                <el-input
-                  v-model="childPuppet.proxyHost"
-                  placeholder="请输入代理地址"
-                  clearable
-                />
+              <el-form-item label="代理地址" prop="proxyHost">
+                <el-input v-model="childPuppet.proxyHost" placeholder="请输入代理地址" clearable />
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item
-                label="代理端口"
-                prop="proxyPort"
-              >
+              <el-form-item label="代理端口" prop="proxyPort">
                 <el-input-number
                   v-model="childPuppet.proxyPort"
                   :min="1"
@@ -365,22 +296,13 @@
 
     <template #footer>
       <div class="dialog-footer-actions">
-        <el-button
-          type="danger"
-          class="cancel-btn"
-          @click="close"
-        >
+        <el-button type="danger" class="cancel-btn" @click="close">
           <el-icon><Icon :icon="iconMap.close" /></el-icon>
           取消
         </el-button>
-        <el-button
-          type="primary"
-          :loading="loading"
-          class="submit-btn"
-          @click="handleSubmit"
-        >
+        <el-button type="primary" :loading="loading" class="submit-btn" @click="handleSubmit">
           <el-icon><Icon :icon="iconMap.check" /></el-icon>
-          {{ loading ? '添加中...' : '添加寄生主机' }}
+          {{ loading ? '添加中...' : '添加子节点主机' }}
         </el-button>
       </div>
     </template>
@@ -400,6 +322,7 @@ import { validateForm, handleFormSubmit, resetForm as resetFormUtil } from '@/ut
 import { getAllDisguises } from '@/utils/puppetUtils.js'
 import { stringifyHeadersForSubmit } from '@/utils/headers.js'
 import { addPuppetApi } from '@/services/api.js'
+import ParentHostSummary from './ParentHostSummary.vue'
 import {
   createPuppetDialogRules,
   PUPPET_PERMISSION_OPTIONS,
@@ -423,14 +346,14 @@ const permissions = PUPPET_PERMISSION_OPTIONS
 const allProtocol = PUPPET_PROTOCOL_OPTIONS
 const allTypes = PUPPET_TYPE_OPTIONS
 const proxyOptions = PUPPET_PROXY_OPTIONS
-const parentConnLink = ref('')
-const parentPuppetName = ref('')
+const parentPuppet = ref(null)
+const parentRuntimeStatus = ref({ status: 'untested', label: '' })
 
 // 使用默认值创建childPuppet对象
 const childPuppet = reactive(createDefaultPuppet())
 
 const rules = createPuppetDialogRules({
-  nameRequiredMessage: '请输入寄生主机名称',
+  nameRequiredMessage: '请输入子节点主机名称',
   connLinkPattern: /^https?:\/\/.+/,
   connLinkPatternMessage: '请输入有效的连接地址',
   requireDisguises: true,
@@ -451,7 +374,8 @@ const resetForm = () => {
   const parentId = childPuppet.parentPuppetId || ''
   resetFormUtil(formRef, childPuppet, createDefaultPuppet({ parentPuppetId: parentId }))
   proxyEnabled.value = false
-  parentPuppetName.value = ''
+  parentPuppet.value = null
+  parentRuntimeStatus.value = { status: 'untested', label: '' }
 }
 
 const close = () => {
@@ -480,7 +404,7 @@ const handleSubmit = async () => {
     },
     {
       loadingRef: loading,
-      successMessage: '寄生主机添加成功！',
+      successMessage: '子节点主机添加成功！',
       errorMessage: '添加失败，请稍后重试',
       onSuccess: () => {
         refresh()
@@ -490,17 +414,16 @@ const handleSubmit = async () => {
   )
 }
 
-const openAddChildPuppet = (
-  parentPuppetId,
-  parentConnLinkValue = '',
-  parentPuppetNameValue = ''
-) => {
+const openAddChildPuppet = (parentHost, runtimeStatus = {}) => {
   dialog.open()
   resetForm()
   // 在 resetForm 之后设置父主机信息，避免被重置
-  childPuppet.parentPuppetId = parentPuppetId
-  parentConnLink.value = parentConnLinkValue
-  parentPuppetName.value = parentPuppetNameValue
+  childPuppet.parentPuppetId = parentHost?.puppetId || ''
+  parentPuppet.value = parentHost || null
+  parentRuntimeStatus.value = {
+    status: runtimeStatus.status || 'untested',
+    label: runtimeStatus.label || ''
+  }
 }
 
 onMounted(() => {
@@ -516,47 +439,7 @@ defineExpose({
 <style scoped>
 @import '@/styles/puppet-form-dialog-shared.css';
 
-/* 父主机信息 */
-.parent-info {
-  margin-bottom: 18px;
-  padding: 14px;
-  border-radius: var(--radius-container);
-  background: color-mix(in srgb, var(--el-color-warning) 9%, var(--dialog-surface-muted));
-  border: 1px solid color-mix(in srgb, var(--el-color-warning-light-6) 54%, transparent);
-}
-
-.parent-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 10px 12px;
-  border-radius: var(--radius-container);
-  background: var(--dialog-surface-muted);
-}
-
-.parent-label {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.parent-value {
-  font-size: 13px;
-  color: var(--el-color-primary);
-  font-weight: 600;
-  word-break: break-all;
-}
-
 .submit-btn {
   min-width: 148px;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .parent-info .el-col {
-    margin-bottom: 8px;
-  }
 }
 </style>

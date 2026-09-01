@@ -23,6 +23,13 @@
       </div>
     </template>
 
+    <ParentHostSummary
+      v-if="parentContext"
+      :host="parentContext.host"
+      :status="parentContext.status"
+      :status-label="parentContext.label"
+    />
+
     <PuppetFormFields
       ref="formRef"
       v-model:puppet="puppet"
@@ -53,12 +60,7 @@
           @dismiss="testResult = null"
         />
         <div class="dialog-footer-actions">
-          <el-button
-            class="cancel-btn"
-            @click="close"
-          >
-            取消
-          </el-button>
+          <el-button class="cancel-btn" @click="close"> 取消 </el-button>
           <el-button
             class="test-btn"
             :loading="testingConnection"
@@ -99,6 +101,7 @@ import { usePuppetUrlProbe } from '@/composables/usePuppetUrlProbe.js'
 import { usePuppetConfigTest } from '@/composables/usePuppetConfigTest.js'
 import PuppetFormFields from './PuppetFormFields.vue'
 import PuppetConnectionResultBanner from './PuppetConnectionResultBanner.vue'
+import ParentHostSummary from './ParentHostSummary.vue'
 import { updatePuppetApi } from '@/services/api.js'
 import { createPuppetDialogRules } from '@/components/PuppetManager/puppetFormShared.js'
 
@@ -135,6 +138,7 @@ const {
 } = usePuppetStrategies()
 
 const allDisguises = ref([])
+const parentContext = ref(null)
 
 // 使用默认值创建puppet对象
 const puppet = reactive(createDefaultPuppet())
@@ -192,6 +196,7 @@ const resetForm = () => {
   resetStrategies()
   cancelProbe()
   resetConnectionTest()
+  parentContext.value = null
 }
 
 const close = () => {
@@ -199,13 +204,14 @@ const close = () => {
   resetForm()
 }
 
-const openEditPuppetDialog = (puppetData) => {
+const openEditPuppetDialog = (puppetData, parentHostContext = null) => {
   editDialog.open(puppetData)
   Object.assign(puppet, createDefaultPuppet(puppetData))
   puppet.headers = formatHeadersForEditor(puppetData.headers)
   proxyEnabled.value = puppet.proxyEnabled == 1
   loadStrategies(puppetData)
   resetConnectionTest()
+  parentContext.value = parentHostContext
 }
 
 const {

@@ -1,8 +1,5 @@
 <template>
-  <div
-    v-loading="loading"
-    class="tree-wrapper"
-  >
+  <div v-loading="loading" class="tree-wrapper">
     <!-- Empty state -->
     <EmptyState
       v-if="!loading && !puppets.length"
@@ -34,23 +31,14 @@
       @node-click="handleNodeClick"
     >
       <template #default="{ data }">
-        <div
-          class="tree-node"
-          @dblclick="handleQuickEnter(data)"
-        >
-          <div
-            class="node-card"
-            :class="{ 'is-child': isChildHost(data) }"
-          >
+        <div class="tree-node" @dblclick="handleQuickEnter(data)">
+          <div class="node-card" :class="{ 'is-child': isChildHost(data) }">
             <!-- Left: icon -->
             <div class="node-icon-shell">
               <el-icon class="node-icon">
                 <Icon :icon="getHostIcon(data)" />
               </el-icon>
-              <span
-                class="node-dot"
-                :class="getStatusDotClass(data)"
-              />
+              <span class="node-dot" :class="getStatusDotClass(data)" />
             </div>
 
             <!-- Center: two lines -->
@@ -66,10 +54,7 @@
                 >
                   子机
                 </el-tag>
-                <span
-                  v-if="getProjectMemberships(data).length"
-                  class="node-projects"
-                >
+                <span v-if="getProjectMemberships(data).length" class="node-projects">
                   <span
                     v-for="project in getProjectMemberships(data).slice(0, 2)"
                     :key="project.projectId"
@@ -79,10 +64,9 @@
                   >
                     {{ project.projectName }}
                   </span>
-                  <span
-                    v-if="getProjectMemberships(data).length > 2"
-                    class="node-project-more"
-                  >+{{ getProjectMemberships(data).length - 2 }}</span>
+                  <span v-if="getProjectMemberships(data).length > 2" class="node-project-more"
+                    >+{{ getProjectMemberships(data).length - 2 }}</span
+                  >
                 </span>
               </div>
               <div class="node-line2">
@@ -121,8 +105,17 @@ import { ref, watch, nextTick } from 'vue'
 import { icons } from '@/utils/icons.js'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
+import { resolvePuppetRuntimeStatus } from './puppetRuntimeStatus.js'
 
 const iconMap = icons
+const STATUS_DOT_CLASS_MAP = {
+  online: 'online',
+  running: 'testing',
+  success: 'online',
+  failed: 'error',
+  untested: 'muted',
+  offline: 'offline'
+}
 
 const props = defineProps({
   puppets: { type: Array, default: () => [] },
@@ -184,31 +177,21 @@ const getHostSubtitle = (row) => {
   return link
 }
 
+const getRuntimeStatus = (row) =>
+  resolvePuppetRuntimeStatus({
+    puppet: row,
+    sessions: getHostSessions(row),
+    isTesting: isTestingPuppet(row),
+    connectionResult: getConnectionResult(row)
+  })
+
 const getStatusDotClass = (row) => {
-  if (getHostSessions(row).length) return 'online'
-  if (isTestingPuppet(row)) return 'testing'
-  const result = getConnectionResult(row)
-  if (result) return result.success ? 'online' : 'error'
-  if (!row.connLink) return 'offline'
-  return 'muted'
+  return STATUS_DOT_CLASS_MAP[getRuntimeStatus(row).status] || 'muted'
 }
 
-const getStateText = (row) => {
-  const liveCount = getHostSessions(row).length
-  if (liveCount) return `${liveCount} 会话`
-  if (isTestingPuppet(row)) return '测试中'
-  const result = getConnectionResult(row)
-  if (result) return result.success ? '成功' : '失败'
-  return row.connLink ? '未测试' : '离线'
-}
+const getStateText = (row) => getRuntimeStatus(row).label
 
-const getIndicatorStatus = (row) => {
-  if (getHostSessions(row).length) return 'online'
-  if (isTestingPuppet(row)) return 'running'
-  const result = getConnectionResult(row)
-  if (result) return result.success ? 'success' : 'failed'
-  return row.connLink ? 'untested' : 'offline'
-}
+const getIndicatorStatus = (row) => getRuntimeStatus(row).status
 
 const handleLoad = (node, resolve) => {
   if (node.level === 0) {
@@ -247,7 +230,9 @@ const filterNode = (keyword, data) => {
   const name = String(data?.puppetName || '').toLowerCase()
   const link = String(data?.connLink || '').toLowerCase()
   const sessionMatch = getHostSessions(data).some((session) =>
-    String(session?.sessionId || '').toLowerCase().includes(query)
+    String(session?.sessionId || '')
+      .toLowerCase()
+      .includes(query)
   )
   return name.includes(query) || link.includes(query) || sessionMatch
 }
@@ -268,6 +253,8 @@ const selectAll = async (puppetIds) => {
   const checkedNodes = puppetTree.value?.getCheckedNodes?.() || []
   emit('selection-change', checkedNodes)
 }
+
+const getLoadedPuppet = (puppetId) => puppetTree.value?.getNode?.(puppetId)?.data || null
 
 watch(
   () => props.keyword,
@@ -290,7 +277,8 @@ watch(
 defineExpose({
   clearSelection,
   clearChecked,
-  selectAll
+  selectAll,
+  getLoadedPuppet
 })
 </script>
 
@@ -414,13 +402,21 @@ defineExpose({
   justify-content: center;
   flex: 0 0 auto;
   border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--pm-blue, var(--el-color-primary)) 6%, var(--pm-panel-soft, var(--app-control-background-soft)));
+  background: color-mix(
+    in srgb,
+    var(--pm-blue, var(--el-color-primary)) 6%,
+    var(--pm-panel-soft, var(--app-control-background-soft))
+  );
   border: 1px solid color-mix(in srgb, var(--pm-blue, var(--el-color-primary)) 12%, transparent);
   color: var(--pm-blue, var(--el-color-primary));
 }
 
 .is-child .node-icon-shell {
-  background: color-mix(in srgb, var(--el-color-warning) 10%, var(--pm-panel-soft, var(--app-control-background-soft)));
+  background: color-mix(
+    in srgb,
+    var(--el-color-warning) 10%,
+    var(--pm-panel-soft, var(--app-control-background-soft))
+  );
   border-color: color-mix(in srgb, var(--el-color-warning) 20%, transparent);
   color: var(--el-color-warning);
 }
@@ -438,7 +434,8 @@ defineExpose({
   border-radius: 999px;
   border: 2px solid var(--pm-panel, var(--app-surface-background));
   background: var(--pm-green, var(--el-color-success));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pm-green, var(--el-color-success)) 24%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--pm-green, var(--el-color-success)) 24%, transparent);
 }
 
 .node-dot.offline {
@@ -463,8 +460,15 @@ defineExpose({
 }
 
 @keyframes dotPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.55; transform: scale(0.8); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.8);
+  }
 }
 
 /* ─── Content (two lines) ─── */

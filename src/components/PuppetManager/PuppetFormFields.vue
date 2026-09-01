@@ -203,7 +203,7 @@
               <el-input
                 v-model="puppet.payloadKey"
                 clearable
-                placeholder="请输入连接对应的 PayloadCodec AES 密钥"
+                placeholder="请输入 AES 密钥"
               />
             </el-form-item>
           </el-col>
