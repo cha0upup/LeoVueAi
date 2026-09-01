@@ -531,6 +531,7 @@ const handleGenerateTypeChange = () => {
     form.coreClassName = ''
     // 切换到内存马模式时自动生成随机请求头
     generateRandomHeader()
+    reconcileMemorySelections()
   }
   outputResult.value = ''
   memoryMetadata.value = null

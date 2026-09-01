@@ -52,4 +52,27 @@ describe('script generator protocol compatibility', () => {
       packerType: ''
     })
   })
+
+  it('selects the preferred memory-shell configuration when available', () => {
+    const form = {
+      serverType: '',
+      shellType: '',
+      packerType: ''
+    }
+
+    reconcileMemoryProtocolSelection({
+      form,
+      serverInjectorTypes: {
+        Jetty: ['FilterInjector'],
+        Tomcat: ['ListenerInjector', 'FilterInjector']
+      },
+      compatiblePackerNames: ['GzipBase64', 'DefaultBase64']
+    })
+
+    expect(form).toEqual({
+      serverType: 'Tomcat',
+      shellType: 'FilterInjector',
+      packerType: 'DefaultBase64'
+    })
+  })
 })

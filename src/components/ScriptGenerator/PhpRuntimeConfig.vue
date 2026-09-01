@@ -38,43 +38,15 @@
         >{{ requirementLabel(mode) }}</span>
       </button>
     </div>
-
-    <div class="php-security-row">
-      <div>
-        <strong>可选 Header 门禁</strong>
-        <small>留空时关闭；填写时名称和值必须成对配置</small>
-      </div>
-      <button
-        class="random-button"
-        type="button"
-        @click="emit('generate-random-header')"
-      >
-        <Icon :icon="iconMap.refresh" /> 随机
-      </button>
-    </div>
-    <div class="header-pair">
-      <el-input
-        v-model="form.headerName"
-        placeholder="Header 名"
-      />
-      <span>:</span>
-      <el-input
-        v-model="form.headerValue"
-        placeholder="Header 值"
-      />
-    </div>
   </section>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { icons } from '@/utils/icons.js'
 import { PHP_OUTPUT_MODES } from './scriptGeneratorBuildModel.js'
 
-const iconMap = icons
 const form = defineModel('form', { type: Object, required: true })
 const props = defineProps({ metadata: { type: Object, default: () => ({}) } })
-const emit = defineEmits(['generate-random-header'])
 
 const minimumVersion = computed(() => props.metadata.minimumVersion || form.value.phpMinimumVersion || '5.6')
 const outputModes = computed(() => Array.isArray(props.metadata.outputModes) && props.metadata.outputModes.length
@@ -113,12 +85,5 @@ const requirementLabel = mode => {
 .output-mode-card > b { font-size: 11px; }
 .output-mode-card > small { color: var(--sg-muted); font-size: 8px; line-height: 1.35; }
 .requirement-chip { margin-top: auto; color: var(--el-color-warning); font-size: 7px; }
-.php-security-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; margin-bottom: 7px; }
-.php-security-row > div { display: flex; flex-direction: column; gap: 2px; }
-.php-security-row strong { font-size: 10px; }
-.php-security-row small { color: var(--sg-muted); font-size: 8px; }
-.random-button { height: 25px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; border: 1px solid var(--sg-border); border-radius: 7px; background: var(--sg-panel-strong); color: var(--sg-blue); font-size: 9px; cursor: pointer; }
-.header-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 7px; }
-.header-pair > span { color: var(--sg-muted); font-weight: 700; }
 @media (max-width: 760px) { .output-mode-grid, .runtime-facts { grid-template-columns: 1fr; } }
 </style>

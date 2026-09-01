@@ -1,37 +1,5 @@
 <template>
   <div class="java-runtime-config">
-    <section class="java-strategy form-group">
-      <div class="group-heading">
-        <strong>Java 构建策略</strong>
-      </div>
-      <div class="form-grid">
-        <el-form-item
-          label="目标 JDK"
-          required
-        >
-          <el-select
-            v-model="form.targetJavaVersion"
-            @change="handleTargetJavaVersionChange"
-          >
-            <el-option
-              v-for="version in targetJavaVersions"
-              :key="version"
-              :label="targetJavaLabel(version)"
-              :value="version"
-            />
-          </el-select>
-        </el-form-item>
-      </div>
-      <div
-        v-if="compatibilityMessage"
-        class="compatibility-note"
-        :class="`is-${compatibilityTone}`"
-      >
-        <Icon :icon="compatibilityTone === 'warning' ? iconMap.warning : iconMap.info" />
-        {{ compatibilityMessage }}
-      </div>
-    </section>
-
     <section
       v-if="form.generateType === 'webshell'"
       class="form-group"
@@ -198,37 +166,14 @@
       </div>
     </section>
 
-    <section
-      v-if="form.generateType === 'webshell' || form.generateType === 'memoryshell'"
-      class="form-group header-gate-panel"
+    <div
+      v-if="compatibilityMessage"
+      class="compatibility-note"
+      :class="`is-${compatibilityTone}`"
     >
-      <div class="group-heading">
-        <strong>{{ form.protocol === 'websocket' ? 'WebSocket 查询门禁' : 'Header 门禁' }}</strong>
-        <button
-          v-if="form.generateType === 'webshell' || selectedInjectorCapability?.supportsHeaderGate !== false"
-          class="random-button"
-          type="button"
-          @click="emit('generate-random-header')"
-        >
-          <Icon :icon="iconMap.refresh" />
-          随机
-        </button>
-      </div>
-      <div
-        v-if="form.generateType === 'webshell' || selectedInjectorCapability?.supportsHeaderGate !== false"
-        class="header-pair"
-      >
-        <el-input
-          v-model="form.headerName"
-          :placeholder="form.protocol === 'websocket' ? '查询参数名，如 token' : 'Header 名，如 X-Token'"
-        />
-        <span>:</span>
-        <el-input
-          v-model="form.headerValue"
-          :placeholder="form.protocol === 'websocket' ? '查询参数值' : 'Header 值'"
-        />
-      </div>
-    </section>
+      <Icon :icon="compatibilityTone === 'warning' ? iconMap.warning : iconMap.info" />
+      {{ compatibilityMessage }}
+    </div>
 
     <slot />
 
@@ -241,6 +186,22 @@
         <Icon :icon="iconMap.arrowDown" />
       </summary>
       <div class="form-grid advanced-grid">
+        <el-form-item
+          label="目标 JDK"
+          required
+        >
+          <el-select
+            v-model="form.targetJavaVersion"
+            @change="handleTargetJavaVersionChange"
+          >
+            <el-option
+              v-for="version in targetJavaVersions"
+              :key="version"
+              :label="targetJavaLabel(version)"
+              :value="version"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="核心类名">
           <el-input
             v-model="form.coreClassName"
@@ -332,7 +293,7 @@ const props = defineProps({
     })
   }
 })
-const emit = defineEmits(['server-type-change', 'generate-random-header'])
+const emit = defineEmits(['server-type-change'])
 
 const protocolMetadata = Object.freeze({
   http: { value: 'http', label: 'HTTP', description: '标准请求响应' },
@@ -384,9 +345,6 @@ const servletWarning = computed(() => {
   if (!isInjectorNamespaceCompatible(form.value.servletNamespace)) {
     return `${form.value.serverType} / ${form.value.shellType} 仅支持 Javax Servlet`
   }
-  if (form.value.servletNamespace === 'auto') {
-    return '自动模式生成 javax.servlet；Tomcat 10+、Jetty 11+ 或 Spring 6 请选择 Jakarta Servlet'
-  }
   if (form.value.servletNamespace === 'jakarta' && form.value.targetJavaVersion === 'auto') {
     return 'Jakarta Servlet 需要 JDK 8+，建议明确目标 JDK'
   }
@@ -410,8 +368,8 @@ const selectedInjectorPackers = computed(() => getInjectorSupportedPackers(
 ))
 const showServletNamespace = computed(() => usesServletNamespace(selectedInjectorCapability.value))
 const advancedConfigDescription = computed(() => showServletNamespace.value
-  ? '类名、Servlet API、模块兼容等低频选项'
-  : '类名、模块兼容等低频选项')
+  ? '目标 JDK、Servlet API、类名与模块兼容等低频选项'
+  : '目标 JDK、类名与模块兼容等低频选项')
 const routeField = computed(() => getInjectorRouteField(
   selectedInjectorCapability.value,
   form.value.protocol
@@ -469,9 +427,6 @@ const handleTargetJavaVersionChange = () => {
 .strategy-option strong, .protocol-grid strong { color: var(--sg-blue); font-size: 10px; }
 .strategy-option small, .protocol-grid small { color: var(--sg-muted); font-size: 8px; }
 .field-label { margin-bottom: 6px; color: var(--sg-muted); font-size: 10px; font-weight: 600; }
-.header-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 7px; margin-bottom: 9px; }
-.header-pair > span { color: var(--sg-muted); font-weight: 700; }
-.random-button { height: 25px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; border: 1px solid var(--sg-border); border-radius: 7px; background: var(--sg-panel-strong); color: var(--sg-blue); font-size: 9px; cursor: pointer; }
 .advanced-card { border-bottom: 0; }
 .advanced-card summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 9px; border: 1px solid var(--sg-border); border-radius: 8px; background: var(--sg-panel-soft); cursor: pointer; list-style: none; }
 .advanced-card summary::-webkit-details-marker { display: none; }
@@ -484,6 +439,6 @@ const handleTargetJavaVersionChange = () => {
 .switch-options { display: flex; flex-direction: column; justify-content: center; gap: 7px; }
 .switch-options label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--sg-muted); font-size: 9px; }
 @media (max-width: 760px) {
-  .form-grid, .option-grid, .protocol-grid, .header-pair { grid-template-columns: 1fr; }
+  .form-grid, .option-grid, .protocol-grid { grid-template-columns: 1fr; }
 }
 </style>

@@ -72,17 +72,57 @@
         </el-input>
       </el-form-item>
     </div>
+
+    <div
+      v-if="showHeaderGate"
+      class="transport-gate"
+    >
+      <div class="gate-heading">
+        <div>
+          <strong>{{ headerGateTitle }}</strong>
+          <small v-if="form.runtime === 'php'">留空时关闭；填写时名称和值必须成对配置</small>
+        </div>
+        <button
+          class="random-button"
+          type="button"
+          @click="emit('generate-random-header')"
+        >
+          <Icon :icon="iconMap.refresh" />
+          随机
+        </button>
+      </div>
+      <div class="header-pair">
+        <el-input
+          v-model="form.headerName"
+          :placeholder="form.protocol === 'websocket' ? '查询参数名，如 token' : 'Header 名，如 X-Token'"
+        />
+        <span>:</span>
+        <el-input
+          v-model="form.headerValue"
+          :placeholder="form.protocol === 'websocket' ? '查询参数值' : 'Header 值'"
+        />
+      </div>
+    </div>
   </section>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { icons } from '@/utils/icons.js'
 import { generatePayloadKey } from '@/utils/payloadKey.js'
 
 const form = defineModel('form', { type: Object, required: true })
-defineProps({ disguises: { type: Array, default: () => [] } })
+defineProps({
+  disguises: { type: Array, default: () => [] },
+  showHeaderGate: { type: Boolean, default: true }
+})
+const emit = defineEmits(['generate-random-header'])
 
 const iconMap = icons
+const headerGateTitle = computed(() => {
+  if (form.value.runtime === 'php') return '可选 Header 门禁'
+  return form.value.protocol === 'websocket' ? 'WebSocket 查询门禁' : 'Header 门禁'
+})
 </script>
 
 <style scoped>
@@ -90,5 +130,13 @@ const iconMap = icons
 .group-heading { margin-bottom: 9px; }
 .group-heading strong { color: var(--sg-ink); font-size: 12px; }
 .payload-key-random-btn { width: 32px; padding: 0; }
-@media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }
+.transport-gate { margin-top: 11px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--el-border-color) 18%, transparent); }
+.gate-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.gate-heading > div { display: flex; flex-direction: column; gap: 2px; }
+.gate-heading strong { color: var(--sg-ink); font-size: 10px; }
+.gate-heading small { color: var(--sg-muted); font-size: 8px; }
+.random-button { height: 25px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; border: 1px solid var(--sg-border); border-radius: 7px; background: var(--sg-panel-strong); color: var(--sg-blue); font-size: 9px; cursor: pointer; }
+.header-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 7px; }
+.header-pair > span { color: var(--sg-muted); font-weight: 700; }
+@media (max-width: 760px) { .form-grid, .header-pair { grid-template-columns: 1fr; } }
 </style>

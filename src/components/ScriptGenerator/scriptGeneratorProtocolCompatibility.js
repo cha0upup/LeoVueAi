@@ -1,5 +1,11 @@
 export const normalizeTransportProtocol = protocol => String(protocol || 'http').trim().toLowerCase()
 
+export const DEFAULT_MEMORY_SELECTION = Object.freeze({
+  serverType: 'Tomcat',
+  shellType: 'FilterInjector',
+  packerType: 'DefaultBase64'
+})
+
 const getPackerSupportedProtocols = metadata => {
   const protocols = Array.isArray(metadata?.supportedProtocols)
     ? metadata.supportedProtocols.map(normalizeTransportProtocol).filter(Boolean)
@@ -34,6 +40,9 @@ export const reconcileMemoryProtocolSelection = ({
   compatiblePackerNames
 }) => {
   const serverTypes = Object.keys(serverInjectorTypes || {})
+  if (!form.serverType && serverTypes.includes(DEFAULT_MEMORY_SELECTION.serverType)) {
+    form.serverType = DEFAULT_MEMORY_SELECTION.serverType
+  }
   if (form.serverType && !serverTypes.includes(form.serverType)) {
     form.serverType = serverTypes[0] || ''
   }
@@ -42,12 +51,20 @@ export const reconcileMemoryProtocolSelection = ({
     ? serverInjectorTypes?.[form.serverType] || []
     : []
   if (form.shellType && !injectorNames.includes(form.shellType)) {
-    form.shellType = injectorNames.length === 1 ? injectorNames[0] : ''
-  } else if (!form.shellType && form.serverType && injectorNames.length === 1) {
-    form.shellType = injectorNames[0]
+    form.shellType = ''
+  }
+  if (!form.shellType && form.serverType) {
+    form.shellType = injectorNames.includes(DEFAULT_MEMORY_SELECTION.shellType)
+      ? DEFAULT_MEMORY_SELECTION.shellType
+      : injectorNames.length === 1
+        ? injectorNames[0]
+        : ''
   }
 
   if (form.packerType && !compatiblePackerNames.includes(form.packerType)) {
     form.packerType = ''
+  }
+  if (!form.packerType && compatiblePackerNames.includes(DEFAULT_MEMORY_SELECTION.packerType)) {
+    form.packerType = DEFAULT_MEMORY_SELECTION.packerType
   }
 }

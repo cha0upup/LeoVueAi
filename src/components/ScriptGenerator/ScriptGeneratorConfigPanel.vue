@@ -20,6 +20,8 @@
         <DisguiseTransportPanel
           v-model:form="form"
           :disguises="disguises"
+          :show-header-gate="showHeaderGate"
+          @generate-random-header="emit('generate-random-header')"
         />
 
         <JavaRuntimeConfig
@@ -35,7 +37,6 @@
           :servlet-namespaces="servletNamespaces"
           :transport-protocols="transportProtocols"
           @server-type-change="emit('server-type-change')"
-          @generate-random-header="emit('generate-random-header')"
         >
           <ObfuscationEditor
             v-if="showObfuscationSection"
@@ -53,7 +54,6 @@
           v-else
           v-model:form="form"
           :metadata="runtimeGenerators.php"
-          @generate-random-header="emit('generate-random-header')"
         />
       </el-form>
     </div>
@@ -133,6 +133,17 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['set-runtime', 'set-generate-type', 'server-type-change', 'generate-random-header'])
+
+const selectedInjectorCapability = computed(() => props.injectorCapabilities.find((item) =>
+  item?.serverType === form.value.serverType
+    && item?.protocol === form.value.protocol
+    && item?.injectorName === form.value.shellType
+))
+
+const showHeaderGate = computed(() => {
+  if (form.value.runtime === 'php' || form.value.generateType === 'webshell') return true
+  return selectedInjectorCapability.value?.supportsHeaderGate !== false
+})
 
 // ---- JSP 混淆层逻辑 ----
 
