@@ -192,10 +192,17 @@ const hasCompletedTasks = computed(() => {
 // 从选中的任务中收集所有开放端口为 TCP 目标 { host, port }
 const selectedTcpTargets = computed(() => {
   return props.tasks
-    .filter((task) => selectedTasks.value.includes(task.taskId) && task.openPortList?.length > 0)
-    .flatMap((task) =>
-      (task.openPortList || []).map((port) => ({ host: task.scanHost, port: Number(port) }))
-    )
+    .filter((task) => selectedTasks.value.includes(task.taskId) && (
+      task.openPortResults?.length > 0 || task.openPortList?.length > 0
+    ))
+    .flatMap((task) => {
+      if (Array.isArray(task.openPortResults) && task.openPortResults.length > 0) {
+        return task.openPortResults
+          .filter(result => result?.host && result?.port)
+          .map(result => ({ host: result.host, port: Number(result.port) }))
+      }
+      return (task.openPortList || []).map((port) => ({ host: task.scanHost, port: Number(port) }))
+    })
 })
 
 const selectedTcpTargetsCount = computed(() => selectedTcpTargets.value.length)
@@ -230,10 +237,19 @@ const exportToCSV = (tasks, filename) => {
     '已扫描',
     '开放端口数',
     '开放端口',
+    '服务识别',
     '创建时间'
   ]
   const rows = tasks.map((task) => {
-    const openPorts = task.openPortList?.join(',') || ''
+    const structuredOpenPorts = Array.isArray(task.openPortResults) ? task.openPortResults : []
+    const openPorts = structuredOpenPorts.length > 0
+      ? structuredOpenPorts
+        .map((result) => `${result.host ? `${result.host}:` : ''}${result.port}`)
+        .join(',')
+      : task.openPortList?.join(',') || ''
+    const services = (task.serviceResults || [])
+      .map((service) => `${service.host ? `${service.host}:` : ''}${service.port}/${service.service || 'unknown'}`)
+      .join('; ')
     const createTime = task.createTime ? new Date(task.createTime).toLocaleString('zh-CN') : ''
 
     return [
@@ -243,8 +259,9 @@ const exportToCSV = (tasks, filename) => {
       getTaskStatusText(task),
       task.portLength || 0,
       task.scannedCount || 0,
-      task.openPortList?.length || 0,
+      structuredOpenPorts.length || task.openPortList?.length || 0,
       openPorts,
+      services,
       createTime
     ]
   })

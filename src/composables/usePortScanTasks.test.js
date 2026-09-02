@@ -75,7 +75,8 @@ describe('usePortScanTasks', () => {
       scanHost: 'host',
       scanPorts: [80, 443],
       scanTimeout: 1000,
-      threadsNum: 4
+      threadsNum: 4,
+      probeServices: true
     })
     expect(subject.tasks.value[0]).toMatchObject({
       taskId: 'task-1',
@@ -105,6 +106,49 @@ describe('usePortScanTasks', () => {
     expect(subject.tasks.value).toHaveLength(0)
     expect(subject.isStarting.value).toBe(false)
     expect(mocks.createScanTask).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  it('creates one unified task for a batch of hosts', async () => {
+    const { scope, subject } = createSubject()
+    const result = await subject.startBatch({
+      hosts: ['host-a', 'host-b', 'host-a'],
+      scanPorts: [80],
+      scanTimeout: 1000,
+      threadsNum: 4
+    })
+
+    expect(result).toMatchObject({ successCount: 2, failCount: 0, taskCount: 1 })
+    expect(mocks.startPortScanApi).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      scanHosts: ['host-a', 'host-b'],
+      scanPorts: [80],
+      scanTimeout: 1000,
+      threadsNum: 4,
+      probeServices: true
+    })
+    expect(subject.tasks.value[0].scanHost).toBe('host-a, host-b')
+    scope.stop()
+  })
+
+  it('falls back to single-target tasks for legacy nodes', async () => {
+    mocks.startPortScanApi
+      .mockRejectedValueOnce(new Error('当前节点不支持多目标端口扫描'))
+      .mockResolvedValueOnce({ data: { taskId: 'task-a' } })
+      .mockResolvedValueOnce({ data: { taskId: 'task-b' } })
+    const { scope, subject } = createSubject()
+
+    const result = await subject.startBatch({
+      hosts: ['host-a', 'host-b'],
+      scanPorts: [80],
+      scanTimeout: 1000,
+      threadsNum: 4
+    })
+
+    expect(result).toMatchObject({ successCount: 2, failCount: 0, taskCount: 2 })
+    expect(mocks.startPortScanApi).toHaveBeenNthCalledWith(2, expect.objectContaining({ scanHost: 'host-a' }))
+    expect(mocks.startPortScanApi).toHaveBeenNthCalledWith(3, expect.objectContaining({ scanHost: 'host-b' }))
+    expect(subject.tasks.value).toHaveLength(2)
     scope.stop()
   })
 })

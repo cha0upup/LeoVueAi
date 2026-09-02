@@ -176,13 +176,42 @@
           class="port-chips"
         >
           <span
-            v-for="port in task.openPortList"
-            :key="port"
+            v-for="entry in openPortEntries"
+            :key="entry.key"
             class="port-chip"
-          >{{ port }}</span>
+          >{{ entry.label }}</span>
         </div>
       </transition>
     </template>
+
+    <div
+      v-if="serviceResults.length > 0"
+      class="service-results"
+    >
+      <div class="service-results-heading">
+        服务识别
+      </div>
+      <div
+        v-for="(service, index) in serviceResults"
+        :key="`${service.host || 'target'}-${service.port}-${service.service || 'unknown'}-${index}`"
+        class="service-result"
+      >
+        <span
+          v-if="isMultiTarget && service.host"
+          class="service-result-host"
+        >{{ service.host }}</span>
+        <span class="service-result-port">{{ service.port }}</span>
+        <span class="service-result-name">{{ formatServiceName(service) }}</span>
+        <span
+          v-if="service.statusCode"
+          class="service-result-meta"
+        >HTTP {{ service.statusCode }}</span>
+        <span
+          v-if="service.server"
+          class="service-result-meta"
+        >{{ service.server }}</span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -214,13 +243,43 @@ const shortTaskId = computed(() => {
   return taskId.length > 16 ? taskId.slice(-12) : taskId
 })
 
-const openCount = computed(() => props.task.openPortList?.length || 0)
+const openCount = computed(() => (
+  props.task.openPortResults?.length > 0
+    ? props.task.openPortResults.length
+    : props.task.openPortList?.length || 0
+))
+const isMultiTarget = computed(() => (props.task.targetCount || props.task.scanHosts?.length || 0) > 1)
+const openPortEntries = computed(() => {
+  if (Array.isArray(props.task.openPortResults) && props.task.openPortResults.length > 0) {
+    return props.task.openPortResults.map((result, index) => {
+      const host = result?.host || ''
+      const port = result?.port ?? ''
+      return {
+        key: `${host}-${port}-${index}`,
+        label: isMultiTarget.value && host ? `${host}:${port}` : String(port),
+        exportLabel: host ? `${host}:${port}` : String(port)
+      }
+    })
+  }
+  return (props.task.openPortList || []).map((port, index) => ({
+    key: `${port}-${index}`,
+    label: String(port),
+    exportLabel: String(port)
+  }))
+})
+const serviceResults = computed(() => Array.isArray(props.task.serviceResults) ? props.task.serviceResults : [])
 
 const canExport = computed(() =>
   props.task.status === 'STOPPED' &&
   props.task.scannedCount === props.task.portLength &&
   openCount.value > 0
 )
+
+const formatServiceName = (service) => {
+  const name = service?.service || 'unknown'
+  const version = service?.version || service?.product
+  return version ? `${name} · ${version}` : name
+}
 
 const handleSelect = (checked) => {
   emit('select', props.task.taskId, checked)
@@ -262,8 +321,11 @@ function formatTimeShort(timestamp) {
 
 const handleExport = () => {
   const task = props.task
-  const headers = ['主机地址', '任务ID', '扫描状态', '总端口数', '已扫描', '开放端口数', '开放端口', '创建时间']
-  const openPorts = task.openPortList?.join(',') || ''
+  const headers = ['主机地址', '任务ID', '扫描状态', '总端口数', '已扫描', '开放端口数', '开放端口', '服务识别', '创建时间']
+  const openPorts = openPortEntries.value.map((entry) => entry.exportLabel).join(',')
+  const services = serviceResults.value
+    .map((service) => `${service.host ? `${service.host}:` : ''}${service.port}/${formatServiceName(service)}`)
+    .join('; ')
   const createTime = task.createTime ? new Date(task.createTime).toLocaleString('zh-CN') : ''
   const row = [
     task.scanHost || '',
@@ -273,6 +335,7 @@ const handleExport = () => {
     task.scannedCount || 0,
     openCount.value,
     openPorts,
+    services,
     createTime
   ]
   const csvContent = [
@@ -576,6 +639,62 @@ const handleExport = () => {
   color: var(--el-text-color-regular);
   font-family: var(--el-font-family-mono);
   cursor: default;
+}
+
+/* ── Service results ──────────────────────────────────────────────── */
+.service-results {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--task-item-border-soft);
+  border-radius: var(--radius-control);
+  background: var(--task-item-muted-surface);
+}
+
+.service-results-heading {
+  margin-bottom: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.service-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+}
+
+.service-result-port {
+  min-width: 42px;
+  color: var(--el-text-color-secondary);
+  font-family: var(--el-font-family-mono);
+}
+
+.service-result-host {
+  max-width: 150px;
+  overflow: hidden;
+  color: var(--el-text-color-secondary);
+  font-family: var(--el-font-family-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-result-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-result-meta {
+  overflow: hidden;
+  color: var(--el-text-color-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Animation ───────────────────────────────────────────────────── */

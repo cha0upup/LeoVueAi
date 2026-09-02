@@ -71,7 +71,7 @@
             <el-checkbox
               v-for="port in commonPorts"
               :key="port.value"
-              :label="port.value"
+              :value="port.value"
               class="port-checkbox"
             >
               {{ port.label }} ({{ port.value }})
@@ -180,14 +180,32 @@
           <el-input-number
             v-model="scanForm.threadsNum"
             :min="1"
-            :max="200"
+            :max="64"
             controls-position="right"
             class="ctrl-input"
           />
           <span class="ctrl-unit">threads</span>
         </div>
         <div class="cfg-hint">
-          控制并发扫描数量，建议按目标主机性能调整
+          服务端并发上限 64
+        </div>
+      </div>
+
+      <div class="cfg-section cfg-section--probe">
+        <div class="cfg-section-label">
+          服务识别
+        </div>
+        <div class="probe-setting">
+          <span class="probe-setting-label">开放端口自动探测</span>
+          <el-switch
+            v-model="scanForm.probeServices"
+            inline-prompt
+            active-text="开"
+            inactive-text="关"
+          />
+        </div>
+        <div class="cfg-hint">
+          仅发送有限的 Banner/HTTP HEAD 探测请求
         </div>
       </div>
     </el-form>
@@ -220,6 +238,7 @@ import { icons } from '@/utils/icons.js'
 import { showWarning } from '@/utils/messageUtils.js'
 
 const iconMap = icons
+const MAX_SCAN_PORTS = 4096
 
 defineProps({
   isStarting: {
@@ -244,6 +263,7 @@ const scanForm = ref({
   scanPorts: [],
   scanTimeout: 3000,
   threadsNum: 50,
+  probeServices: true,
   commonPorts: [],
   startPort: 1,
   endPort: 100,
@@ -294,14 +314,18 @@ const formRules = {
     { required: true, message: '请输入目标主机地址', trigger: 'blur' },
     {
       pattern:
-        /^((\d{1,3}\.){3}\d{1,3}|([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,})$/,
-      message: '请输入有效的IP地址或域名',
+        /^(?=.{1,253}$)((\d{1,3}\.){3}\d{1,3}|([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4})$/,
+      message: '请输入有效的 IP、IPv6 地址或域名',
       trigger: 'blur'
     }
   ],
   scanPorts: [
     {
       validator: (rule, value, callback) => {
+        if (portLimitExceeded.value) {
+          callback(new Error(`扫描端口不能超过 ${MAX_SCAN_PORTS} 个`))
+          return
+        }
         const ports = getPortsList()
         if (ports.length === 0) callback(new Error('请至少选择一个端口'))
         else callback()
@@ -315,11 +339,20 @@ const formRules = {
   ],
   threadsNum: [
     { required: true, message: '请输入线程数量', trigger: 'blur' },
-    { type: 'number', min: 1, max: 200, message: '线程数量应在1-200之间', trigger: 'blur' }
+    { type: 'number', min: 1, max: 64, message: '线程数量应在1-64之间', trigger: 'blur' }
   ]
 }
 
-const canStartScan = computed(() => scanForm.value.scanHost && getPortsList().length > 0)
+const requestedPortCount = computed(() => {
+  if (portInputMode.value !== 'range') return getPortsList().length
+  const start = Number(scanForm.value.startPort)
+  const end = Number(scanForm.value.endPort)
+  return Number.isInteger(start) && Number.isInteger(end) && end >= start ? end - start + 1 : 0
+})
+const portLimitExceeded = computed(() => requestedPortCount.value > MAX_SCAN_PORTS)
+const canStartScan = computed(() =>
+  scanForm.value.scanHost && !portLimitExceeded.value && getPortsList().length > 0
+)
 const portsPreview = computed(() => getPortsList().slice(0, 10))
 const isAllSelected = computed(() =>
   scanForm.value.commonPorts.length === commonPorts.length && commonPorts.length > 0
@@ -351,6 +384,7 @@ const generatePortRange = () => {
   const start = scanForm.value.startPort
   const end = scanForm.value.endPort
   if (!start || !end || start > end) { parsedPorts.value = []; return }
+  if (end - start + 1 > MAX_SCAN_PORTS) { parsedPorts.value = []; return }
   parsedPorts.value = []
   for (let i = start; i <= end; i++) parsedPorts.value.push(i)
 }
@@ -377,12 +411,17 @@ const handleStartScan = async () => {
   await formRef.value.validate(async (valid) => {
     if (!valid) return
     const ports = getPortsList()
+    if (portLimitExceeded.value) {
+      showWarning(`扫描端口不能超过 ${MAX_SCAN_PORTS} 个`)
+      return
+    }
     if (ports.length === 0) { showWarning('请至少选择一个端口'); return }
     emit('start-scan', {
       scanHost: scanForm.value.scanHost,
       scanPorts: ports,
       scanTimeout: scanForm.value.scanTimeout,
-      threadsNum: scanForm.value.threadsNum
+      threadsNum: scanForm.value.threadsNum,
+      probeServices: scanForm.value.probeServices
     })
   })
 }
@@ -393,6 +432,7 @@ const handleResetForm = () => {
     scanPorts: [],
     scanTimeout: 3000,
     threadsNum: 50,
+    probeServices: true,
     commonPorts: [],
     startPort: 1,
     endPort: 100,
@@ -553,6 +593,19 @@ const handleResetForm = () => {
   font-weight: 600;
   color: var(--el-text-color-regular);
   flex-shrink: 0;
+}
+
+.probe-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.probe-setting-label {
+  color: var(--el-text-color-regular);
+  font-size: 13px;
 }
 
 .ctrl-separator {

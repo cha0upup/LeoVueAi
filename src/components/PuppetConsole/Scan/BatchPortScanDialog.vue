@@ -12,7 +12,7 @@
         <el-icon class="summary-icon">
           <Icon :icon="iconMap.server" />
         </el-icon>
-        <span>已选择 <strong>{{ selectedHosts.length }}</strong> 个主机，将为每个主机分别创建扫描任务</span>
+        <span>已选择 <strong>{{ selectedHosts.length }}</strong> 个主机，优先合并为一个任务</span>
       </div>
 
       <el-form
@@ -65,7 +65,7 @@
               <el-checkbox
                 v-for="port in commonPorts"
                 :key="port.value"
-                :label="port.value"
+                :value="port.value"
                 class="port-checkbox"
               >
                 {{ port.label }} ({{ port.value }})
@@ -156,14 +156,14 @@
             <el-input-number
               v-model="scanConfig.threadsNum"
               :min="1"
-              :max="200"
+              :max="64"
               controls-position="right"
               class="ctrl-input"
             />
             <span class="ctrl-unit">threads</span>
           </div>
           <div class="cfg-hint">
-            控制并发扫描数量，建议按目标主机性能调整
+            服务端并发上限 64
           </div>
         </div>
       </el-form>
@@ -287,7 +287,7 @@ const formRules = {
   ],
   threadsNum: [
     { required: true, message: '请输入线程数量', trigger: 'blur' },
-    { type: 'number', min: 1, max: 200, message: '线程数量应在1-200之间', trigger: 'blur' }
+    { type: 'number', min: 1, max: 64, message: '线程数量应在1-64之间', trigger: 'blur' }
   ]
 }
 
