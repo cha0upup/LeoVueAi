@@ -52,8 +52,7 @@ export const HOME_MENU_GROUPS = [
     kicker: 'Operations',
     title: '运行工作台',
     items: [
-      { key: 'puppet', title: '主机资产', icon: icons.server },
-      { key: 'task-center', title: '任务总览', icon: icons.task }
+      { key: 'puppet', title: '主机资产', icon: icons.server }
     ]
   },
   {

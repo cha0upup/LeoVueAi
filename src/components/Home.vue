@@ -44,35 +44,15 @@
                   :key="item.key"
                   type="button"
                   class="menu-item"
-                  :class="{
-                    'is-active': selectedMenu === item.key,
-                    'has-task-alert': item.key === 'task-center' && taskSummary.failed > 0
-                  }"
-                  :title="sidebarCollapsed ? menuAriaLabel(item) : ''"
-                  :aria-label="menuAriaLabel(item)"
+                  :class="{ 'is-active': selectedMenu === item.key }"
+                  :title="sidebarCollapsed ? item.title : ''"
+                  :aria-label="item.title"
                   @click="handleSelect(item.key)"
                 >
                   <span class="menu-icon">
                     <el-icon><Icon :icon="item.icon" /></el-icon>
                   </span>
                   <strong class="menu-title">{{ item.title }}</strong>
-                  <span
-                    v-if="item.key === 'task-center' && hasTaskBadge"
-                    class="menu-badges"
-                  >
-                    <StatusIndicator
-                      v-if="taskSummary.active > 0"
-                      status="running"
-                      :label="String(taskSummary.active)"
-                      compact
-                    />
-                    <StatusIndicator
-                      v-if="taskSummary.failed > 0"
-                      status="failed"
-                      :label="String(taskSummary.failed)"
-                      compact
-                    />
-                  </span>
                 </button>
               </section>
             </div>
@@ -108,11 +88,9 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { defineAsyncComponent, onMounted, reactive, ref, watch } from 'vue'
 import { DEFAULT_HOME_MENU_KEY, HOME_MENU_GROUPS } from '@/constants/app.js'
-import { globalTaskCenterSnapshotApi } from '@/services/api.js'
 import { icons } from '@/utils/icons.js'
-import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 
 const ScriptGenerator = defineAsyncComponent(
@@ -131,9 +109,6 @@ const PuppetManager = defineAsyncComponent(
   () => import('@/components/PuppetManager/PuppetManager.vue')
 )
 const UserSpace = defineAsyncComponent(() => import('@/components/UserSpace/UserSpace.vue'))
-const GlobalTaskCenter = defineAsyncComponent(
-  () => import('@/components/TaskCenter/GlobalTaskCenter.vue')
-)
 const SkillManager = defineAsyncComponent(
   () => import('@/components/SkillManager/SkillManager.vue')
 )
@@ -143,16 +118,12 @@ const selectedMenu = ref(DEFAULT_HOME_MENU_KEY)
 const SIDEBAR_COLLAPSED_KEY = 'leovue-home-sidebar-collapsed'
 const sidebarCollapsed = ref(false)
 const iconMap = icons
-const taskSummary = ref({ active: 0, failed: 0 })
-let taskSummaryTimer = null
 // 记录已挂载过的模块 key，首次访问时懒挂载，之后用 v-show 保留状态
 const initializedModules = reactive({ [DEFAULT_HOME_MENU_KEY]: true })
 const menuGroups = HOME_MENU_GROUPS
-const hasTaskBadge = computed(() => taskSummary.value.active > 0 || taskSummary.value.failed > 0)
 
 const componentMap = {
   puppet: PuppetManager,
-  'task-center': GlobalTaskCenter,
   'user-space': UserSpace,
   hostgen: ScriptGenerator,
   disguise: DisguiseManager,
@@ -173,45 +144,12 @@ const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
-const refreshTaskSummary = async () => {
-  try {
-    const response = await globalTaskCenterSnapshotApi()
-    const summary = response.data?.summary
-    taskSummary.value = {
-      active: Number(summary?.active) || 0,
-      failed: Number(summary?.failed) || 0
-    }
-  } catch {
-    // 导航状态不应因临时网络错误打断用户工作；保留上一轮可用快照。
-  }
-}
-
-const menuAriaLabel = (item) => {
-  if (item.key !== 'task-center' || !hasTaskBadge.value) return item.title
-  const parts = []
-  if (taskSummary.value.active > 0) parts.push(`${taskSummary.value.active} 个进行中`)
-  if (taskSummary.value.failed > 0) parts.push(`${taskSummary.value.failed} 个失败`)
-  return `${item.title}，${parts.join('，')}`
-}
-
-const refreshTaskSummaryWhenVisible = () => {
-  if (document.visibilityState === 'visible') refreshTaskSummary()
-}
-
 const addPuppetEntity = (puppetEntityParams) => {
   emit('addPuppetEntity', puppetEntityParams)
 }
 
 onMounted(() => {
   sidebarCollapsed.value = safeLocalStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
-  refreshTaskSummary()
-  taskSummaryTimer = window.setInterval(refreshTaskSummaryWhenVisible, 15000)
-  document.addEventListener('visibilitychange', refreshTaskSummaryWhenVisible)
-})
-
-onUnmounted(() => {
-  if (taskSummaryTimer) window.clearInterval(taskSummaryTimer)
-  document.removeEventListener('visibilitychange', refreshTaskSummaryWhenVisible)
 })
 
 watch(sidebarCollapsed, (collapsed) => {

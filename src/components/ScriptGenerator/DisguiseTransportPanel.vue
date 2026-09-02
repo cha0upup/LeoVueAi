@@ -51,13 +51,13 @@
         />
       </el-form-item>
       <el-form-item
-        label="PayloadCodec AES 密钥"
+        label="AES 密钥"
         required
       >
         <el-input
           v-model="form.payloadKey"
           clearable
-          placeholder="请输入用户自定义 AES 密钥"
+          placeholder="请输入 AES 密钥"
         >
           <template #append>
             <el-button

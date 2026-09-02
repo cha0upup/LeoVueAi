@@ -4,36 +4,41 @@
       v-if="form.generateType === 'webshell'"
       class="form-group"
     >
-      <div class="group-heading">
-        <strong>WebShell 载体</strong>
-      </div>
-      <div class="option-grid">
-        <button
-          v-for="type in ['JSP', 'JSPX']"
-          :key="type"
-          type="button"
-          class="strategy-option"
-          :class="{ active: form.shellType === type }"
-          @click="form.shellType = type"
+      <div class="form-grid">
+        <el-form-item
+          label="WebShell 载体"
+          required
         >
-          <strong>{{ type }}</strong>
-          <small>{{ type === 'JSP' ? '标准脚本页' : 'XML 文档格式' }}</small>
-        </button>
-      </div>
-      <div class="field-label">
-        传输协议
-      </div>
-      <div class="protocol-grid">
-        <button
-          v-for="item in protocolOptions"
-          :key="item.value"
-          type="button"
-          :class="{ active: form.protocol === item.value }"
-          @click="form.protocol = item.value"
+          <el-select
+            v-model="form.shellType"
+            placeholder="选择载体"
+          >
+            <el-option
+              label="JSP"
+              value="JSP"
+            />
+            <el-option
+              label="JSPX"
+              value="JSPX"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item
+          label="传输协议"
+          required
         >
-          <strong>{{ item.label }}</strong>
-          <small>{{ item.description }}</small>
-        </button>
+          <el-select
+            v-model="form.protocol"
+            placeholder="选择协议"
+          >
+            <el-option
+              v-for="item in protocolOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
       </div>
     </section>
 
@@ -44,22 +49,69 @@
       <div class="group-heading">
         <strong>宿主与装载策略</strong>
       </div>
-      <div class="field-label">
-        传输协议
-      </div>
-      <div class="protocol-grid">
-        <button
-          v-for="item in protocolOptions"
-          :key="item.value"
-          type="button"
-          :class="{ active: form.protocol === item.value }"
-          @click="form.protocol = item.value"
-        >
-          <strong>{{ item.label }}</strong>
-          <small>{{ item.description }}</small>
-        </button>
-      </div>
       <div class="form-grid">
+        <el-form-item
+          label="传输协议"
+          required
+        >
+          <el-select
+            v-model="form.protocol"
+            placeholder="选择协议"
+          >
+            <el-option
+              v-for="item in protocolOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item
+          label="打包器 Packer"
+          required
+        >
+          <el-select
+            v-model="form.packerType"
+            placeholder="按分组选择打包器"
+            clearable
+            filterable
+          >
+            <el-option-group
+              v-for="group in packerTypesStructure.groups"
+              :key="group.groupName"
+              :label="group.groupName"
+            >
+              <el-option
+                v-for="packer in group.packers"
+                :key="group.groupName + ':' + packer"
+                :label="packerLabel(packer)"
+                :value="packer"
+                :disabled="!isPackerCompatible(packer)"
+              />
+            </el-option-group>
+            <el-option-group
+              v-if="packerTypesStructure.ungrouped.length"
+              label="其他"
+            >
+              <el-option
+                v-for="packer in packerTypesStructure.ungrouped"
+                :key="'ug:' + packer"
+                :label="packerLabel(packer)"
+                :value="packer"
+                :disabled="!isPackerCompatible(packer)"
+              />
+            </el-option-group>
+            <template v-if="!packerTypesStructure.groups.length && !packerTypesStructure.ungrouped.length">
+              <el-option
+                v-for="packer in packerTypesFlat"
+                :key="packer"
+                :label="packerLabel(packer)"
+                :value="packer"
+                :disabled="!isPackerCompatible(packer)"
+              />
+            </template>
+          </el-select>
+        </el-form-item>
         <el-form-item
           label="应用服务器"
           required
@@ -114,53 +166,6 @@
               :label="`${form.serverType} ${version}`"
               :value="version"
             />
-          </el-select>
-        </el-form-item>
-        <el-form-item
-          class="span-2"
-          label="打包器 Packer"
-          required
-        >
-          <el-select
-            v-model="form.packerType"
-            placeholder="按分组选择打包器"
-            clearable
-            filterable
-          >
-            <el-option-group
-              v-for="group in packerTypesStructure.groups"
-              :key="group.groupName"
-              :label="group.groupName"
-            >
-              <el-option
-                v-for="packer in group.packers"
-                :key="group.groupName + ':' + packer"
-                :label="packerLabel(packer)"
-                :value="packer"
-                :disabled="!isPackerCompatible(packer)"
-              />
-            </el-option-group>
-            <el-option-group
-              v-if="packerTypesStructure.ungrouped.length"
-              label="其他"
-            >
-              <el-option
-                v-for="packer in packerTypesStructure.ungrouped"
-                :key="'ug:' + packer"
-                :label="packerLabel(packer)"
-                :value="packer"
-                :disabled="!isPackerCompatible(packer)"
-              />
-            </el-option-group>
-            <template v-if="!packerTypesStructure.groups.length && !packerTypesStructure.ungrouped.length">
-              <el-option
-                v-for="packer in packerTypesFlat"
-                :key="packer"
-                :label="packerLabel(packer)"
-                :value="packer"
-                :disabled="!isPackerCompatible(packer)"
-              />
-            </template>
           </el-select>
         </el-form-item>
       </div>
@@ -296,9 +301,9 @@ const props = defineProps({
 const emit = defineEmits(['server-type-change'])
 
 const protocolMetadata = Object.freeze({
-  http: { value: 'http', label: 'HTTP', description: '标准请求响应' },
-  httpchunk: { value: 'httpchunk', label: 'HTTP Chunk', description: '持久分帧连接' },
-  websocket: { value: 'websocket', label: 'WebSocket', description: 'WebSocket 连接' }
+  http: { value: 'http', label: 'HTTP' },
+  httpchunk: { value: 'httpchunk', label: 'HTTP Chunk' },
+  websocket: { value: 'websocket', label: 'WebSocket' }
 })
 const protocolOptions = computed(() => {
   const key = form.value.generateType === 'memoryshell' ? 'memoryshell' : 'webshell'
@@ -418,15 +423,8 @@ const handleTargetJavaVersionChange = () => {
 .group-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
 .group-heading strong { color: var(--sg-ink); font-size: 12px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 10px; }
-.span-2 { grid-column: 1 / -1; }
 .compatibility-note { display: flex; align-items: flex-start; gap: 6px; margin-top: 8px; padding: 6px 7px; border-radius: 6px; background: color-mix(in srgb, var(--sg-blue) 8%, var(--sg-panel-strong)); color: var(--sg-muted); font-size: 8px; line-height: 1.4; }
 .compatibility-note.is-warning { background: color-mix(in srgb, var(--el-color-warning) 10%, var(--sg-panel-strong)); color: var(--el-color-warning); }
-.option-grid, .protocol-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-bottom: 10px; }
-.strategy-option, .protocol-grid button { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 9px; border: 1px solid var(--sg-border); border-radius: 8px; background: var(--sg-panel-strong); color: var(--sg-ink); text-align: left; cursor: pointer; }
-.strategy-option.active, .protocol-grid button.active { border-color: var(--sg-blue); background: var(--sg-blue-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sg-blue) 20%, transparent); }
-.strategy-option strong, .protocol-grid strong { color: var(--sg-blue); font-size: 10px; }
-.strategy-option small, .protocol-grid small { color: var(--sg-muted); font-size: 8px; }
-.field-label { margin-bottom: 6px; color: var(--sg-muted); font-size: 10px; font-weight: 600; }
 .advanced-card { border-bottom: 0; }
 .advanced-card summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 9px; border: 1px solid var(--sg-border); border-radius: 8px; background: var(--sg-panel-soft); cursor: pointer; list-style: none; }
 .advanced-card summary::-webkit-details-marker { display: none; }
@@ -439,6 +437,6 @@ const handleTargetJavaVersionChange = () => {
 .switch-options { display: flex; flex-direction: column; justify-content: center; gap: 7px; }
 .switch-options label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--sg-muted); font-size: 9px; }
 @media (max-width: 760px) {
-  .form-grid, .option-grid, .protocol-grid { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
 }
 </style>

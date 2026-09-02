@@ -296,7 +296,7 @@ const configSummary = computed(() => {
       { label: '输出模式', value: `${PHP_OUTPUT_MODES[form.phpOutputMode]?.label || form.phpOutputMode} ${PHP_OUTPUT_MODES[form.phpOutputMode]?.title || ''}`.trim() },
       { label: '请求伪装', value: findDisguiseLabel(form.reqDisguiseId) },
       { label: '响应伪装', value: findDisguiseLabel(form.respDisguiseId) },
-      { label: 'PayloadCodec AES 密钥', value: form.payloadKey || '-' },
+      { label: 'AES 密钥', value: form.payloadKey || '-' },
       { label: '响应码', value: form.respCode || '-' },
       { label: '按需加载组件', value: '全部' },
       { label: 'Header 校验', value: form.headerName ? `${form.headerName}: ${form.headerValue}` : '关闭' }
@@ -310,7 +310,7 @@ const configSummary = computed(() => {
     { label: '类型', value: form.shellType || '-' },
     { label: '请求伪装', value: findDisguiseLabel(form.reqDisguiseId) },
     { label: '响应伪装', value: findDisguiseLabel(form.respDisguiseId) },
-    { label: 'PayloadCodec AES 密钥', value: form.payloadKey || '-' },
+    { label: 'AES 密钥', value: form.payloadKey || '-' },
     { label: '响应码', value: form.respCode || '-' },
     { label: '目标 JDK', value: form.targetJavaVersion || 'auto' },
     { label: '核心类名', value: form.coreClassName || '随机生成' }

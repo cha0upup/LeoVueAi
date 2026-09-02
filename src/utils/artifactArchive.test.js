@@ -7,7 +7,6 @@ vi.mock('@/services/api.js', () => ({
 
 import {
   buildAiReportMarkdown,
-  buildTaskResultMarkdown,
   sanitizeArtifactName
 } from './artifactArchive.js'
 
@@ -30,19 +29,5 @@ describe('artifactArchive', () => {
     expect(report).toContain('# 主机分析')
     expect(report).toContain('## 问题 1')
     expect(report).toContain('发现一项风险')
-  })
-
-  it('preserves structured task results as readable JSON', () => {
-    const report = buildTaskResultMarkdown({
-      title: '扫描任务',
-      taskId: 'task-1',
-      status: 'completed',
-      progress: 100,
-      result: { hosts: 2 }
-    })
-
-    expect(report).toContain('# 扫描任务')
-    expect(report).toContain('```json')
-    expect(report).toContain('"hosts": 2')
   })
 })

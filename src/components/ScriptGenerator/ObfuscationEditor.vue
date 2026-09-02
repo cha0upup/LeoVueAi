@@ -1,132 +1,54 @@
 <template>
   <div class="form-group obfus-editor">
-    <div class="group-label">
-      JSP 混淆层
-      <el-tooltip content="自定义混淆步骤及执行顺序；留空则使用默认策略。拖拽行可调整顺序。">
-        <Icon
-          :icon="iconMap.info"
-          class="group-label-icon"
-        />
-      </el-tooltip>
-    </div>
+    <details class="obfus-disclosure">
+      <summary class="obfus-summary">
+        <strong>JSP 混淆层</strong>
+        <span>{{ enabledStepCount }}/{{ localSteps.length }} 已启用</span>
+        <Icon :icon="iconMap.arrowDown" />
+      </summary>
 
-    <!-- 步骤列表 -->
-    <div class="obfus-list">
-      <template
-        v-for="(item, idx) in renderedItems"
-        :key="item.type === 'single' ? item.step.id : item.groupId"
-      >
-        <!-- 普通步骤 -->
-        <div
-          v-if="item.type === 'single'"
-          class="obfus-item"
-          :class="{
-            'is-enabled': item.step.enabled,
-            'is-blocked': blockedByEnabled.has(item.step.id) && !item.step.enabled,
-            'has-order-warning': orderViolations.has(item.step.id),
-            'is-compat-blocked': item.step.compatibilityBlocked,
-            'is-drop-target': dropTargetIdx === idx && dragFromIdx >= 0 && dragFromIdx !== idx
-          }"
-          :draggable="!item.step.compatibilityBlocked"
-          @dragstart="!item.step.compatibilityBlocked && onDragStart(idx)"
-          @dragover.prevent="onDragOver(idx)"
-          @dragend="onDragEnd"
-        >
-          <span
-            class="drag-handle"
-            title="拖拽排序"
-          >⠿</span>
-          <el-switch
-            v-model="item.step.enabled"
-            size="small"
-            :disabled="item.step.compatibilityBlocked"
-            @change="onStepToggle(item.step)"
-          />
-          <div class="step-info">
-            <span class="step-name">{{ item.step.nameZh }}</span>
-            <span class="step-compat">
-              <el-tag
-                v-if="item.step.jspCompatible"
-                size="small"
-                type="primary"
-                effect="plain"
-              >JSP</el-tag>
-              <el-tag
-                v-if="item.step.jspxCompatible"
-                size="small"
-                type="warning"
-                effect="plain"
-              >JSPX</el-tag>
-            </span>
-          </div>
-          <el-tooltip
-            v-if="item.step.compatibilityBlocked"
-            :content="compatBlockedHint(item.step)"
-            placement="left"
-            :show-after="150"
+      <div class="obfus-content">
+        <!-- 步骤列表 -->
+        <div class="obfus-list">
+          <template
+            v-for="(item, idx) in renderedItems"
+            :key="item.type === 'single' ? item.step.id : item.groupId"
           >
-            <span class="step-icon step-icon--blocked">⊘</span>
-          </el-tooltip>
-          <el-tooltip
-            v-if="orderViolations.has(item.step.id)"
-            :content="orderViolationHint(item.step)"
-            placement="left"
-            :show-after="150"
-          >
-            <span class="step-icon step-icon--warn">⚠</span>
-          </el-tooltip>
-          <el-tooltip
-            :content="item.step.description"
-            placement="left"
-            :show-after="200"
-          >
-            <Icon
-              :icon="iconMap.info"
-              class="step-desc-icon"
-            />
-          </el-tooltip>
-        </div>
-
-        <!-- 互斥步骤组 -->
-        <div
-          v-else
-          class="obfus-mutex-group"
-          :class="{ 'is-drop-target': dropTargetIdx === idx && dragFromIdx >= 0 && dragFromIdx !== idx }"
-          draggable="true"
-          @dragstart="onDragStart(idx)"
-          @dragover.prevent="onDragOver(idx)"
-          @dragend="onDragEnd"
-        >
-          <div class="mutex-group-header">
-            <span
-              class="drag-handle"
-              title="拖拽排序"
-            >⠿</span>
-            <span class="mutex-group-label">选其一</span>
-          </div>
-          <div class="mutex-group-items">
+            <!-- 普通步骤 -->
             <div
-              v-for="step in item.steps"
-              :key="step.id"
-              class="obfus-item mutex-option"
-              :class="{ 'is-enabled': step.enabled, 'has-order-warning': orderViolations.has(step.id) }"
+              v-if="item.type === 'single'"
+              class="obfus-item"
+              :class="{
+                'is-enabled': item.step.enabled,
+                'is-blocked': blockedByEnabled.has(item.step.id) && !item.step.enabled,
+                'has-order-warning': orderViolations.has(item.step.id),
+                'is-drop-target': dropTargetIdx === idx && dragFromIdx >= 0 && dragFromIdx !== idx
+              }"
+              draggable="true"
+              @dragstart="onDragStart(idx)"
+              @dragover.prevent="onDragOver(idx)"
+              @dragend="onDragEnd"
             >
+              <span
+                class="drag-handle"
+                title="拖拽排序"
+              >⠿</span>
               <el-switch
-                v-model="step.enabled"
+                v-model="item.step.enabled"
                 size="small"
-                @change="onStepToggle(step)"
+                @change="onStepToggle(item.step)"
               />
               <div class="step-info">
-                <span class="step-name">{{ step.nameZh }}</span>
+                <span class="step-name">{{ item.step.nameZh }}</span>
                 <span class="step-compat">
                   <el-tag
-                    v-if="step.jspCompatible"
+                    v-if="item.step.jspCompatible"
                     size="small"
                     type="primary"
                     effect="plain"
                   >JSP</el-tag>
                   <el-tag
-                    v-if="step.jspxCompatible"
+                    v-if="item.step.jspxCompatible"
                     size="small"
                     type="warning"
                     effect="plain"
@@ -134,15 +56,15 @@
                 </span>
               </div>
               <el-tooltip
-                v-if="orderViolations.has(step.id)"
-                :content="orderViolationHint(step)"
+                v-if="orderViolations.has(item.step.id)"
+                :content="orderViolationHint(item.step)"
                 placement="left"
                 :show-after="150"
               >
                 <span class="step-icon step-icon--warn">⚠</span>
               </el-tooltip>
               <el-tooltip
-                :content="step.description"
+                :content="item.step.description"
                 placement="left"
                 :show-after="200"
               >
@@ -152,43 +74,111 @@
                 />
               </el-tooltip>
             </div>
-          </div>
-        </div>
-      </template>
-    </div>
 
-    <!-- 操作按钮行 -->
-    <div class="obfus-actions">
-      <button
-        type="button"
-        class="obfus-link-btn"
-        @click="resetToDefault"
-      >
-        重置
-      </button>
-      <button
-        type="button"
-        class="obfus-link-btn"
-        @click="enableAll"
-      >
-        全部启用
-      </button>
-      <button
-        type="button"
-        class="obfus-link-btn"
-        @click="disableAll"
-      >
-        全部禁用
-      </button>
-      <button
-        v-if="orderViolations.size > 0"
-        type="button"
-        class="obfus-link-btn obfus-link-btn--warn"
-        @click="fixOrder"
-      >
-        修复顺序
-      </button>
-    </div>
+            <!-- 互斥步骤组 -->
+            <div
+              v-else
+              class="obfus-mutex-group"
+              :class="{ 'is-drop-target': dropTargetIdx === idx && dragFromIdx >= 0 && dragFromIdx !== idx }"
+              draggable="true"
+              @dragstart="onDragStart(idx)"
+              @dragover.prevent="onDragOver(idx)"
+              @dragend="onDragEnd"
+            >
+              <div class="mutex-group-header">
+                <span
+                  class="drag-handle"
+                  title="拖拽排序"
+                >⠿</span>
+                <span class="mutex-group-label">选其一</span>
+              </div>
+              <div class="mutex-group-items">
+                <div
+                  v-for="step in item.steps"
+                  :key="step.id"
+                  class="obfus-item mutex-option"
+                  :class="{ 'is-enabled': step.enabled, 'has-order-warning': orderViolations.has(step.id) }"
+                >
+                  <el-switch
+                    v-model="step.enabled"
+                    size="small"
+                    @change="onStepToggle(step)"
+                  />
+                  <div class="step-info">
+                    <span class="step-name">{{ step.nameZh }}</span>
+                    <span class="step-compat">
+                      <el-tag
+                        v-if="step.jspCompatible"
+                        size="small"
+                        type="primary"
+                        effect="plain"
+                      >JSP</el-tag>
+                      <el-tag
+                        v-if="step.jspxCompatible"
+                        size="small"
+                        type="warning"
+                        effect="plain"
+                      >JSPX</el-tag>
+                    </span>
+                  </div>
+                  <el-tooltip
+                    v-if="orderViolations.has(step.id)"
+                    :content="orderViolationHint(step)"
+                    placement="left"
+                    :show-after="150"
+                  >
+                    <span class="step-icon step-icon--warn">⚠</span>
+                  </el-tooltip>
+                  <el-tooltip
+                    :content="step.description"
+                    placement="left"
+                    :show-after="200"
+                  >
+                    <Icon
+                      :icon="iconMap.info"
+                      class="step-desc-icon"
+                    />
+                  </el-tooltip>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 操作按钮行 -->
+        <div class="obfus-actions">
+          <button
+            type="button"
+            class="obfus-link-btn"
+            @click="resetToDefault"
+          >
+            重置
+          </button>
+          <button
+            type="button"
+            class="obfus-link-btn"
+            @click="enableAll"
+          >
+            全部启用
+          </button>
+          <button
+            type="button"
+            class="obfus-link-btn"
+            @click="disableAll"
+          >
+            全部禁用
+          </button>
+          <button
+            v-if="orderViolations.size > 0"
+            type="button"
+            class="obfus-link-btn obfus-link-btn--warn"
+            @click="fixOrder"
+          >
+            修复顺序
+          </button>
+        </div>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -215,6 +205,7 @@ const modelValue = defineModel({ type: Array, default: () => [] })
 // ---- 本地步骤状态 ----
 
 const localSteps = ref([])
+const enabledStepCount = computed(() => localSteps.value.filter(step => step.enabled).length)
 
 const syncLocalSteps = () => {
   const type = props.generateType
@@ -239,9 +230,9 @@ const syncLocalSteps = () => {
   const isWebshell = type === 'webshell'
 
   localSteps.value = allSteps.map(s => {
-    if (prev[s.id] !== undefined) return { ...s, enabled: prev[s.id], compatibilityBlocked: false }
-    if (modelValue.value?.length) return { ...s, enabled: modelValue.value.includes(s.id), compatibilityBlocked: false }
-    return { ...s, enabled: !isWebshell && MEMSHELL_DEFAULTS.has(s.id), compatibilityBlocked: false }
+    if (prev[s.id] !== undefined) return { ...s, enabled: prev[s.id] }
+    if (modelValue.value?.length) return { ...s, enabled: modelValue.value.includes(s.id) }
+    return { ...s, enabled: !isWebshell && MEMSHELL_DEFAULTS.has(s.id) }
   })
 }
 
@@ -322,19 +313,10 @@ const orderViolationHint = (step) => {
   return `建议在「${names}」之前执行`
 }
 
-const compatBlockedHint = (step) => {
-  if (props.generateType === 'webshell') {
-    const isJspx = props.shellType === 'JSPX'
-    if (isJspx && !step.jspxCompatible) return '此步骤不支持 JSPX 模式'
-    if (!isJspx && !step.jspCompatible)  return '此步骤不支持 JSP 模式'
-  }
-  return '当前模式下此步骤不可用'
-}
-
 // ---- 写回 ----
 
 const emitSteps = () => {
-  modelValue.value = localSteps.value.filter(s => s.enabled && !s.compatibilityBlocked).map(s => s.id)
+  modelValue.value = localSteps.value.filter(s => s.enabled).map(s => s.id)
 }
 
 const onStepToggle = (step) => {
@@ -359,7 +341,6 @@ const resetToDefault = () => {
 const enableAll = () => {
   const skipped = new Set()
   localSteps.value.forEach(s => {
-    if (s.compatibilityBlocked) return
     if (skipped.has(s.id)) { s.enabled = false; return }
     s.enabled = true
     const inc = Array.isArray(s.incompatibleWith) ? s.incompatibleWith : [...(s.incompatibleWith || [])]
@@ -411,6 +392,15 @@ const onDragEnd = () => { dragFromIdx.value = -1; dropTargetIdx.value = -1; emit
 </script>
 
 <style scoped>
+.obfus-disclosure { border-top: 0; }
+.obfus-summary { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 2px; color: var(--sg-ink); cursor: pointer; list-style: none; }
+.obfus-summary::-webkit-details-marker { display: none; }
+.obfus-summary strong { font-size: 11px; }
+.obfus-summary span { margin-right: auto; color: var(--sg-muted); font-size: 9px; }
+.obfus-summary > svg { color: var(--sg-muted); transition: transform .16s ease; }
+.obfus-disclosure[open] .obfus-summary { margin-bottom: 8px; }
+.obfus-disclosure[open] .obfus-summary > svg { transform: rotate(180deg); }
+.obfus-content { padding-top: 1px; }
 /* 步骤列表 */
 .obfus-list {
   display: flex;
@@ -437,7 +427,6 @@ const onDragEnd = () => { dragFromIdx.value = -1; dropTargetIdx.value = -1; emit
 }
 .obfus-item.is-blocked        { opacity: 0.45; }
 .obfus-item.has-order-warning { border-color: color-mix(in srgb, var(--el-color-warning) 50%, var(--sg-border)); }
-.obfus-item.is-compat-blocked { opacity: 0.38; cursor: not-allowed; }
 .obfus-item.is-drop-target,
 .obfus-mutex-group.is-drop-target {
   outline: 2px solid var(--sg-blue);
@@ -470,7 +459,6 @@ const onDragEnd = () => { dragFromIdx.value = -1; dropTargetIdx.value = -1; emit
   flex-shrink: 0;
 }
 .step-icon          { flex-shrink: 0; font-size: 11px; cursor: default; }
-.step-icon--blocked { color: var(--sg-muted); opacity: 0.7; }
 .step-icon--warn    { color: var(--el-color-warning); }
 .step-desc-icon {
   color: var(--sg-muted);

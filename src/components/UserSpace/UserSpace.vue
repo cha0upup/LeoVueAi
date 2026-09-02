@@ -170,7 +170,7 @@
                 v-else
                 class="artifact-empty"
               >
-                <el-icon><Icon :icon="iconMap.documentAdd" /></el-icon><strong>还没有成果</strong><span>从脚本构建、AI 分析或任务中心归档第一份成果。</span>
+                <el-icon><Icon :icon="iconMap.documentAdd" /></el-icon><strong>还没有成果</strong><span>从脚本构建或 AI 分析归档第一份成果。</span>
               </div>
             </section>
 
@@ -714,7 +714,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Artifact Library 2.0 — 与任务中心、主机管理共用左右工作台节奏。 */
+/* Artifact Library 2.0 — 与主机管理共用左右工作台节奏。 */
 .user-space-manager {
   width: 100%;
   min-height: 0;
