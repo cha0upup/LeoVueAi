@@ -159,17 +159,20 @@
           </div>
         </el-form-item>
         <el-form-item
-          label="命中脚本"
-          prop="script"
+          label="命中条件"
+          prop="matchText"
           required
         >
           <el-input
-            v-model="formData.script"
+            v-model="formData.matchText"
             type="textarea"
-            placeholder="JavaScript：HTTP 可用 resp[i].status、resp[i].body、resp[i].headers；TCP 可用 raw 或 resp[i].raw"
-            :rows="4"
+            placeholder='声明式 JSON，例如 {"field":"body","operator":"contains","value":"nginx"}'
+            :rows="6"
             clearable
           />
+          <div class="form-tip">
+            支持 all、any、not 组合；字段可用 status、body、headers、raw
+          </div>
         </el-form-item>
       </section>
     </el-form>
@@ -233,7 +236,7 @@ const formRules = {
   protocol: [{ required: true, message: '请选择协议', trigger: 'change' }],
   name: [{ required: true, message: '请输入指纹名称', trigger: 'blur' }],
   version: [{ required: true, message: '请输入版本', trigger: 'blur' }],
-  script: [{ required: true, message: '请输入命中判断脚本', trigger: 'blur' }]
+  matchText: [{ required: true, message: '请输入声明式命中条件', trigger: 'blur' }]
 }
 
 watch(
@@ -289,8 +292,17 @@ const handleSubmit = async () => {
     showWarning(`有 ${incompleteCount} 条漏洞缺少标题，请补全或删除`)
     return
   }
-  submitLocked.value = true
-  emit('submit', buildFingerprintPayload(formData.value))
+  try {
+    const payload = buildFingerprintPayload(formData.value)
+    if (!payload.rule.match || typeof payload.rule.match !== 'object' || Array.isArray(payload.rule.match)) {
+      showWarning('命中条件必须是 JSON 对象')
+      return
+    }
+    submitLocked.value = true
+    emit('submit', payload)
+  } catch {
+    showWarning('命中条件 JSON 格式无效')
+  }
 }
 </script>
 

@@ -51,36 +51,113 @@ export const createPortScanTaskModel = ({
   }
 }
 
+const inferService = port => {
+  const services = {
+    21: 'ftp', 22: 'ssh', 23: 'telnet', 25: 'smtp', 53: 'dns',
+    80: 'http', 81: 'http', 110: 'pop3', 143: 'imap', 443: 'https',
+    445: 'smb', 1433: 'mssql', 1521: 'oracle', 3306: 'mysql',
+    3389: 'rdp', 5432: 'postgresql', 5900: 'vnc', 5901: 'vnc',
+    6379: 'redis', 8080: 'http', 8081: 'http', 8443: 'https',
+    8888: 'http', 9000: 'http', 9090: 'http', 9200: 'elasticsearch',
+    11211: 'memcached', 27017: 'mongodb', 27018: 'mongodb'
+  }
+  return services[Number(port)] || null
+}
+
+const uniqueValues = values => [...new Set((Array.isArray(values) ? values : []).filter(value => value != null))]
+
+/** Convert the unified node observation stream into the discovery view model. */
+export const normalizeNetworkProbeResult = result => {
+  const observations = Array.isArray(result?.observations) ? result.observations : []
+  const targets = Array.isArray(result?.targets) ? result.targets : []
+  const connectObservations = observations.filter(observation =>
+    observation?.stage === 'tcp-connect' && observation?.state === 'open'
+  )
+  const exchangeByTarget = new Map(
+    observations
+      .filter(observation => observation?.stage === 'tcp-exchange')
+      .map(observation => [`${observation.host}:${observation.port}`, observation])
+  )
+  const openPortResults = connectObservations.map(observation => {
+    const port = Number(observation.port)
+    const service = inferService(port)
+    const resultEntry = {
+      host: observation.host,
+      port,
+      transport: 'tcp',
+      state: 'open',
+      service,
+      confidence: service ? 0.35 : 0.1,
+      probe: 'connect'
+    }
+    const exchange = exchangeByTarget.get(`${observation.host}:${observation.port}`)
+    const evidence = exchange?.evidence
+    if (exchange) resultEntry.probe = 'tcp-exchange'
+    if (evidence?.banner) resultEntry.banner = evidence.banner
+    if (evidence?.statusCode != null) {
+      resultEntry.statusCode = evidence.statusCode
+      resultEntry.service = resultEntry.service || 'http'
+      resultEntry.confidence = 0.9
+    }
+    if (evidence?.server) resultEntry.server = evidence.server
+    if (evidence?.location) resultEntry.location = evidence.location
+    if (evidence?.contentType) resultEntry.contentType = evidence.contentType
+    if (exchange?.error) resultEntry.probeError = exchange.error
+    return resultEntry
+  })
+  const scanHosts = uniqueValues(targets.map(target => target?.host).filter(Boolean))
+  const scanPorts = uniqueValues(targets.map(target => Number(target?.port)).filter(port => Number.isFinite(port)))
+  const stages = result?.plan?.stages || []
+  const probeServices = stages.includes('tcp-exchange')
+  return {
+    ...result,
+    scanKind: 'discovery',
+    scanStage: probeServices ? 'PORT_AND_SERVICE' : 'PORT',
+    target: scanHosts.length ? { host: scanHosts[0], protocol: 'tcp', source: 'network-probe' } : null,
+    scanHosts,
+    scanHost: scanHosts.length > 1 ? scanHosts.join(', ') : (scanHosts[0] || ''),
+    targetCount: scanHosts.length,
+    scanPorts,
+    portLength: toNonNegativeNumber(result?.total),
+    scannedCount: toNonNegativeNumber(result?.completed),
+    scanTimeout: result?.plan?.timeout,
+    threadsNum: result?.plan?.threads,
+    openPortList: openPortResults.map(entry => entry.port),
+    openPortResults,
+    serviceResults: probeServices ? openPortResults : [],
+    results: probeServices ? openPortResults : []
+  }
+}
+
 export const applyPortScanResult = (task, result) => {
-  const reportedPortLength = toNonNegativeNumber(result?.portLength)
+  const normalizedResult = normalizeNetworkProbeResult(result)
+  const reportedPortLength = toNonNegativeNumber(normalizedResult?.portLength)
   const portLength = reportedPortLength > 0 ? reportedPortLength : toNonNegativeNumber(task.portLength)
-  const scannedCount = Math.min(toNonNegativeNumber(result?.scannedCount), portLength || Infinity)
+  const scannedCount = Math.min(toNonNegativeNumber(normalizedResult?.scannedCount), portLength || Infinity)
   task.portLength = portLength
-  if (result?.resultVersion != null) task.resultVersion = Number(result.resultVersion) || 1
-  if (result?.scanKind) task.scanKind = result.scanKind
-  if (result?.scanStage) task.scanStage = result.scanStage
-  if (result?.target && typeof result.target === 'object') task.target = result.target
-  if (Array.isArray(result?.scanPorts)) task.scanPorts = result.scanPorts
-  if (result?.scanTimeout != null) task.scanTimeout = Number(result.scanTimeout) || task.scanTimeout
-  if (result?.threadsNum != null) task.threadsNum = Number(result.threadsNum) || task.threadsNum
-  if (result?.probeServices != null) task.probeServices = result.probeServices !== false
-  if (result?.createdAt != null) task.createTime = Number(result.createdAt) || task.createTime
-  if (result?.finishedAt != null) task.endTime = Number(result.finishedAt) || task.endTime
-  if (Array.isArray(result?.targets)) {
-    task.targets = result.targets
-    task.scanHosts = result.targets
-      .map(target => target?.host)
-      .filter(host => typeof host === 'string' && host.length > 0)
-    task.targetCount = Number(result.targetCount) || task.scanHosts.length
+  if (normalizedResult?.resultVersion != null) task.resultVersion = Number(normalizedResult.resultVersion) || 1
+  if (normalizedResult?.scanKind) task.scanKind = normalizedResult.scanKind
+  if (normalizedResult?.scanStage) task.scanStage = normalizedResult.scanStage
+  if (normalizedResult?.target && typeof normalizedResult.target === 'object') task.target = normalizedResult.target
+  if (Array.isArray(normalizedResult?.scanPorts)) task.scanPorts = normalizedResult.scanPorts
+  if (normalizedResult?.scanTimeout != null) task.scanTimeout = Number(normalizedResult.scanTimeout) || task.scanTimeout
+  if (normalizedResult?.threadsNum != null) task.threadsNum = Number(normalizedResult.threadsNum) || task.threadsNum
+  if (normalizedResult?.probeServices != null) task.probeServices = normalizedResult.probeServices !== false
+  if (normalizedResult?.createdAt != null) task.createTime = Number(normalizedResult.createdAt) || task.createTime
+  if (normalizedResult?.finishedAt != null) task.endTime = Number(normalizedResult.finishedAt) || task.endTime
+  if (Array.isArray(normalizedResult?.targets)) {
+    task.targets = normalizedResult.targets
+    task.scanHosts = Array.isArray(normalizedResult.scanHosts) ? normalizedResult.scanHosts : []
+    task.targetCount = Number(normalizedResult.targetCount) || task.scanHosts.length
     if (task.scanHosts.length === 1) task.scanHost = task.scanHosts[0]
     else if (task.scanHosts.length > 1) task.scanHost = task.scanHosts.join(', ')
   }
-  if (typeof result?.scanHost === 'string' && result.scanHost) task.scanHost = result.scanHost
-  task.openPortList = Array.isArray(result?.openPortList) ? result.openPortList : []
-  task.openPortResults = Array.isArray(result?.openPortResults) ? result.openPortResults : []
-  const reportedServices = Array.isArray(result?.serviceResults)
-    ? result.serviceResults
-    : result?.results
+  if (typeof normalizedResult?.scanHost === 'string' && normalizedResult.scanHost) task.scanHost = normalizedResult.scanHost
+  task.openPortList = Array.isArray(normalizedResult?.openPortList) ? normalizedResult.openPortList : []
+  task.openPortResults = Array.isArray(normalizedResult?.openPortResults) ? normalizedResult.openPortResults : []
+  const reportedServices = Array.isArray(normalizedResult?.serviceResults)
+    ? normalizedResult.serviceResults
+    : normalizedResult?.results
   task.serviceResults = Array.isArray(reportedServices) ? reportedServices : []
   task.scannedCount = Number.isFinite(scannedCount) ? scannedCount : 0
   task.progress = portLength > 0 ? Math.min(100, Math.round((task.scannedCount / portLength) * 100)) : 0

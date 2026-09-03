@@ -2,11 +2,11 @@ import { effectScope, nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  startPortScanApi: vi.fn(),
-  queryPortScanResultApi: vi.fn(),
-  pausePortScanApi: vi.fn(),
-  resumePortScanApi: vi.fn(),
-  stopPortScanApi: vi.fn(),
+  startNetworkProbeApi: vi.fn(),
+  queryNetworkProbeApi: vi.fn(),
+  pauseNetworkProbeApi: vi.fn(),
+  resumeNetworkProbeApi: vi.fn(),
+  stopNetworkProbeApi: vi.fn(),
   createScanTask: vi.fn(() => 'center-1'),
   hydrateScanTask: vi.fn(),
   showError: vi.fn(),
@@ -16,11 +16,11 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/services/api.js', () => ({
-  startPortScanApi: mocks.startPortScanApi,
-  queryPortScanResultApi: mocks.queryPortScanResultApi,
-  pausePortScanApi: mocks.pausePortScanApi,
-  resumePortScanApi: mocks.resumePortScanApi,
-  stopPortScanApi: mocks.stopPortScanApi
+  startNetworkProbeApi: mocks.startNetworkProbeApi,
+  queryNetworkProbeApi: mocks.queryNetworkProbeApi,
+  pauseNetworkProbeApi: mocks.pauseNetworkProbeApi,
+  resumeNetworkProbeApi: mocks.resumeNetworkProbeApi,
+  stopNetworkProbeApi: mocks.stopNetworkProbeApi
 }))
 
 vi.mock('@/components/PuppetConsole/File/TaskEngine.js', () => ({
@@ -50,33 +50,43 @@ const createSubject = () => {
 describe('usePortScanTasks', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.startPortScanApi.mockResolvedValue({ data: { taskId: 'task-1' } })
-    mocks.queryPortScanResultApi.mockResolvedValue({
+    mocks.startNetworkProbeApi.mockResolvedValue({ data: { taskId: 'task-1' } })
+    mocks.queryNetworkProbeApi.mockResolvedValue({
       data: {
-        scanTaskInfo: {
+        result: {
           status: 'STOPPED',
-          portLength: 2,
-          scannedCount: 2,
-          openPortList: [443]
+          total: 2,
+          completed: 2,
+          targets: [
+            { host: 'host', port: 80, protocol: 'tcp' },
+            { host: 'host', port: 443, protocol: 'tcp' }
+          ],
+          observations: [
+            { host: 'host', port: 443, stage: 'tcp-connect', state: 'open' }
+          ],
+          plan: { stages: ['tcp-connect', 'tcp-exchange'], timeout: 1000, threads: 4 }
         }
       }
     })
-    mocks.pausePortScanApi.mockResolvedValue({})
-    mocks.resumePortScanApi.mockResolvedValue({})
-    mocks.stopPortScanApi.mockResolvedValue({})
+    mocks.pauseNetworkProbeApi.mockResolvedValue({})
+    mocks.resumeNetworkProbeApi.mockResolvedValue({})
+    mocks.stopNetworkProbeApi.mockResolvedValue({})
   })
 
   it('starts, polls and maps the port scan response shape', async () => {
     const { scope, subject } = createSubject()
     await subject.start({ scanHost: 'host', scanPorts: [80, 443], scanTimeout: 1000, threadsNum: 4 })
 
-    expect(mocks.startPortScanApi).toHaveBeenCalledWith({
+    expect(mocks.startNetworkProbeApi).toHaveBeenCalledWith({
       sessionId: 'session-1',
-      scanHost: 'host',
-      scanPorts: [80, 443],
-      scanTimeout: 1000,
-      threadsNum: 4,
-      probeServices: true
+      plan: {
+        targets: [
+          { protocol: 'tcp', host: 'host', port: 80 },
+          { protocol: 'tcp', host: 'host', port: 443 }
+        ],
+        stages: ['tcp-connect', 'tcp-exchange'],
+        limits: { timeout: 1000, threads: 4 }
+      }
     })
     expect(subject.tasks.value[0]).toMatchObject({
       taskId: 'task-1',
@@ -94,7 +104,7 @@ describe('usePortScanTasks', () => {
 
   it('drops a late start response when the session changes', async () => {
     let resolveStart
-    mocks.startPortScanApi.mockImplementationOnce(() => new Promise(resolve => { resolveStart = resolve }))
+    mocks.startNetworkProbeApi.mockImplementationOnce(() => new Promise(resolve => { resolveStart = resolve }))
     const { scope, sessionId, subject } = createSubject()
 
     const starting = subject.start({ scanHost: 'old', scanPorts: [80] })
@@ -110,6 +120,21 @@ describe('usePortScanTasks', () => {
   })
 
   it('creates one unified task for a batch of hosts', async () => {
+    mocks.queryNetworkProbeApi.mockResolvedValue({
+      data: {
+        result: {
+          status: 'RUNNING',
+          total: 2,
+          completed: 0,
+          targets: [
+            { host: 'host-a', port: 80, protocol: 'tcp' },
+            { host: 'host-b', port: 80, protocol: 'tcp' }
+          ],
+          observations: [],
+          plan: { stages: ['tcp-connect', 'tcp-exchange'], timeout: 1000, threads: 4 }
+        }
+      }
+    })
     const { scope, subject } = createSubject()
     const result = await subject.startBatch({
       hosts: ['host-a', 'host-b', 'host-a'],
@@ -119,36 +144,19 @@ describe('usePortScanTasks', () => {
     })
 
     expect(result).toMatchObject({ successCount: 2, failCount: 0, taskCount: 1 })
-    expect(mocks.startPortScanApi).toHaveBeenCalledWith({
+    expect(mocks.startNetworkProbeApi).toHaveBeenCalledWith({
       sessionId: 'session-1',
-      scanHosts: ['host-a', 'host-b'],
-      scanPorts: [80],
-      scanTimeout: 1000,
-      threadsNum: 4,
-      probeServices: true
+      plan: {
+        targets: [
+          { protocol: 'tcp', host: 'host-a', port: 80 },
+          { protocol: 'tcp', host: 'host-b', port: 80 }
+        ],
+        stages: ['tcp-connect', 'tcp-exchange'],
+        limits: { timeout: 1000, threads: 4 }
+      }
     })
     expect(subject.tasks.value[0].scanHost).toBe('host-a, host-b')
     scope.stop()
   })
 
-  it('falls back to single-target tasks for legacy nodes', async () => {
-    mocks.startPortScanApi
-      .mockRejectedValueOnce(new Error('当前节点不支持多目标端口扫描'))
-      .mockResolvedValueOnce({ data: { taskId: 'task-a' } })
-      .mockResolvedValueOnce({ data: { taskId: 'task-b' } })
-    const { scope, subject } = createSubject()
-
-    const result = await subject.startBatch({
-      hosts: ['host-a', 'host-b'],
-      scanPorts: [80],
-      scanTimeout: 1000,
-      threadsNum: 4
-    })
-
-    expect(result).toMatchObject({ successCount: 2, failCount: 0, taskCount: 2 })
-    expect(mocks.startPortScanApi).toHaveBeenNthCalledWith(2, expect.objectContaining({ scanHost: 'host-a' }))
-    expect(mocks.startPortScanApi).toHaveBeenNthCalledWith(3, expect.objectContaining({ scanHost: 'host-b' }))
-    expect(subject.tasks.value).toHaveLength(2)
-    scope.stop()
-  })
 })

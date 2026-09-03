@@ -238,6 +238,7 @@
 import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
+import { getReconAnalysis } from './networkProbeAnalysisModel.js'
 
 const iconMap = icons
 
@@ -298,23 +299,16 @@ const parsedResult = computed(() => {
   return r && typeof r === 'object' ? r : {}
 })
 
-const resultsMap = computed(() => {
-  const m = parsedResult.value.results
-  return m && typeof m === 'object' ? m : {}
-})
-
-const matchedMap = computed(() => {
-  const m = parsedResult.value.matched
-  return m && typeof m === 'object' ? m : {}
-})
+const reconAnalysis = computed(() => getReconAnalysis(parsedResult.value, props.task))
+const resultsMap = computed(() => reconAnalysis.value.results)
+const matchedMap = computed(() => reconAnalysis.value.matched)
 
 const resolvedRuleCount = computed(() => {
-  const fromResult = parsedResult.value.ruleCount
-  return fromResult != null ? Number(fromResult) : (props.task.ruleCount ?? 0)
+  return reconAnalysis.value.ruleCount || (props.task.ruleCount ?? 0)
 })
 
-const totalWorkItems = computed(() => Number(parsedResult.value.total ?? 0))
-const completedCount = computed(() => Number(parsedResult.value.completed ?? 0))
+const totalWorkItems = computed(() => reconAnalysis.value.total)
+const completedCount = computed(() => reconAnalysis.value.completed)
 
 const progressPct = computed(() => {
   if (totalWorkItems.value <= 0) return 0

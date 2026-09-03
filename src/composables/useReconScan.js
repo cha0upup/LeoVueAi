@@ -1,13 +1,14 @@
 import { nextTick, ref, watch } from 'vue'
 
 import {
-  pauseReconScanApi,
-  queryReconScanResultApi,
-  resumeReconScanApi,
-  startReconScanApi,
-  stopReconScanApi
+  pauseNetworkProbeApi,
+  queryNetworkProbeApi,
+  resumeNetworkProbeApi,
+  startNetworkProbeApi,
+  stopNetworkProbeApi
 } from '@/services/api.js'
 import { taskEngine } from '@/components/PuppetConsole/File/TaskEngine.js'
+import { getReconAnalysis } from '@/components/PuppetConsole/Scan/networkProbeAnalysisModel.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { useScanTaskLifecycle } from './useScanTaskLifecycle.js'
 
@@ -30,17 +31,8 @@ export function useReconScan(sessionIdRef) {
   })
 
   const getReconStats = (task) => {
-    const result = task?.result ?? {}
-    const total = Number(result.total ?? 0)
-    const completed = Number(result.completed ?? 0)
-    const matched = result.matched ?? {}
-    const hitTargets = Object.values(matched).filter(
-      (rules) => Array.isArray(rules) && rules.length > 0
-    ).length
-    const totalTargets = Number(result.targetCount ?? task?.targetCount ?? 0)
-    const ruleCount = Number(result.ruleCount ?? task?.ruleCount ?? 0)
-
-    return { total, completed, hitTargets, totalTargets, ruleCount }
+    const analysis = getReconAnalysis(task?.result, task)
+    return { ...analysis, totalTargets: analysis.targetCount }
   }
 
   const buildTaskLabel = (task) => {
@@ -79,14 +71,15 @@ export function useReconScan(sessionIdRef) {
 
   const lifecycle = useScanTaskLifecycle({
     sessionIdRef,
-    queryApi: queryReconScanResultApi,
-    pauseApi: pauseReconScanApi,
-    resumeApi: resumeReconScanApi,
-    stopApi: stopReconScanApi,
+    queryApi: queryNetworkProbeApi,
+    pauseApi: pauseNetworkProbeApi,
+    resumeApi: resumeNetworkProbeApi,
+    stopApi: stopNetworkProbeApi,
     syncTask: syncReconTaskToCenter,
     applyResult(task, result) {
-      if (result.ruleCount != null) task.ruleCount = Number(result.ruleCount)
-      if (result.targetCount != null) task.targetCount = Number(result.targetCount)
+      const analysis = getReconAnalysis(result, task)
+      if (analysis.ruleCount > 0) task.ruleCount = analysis.ruleCount
+      if (analysis.targetCount > 0) task.targetCount = analysis.targetCount
     },
     taskName: '侦察扫描任务'
   })
@@ -147,11 +140,14 @@ export function useReconScan(sessionIdRef) {
     const sequence = ++startSequence
     isStarting.value = true
     try {
-      const response = await startReconScanApi({
+      const response = await startNetworkProbeApi({
         sessionId,
-        targets,
-        ruleSelector,
-        threads
+        scan: {
+          kind: 'recon',
+          targets,
+          ruleSelector,
+          threads
+        }
       })
       if (sequence !== startSequence || sessionId !== lifecycle.getSessionId()) return
       const taskId = response?.data?.taskId

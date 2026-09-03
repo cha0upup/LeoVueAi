@@ -1,11 +1,11 @@
 import { nextTick, ref, watch } from 'vue'
 
 import {
-  pausePortScanApi,
-  queryPortScanResultApi,
-  resumePortScanApi,
-  startPortScanApi,
-  stopPortScanApi
+  pauseNetworkProbeApi,
+  queryNetworkProbeApi,
+  resumeNetworkProbeApi,
+  startNetworkProbeApi,
+  stopNetworkProbeApi
 } from '@/services/api.js'
 import { taskEngine } from '@/components/PuppetConsole/File/TaskEngine.js'
 import {
@@ -16,6 +16,8 @@ import {
 } from '@/components/PuppetConsole/Scan/portScanModel.js'
 import { showError, showInfo, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { useScanTaskLifecycle } from './useScanTaskLifecycle.js'
+
+const MAX_NETWORK_PROBE_TARGETS = 128
 
 export function usePortScanTasks(sessionIdRef) {
   const isStarting = ref(false)
@@ -67,11 +69,11 @@ export function usePortScanTasks(sessionIdRef) {
 
   const lifecycle = useScanTaskLifecycle({
     sessionIdRef,
-    queryApi: queryPortScanResultApi,
-    pauseApi: pausePortScanApi,
-    resumeApi: resumePortScanApi,
-    stopApi: stopPortScanApi,
-    extractResult: response => response?.data?.scanTaskInfo,
+    queryApi: queryNetworkProbeApi,
+    pauseApi: pauseNetworkProbeApi,
+    resumeApi: resumeNetworkProbeApi,
+    stopApi: stopNetworkProbeApi,
+    extractResult: response => response?.data?.result,
     applyResult: applyPortScanResult,
     syncTask: syncTaskToCenter,
     onTerminal(task) {
@@ -109,10 +111,28 @@ export function usePortScanTasks(sessionIdRef) {
   }
 
   const requestStart = async ({ sessionId, scanHost, scanHosts, scanPorts, scanTimeout, threadsNum, probeServices = true }) => {
-    const request = { sessionId, scanPorts, scanTimeout, threadsNum, probeServices }
-    if (Array.isArray(scanHosts) && scanHosts.length > 0) request.scanHosts = scanHosts
-    else request.scanHost = scanHost
-    const response = await startPortScanApi(request)
+    const hosts = Array.isArray(scanHosts) && scanHosts.length > 0
+      ? [...new Set(scanHosts.map(String).map(host => host.trim()).filter(Boolean))]
+      : [String(scanHost || '').trim()].filter(Boolean)
+    const ports = [...new Set((Array.isArray(scanPorts) ? scanPorts : []).map(Number))]
+    const targets = hosts.flatMap(host => ports.map(port => ({ protocol: 'tcp', host, port })))
+    if (targets.length === 0) throw new Error('请至少提供一个主机和端口')
+    if (targets.length > MAX_NETWORK_PROBE_TARGETS) {
+      throw new Error(`网络探测目标组合不能超过 ${MAX_NETWORK_PROBE_TARGETS} 项`)
+    }
+    const stages = ['tcp-connect']
+    if (probeServices) stages.push('tcp-exchange')
+    const response = await startNetworkProbeApi({
+      sessionId,
+      plan: {
+        targets,
+        stages,
+        limits: {
+          timeout: scanTimeout,
+          threads: threadsNum
+        }
+      }
+    })
     const taskId = response?.data?.taskId
     if (!taskId) throw new Error('扫描服务未返回 taskId')
     if (sessionId !== lifecycle.getSessionId()) return null
@@ -141,7 +161,9 @@ export function usePortScanTasks(sessionIdRef) {
       return task
     } catch (error) {
       if (sessionId === lifecycle.getSessionId()) {
-        if (String(error?.message || '').includes('taskId')) showWarning(error.message)
+        if (String(error?.message || '').includes('taskId') || String(error?.message || '').includes('网络探测')) {
+          showWarning(error.message)
+        }
         else showError('启动扫描任务失败')
       }
       return null
@@ -161,12 +183,16 @@ export function usePortScanTasks(sessionIdRef) {
       showWarning('请至少选择一个端口')
       return { successCount: 0, failCount: 0 }
     }
+    if (uniqueHosts.length * new Set(scanPorts.map(Number)).size > MAX_NETWORK_PROBE_TARGETS) {
+      showWarning(`网络探测目标组合不能超过 ${MAX_NETWORK_PROBE_TARGETS} 项`)
+      return { successCount: 0, failCount: uniqueHosts.length }
+    }
 
     const sessionId = lifecycle.getSessionId()
     const sequence = ++startSequence
     isStarting.value = true
     try {
-      let results = await Promise.allSettled([requestStart({
+      const results = await Promise.allSettled([requestStart({
         sessionId,
         scanHosts: uniqueHosts,
         scanPorts,
@@ -175,36 +201,15 @@ export function usePortScanTasks(sessionIdRef) {
         probeServices
       })])
       if (sessionId !== lifecycle.getSessionId()) return { successCount: 0, failCount: 0 }
-      let taskCount = results.filter(result => result.status === 'fulfilled' && result.value).length
-      let successCount = taskCount > 0 ? uniqueHosts.length : 0
-      let failCount = successCount > 0 ? 0 : uniqueHosts.length
-      let usedFallback = false
-      const unifiedError = results[0]?.status === 'rejected' ? results[0].reason : null
-      if (!taskCount && isMultiTargetUnsupported(unifiedError)) {
-        usedFallback = true
-        results = await Promise.allSettled(uniqueHosts.map(scanHost => requestStart({
-          sessionId,
-          scanHost,
-          scanPorts,
-          scanTimeout,
-          threadsNum,
-          probeServices
-        })))
-        if (sessionId !== lifecycle.getSessionId()) return { successCount: 0, failCount: 0 }
-        taskCount = results.filter(result => result.status === 'fulfilled' && result.value).length
-        successCount = taskCount
-        failCount = uniqueHosts.length - successCount
-      }
+      const taskCount = results.filter(result => result.status === 'fulfilled' && result.value).length
+      const successCount = taskCount > 0 ? uniqueHosts.length : 0
+      const failCount = successCount > 0 ? 0 : uniqueHosts.length
       if (successCount > 0) {
-        if (usedFallback) {
-          showSuccess(`已创建 ${successCount} 个扫描任务${failCount ? `，失败 ${failCount} 个` : ''}`)
-        } else {
-          showSuccess(`已创建 1 个多目标扫描任务，覆盖 ${uniqueHosts.length} 个主机`)
-        }
+        showSuccess(`已创建 1 个网络探测任务，覆盖 ${uniqueHosts.length} 个主机`)
       } else {
         showError('批量创建扫描任务失败')
       }
-      return { successCount, failCount, taskCount: usedFallback ? taskCount : (successCount > 0 ? 1 : 0) }
+      return { successCount, failCount, taskCount: successCount > 0 ? 1 : 0 }
     } finally {
       if (sequence === startSequence) isStarting.value = false
     }
@@ -224,13 +229,4 @@ export function usePortScanTasks(sessionIdRef) {
     resume: lifecycle.resume,
     stop: lifecycle.stop
   }
-}
-
-function isMultiTargetUnsupported(error) {
-  const message = [
-    error?.message,
-    error?.response?.data?.msg,
-    error?.response?.data?.message
-  ].filter(Boolean).join(' ')
-  return /不支持多目标|multi.?target/i.test(message)
 }

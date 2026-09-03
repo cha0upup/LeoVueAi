@@ -104,6 +104,7 @@ defineProps({
 
 const emit = defineEmits(['scan'])
 
+const MAX_REACHABILITY_HOSTS = 42
 const formRef = ref(null)
 const scanForm = ref({ hostsInput: '', scanTimeout: 3000 })
 const parsedHosts = ref([])
@@ -114,7 +115,7 @@ const formRules = {
     {
       validator: (rule, value, callback) => {
         if (parsedHosts.value.length === 0) callback(new Error('请至少输入一个主机地址'))
-        else if (parsedHosts.value.length > 1000) callback(new Error('主机数量不能超过 1000 个'))
+        else if (parsedHosts.value.length > MAX_REACHABILITY_HOSTS) callback(new Error(`主机数量不能超过 ${MAX_REACHABILITY_HOSTS} 个`))
         else callback()
       },
       trigger: 'change'
@@ -148,9 +149,9 @@ const parseHosts = () => {
 
   if (parsedHosts.value.length === 0) {
     showWarning('未解析到有效的主机地址')
-  } else if (parsedHosts.value.length > 1000) {
-    showWarning(`解析到 ${parsedHosts.value.length} 个主机，将限制为前 1000 个`)
-    parsedHosts.value = parsedHosts.value.slice(0, 1000)
+  } else if (parsedHosts.value.length > MAX_REACHABILITY_HOSTS) {
+    showWarning(`解析到 ${parsedHosts.value.length} 个主机，将限制为前 ${MAX_REACHABILITY_HOSTS} 个`)
+    parsedHosts.value = parsedHosts.value.slice(0, MAX_REACHABILITY_HOSTS)
   }
 }
 

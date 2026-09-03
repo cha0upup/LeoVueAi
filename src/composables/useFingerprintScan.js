@@ -1,13 +1,14 @@
 import { nextTick, ref, watch } from 'vue'
 
 import {
-  pauseFingerprintScanApi,
-  queryFingerprintScanResultApi,
-  resumeFingerprintScanApi,
-  startFingerprintScanApi,
-  stopFingerprintScanApi
+  pauseNetworkProbeApi,
+  queryNetworkProbeApi,
+  resumeNetworkProbeApi,
+  startNetworkProbeApi,
+  stopNetworkProbeApi
 } from '@/services/api.js'
 import { taskEngine } from '@/components/PuppetConsole/File/TaskEngine.js'
+import { getFingerprintAnalysis } from '@/components/PuppetConsole/Scan/networkProbeAnalysisModel.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { useScanTaskLifecycle } from './useScanTaskLifecycle.js'
 
@@ -31,19 +32,7 @@ export function useFingerprintScan(sessionIdRef, protocol) {
   })
 
   const getFingerprintResultStats = (task) => {
-    const hasResult = task?.result && typeof task.result === 'object'
-    const result = hasResult ? task.result : {}
-    const results = result.results && typeof result.results === 'object' ? result.results : {}
-    const total = Number(result.total ?? task?.targetCount ?? Object.keys(results).length ?? 0)
-    const completed = Number(result.completed ?? (hasResult && task?.status === 'STOPPED' ? total : 0))
-    const hitCount = Object.values(results).filter(Boolean).length
-
-    return {
-      total,
-      completed,
-      hitCount,
-      missCount: Math.max(0, completed - hitCount)
-    }
+    return getFingerprintAnalysis(task?.result, task?.targetCount ?? 0)
   }
 
   const syncFingerprintTaskToCenter = (task) => {
@@ -77,10 +66,10 @@ export function useFingerprintScan(sessionIdRef, protocol) {
 
   const lifecycle = useScanTaskLifecycle({
     sessionIdRef,
-    queryApi: queryFingerprintScanResultApi,
-    pauseApi: pauseFingerprintScanApi,
-    resumeApi: resumeFingerprintScanApi,
-    stopApi: stopFingerprintScanApi,
+    queryApi: queryNetworkProbeApi,
+    pauseApi: pauseNetworkProbeApi,
+    resumeApi: resumeNetworkProbeApi,
+    stopApi: stopNetworkProbeApi,
     syncTask: syncFingerprintTaskToCenter,
     taskName: '指纹扫描任务'
   })
@@ -144,11 +133,14 @@ export function useFingerprintScan(sessionIdRef, protocol) {
     try {
       for (const fingerprintId of fingerprintIds) {
         try {
-          const response = await startFingerprintScanApi({
+          const response = await startNetworkProbeApi({
             sessionId,
-            fingerprintId,
-            targets,
-            threads
+            scan: {
+              kind: 'fingerprint',
+              fingerprintIds: [fingerprintId],
+              targets,
+              threads
+            }
           })
           const taskId = response?.data?.taskId
           if (sequence !== startSequence || sessionId !== lifecycle.getSessionId()) return

@@ -332,9 +332,9 @@
 
       <div class="script-panel panel">
         <div class="panel-header">
-          命中脚本
+          命中条件
         </div>
-        <pre class="script-block">{{ detail.rule?.script || '—' }}</pre>
+        <pre class="script-block">{{ formattedMatch }}</pre>
       </div>
     </div>
 
@@ -345,7 +345,7 @@
       <EmptyState
         workbench
         title="选择一个指纹"
-        description="左侧列表支持搜索和协议筛选，右侧展示元信息、请求列表和命中脚本。"
+        description="左侧列表支持搜索和协议筛选，右侧展示元信息、请求列表和命中条件。"
         :icon="iconMap.fingerprint"
       />
     </div>
@@ -383,6 +383,9 @@ const isHttp = computed(() => (props.detail?.protocol || '').toLowerCase() === '
 const requestList = computed(() =>
   Array.isArray(props.detail?.rule?.requests) ? props.detail.rule.requests : []
 )
+const formattedMatch = computed(() => props.detail?.rule?.match
+  ? JSON.stringify(props.detail.rule.match, null, 2)
+  : '—')
 
 function handleActionCommand(command) {
   if (command === 'delete') {

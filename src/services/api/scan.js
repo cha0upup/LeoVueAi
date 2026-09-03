@@ -24,68 +24,28 @@ function resolveHostReachabilityRequestTimeout(params) {
   )
 }
 
-export function startPortScanApi(params) {
-  return http.post('/puppet-node/port-scan/start-scan', params)
+export function startNetworkProbeApi(params) {
+  return http.post('/puppet-node/network-probe/start', params)
 }
 
-export function queryPortScanResultApi(params) {
-  return http.post('/puppet-node/port-scan/query-result', params)
+export function queryNetworkProbeApi(params) {
+  return http.post('/puppet-node/network-probe/query', params)
 }
 
-export function pausePortScanApi(params) {
-  return http.post('/puppet-node/port-scan/pause-scan', params)
+export function pauseNetworkProbeApi(params) {
+  return http.post('/puppet-node/network-probe/pause', params)
 }
 
-export function resumePortScanApi(params) {
-  return http.post('/puppet-node/port-scan/resume-scan', params)
+export function resumeNetworkProbeApi(params) {
+  return http.post('/puppet-node/network-probe/resume', params)
 }
 
-export function stopPortScanApi(params) {
-  return http.post('/puppet-node/port-scan/stop-scan', params)
-}
-
-export function startFingerprintScanApi(params) {
-  return http.post('/puppet-node/fingerprint/start-scan', params)
-}
-
-export function queryFingerprintScanResultApi(params) {
-  return http.post('/puppet-node/fingerprint/query-result', params)
-}
-
-export function pauseFingerprintScanApi(params) {
-  return http.post('/puppet-node/fingerprint/pause-scan', params)
-}
-
-export function resumeFingerprintScanApi(params) {
-  return http.post('/puppet-node/fingerprint/resume-scan', params)
-}
-
-export function stopFingerprintScanApi(params) {
-  return http.post('/puppet-node/fingerprint/stop-scan', params)
+export function stopNetworkProbeApi(params) {
+  return http.post('/puppet-node/network-probe/stop', params)
 }
 
 export function scanHostReachabilityApi(params) {
-  return http.post('/puppet-node/host-reachable/scan', params, {
+  return http.post('/puppet-node/network-probe/reachability', params, {
     timeout: resolveHostReachabilityRequestTimeout(params)
   })
-}
-
-export function startReconScanApi(params) {
-  return http.post('/puppet-node/recon-scan/start-scan', params)
-}
-
-export function queryReconScanResultApi(params) {
-  return http.post('/puppet-node/recon-scan/query-result', params)
-}
-
-export function pauseReconScanApi(params) {
-  return http.post('/puppet-node/recon-scan/pause-scan', params)
-}
-
-export function resumeReconScanApi(params) {
-  return http.post('/puppet-node/recon-scan/resume-scan', params)
-}
-
-export function stopReconScanApi(params) {
-  return http.post('/puppet-node/recon-scan/stop-scan', params)
 }

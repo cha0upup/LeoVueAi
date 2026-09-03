@@ -13,9 +13,21 @@ describe('portScanModel', () => {
   it('creates a stable task model and applies bounded progress', () => {
     vi.spyOn(Date, 'now').mockReturnValue(500)
     const task = createPortScanTaskModel({ taskId: 'task-1', scanHost: 'host', scanPorts: [80, 443] })
-    applyPortScanResult(task, { status: 'STOPPED', portLength: 2, scannedCount: 9, openPortList: [443] })
+    const result = {
+      status: 'STOPPED',
+      total: 2,
+      completed: 9,
+      targets: [
+        { host: 'host', port: 80, protocol: 'tcp' },
+        { host: 'host', port: 443, protocol: 'tcp' }
+      ],
+      observations: [
+        { host: 'host', port: 443, stage: 'tcp-connect', state: 'open' }
+      ]
+    }
+    applyPortScanResult(task, result)
     task.status = 'STOPPED'
-    applyPortScanResult(task, { portLength: 2, scannedCount: 9, openPortList: [443] })
+    applyPortScanResult(task, result)
 
     expect(task).toMatchObject({ portLength: 2, scannedCount: 2, progress: 100, endTime: 500 })
     expect(getPortScanTaskStats(task)).toEqual({
@@ -73,7 +85,7 @@ describe('portScanModel', () => {
     expect(task.scanHosts).toEqual(['127.0.0.1'])
   })
 
-  it('maps structured service results while retaining open port compatibility', () => {
+  it('maps structured service evidence from the unified result', () => {
     const task = createPortScanTaskModel({
       taskId: 'task-1',
       scanHost: '127.0.0.1',
@@ -81,16 +93,26 @@ describe('portScanModel', () => {
     })
     applyPortScanResult(task, {
       status: 'STOPPED',
-      portLength: 1,
-      scannedCount: 1,
-      openPortList: [80],
-      serviceResults: [{ host: '127.0.0.1', port: 80, service: 'http', statusCode: 200 }]
+      total: 1,
+      completed: 1,
+      targets: [{ host: '127.0.0.1', port: 80, protocol: 'tcp' }],
+      plan: { stages: ['tcp-connect', 'tcp-exchange'] },
+      observations: [
+        { host: '127.0.0.1', port: 80, stage: 'tcp-connect', state: 'open' },
+        {
+          host: '127.0.0.1',
+          port: 80,
+          stage: 'tcp-exchange',
+          state: 'open',
+          evidence: { statusCode: 200 }
+        }
+      ]
     })
 
     expect(task.openPortList).toEqual([80])
-    expect(task.serviceResults).toEqual([
-      { host: '127.0.0.1', port: 80, service: 'http', statusCode: 200 }
-    ])
+    expect(task.serviceResults[0]).toMatchObject({
+      host: '127.0.0.1', port: 80, service: 'http', statusCode: 200
+    })
     expect(task.progress).toBe(100)
   })
 
@@ -102,17 +124,15 @@ describe('portScanModel', () => {
     })
     applyPortScanResult(task, {
       status: 'STOPPED',
-      targetCount: 2,
       targets: [
-        { host: '127.0.0.1', protocol: 'tcp' },
-        { host: 'localhost', protocol: 'tcp' }
+        { host: '127.0.0.1', port: 80, protocol: 'tcp' },
+        { host: 'localhost', port: 80, protocol: 'tcp' }
       ],
-      portLength: 2,
-      scannedCount: 2,
-      openPortList: [80, 80],
-      openPortResults: [
-        { host: '127.0.0.1', port: 80, service: 'http' },
-        { host: 'localhost', port: 80, service: 'http' }
+      total: 2,
+      completed: 2,
+      observations: [
+        { host: '127.0.0.1', port: 80, stage: 'tcp-connect', state: 'open' },
+        { host: 'localhost', port: 80, stage: 'tcp-connect', state: 'open' }
       ]
     })
 
@@ -120,5 +140,50 @@ describe('portScanModel', () => {
     expect(task.targetCount).toBe(2)
     expect(task.openPortResults).toHaveLength(2)
     expect(getPortScanTaskStats(task).openCount).toBe(2)
+  })
+
+  it('maps network probe observations into discovery results', () => {
+    const task = createPortScanTaskModel({ taskId: 'probe-1', scanHost: '127.0.0.1', scanPorts: [80, 443] })
+    applyPortScanResult(task, {
+      resultVersion: 1,
+      scanKind: 'network-probe',
+      status: 'STOPPED',
+      total: 2,
+      completed: 2,
+      targets: [
+        { target: '127.0.0.1:80', host: '127.0.0.1', port: 80, protocol: 'tcp' },
+        { target: '127.0.0.1:443', host: '127.0.0.1', port: 443, protocol: 'tcp' }
+      ],
+      plan: { stages: ['tcp-connect', 'tcp-exchange'], timeout: 3000, threads: 4 },
+      observations: [
+        { host: '127.0.0.1', port: 80, stage: 'tcp-connect', state: 'open' },
+        {
+          host: '127.0.0.1',
+          port: 80,
+          stage: 'tcp-exchange',
+          state: 'open',
+          evidence: { statusCode: 200, server: 'leo-test' }
+        }
+      ]
+    })
+
+    expect(task).toMatchObject({
+      scanKind: 'discovery',
+      scanStage: 'PORT_AND_SERVICE',
+      scanHost: '127.0.0.1',
+      scanPorts: [80, 443],
+      portLength: 2,
+      scannedCount: 2,
+      progress: 100
+    })
+    expect(task.openPortList).toEqual([80])
+    expect(task.serviceResults[0]).toMatchObject({
+      host: '127.0.0.1',
+      port: 80,
+      service: 'http',
+      statusCode: 200,
+      server: 'leo-test',
+      probe: 'tcp-exchange'
+    })
   })
 })

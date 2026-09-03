@@ -1,10 +1,7 @@
 import {
-  pauseFingerprintScanApi,
-  pausePortScanApi,
-  resumeFingerprintScanApi,
-  resumePortScanApi,
-  stopFingerprintScanApi,
-  stopPortScanApi
+  pauseNetworkProbeApi,
+  resumeNetworkProbeApi,
+  stopNetworkProbeApi
 } from '@/services/api.js'
 import { TERMINAL_TASK_STATUSES, TaskStatus, TaskType } from '@/constants/task.js'
 
@@ -19,10 +16,8 @@ export function applyScanExecutor(TaskEngine) {
       throw new Error('缺少扫描任务编号，无法暂停')
     }
 
-    if (task.scanKind === 'port_scan') {
-      await pausePortScanApi({ sessionId: task.sessionId, taskId: backendTaskId })
-    } else if (task.scanKind === 'fingerprint_scan') {
-      await pauseFingerprintScanApi({ sessionId: task.sessionId, taskId: backendTaskId })
+    if (['port_scan', 'fingerprint_scan', 'recon_scan'].includes(task.scanKind)) {
+      await pauseNetworkProbeApi({ sessionId: task.sessionId, taskId: backendTaskId })
     } else {
       throw new Error('该扫描任务不支持暂停')
     }
@@ -34,10 +29,8 @@ export function applyScanExecutor(TaskEngine) {
       throw new Error('缺少扫描任务编号，无法继续')
     }
 
-    if (task.scanKind === 'port_scan') {
-      await resumePortScanApi({ sessionId: task.sessionId, taskId: backendTaskId })
-    } else if (task.scanKind === 'fingerprint_scan') {
-      await resumeFingerprintScanApi({ sessionId: task.sessionId, taskId: backendTaskId })
+    if (['port_scan', 'fingerprint_scan', 'recon_scan'].includes(task.scanKind)) {
+      await resumeNetworkProbeApi({ sessionId: task.sessionId, taskId: backendTaskId })
     } else {
       throw new Error('该扫描任务不支持继续')
     }
@@ -49,10 +42,8 @@ export function applyScanExecutor(TaskEngine) {
       throw new Error('缺少扫描任务编号，无法终止')
     }
 
-    if (task.scanKind === 'port_scan') {
-      await stopPortScanApi({ sessionId: task.sessionId, taskId: backendTaskId })
-    } else if (task.scanKind === 'fingerprint_scan') {
-      await stopFingerprintScanApi({ sessionId: task.sessionId, taskId: backendTaskId })
+    if (['port_scan', 'fingerprint_scan', 'recon_scan'].includes(task.scanKind)) {
+      await stopNetworkProbeApi({ sessionId: task.sessionId, taskId: backendTaskId })
     } else {
       throw new Error('该扫描任务不支持终止')
     }

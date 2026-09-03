@@ -1,4 +1,5 @@
 const DEFAULT_TIMEOUT = 3000
+const DEFAULT_MATCH = { field: 'body', operator: 'contains', value: '' }
 
 const toTimeout = value => {
   if (value == null || value === '') return DEFAULT_TIMEOUT
@@ -30,7 +31,7 @@ export const createEmptyFingerprintForm = () => ({
   infoRemark: '',
   vulnerabilityList: [],
   requestList: [createEmptyRequest()],
-  script: ''
+  matchText: JSON.stringify(DEFAULT_MATCH, null, 2)
 })
 
 export const normalizeRequestsForProtocol = (requests, protocol, ensureOne = true) => {
@@ -87,7 +88,7 @@ export const loadFingerprintForm = fingerprint => {
     infoRemark: String(fingerprint.info?.remark || ''),
     vulnerabilityList: vulnerabilities,
     requestList: normalizeRequestsForProtocol(fingerprint.rule?.requests, protocol),
-    script: String(fingerprint.rule?.script || '')
+    matchText: JSON.stringify(fingerprint.rule?.match || DEFAULT_MATCH, null, 2)
   }
 }
 
@@ -158,7 +159,7 @@ export const buildFingerprintPayload = form => {
     name: String(form?.name || '').trim(),
     protocol,
     info,
-    rule: { requests, script: String(form?.script || '').trim() }
+    rule: { requests, match: JSON.parse(String(form?.matchText || '').trim()) }
   }
   const tags = parseFingerprintTags(form?.tagsStr)
   if (tags.length) payload.tags = tags

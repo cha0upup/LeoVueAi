@@ -205,6 +205,7 @@
 import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
+import { getFingerprintAnalysis } from './networkProbeAnalysisModel.js'
 
 const iconMap = icons
 
@@ -259,23 +260,20 @@ const parsedResult = computed(() => {
   return r && typeof r === 'object' ? r : {}
 })
 
-const resultsMap = computed(() => {
-  const m = parsedResult.value.results
-  return m && typeof m === 'object' ? m : {}
-})
-
-const resultEntries = computed(() =>
-  Object.entries(resultsMap.value).map(([key, hit]) => ({ key, hit: Boolean(hit) }))
-)
-
-const totalTargets = computed(() => resultEntries.value.length)
-const hitCount = computed(() => resultEntries.value.filter((e) => e.hit).length)
+const fingerprintAnalysis = computed(() => getFingerprintAnalysis(
+  parsedResult.value,
+  props.task.targetCount || 0
+))
+const resultEntries = computed(() => fingerprintAnalysis.value.entries)
+const totalTargets = computed(() => fingerprintAnalysis.value.total)
+const completedTargets = computed(() => fingerprintAnalysis.value.completed)
+const hitCount = computed(() => fingerprintAnalysis.value.hitCount)
 
 // Progress: treat each target as a work item (completed when result is present)
 const progressPct = computed(() => {
   const total = props.task.targetCount || 0
   if (total <= 0) return 0
-  return Math.min(100, Math.round((totalTargets.value / total) * 100))
+  return Math.min(100, Math.round((completedTargets.value / total) * 100))
 })
 
 function formatTimeShort(timestamp) {
