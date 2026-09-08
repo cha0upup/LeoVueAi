@@ -1,9 +1,5 @@
 <template>
-  <article
-    class="task-card"
-    :class="{ selected: isSelected }"
-    @click="$emit('select')"
-  >
+  <article class="task-card" :class="{ selected: isSelected }" @click="$emit('select')">
     <div class="task-card-top">
       <div class="task-title-wrap">
         <div class="task-icon">
@@ -16,48 +12,30 @@
       </div>
 
       <div class="task-status-wrap">
-        <StatusIndicator
-          :status="statusKey"
-          :label="statusText"
-          compact
-        />
-        <span
-          v-if="task.isManagedLocally"
-          class="task-source task-source--live"
-        >可控</span>
-        <span
-          v-else
-          class="task-source"
-        >快照</span>
+        <StatusIndicator :status="statusKey" :label="statusText" compact />
+        <span v-if="task.isManagedLocally" class="task-source task-source--live">可控</span>
+        <span v-else class="task-source">快照</span>
       </div>
     </div>
 
     <div class="task-meta-grid">
-      <div
-        v-for="item in metaItems"
-        :key="item.label"
-        class="meta-pill"
-      >
+      <div v-for="item in metaItems" :key="item.label" class="meta-pill">
         <span>{{ item.label }}</span>
         <strong>{{ item.value }}</strong>
       </div>
     </div>
 
     <div class="task-progress">
-      <el-progress
-        :percentage="normalizedProgress"
-        :status="progressStatus"
-        :stroke-width="7"
-      />
+      <el-progress :percentage="normalizedProgress" :status="progressStatus" :stroke-width="7" />
     </div>
 
     <div
       v-if="
         task.currentTable ||
-          task.databaseName ||
-          task.downloadPath ||
-          task.scanKind ||
-          task.resultSummary
+        task.databaseName ||
+        task.downloadPath ||
+        task.scanKind ||
+        task.resultSummary
       "
       class="task-context"
     >
@@ -69,10 +47,7 @@
       <span v-if="task.resultSummary">{{ task.resultSummary }}</span>
     </div>
 
-    <div
-      v-if="task.error || task.lastError"
-      class="task-error"
-    >
+    <div v-if="task.error || task.lastError" class="task-error">
       {{ task.error || task.lastError }}
     </div>
 
@@ -182,9 +157,7 @@ const metaItems = computed(() => {
 
 const getScanKindLabel = (scanKind) => {
   const map = {
-    host_reachability: '主机探活',
-    port_scan: '端口扫描',
-    fingerprint_scan: '指纹识别'
+    network_workflow: '一键扫描'
   }
   return map[scanKind] || '扫描'
 }

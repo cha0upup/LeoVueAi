@@ -118,11 +118,11 @@
               <span>{{ String(task.protocol).toUpperCase() }}</span>
             </div>
             <div
-              v-if="task.fingerprintId"
+              v-if="task.fingerprintIds?.length || task.fingerprintId"
               class="detail-info-item"
             >
               <label>指纹</label>
-              <span>{{ task.fingerprintId }}</span>
+              <span>{{ task.fingerprintIds?.length > 1 ? `${task.fingerprintIds.length} 条` : (task.fingerprintIds?.[0] || task.fingerprintId) }}</span>
             </div>
             <div
               v-if="task.totalCount"

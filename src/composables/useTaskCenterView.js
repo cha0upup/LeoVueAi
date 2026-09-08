@@ -45,6 +45,7 @@ const taskMatchesKeyword = (task, keyword) => {
     task.reachableHostList,
     task.unreachableHostList,
     task.fingerprintId,
+    task.fingerprintIds,
     task.protocol,
     task.resultSummary
   ]

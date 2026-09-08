@@ -7,7 +7,7 @@
  * 注意：消息、确认框、通知等命令式 API
  * 在各自使用的组件中单独 import，不在此处注册。
  */
-import { ElAlert, ElAvatar, ElBadge, ElBreadcrumb, ElBreadcrumbItem, ElButton, ElButtonGroup, ElCard, ElCheckbox, ElCheckboxGroup, ElCol, ElCollapse, ElCollapseItem, ElContainer, ElDatePicker, ElDescriptions, ElDescriptionsItem, ElDialog, ElDivider, ElDrawer, ElDropdown, ElDropdownItem, ElDropdownMenu, ElEmpty, ElForm, ElFormItem, ElHeader, ElIcon, ElInput, ElInputNumber, ElLink, ElLoading, ElMain, ElOption, ElOptionGroup, ElPagination, ElPopconfirm, ElPopover, ElProgress, ElRadio, ElRadioButton, ElRadioGroup, ElResult, ElRow, ElScrollbar, ElSegmented, ElSelect, ElSkeleton, ElStatistic, ElSwitch, ElTabPane, ElTable, ElTableColumn, ElTabs, ElTag, ElTooltip, ElTree, ElUpload } from 'element-plus'
+import { ElAlert, ElAvatar, ElBadge, ElBreadcrumb, ElBreadcrumbItem, ElButton, ElButtonGroup, ElCard, ElCheckbox, ElCheckboxGroup, ElCol, ElCollapse, ElCollapseItem, ElCollapseTransition, ElContainer, ElDatePicker, ElDescriptions, ElDescriptionsItem, ElDialog, ElDivider, ElDrawer, ElDropdown, ElDropdownItem, ElDropdownMenu, ElEmpty, ElForm, ElFormItem, ElHeader, ElIcon, ElInput, ElInputNumber, ElLink, ElLoading, ElMain, ElOption, ElOptionGroup, ElPagination, ElPopconfirm, ElPopover, ElProgress, ElRadio, ElRadioButton, ElRadioGroup, ElResult, ElRow, ElScrollbar, ElSegmented, ElSelect, ElSkeleton, ElSlider, ElStatistic, ElSwitch, ElTabPane, ElTable, ElTableColumn, ElTabs, ElTag, ElTimeline, ElTimelineItem, ElTooltip, ElTree, ElUpload } from 'element-plus'
 
 // ===========================
 // CSS 按需引入（使用预编译 CSS，替代全量 ~800KB index.css）
@@ -78,6 +78,7 @@ import 'element-plus/theme-chalk/el-scrollbar.css'
 import 'element-plus/theme-chalk/el-segmented.css'
 import 'element-plus/theme-chalk/el-select.css'
 import 'element-plus/theme-chalk/el-skeleton.css'
+import 'element-plus/theme-chalk/el-slider.css'
 import 'element-plus/theme-chalk/el-statistic.css'
 import 'element-plus/theme-chalk/el-switch.css'
 import 'element-plus/theme-chalk/el-tab-pane.css'
@@ -86,6 +87,7 @@ import 'element-plus/theme-chalk/el-table-column.css'
 import 'element-plus/theme-chalk/el-tabs.css'
 import 'element-plus/theme-chalk/el-tag.css'
 import 'element-plus/theme-chalk/el-time-picker.css'
+import 'element-plus/theme-chalk/el-timeline.css'
 import 'element-plus/theme-chalk/el-tooltip.css'
 import 'element-plus/theme-chalk/el-tree.css'
 import 'element-plus/theme-chalk/el-upload.css'
@@ -104,6 +106,7 @@ export const elementPlusComponents = [
   ElCol,
   ElCollapse,
   ElCollapseItem,
+  ElCollapseTransition,
   ElContainer,
   ElDatePicker,
   ElDescriptions,
@@ -138,6 +141,7 @@ export const elementPlusComponents = [
   ElSegmented,
   ElSelect,
   ElSkeleton,
+  ElSlider,
   ElStatistic,
   ElSwitch,
   ElTabPane,
@@ -145,6 +149,8 @@ export const elementPlusComponents = [
   ElTableColumn,
   ElTabs,
   ElTag,
+  ElTimeline,
+  ElTimelineItem,
   ElTooltip,
   ElTree,
   ElUpload

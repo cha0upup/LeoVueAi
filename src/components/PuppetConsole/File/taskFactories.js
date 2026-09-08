@@ -1,6 +1,13 @@
 import { TaskStatus, TaskType } from '@/constants/task.js'
 
-export function createDownloadTask({ taskId, sessionId, filePath, fileName, fileSize, options = {} }) {
+export function createDownloadTask({
+  taskId,
+  sessionId,
+  filePath,
+  fileName,
+  fileSize,
+  options = {}
+}) {
   return {
     id: taskId,
     type: TaskType.DOWNLOAD,
@@ -116,9 +123,7 @@ export function createDbExportTask({ taskId, sessionId, databaseName, tableCount
 }
 
 const SCAN_KIND_LABELS = {
-  host_reachability: '主机探活',
-  port_scan: '端口扫描',
-  fingerprint_scan: '指纹识别'
+  network_workflow: '一键扫描'
 }
 
 export function createScanTask({
@@ -160,8 +165,10 @@ export function createScanTask({
     reachableHostList: [],
     unreachableHostList: [],
     fingerprintId: options.fingerprintId || '',
+    fingerprintIds: options.fingerprintIds || [],
     protocol: options.protocol || '',
     result: null,
+    createdAt: createdTime,
     createdTime,
     createTime: createdTime,
     startTime: null,

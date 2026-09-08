@@ -4,10 +4,6 @@ export function getFingerprintsApi() {
   return http.get('/platform/fingerprint-manage/fingerprints')
 }
 
-export function getFingerprintsByProtocolApi(params) {
-  return http.post('/platform/fingerprint-manage/fingerprints/by-protocol', params)
-}
-
 export function getFingerprintDetailApi(params) {
   return http.post('/platform/fingerprint-manage/fingerprints/get', params)
 }

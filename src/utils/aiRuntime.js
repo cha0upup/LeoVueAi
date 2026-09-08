@@ -1,6 +1,5 @@
 export const TERMINAL_AI_STATUSES = ['completed', 'failed', 'cancelled']
 export const ACTIVE_AI_STATUSES = ['queued', 'running', 'cancelling']
-export const WAITING_AI_STATUSES = ['waiting_for_user']
 
 export function normalizeAiStatus(status, fallback = 'idle') {
   if (status === 'done') return 'completed'

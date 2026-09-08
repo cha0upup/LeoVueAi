@@ -226,7 +226,14 @@ const syncRemoteTasks = (force = false) => {
 }
 
 const refreshAll = () => {
-  syncRemoteTasks()
+  const sessionId = props.sessionId
+  if (!sessionId) return
+  void Promise.allSettled([
+    syncRemoteTasks(),
+    taskEngine.syncNetworkWorkflowTasks(sessionId)
+  ]).then(() => {
+    if (isCurrentSession(sessionId)) rebuildTaskList(sessionId)
+  })
 }
 
 const resetSessionState = () => {

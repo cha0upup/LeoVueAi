@@ -1,9 +1,5 @@
 import http from '../http.js'
 
-export function getChildrenByParentPuppetIdApi(params) {
-  return http.post('/platform/puppet-manage/children', params)
-}
-
 export function getPuppetsApi() {
   return http.get('/platform/puppet-manage/puppets')
 }

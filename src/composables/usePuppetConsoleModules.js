@@ -62,13 +62,13 @@ export function usePuppetConsoleModules(iconMap) {
     },
     {
       key: 'scan',
-      title: '扫描探测',
-      description: '端口扫描和主机探活',
+      title: '网络资产发现',
+      description: '统一扫描协议，支持多格式目标、端口策略、服务识别与变化追踪',
       icon: iconMap.scan,
       iconClass: 'scan-icon',
       phase: 'recon',
-      requiredCapabilities: ['scan'],
-      component: defineAsyncComponent(() => import('@/components/PuppetConsole/Scan/PortScan.vue'))
+      requiredCapabilities: ['networkProbe'],
+      component: defineAsyncComponent(() => import('@/components/PuppetConsole/Scan/AssetDiscoveryView.vue'))
     },
     {
       key: 'network-connection',

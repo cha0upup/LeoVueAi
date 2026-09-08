@@ -1,7 +1,9 @@
 import {
-  pauseNetworkProbeApi,
-  resumeNetworkProbeApi,
-  stopNetworkProbeApi
+  pauseNetworkProbeWorkflowApi,
+  resumeNetworkProbeWorkflowApi,
+  stopNetworkProbeWorkflowApi,
+  queryNetworkProbeWorkflowApi,
+  listNetworkProbeWorkflowTasksApi
 } from '@/services/api.js'
 import { TERMINAL_TASK_STATUSES, TaskStatus, TaskType } from '@/constants/task.js'
 
@@ -16,11 +18,8 @@ export function applyScanExecutor(TaskEngine) {
       throw new Error('缺少扫描任务编号，无法暂停')
     }
 
-    if (['port_scan', 'fingerprint_scan', 'recon_scan'].includes(task.scanKind)) {
-      await pauseNetworkProbeApi({ sessionId: task.sessionId, taskId: backendTaskId })
-    } else {
-      throw new Error('该扫描任务不支持暂停')
-    }
+    if (task.scanKind !== 'network_workflow') throw new Error('该扫描任务不支持暂停')
+    await pauseNetworkProbeWorkflowApi({ sessionId: task.sessionId, taskId: backendTaskId })
   }
 
   TaskEngine.prototype.resumeScanTask = async function (task) {
@@ -29,11 +28,8 @@ export function applyScanExecutor(TaskEngine) {
       throw new Error('缺少扫描任务编号，无法继续')
     }
 
-    if (['port_scan', 'fingerprint_scan', 'recon_scan'].includes(task.scanKind)) {
-      await resumeNetworkProbeApi({ sessionId: task.sessionId, taskId: backendTaskId })
-    } else {
-      throw new Error('该扫描任务不支持继续')
-    }
+    if (task.scanKind !== 'network_workflow') throw new Error('该扫描任务不支持继续')
+    await resumeNetworkProbeWorkflowApi({ sessionId: task.sessionId, taskId: backendTaskId })
   }
 
   TaskEngine.prototype.stopScanTask = async function (task) {
@@ -42,11 +38,8 @@ export function applyScanExecutor(TaskEngine) {
       throw new Error('缺少扫描任务编号，无法终止')
     }
 
-    if (['port_scan', 'fingerprint_scan', 'recon_scan'].includes(task.scanKind)) {
-      await stopNetworkProbeApi({ sessionId: task.sessionId, taskId: backendTaskId })
-    } else {
-      throw new Error('该扫描任务不支持终止')
-    }
+    if (task.scanKind !== 'network_workflow') throw new Error('该扫描任务不支持终止')
+    await stopNetworkProbeWorkflowApi({ sessionId: task.sessionId, taskId: backendTaskId })
   }
 
   TaskEngine.prototype.executeScanTask = async function (task) {
@@ -73,9 +66,20 @@ export function applyScanExecutor(TaskEngine) {
     if (normalized === 'COMPLETED' || normalized === 'DONE') return TaskStatus.COMPLETED
 
     if (normalized === 'STOPPED') {
+      const outcome = String(snapshot.outcome || '').toUpperCase()
+      if (outcome === 'COMPLETED') return TaskStatus.COMPLETED
+      if (outcome === 'FAILED') return TaskStatus.FAILED
+      if (outcome === 'CANCELLED' || outcome === 'CANCELED') return TaskStatus.CANCELLED
       const total = Number(snapshot.totalCount ?? snapshot.total ?? snapshot.portLength ?? 0)
-      const processed = Number(snapshot.processedCount ?? snapshot.completed ?? snapshot.scannedCount ?? 0)
-      return total > 0 && processed >= total ? TaskStatus.COMPLETED : TaskStatus.CANCELLED
+      const processed = Number(
+        snapshot.processedCount ?? snapshot.completed ?? snapshot.scannedCount ??
+          snapshot.completedStageCount ?? 0
+      )
+      const stageTotal = Number(snapshot.stageCount ?? 0)
+      const stageCompleted = Number(snapshot.completedStageCount ?? 0)
+      return (total > 0 && processed >= total) || (stageTotal > 0 && stageCompleted >= stageTotal)
+        ? TaskStatus.COMPLETED
+        : TaskStatus.CANCELLED
     }
 
     return TaskStatus.PENDING
@@ -95,7 +99,11 @@ export function applyScanExecutor(TaskEngine) {
         0
     )
     const processedCount = Number(
-      snapshot.processedCount ?? snapshot.completed ?? snapshot.scannedCount ?? task.processedCount ?? 0
+      snapshot.processedCount ??
+        snapshot.completed ??
+        snapshot.scannedCount ??
+        task.processedCount ??
+        0
     )
     const nextStatus = snapshot.status ? this.mapScanStatus(snapshot.status, snapshot) : task.status
     const progress =
@@ -116,6 +124,10 @@ export function applyScanExecutor(TaskEngine) {
     task.totalCount = totalCount
     task.processedCount = processedCount
     task.targetCount = Number(snapshot.targetCount ?? task.targetCount ?? totalCount)
+    task.openCount = Number(snapshot.openCount ?? task.openCount ?? 0)
+    task.serviceCount = Number(snapshot.serviceCount ?? task.serviceCount ?? 0)
+    task.fingerprintCount = Number(snapshot.fingerprintCount ?? task.fingerprintCount ?? 0)
+    task.errorCount = Number(snapshot.errorCount ?? task.errorCount ?? 0)
     task.hitCount = Number(snapshot.hitCount ?? task.hitCount ?? 0)
     task.missCount = Number(snapshot.missCount ?? task.missCount ?? 0)
     task.resultSummary = snapshot.resultSummary || task.resultSummary || ''
@@ -125,17 +137,47 @@ export function applyScanExecutor(TaskEngine) {
     task.portLength = Number(snapshot.portLength ?? task.portLength ?? 0)
     task.scannedCount = Number(snapshot.scannedCount ?? task.scannedCount ?? processedCount)
     task.openPortList = snapshot.openPortList || task.openPortList || []
+    task.openPortResults = Array.isArray(snapshot.openPortResults)
+      ? snapshot.openPortResults
+      : task.openPortResults || []
+    task.serviceResults = Array.isArray(snapshot.serviceResults)
+      ? snapshot.serviceResults
+      : task.serviceResults || []
+    task.errors = Array.isArray(snapshot.errors) ? snapshot.errors : task.errors || []
     task.reachableHostList = snapshot.reachableHostList || task.reachableHostList || []
+    task.reachableHostCount = Number(snapshot.reachableHostCount ?? task.reachableHostCount ?? task.reachableHostList.length)
+    if (snapshot.reachableHostList !== undefined || snapshot.reachableHostCount !== undefined) {
+      task.reachabilityLoaded = true
+    }
     task.unreachableHostList = snapshot.unreachableHostList || task.unreachableHostList || []
     task.fingerprintId = snapshot.fingerprintId || task.fingerprintId || ''
+    task.fingerprintIds = snapshot.fingerprintIds || task.fingerprintIds || []
     task.protocol = snapshot.protocol || task.protocol || ''
     task.result = snapshot.result ?? task.result
-    task.createdTime = snapshot.createdTime || task.createdTime || snapshot.createTime
-    task.createTime = snapshot.createTime || task.createTime || task.createdTime
+    task.outcome = snapshot.outcome || task.outcome || null
+    task.stages = Array.isArray(snapshot.stages) ? snapshot.stages : task.stages || []
+    task.currentStage = snapshot.currentStage || task.currentStage || null
+    task.reconAnalysis = snapshot.reconAnalysis || task.reconAnalysis || {}
+    task.metrics = snapshot.metrics || task.metrics || null
+    const createdAt = snapshot.createdAt ?? snapshot.createdTime ?? snapshot.createTime
+    if (createdAt != null) {
+      const numericCreatedAt = Number(createdAt)
+      const normalizedCreatedAt = Number.isFinite(numericCreatedAt) && numericCreatedAt > 0
+        ? numericCreatedAt
+        : Date.parse(String(createdAt))
+      if (Number.isFinite(normalizedCreatedAt) && normalizedCreatedAt > 0) {
+        task.createdAt = normalizedCreatedAt
+        task.createdTime = normalizedCreatedAt
+        task.createTime = normalizedCreatedAt
+      }
+    }
     task.startTime =
-      snapshot.startTime || task.startTime || (nextStatus === TaskStatus.SCANNING ? Date.now() : null)
+      snapshot.startTime ||
+      task.startTime ||
+      (nextStatus === TaskStatus.SCANNING ? Date.now() : null)
     task.endTime =
-      snapshot.endTime || (TERMINAL_TASK_STATUSES.includes(nextStatus) ? task.endTime || Date.now() : null)
+      snapshot.endTime ||
+      (TERMINAL_TASK_STATUSES.includes(nextStatus) ? task.endTime || Date.now() : null)
     task.error = snapshot.error || null
     task.canControl = snapshot.canControl === undefined ? task.canControl : snapshot.canControl
     task.options = {
@@ -165,5 +207,65 @@ export function applyScanExecutor(TaskEngine) {
     }
 
     this.emit('taskProgress', task)
+  }
+
+  TaskEngine.prototype.queryScanTask = async function (task) {
+    const backendTaskId = this.getScanBackendTaskId(task)
+    if (!backendTaskId || !task?.sessionId) return null
+    if (!this.scanQueryRequests) this.scanQueryRequests = new Map()
+    const existing = this.scanQueryRequests.get(task.id)
+    if (existing) return existing
+    if (task.scanKind !== 'network_workflow') {
+      throw new Error('未知的扫描任务类型')
+    }
+    const queryApi = queryNetworkProbeWorkflowApi
+    const request = (async () => {
+      const response = await queryApi({ sessionId: task.sessionId, taskId: backendTaskId })
+      const result = response?.data?.result || response?.data
+      if (result && typeof result === 'object') {
+        this.hydrateScanTask(task.id, result)
+      }
+      return result
+    })()
+    this.scanQueryRequests.set(task.id, request)
+    try {
+      return await request
+    } finally {
+      if (this.scanQueryRequests.get(task.id) === request) this.scanQueryRequests.delete(task.id)
+    }
+  }
+
+  TaskEngine.prototype.syncNetworkWorkflowTasks = async function (sessionId) {
+    if (!sessionId) return []
+    const response = await listNetworkProbeWorkflowTasksApi({ sessionId })
+    const snapshots = Array.isArray(response?.data?.tasks) ? response.data.tasks : []
+    const result = []
+    for (const snapshot of snapshots) {
+      const backendTaskId = snapshot?.taskId
+      if (!backendTaskId) continue
+      let task = this.getTasksBySession(sessionId).find(item =>
+        item.scanKind === 'network_workflow' &&
+        (item.backendTaskId === backendTaskId || item.serverTaskId === backendTaskId)
+      )
+      if (!task) {
+        const taskId = this.createScanTask(
+          sessionId,
+          'network_workflow',
+          snapshot.name || '网络资产发现',
+          snapshot.stageCount || 4,
+          {
+            backendTaskId,
+            targetCount: snapshot.targetCount,
+            scanHosts: snapshot.hosts,
+            scanPorts: snapshot.ports,
+            canControl: true
+          }
+        )
+        task = this.getTaskById(taskId)
+      }
+      this.hydrateScanTask(task.id, snapshot)
+      result.push(task)
+    }
+    return result
   }
 }
