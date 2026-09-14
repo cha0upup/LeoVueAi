@@ -15,7 +15,7 @@
         <h2>{{ isEdit ? '编辑指纹' : '新增指纹' }}</h2>
       </div>
       <div class="dialog-meta">
-        <span>{{ (formData.protocol || 'http').toUpperCase() }}</span>
+        <span>HTTP</span>
         <span>{{ formData.requestList.length }} 请求</span>
         <span>{{ formData.vulnerabilityList.length }} 漏洞</span>
       </div>
@@ -51,26 +51,6 @@
             <div class="form-tip">
               由 name + version 自动生成，同名同版本会覆盖
             </div>
-          </el-form-item>
-          <el-form-item
-            label="协议"
-            prop="protocol"
-            required
-          >
-            <el-select
-              v-model="formData.protocol"
-              placeholder="请选择"
-              style="width: 100%"
-            >
-              <el-option
-                label="HTTP"
-                value="http"
-              />
-              <el-option
-                label="TCP"
-                value="tcp"
-              />
-            </el-select>
           </el-form-item>
           <el-form-item
             label="名称"
@@ -152,7 +132,6 @@
         >
           <FingerprintRequestEditor
             v-model="formData.requestList"
-            :protocol="formData.protocol"
           />
           <div class="form-tip">
             按顺序执行，至少保留一条请求
@@ -213,8 +192,7 @@ import {
   buildFingerprintPayload,
   createEmptyFingerprintForm,
   findIncompleteVulnerabilities,
-  loadFingerprintForm,
-  normalizeRequestsForProtocol
+  loadFingerprintForm
 } from './saveFingerprintModel.js'
 
 const props = defineProps({
@@ -233,7 +211,6 @@ const isEdit = computed(() => Boolean(props.fingerprint))
 const saving = computed(() => props.loading || submitLocked.value)
 
 const formRules = {
-  protocol: [{ required: true, message: '请选择协议', trigger: 'change' }],
   name: [{ required: true, message: '请输入指纹名称', trigger: 'blur' }],
   version: [{ required: true, message: '请输入版本', trigger: 'blur' }],
   matchText: [{ required: true, message: '请输入声明式命中条件', trigger: 'blur' }]
@@ -248,15 +225,6 @@ watch(
     formRef.value?.clearValidate()
   },
   { immediate: true }
-)
-
-watch(
-  () => formData.value.protocol,
-  (protocol, previousProtocol) => {
-    if (!previousProtocol || protocol === previousProtocol) return
-    formData.value.requestList = normalizeRequestsForProtocol(formData.value.requestList, protocol)
-    formRef.value?.clearValidate()
-  }
 )
 
 watch(

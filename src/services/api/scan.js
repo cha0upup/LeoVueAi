@@ -20,6 +20,10 @@ export function stopNetworkProbeWorkflowApi(params) {
   return http.post('/puppet-node/network-probe/workflow/stop', params)
 }
 
+export function deleteNetworkProbeWorkflowApi(params) {
+  return http.post('/puppet-node/network-probe/workflow/delete', params)
+}
+
 export function previewNetworkProbeWorkflowApi(params) {
   return http.post('/puppet-node/network-probe/workflow/preview', params)
 }
@@ -30,8 +34,4 @@ export function listNetworkProbeWorkflowTasksApi(params) {
 
 export function queryNetworkProbeWorkflowResultsApi(params) {
   return http.post('/puppet-node/network-probe/workflow/results/query', params)
-}
-
-export function queryNetworkProbeWorkflowEvidenceApi(params) {
-  return http.post('/puppet-node/network-probe/workflow/evidence/query', params)
 }

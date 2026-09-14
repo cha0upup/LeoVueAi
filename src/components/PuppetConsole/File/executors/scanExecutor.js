@@ -6,6 +6,7 @@ import {
   listNetworkProbeWorkflowTasksApi
 } from '@/services/api.js'
 import { TERMINAL_TASK_STATUSES, TaskStatus, TaskType } from '@/constants/task.js'
+import { normalizeNetworkWorkflowKind } from '../taskFactories.js'
 
 export function applyScanExecutor(TaskEngine) {
   TaskEngine.prototype.getScanBackendTaskId = function (task) {
@@ -98,7 +99,7 @@ export function applyScanExecutor(TaskEngine) {
         task.totalCount ??
         0
     )
-    const processedCount = Number(
+    const reportedProcessedCount = Number(
       snapshot.processedCount ??
         snapshot.completed ??
         snapshot.scannedCount ??
@@ -106,6 +107,15 @@ export function applyScanExecutor(TaskEngine) {
         0
     )
     const nextStatus = snapshot.status ? this.mapScanStatus(snapshot.status, snapshot) : task.status
+    const targetCount = Number(snapshot.targetCount ?? task.targetCount ?? totalCount)
+    const processedCount =
+      snapshot.processedCount !== undefined ||
+      snapshot.completed !== undefined ||
+      snapshot.scannedCount !== undefined ||
+      task.processedCount > 0 ||
+      nextStatus !== TaskStatus.COMPLETED
+        ? reportedProcessedCount
+        : targetCount
     const progress =
       snapshot.progress !== undefined
         ? this.clampProgress(snapshot.progress)
@@ -115,7 +125,10 @@ export function applyScanExecutor(TaskEngine) {
 
     task.backendTaskId = snapshot.backendTaskId || snapshot.taskId || task.backendTaskId
     task.serverTaskId = task.backendTaskId || task.serverTaskId
-    task.scanKind = snapshot.scanKind || task.scanKind
+    // Older servers used a hyphenated identifier; keep it compatible while
+    // storing the canonical value expected by the scan workbench.
+    const scanKind = normalizeNetworkWorkflowKind(snapshot.scanKind)
+    task.scanKind = scanKind || task.scanKind
     task.targetLabel = snapshot.targetLabel || task.targetLabel
     task.fileName = snapshot.fileName || task.fileName
     task.status = nextStatus
@@ -123,7 +136,7 @@ export function applyScanExecutor(TaskEngine) {
     task.currentStep = snapshot.currentStep || task.currentStep || ''
     task.totalCount = totalCount
     task.processedCount = processedCount
-    task.targetCount = Number(snapshot.targetCount ?? task.targetCount ?? totalCount)
+    task.targetCount = targetCount
     task.openCount = Number(snapshot.openCount ?? task.openCount ?? 0)
     task.serviceCount = Number(snapshot.serviceCount ?? task.serviceCount ?? 0)
     task.fingerprintCount = Number(snapshot.fingerprintCount ?? task.fingerprintCount ?? 0)
@@ -156,7 +169,13 @@ export function applyScanExecutor(TaskEngine) {
     task.result = snapshot.result ?? task.result
     task.outcome = snapshot.outcome || task.outcome || null
     task.stages = Array.isArray(snapshot.stages) ? snapshot.stages : task.stages || []
-    task.currentStage = snapshot.currentStage || task.currentStage || null
+    // A terminal workflow deliberately returns currentStage=null. Do not
+    // retain the previous live stage when hydrating a completed history item.
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'currentStage')) {
+      task.currentStage = snapshot.currentStage
+    } else {
+      task.currentStage = task.currentStage || null
+    }
     task.reconAnalysis = snapshot.reconAnalysis || task.reconAnalysis || {}
     task.metrics = snapshot.metrics || task.metrics || null
     const createdAt = snapshot.createdAt ?? snapshot.createdTime ?? snapshot.createTime
@@ -215,6 +234,7 @@ export function applyScanExecutor(TaskEngine) {
     if (!this.scanQueryRequests) this.scanQueryRequests = new Map()
     const existing = this.scanQueryRequests.get(task.id)
     if (existing) return existing
+    task.scanKind = normalizeNetworkWorkflowKind(task.scanKind)
     if (task.scanKind !== 'network_workflow') {
       throw new Error('未知的扫描任务类型')
     }
@@ -244,7 +264,7 @@ export function applyScanExecutor(TaskEngine) {
       const backendTaskId = snapshot?.taskId
       if (!backendTaskId) continue
       let task = this.getTasksBySession(sessionId).find(item =>
-        item.scanKind === 'network_workflow' &&
+        normalizeNetworkWorkflowKind(item.scanKind) === 'network_workflow' &&
         (item.backendTaskId === backendTaskId || item.serverTaskId === backendTaskId)
       )
       if (!task) {

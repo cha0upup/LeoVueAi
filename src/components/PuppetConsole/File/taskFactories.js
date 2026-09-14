@@ -126,6 +126,12 @@ const SCAN_KIND_LABELS = {
   network_workflow: '一键扫描'
 }
 
+export function normalizeNetworkWorkflowKind(value) {
+  return String(value || '').toLowerCase() === 'network-workflow'
+    ? 'network_workflow'
+    : value
+}
+
 export function createScanTask({
   taskId,
   sessionId,

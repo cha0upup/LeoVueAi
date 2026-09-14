@@ -27,20 +27,6 @@
         </el-button>
       </div>
 
-      <div class="scope-tabs">
-        <button
-          v-for="p in protocolTabs"
-          :key="p.value"
-          type="button"
-          class="scope-tab"
-          :class="{ 'is-active': activeProtocol === p.value }"
-          @click="activeProtocol = p.value"
-        >
-          {{ p.label }}
-          <span>{{ p.count }}</span>
-        </button>
-      </div>
-
       <div class="toolbar-row">
         <el-input
           v-model="searchKeyword"
@@ -86,7 +72,7 @@
 
       <div class="result-row">
         <span>当前 {{ filteredFingerprints.length }} / {{ fingerprints.length }} 条</span>
-        <span>{{ httpCount }} HTTP · {{ tcpCount }} TCP</span>
+        <span>全部为 HTTP 指纹</span>
       </div>
 
       <BatchActionBar
@@ -145,11 +131,11 @@
             <template #status>
               <el-tag
                 size="small"
-                :type="item.protocol === 'http' ? 'primary' : 'success'"
+                type="primary"
                 effect="plain"
                 class="workbench-type-tag"
               >
-                {{ (item.protocol || '-').toUpperCase() }}
+                HTTP
               </el-tag>
             </template>
             <template #extra>
@@ -256,7 +242,6 @@ const fingerprints = ref([])
 const selectedFingerprint = ref(null)
 const detailData = ref(null)
 const searchKeyword = ref('')
-const activeProtocol = ref('all')
 const listLoading = ref(false)
 const detailLoading = ref(false)
 const saveLoading = ref(false)
@@ -272,16 +257,6 @@ const batchDeleteLoading = ref(false)
 const detailExportLoading = ref(false)
 
 const iconMap = icons
-
-const httpCount = computed(
-  () => fingerprints.value.filter((item) => item.protocol === 'http').length
-)
-const tcpCount = computed(() => fingerprints.value.filter((item) => item.protocol === 'tcp').length)
-const protocolTabs = computed(() => [
-  { label: '全部', value: 'all', count: fingerprints.value.length },
-  { label: 'HTTP', value: 'http', count: httpCount.value },
-  { label: 'TCP', value: 'tcp', count: tcpCount.value }
-])
 
 function vulnerabilityCount(item) {
   return Array.isArray(item?.info?.vulnerabilities) ? item.info.vulnerabilities.length : 0
@@ -299,8 +274,7 @@ const filteredFingerprints = computed(() => {
     const tagsStr = (item.tags || []).join(' ').toLowerCase()
     const matchKeyword =
       !keyword || fid.includes(keyword) || name.includes(keyword) || tagsStr.includes(keyword)
-    const matchProtocol = activeProtocol.value === 'all' || item.protocol === activeProtocol.value
-    return matchKeyword && matchProtocol
+    return matchKeyword
   })
 })
 
@@ -386,7 +360,6 @@ function openEditDialog(row) {
       currentEditDetail.value = {
         fingerprintId: row.fingerprintId,
         name: row.name,
-        protocol: row.protocol,
         tags: row.tags,
         info: row.info
       }
@@ -412,8 +385,6 @@ async function handleSave(payload) {
       const savedId = response?.data?.fingerprintId
       getFingerprints().then(() => {
         if (savedId) {
-          const found = fingerprints.value.find((f) => f.fingerprintId === savedId)
-          if (found) selectedFingerprint.value = found
           fetchDetail(savedId)
         }
       })
@@ -552,9 +523,6 @@ async function handleBatchExport() {
   await handleExportList(ids.map((fingerprintId) => ({ fingerprintId })))
   clearBatchSelection()
 }
-
-// 切换协议筛选时清空选中（避免选了不可见项后无法清理）
-watch(activeProtocol, clearBatchSelection)
 
 // ── 导入回调 ──────────────────────────────────────────────────────────────
 async function handleImported() {

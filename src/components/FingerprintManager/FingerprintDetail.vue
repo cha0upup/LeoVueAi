@@ -22,12 +22,11 @@
             </el-icon>
             <h2>{{ detail.name || detail.fingerprintId }}</h2>
             <el-tag
-              v-if="detail.protocol"
-              :type="detail.protocol === 'http' ? 'primary' : 'info'"
+              type="primary"
               effect="light"
               class="detail-protocol-tag"
             >
-              {{ detail.protocol }}
+              HTTP
             </el-tag>
             <el-tag
               v-if="detail.info?.version"
@@ -89,7 +88,7 @@
       </div>
 
       <div class="meta-strip">
-        <span>{{ (detail.protocol || '-').toUpperCase() }}</span>
+        <span>HTTP</span>
         <span>{{ detail.tags?.length || 0 }} 标签</span>
         <span>{{ requestList.length }} 请求</span>
         <span>版本 {{ detail.info?.version || '-' }}</span>
@@ -117,7 +116,7 @@
             </div>
             <div class="kv-item">
               <label>协议</label>
-              <span>{{ detail.protocol || '-' }}</span>
+              <span>HTTP</span>
             </div>
             <div class="kv-item">
               <label>版本</label>
@@ -267,58 +266,38 @@
               >
                 请求 {{ index + 1 }}
               </el-tag>
-              <template v-if="isHttp">
-                <el-tag
-                  v-if="req.method"
-                  size="small"
-                  effect="plain"
-                >
-                  {{ req.method }}
-                </el-tag>
-                <code class="request-path">{{ req.path || req.uri || '/' }}</code>
-              </template>
+              <el-tag
+                v-if="req.method"
+                size="small"
+                effect="plain"
+              >
+                {{ req.method }}
+              </el-tag>
+              <code class="request-path">{{ req.path || req.uri || '/' }}</code>
             </div>
 
             <div class="request-card-body">
-              <template v-if="isHttp">
-                <div
-                  v-if="req.timeout != null"
-                  class="request-row"
-                >
-                  <label>超时</label>
-                  <span>{{ req.timeout }} ms</span>
-                </div>
-                <div
-                  v-if="req.headers && Object.keys(req.headers).length"
-                  class="request-row block"
-                >
-                  <label>Headers</label>
-                  <pre>{{ formatHeaders(req.headers) }}</pre>
-                </div>
-                <div
-                  v-if="req.body"
-                  class="request-row block"
-                >
-                  <label>Body</label>
-                  <pre>{{ req.body }}</pre>
-                </div>
-              </template>
-              <template v-else>
-                <div
-                  v-if="req.body != null"
-                  class="request-row block"
-                >
-                  <label>发送内容</label>
-                  <pre>{{ req.body }}</pre>
-                </div>
-                <div
-                  v-if="req.timeout != null"
-                  class="request-row"
-                >
-                  <label>超时</label>
-                  <span>{{ req.timeout }} ms</span>
-                </div>
-              </template>
+              <div
+                v-if="req.timeout != null"
+                class="request-row"
+              >
+                <label>超时</label>
+                <span>{{ req.timeout }} ms</span>
+              </div>
+              <div
+                v-if="req.headers && Object.keys(req.headers).length"
+                class="request-row block"
+              >
+                <label>Headers</label>
+                <pre>{{ formatHeaders(req.headers) }}</pre>
+              </div>
+              <div
+                v-if="req.body"
+                class="request-row block"
+              >
+                <label>Body</label>
+                <pre>{{ req.body }}</pre>
+              </div>
             </div>
           </article>
         </div>
@@ -345,7 +324,7 @@
       <EmptyState
         workbench
         title="选择一个指纹"
-        description="左侧列表支持搜索和协议筛选，右侧展示元信息、请求列表和命中条件。"
+        description="左侧列表支持搜索，右侧展示元信息、请求列表和命中条件。"
         :icon="iconMap.fingerprint"
       />
     </div>
@@ -379,7 +358,6 @@ const props = defineProps({
 })
 
 const iconMap = icons
-const isHttp = computed(() => (props.detail?.protocol || '').toLowerCase() === 'http')
 const requestList = computed(() =>
   Array.isArray(props.detail?.rule?.requests) ? props.detail.rule.requests : []
 )
@@ -537,12 +515,6 @@ function formatHeaders(headers) {
   background: color-mix(in srgb, var(--el-color-primary-light-8) 82%, white);
   border-color: color-mix(in srgb, var(--el-color-primary) 36%, transparent);
   color: var(--el-color-primary-dark-2);
-}
-
-:deep(.detail-protocol-tag.el-tag--info) {
-  background: color-mix(in srgb, var(--el-color-info-light-8) 80%, white);
-  border-color: color-mix(in srgb, var(--el-color-info) 34%, transparent);
-  color: var(--el-color-info-dark-2);
 }
 
 .identity-id span {

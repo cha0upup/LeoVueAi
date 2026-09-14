@@ -71,6 +71,7 @@ import {
   downloadEngineRetryApi,
   downloadEngineTasksApi,
   downloadLocalFileApi,
+  deleteNetworkProbeWorkflowApi,
   getSqlExportTasksApi,
   uploadEngineCancelApi,
   uploadEnginePauseApi,
@@ -258,14 +259,29 @@ watch(
 )
 
 const removeTask = async task => {
+  const isNetworkWorkflow =
+    task?.type === TaskType.SCAN &&
+    task?.scanKind === 'network_workflow' &&
+    (task?.backendTaskId || task?.serverTaskId)
   const canRemoveServerTransfer =
     [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task?.type) && task?.serverTaskId
-  if (!task?.taskId && !canRemoveServerTransfer) {
+  if (!task?.taskId && !canRemoveServerTransfer && !isNetworkWorkflow) {
     showInfo('该任务仅存在于服务端快照')
     return
   }
   const confirmed = await confirmDelete({ title: '删除任务', message: '确定删除这个任务记录吗？' })
   if (!confirmed) return
+  if (isNetworkWorkflow) {
+    await deleteNetworkProbeWorkflowApi({
+      sessionId: task.sessionId || props.sessionId,
+      taskId: task.backendTaskId || task.serverTaskId
+    })
+    if (task.taskId) taskEngine.removeTaskById(task.taskId)
+    await taskEngine.syncNetworkWorkflowTasks(task.sessionId || props.sessionId)
+    rebuildTaskList()
+    showSuccess('任务已删除')
+    return
+  }
   if (canRemoveServerTransfer) {
     const removeServerTask =
       task.type === TaskType.DOWNLOAD ? downloadEngineRemoveApi : uploadEngineRemoveApi
