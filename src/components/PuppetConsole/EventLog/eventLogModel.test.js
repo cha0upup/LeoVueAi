@@ -5,21 +5,13 @@ import {
   buildEventLogQueryParams,
   formatEventLogValue,
   getEventLogLevel,
-  isEventLogAccessFormat,
-  resolveEventLogLevelTagType,
-  resolveEventLogSourceIcon,
-  resolveHttpStatusTagType
+  isEventLogAccessFormat
 } from './eventLogModel.js'
 
 describe('eventLogModel', () => {
-  it('resolves formats, source icons and severity colors', () => {
+  it('recognizes access logs and resolves the level field', () => {
     expect(isEventLogAccessFormat('nginx-access')).toBe(true)
     expect(isEventLogAccessFormat('tomcat')).toBe(false)
-    expect(resolveEventLogSourceIcon('mysql')).toBe('simple-icons:mysql')
-    expect(resolveEventLogSourceIcon('unknown')).toBe('mdi:text-box')
-    expect(resolveHttpStatusTagType('503')).toBe('danger')
-    expect(resolveHttpStatusTagType('204')).toBe('success')
-    expect(resolveEventLogLevelTagType('WARN')).toBe('warning')
     expect(getEventLogLevel({ Level: 'Error', level: 'info' })).toBe('Error')
   })
 

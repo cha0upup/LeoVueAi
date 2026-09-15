@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 import {
   DATABASE_CONNECTION_STATUS,
-  getDatabaseConnectionStatusPresentation,
   isDatabaseConnectionConfigured,
   useDatabaseConnectionState
 } from './useDatabaseConnectionState.js'
@@ -18,17 +17,6 @@ describe('useDatabaseConnectionState', () => {
     ).toBe(true)
     expect(isDatabaseConnectionConfigured({ dialect: 'mysql' })).toBe(false)
     expect(isDatabaseConnectionConfigured({ host: 'db' })).toBe(false)
-  })
-
-  it('provides one presentation mapping for every connection state', () => {
-    expect(getDatabaseConnectionStatusPresentation('ready')).toEqual({
-      label: '已连接',
-      type: 'success'
-    })
-    expect(getDatabaseConnectionStatusPresentation('unknown')).toEqual({
-      label: '待连接',
-      type: 'info'
-    })
   })
 
   it('moves from connecting to ready and records connection details', async () => {

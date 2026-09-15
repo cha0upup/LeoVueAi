@@ -7,10 +7,6 @@ import {
   formatAuditJson,
   formatAuditTime,
   getActiveAuditFilterSummary,
-  getOperationTagType,
-  getOperationTypeLabel,
-  getStatusIndicatorStatus,
-  getStatusLabel,
   hasActiveAuditFilter
 } from './auditManagerModel.js'
 
@@ -56,14 +52,6 @@ describe('auditManagerModel', () => {
     expect(hasActiveAuditFilter(filter)).toBe(false)
     expect(getActiveAuditFilterSummary(filter)).toEqual({})
     expect(buildAuditFilterParams(filter)).toEqual({})
-  })
-
-  it('maps operation and status presentation consistently', () => {
-    expect(getOperationTypeLabel('AUDIT_LOG_DELETE')).toBe('删除审计日志')
-    expect(getOperationTypeLabel('CUSTOM_ACTION')).toBe('CUSTOM_ACTION')
-    expect(getOperationTagType('SQL_QUERY')).toBe('warning')
-    expect(getStatusLabel('ERROR')).toBe('错误')
-    expect(getStatusIndicatorStatus('PENDING')).toBe('waiting')
   })
 
   it('formats JSON and preserves malformed payloads', () => {

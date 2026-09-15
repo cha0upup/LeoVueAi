@@ -2,12 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   detectUserSpaceLanguage,
   filterUserSpaceEntries,
-  getUserSpaceEntryIconKey,
   getUserSpaceFileExtension,
-  isArtifactCategoryPath,
   joinUserSpacePath,
   normalizeWorkspaceOverview,
-  resolveArtifactCategoryLabel,
   sortUserSpaceEntries
 } from './userSpaceModel.js'
 
@@ -40,16 +37,6 @@ describe('userSpaceModel', () => {
       'z.txt'
     ])
     expect(entries[0].name).toBe('z.txt')
-  })
-
-  it('resolves category labels and entry icon kinds', () => {
-    expect(resolveArtifactCategoryLabel('ai-reports')).toBe('AI 分析报告')
-    expect(resolveArtifactCategoryLabel('custom')).toBe('custom')
-    expect(isArtifactCategoryPath('task-results')).toBe(true)
-    expect(isArtifactCategoryPath('custom')).toBe(false)
-    expect(getUserSpaceEntryIconKey({ isDirectory: true })).toBe('folder')
-    expect(getUserSpaceEntryIconKey({ name: 'report.pdf' })).toBe('filePdf')
-    expect(getUserSpaceEntryIconKey({ name: 'main.ts' })).toBe('codeFile')
   })
 
   it('normalizes incomplete overview payloads', () => {

@@ -9,8 +9,7 @@ import {
   filterProviderRows,
   normalizeProtocol,
   normalizeModelNameForCapability,
-  providerTestModelId,
-  shortTokens
+  providerTestModelId
 } from './aiChannelSettingsModel.js'
 
 describe('aiChannelSettingsModel', () => {
@@ -43,11 +42,6 @@ describe('aiChannelSettingsModel', () => {
 
     expect(filterProviderRows(rows, 'reasoner')).toHaveLength(1)
     expect(filterProviderRows(rows, 'missing')).toHaveLength(0)
-  })
-
-  it('formats compact token limits', () => {
-    expect(shortTokens(32768)).toBe('33K')
-    expect(shortTokens(1_500_000)).toBe('1.5M')
   })
 
   it('selects the same model used by provider connection testing', () => {

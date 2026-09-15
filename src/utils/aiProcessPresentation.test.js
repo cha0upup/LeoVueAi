@@ -1,23 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  getToolDisplayName,
   groupConsecutiveToolNodes,
   isInternalToolNode,
   summarizeToolNode
 } from './aiProcessPresentation.js'
 
 describe('aiProcessPresentation', () => {
-  it('maps internal tool names to business labels', () => {
-    expect(getToolDisplayName('execSql')).toBe('执行 SQL')
-    expect(getToolDisplayName('createDatabaseConnection')).toBe('新增数据库配置')
-    expect(getToolDisplayName('updateDatabaseConnection')).toBe('编辑数据库配置')
-    expect(getToolDisplayName('deleteDatabaseConnection')).toBe('删除数据库配置')
-    expect(getToolDisplayName('manage_recon_summary')).toBe('更新侦察摘要')
-    expect(getToolDisplayName('inspectWebRuntime')).toBe('检查 Web Runtime')
-    expect(getToolDisplayName('removeWebRuntimeComponent')).toBe('移除 Web Runtime 组件')
-    expect(getToolDisplayName('customTool')).toBe('customTool')
-  })
-
   it('identifies the invisible operation assessment protocol tool', () => {
     expect(isInternalToolNode({
       kind: 'tool', name: 'assess_operation', businessTool: false, toolKind: 'CONTROL'

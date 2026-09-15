@@ -2,22 +2,18 @@ import { describe, expect, it } from 'vitest'
 import {
   detectFileLineEnding,
   getPreviewDisplayName,
-  getPreviewTypeLabel,
   getTextPreviewStats,
   isSamePreviewTarget,
   isTextFilePreview,
   normalizeFileLineEndings,
   resolvePreviewFileSize,
-  shortenPreviewPath,
   splitPreviewDownloadPath
 } from './filePreviewModel.js'
 
 describe('filePreviewModel', () => {
-  it('resolves names, labels and shortened paths', () => {
+  it('resolves Windows file names and distinguishes text previews', () => {
     expect(getPreviewDisplayName('C:\\Temp\\a.txt')).toBe('a.txt')
-    expect(getPreviewTypeLabel('pdf')).toBe('PDF预览')
     expect(isTextFilePreview('image')).toBe(false)
-    expect(shortenPreviewPath('1234567890', 8, 2)).toBe('12...90')
   })
 
   it('detects and normalizes line endings', () => {

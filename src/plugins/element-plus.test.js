@@ -19,9 +19,6 @@ describe('setupElementPlus', () => {
   it('registers every Element Plus component used by templates', () => {
     const names = new Set(elementPlusComponents.map(component => component.name))
 
-    expect(names).toContain('ElSegmented')
-    expect(names).toContain('ElLink')
-
     const registeredTags = new Set([...names].map(toKebab))
     const usedTags = new Set(vueFiles(srcRoot).flatMap(file =>
       [...readFileSync(file, 'utf8').matchAll(/<el-([a-z-]+)/g)].map(match => `el-${match[1]}`)

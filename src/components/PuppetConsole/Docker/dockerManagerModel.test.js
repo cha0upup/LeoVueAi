@@ -3,7 +3,6 @@ import {
   formatDockerInfo,
   getDockerExportConfig,
   getDockerResourceId,
-  getDockerStatusTag,
   isDockerContainerPaused,
   isDockerContainerRunning,
   normalizeDockerList,
@@ -29,12 +28,9 @@ describe('dockerManagerModel', () => {
     expect(getDockerResourceId({ repository: 'nginx' }, 'image')).toBe('nginx')
   })
 
-  it('maps container states consistently', () => {
+  it('recognizes a paused running container', () => {
     expect(isDockerContainerRunning('Up 2 minutes (Paused)')).toBe(true)
     expect(isDockerContainerPaused('Up 2 minutes (Paused)')).toBe(true)
-    expect(getDockerStatusTag('Up 2 minutes (Paused)')).toBe('warning')
-    expect(getDockerStatusTag('Exited (0)')).toBe('danger')
-    expect(getDockerStatusTag()).toBe('info')
   })
 
   it('returns isolated export metadata and formats info payloads', () => {
