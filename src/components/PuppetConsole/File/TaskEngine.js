@@ -365,13 +365,9 @@ class TaskEngine {
     if (!task) return
 
     if (task.type === TaskType.SCAN) {
+      await this.stopScanTask(task)
       task.isCancelled = true
       task.isPaused = false
-      try {
-        await this.stopScanTask(task)
-      } catch {
-        // ignore
-      }
       task.status = TaskStatus.CANCELLED
       task.endTime = Date.now()
       task.canControl = false

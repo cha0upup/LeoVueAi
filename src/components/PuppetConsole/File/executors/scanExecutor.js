@@ -13,34 +13,43 @@ export function applyScanExecutor(TaskEngine) {
     return task?.backendTaskId || task?.serverTaskId || task?.options?.backendTaskId || null
   }
 
-  TaskEngine.prototype.pauseScanTask = async function (task) {
-    const backendTaskId = this.getScanBackendTaskId(task)
-    if (!backendTaskId) {
-      throw new Error('缺少扫描任务编号，无法暂停')
-    }
-
-    if (task.scanKind !== 'network_workflow') throw new Error('该扫描任务不支持暂停')
-    await pauseNetworkProbeWorkflowApi({ sessionId: task.sessionId, taskId: backendTaskId })
+  // Keep request revisions outside the task data exposed to the task center.
+  const requestStates = new WeakMap()
+  const stateFor = task => {
+    if (!requestStates.has(task)) requestStates.set(task, { revision: 0, controlling: false })
+    return requestStates.get(task)
   }
 
-  TaskEngine.prototype.resumeScanTask = async function (task) {
-    const backendTaskId = this.getScanBackendTaskId(task)
-    if (!backendTaskId) {
-      throw new Error('缺少扫描任务编号，无法继续')
+  const controlTask = async (engine, task, api) => {
+    task = engine.getTaskById(task.id)
+    const backendTaskId = engine.getScanBackendTaskId(task)
+    if (!backendTaskId) throw new Error('缺少扫描任务编号')
+    if (normalizeNetworkWorkflowKind(task.scanKind) !== 'network_workflow') {
+      throw new Error('未知的扫描任务类型')
     }
-
-    if (task.scanKind !== 'network_workflow') throw new Error('该扫描任务不支持继续')
-    await resumeNetworkProbeWorkflowApi({ sessionId: task.sessionId, taskId: backendTaskId })
+    const state = stateFor(task)
+    if (state.controlling) throw new Error('扫描任务正在执行控制操作')
+    state.controlling = true
+    state.revision += 1
+    engine.scanQueryRequests?.delete(task.id)
+    try {
+      await api({ sessionId: task.sessionId, taskId: backendTaskId })
+    } finally {
+      state.controlling = false
+      state.revision += 1
+    }
   }
 
-  TaskEngine.prototype.stopScanTask = async function (task) {
-    const backendTaskId = this.getScanBackendTaskId(task)
-    if (!backendTaskId) {
-      throw new Error('缺少扫描任务编号，无法终止')
-    }
+  TaskEngine.prototype.pauseScanTask = function (task) {
+    return controlTask(this, task, pauseNetworkProbeWorkflowApi)
+  }
 
-    if (task.scanKind !== 'network_workflow') throw new Error('该扫描任务不支持终止')
-    await stopNetworkProbeWorkflowApi({ sessionId: task.sessionId, taskId: backendTaskId })
+  TaskEngine.prototype.resumeScanTask = function (task) {
+    return controlTask(this, task, resumeNetworkProbeWorkflowApi)
+  }
+
+  TaskEngine.prototype.stopScanTask = function (task) {
+    return controlTask(this, task, stopNetworkProbeWorkflowApi)
   }
 
   TaskEngine.prototype.executeScanTask = async function (task) {
@@ -229,8 +238,12 @@ export function applyScanExecutor(TaskEngine) {
   }
 
   TaskEngine.prototype.queryScanTask = async function (task) {
+    task = this.getTaskById(task?.id)
     const backendTaskId = this.getScanBackendTaskId(task)
     if (!backendTaskId || !task?.sessionId) return null
+    const state = stateFor(task)
+    if (state.controlling) return null
+    const revision = state.revision
     if (!this.scanQueryRequests) this.scanQueryRequests = new Map()
     const existing = this.scanQueryRequests.get(task.id)
     if (existing) return existing
@@ -238,10 +251,10 @@ export function applyScanExecutor(TaskEngine) {
     if (task.scanKind !== 'network_workflow') {
       throw new Error('未知的扫描任务类型')
     }
-    const queryApi = queryNetworkProbeWorkflowApi
     const request = (async () => {
-      const response = await queryApi({ sessionId: task.sessionId, taskId: backendTaskId })
+      const response = await queryNetworkProbeWorkflowApi({ sessionId: task.sessionId, taskId: backendTaskId })
       const result = response?.data?.result || response?.data
+      if (this.getTaskById(task.id) !== task || state.controlling || state.revision !== revision) return null
       if (result && typeof result === 'object') {
         this.hydrateScanTask(task.id, result)
       }
@@ -257,12 +270,20 @@ export function applyScanExecutor(TaskEngine) {
 
   TaskEngine.prototype.syncNetworkWorkflowTasks = async function (sessionId) {
     if (!sessionId) return []
+    const sessionTasks = this.getSessionTasks(sessionId)
+    const revisions = new Map([...sessionTasks.values()].map(task => [task.id, stateFor(task).revision]))
+    const previousTasks = new Map([...sessionTasks.values()]
+      .filter(task => normalizeNetworkWorkflowKind(task.scanKind) === 'network_workflow')
+      .map(task => [this.getScanBackendTaskId(task), task]))
     const response = await listNetworkProbeWorkflowTasksApi({ sessionId })
+    if (this.sessionTasks.get(sessionId) !== sessionTasks) return []
     const snapshots = Array.isArray(response?.data?.tasks) ? response.data.tasks : []
     const result = []
     for (const snapshot of snapshots) {
       const backendTaskId = snapshot?.taskId
       if (!backendTaskId) continue
+      const previousTask = previousTasks.get(backendTaskId)
+      if (previousTask && this.getTaskById(previousTask.id) !== previousTask) continue
       let task = this.getTasksBySession(sessionId).find(item =>
         normalizeNetworkWorkflowKind(item.scanKind) === 'network_workflow' &&
         (item.backendTaskId === backendTaskId || item.serverTaskId === backendTaskId)
@@ -272,7 +293,7 @@ export function applyScanExecutor(TaskEngine) {
           sessionId,
           'network_workflow',
           snapshot.name || '网络资产发现',
-          snapshot.stageCount || 4,
+          snapshot.stageCount || 3,
           {
             backendTaskId,
             targetCount: snapshot.targetCount,
@@ -283,7 +304,10 @@ export function applyScanExecutor(TaskEngine) {
         )
         task = this.getTaskById(taskId)
       }
-      this.hydrateScanTask(task.id, snapshot)
+      const state = stateFor(task)
+      if (!state.controlling && state.revision === (revisions.get(task.id) ?? 0)) {
+        this.hydrateScanTask(task.id, snapshot)
+      }
       result.push(task)
     }
     return result

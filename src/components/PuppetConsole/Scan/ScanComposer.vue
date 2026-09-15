@@ -6,33 +6,63 @@
       </div>
     </div>
 
-    <el-form ref="formRef" :model="formData" :rules="rules" label-position="top" class="composer-form">
+    <el-form
+      ref="formRef"
+      :model="formData"
+      :rules="rules"
+      label-position="top"
+      class="composer-form"
+    >
       <div class="composer-layout">
         <div class="config-column">
           <section class="config-section">
-            <div class="section-heading"><div><span class="section-index">01</span><strong>扫描目标</strong></div><span class="section-note">{{ formData.targets.length.toLocaleString('zh-CN') }} 个有效目标</span></div>
+            <div class="section-heading">
+              <div><span class="section-index">01</span><strong>扫描目标</strong></div><span class="section-note">{{ formData.targets.length.toLocaleString('zh-CN') }} 个有效目标</span>
+            </div>
             <el-form-item prop="targets">
               <TargetInput v-model="formData.targets" />
             </el-form-item>
           </section>
 
           <section class="config-section">
-            <div class="section-heading"><div><span class="section-index">02</span><strong>扫描策略</strong></div></div>
+            <div class="section-heading">
+              <div><span class="section-index">02</span><strong>扫描策略</strong></div>
+            </div>
             <div class="name-field">
               <label for="scan-name">任务名称 <small>可选</small></label>
-              <el-input id="scan-name" v-model="formData.name" placeholder="例如：生产网段周检" clearable />
+              <el-input
+                id="scan-name"
+                v-model="formData.name"
+                placeholder="例如：生产网段周检"
+                clearable
+              />
             </div>
             <PortPolicySelector v-model="formData.portPolicy" />
           </section>
 
           <section class="config-section">
-            <div class="section-heading"><div><span class="section-index">03</span><strong>执行参数</strong></div><span class="section-note">高级设置</span></div>
+            <div class="section-heading">
+              <div><span class="section-index">03</span><strong>执行参数</strong></div><span class="section-note">高级设置</span>
+            </div>
             <div class="execution-grid">
               <el-form-item label="并发度">
-                <el-slider v-model="formData.concurrency" :min="1" :max="256" show-input />
+                <el-slider
+                  v-model="formData.concurrency"
+                  :min="1"
+                  :max="256"
+                  show-input
+                />
               </el-form-item>
               <el-form-item label="连接超时">
-                <div class="timeout-field"><el-input-number v-model="formData.connectTimeout" :min="100" :max="300000" :step="100" controls-position="right" /><span>ms</span></div>
+                <div class="timeout-field">
+                  <el-input-number
+                    v-model="formData.connectTimeout"
+                    :min="100"
+                    :max="300000"
+                    :step="100"
+                    controls-position="right"
+                  /><span>ms</span>
+                </div>
               </el-form-item>
             </div>
           </section>
@@ -40,9 +70,24 @@
 
         <aside class="plan-column">
           <div class="plan-card">
-            <div class="plan-heading"><div><h3>执行预览</h3></div><span class="plan-state" :class="{ ready: previewData }">{{ previewData ? '已生成' : '待生成' }}</span></div>
-            <div class="plan-target"><span>任务</span><strong>{{ formData.name || '网络资产发现' }}</strong><em>{{ targetSummary }}</em></div>
-            <div class="pipeline"><div v-for="(stage, index) in ['主机探活', '端口扫描', '服务识别']" :key="stage" class="pipeline-row"><span>{{ String(index + 1).padStart(2, '0') }}</span><i></i><strong>{{ stage }}</strong></div></div>
+            <div class="plan-heading">
+              <div><h3>执行预览</h3></div><span
+                class="plan-state"
+                :class="{ ready: previewData }"
+              >{{ previewData ? '已生成' : '待生成' }}</span>
+            </div>
+            <div class="plan-target">
+              <span>任务</span><strong>{{ formData.name || '网络资产发现' }}</strong><em>{{ targetSummary }}</em>
+            </div>
+            <div class="pipeline">
+              <div
+                v-for="(stage, index) in ['主机探活', '端口扫描', '服务识别']"
+                :key="stage"
+                class="pipeline-row"
+              >
+                <span>{{ String(index + 1).padStart(2, '0') }}</span><i /><strong>{{ stage }}</strong>
+              </div>
+            </div>
             <template v-if="previewData">
               <div class="plan-stats">
                 <div><strong>{{ Number(previewData.hostCount || 0).toLocaleString('zh-CN') }}</strong><span>目标</span></div>
@@ -50,18 +95,46 @@
                 <div><strong>{{ Number(previewData.combinationCount || 0).toLocaleString('zh-CN') }}</strong><span>检测组合</span></div>
                 <div><strong>{{ Number(previewData.serviceProbeCount || 0).toLocaleString('zh-CN') }}</strong><span>深度请求</span></div>
               </div>
-              <div class="plan-estimate"><span>预计结果规模</span><strong>{{ previewData.estimatedSize || '-' }}</strong></div>
-              <el-alert v-if="(previewData.warnings || []).length" type="warning" :closable="false" class="preview-warning"><ul><li v-for="(warning, index) in previewData.warnings" :key="index">{{ warning }}</li></ul></el-alert>
+              <div class="plan-estimate">
+                <span>预计结果规模</span><strong>{{ previewData.estimatedSize || '-' }}</strong>
+              </div>
+              <el-alert
+                v-if="(previewData.warnings || []).length"
+                type="warning"
+                :closable="false"
+                class="preview-warning"
+              >
+                <ul>
+                  <li
+                    v-for="(warning, index) in previewData.warnings"
+                    :key="index"
+                  >
+                    {{ warning }}
+                  </li>
+                </ul>
+              </el-alert>
             </template>
-            <div v-else class="plan-placeholder"><span>暂无预览</span></div>
+            <div
+              v-else
+              class="plan-placeholder"
+            >
+              <span>暂无预览</span>
+            </div>
           </div>
         </aside>
       </div>
     </el-form>
 
     <footer class="composer-footer">
-      <el-button @click="handleCancel">取消</el-button>
-      <el-button type="primary" :loading="previewing || starting" :disabled="!formData.targets.length" @click="previewData ? handleStart() : handlePreview()">
+      <el-button @click="handleCancel">
+        取消
+      </el-button>
+      <el-button
+        type="primary"
+        :loading="previewing || starting"
+        :disabled="!formData.targets.length || previewing || starting"
+        @click="previewData ? handleStart() : handlePreview()"
+      >
         <el-icon><CaretRight /></el-icon>{{ previewData ? '开始扫描' : '生成预览' }}
       </el-button>
     </footer>
@@ -69,15 +142,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, onScopeDispose, watch } from 'vue'
 import { CaretRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import TargetInput from './TargetInput.vue'
 import PortPolicySelector from './PortPolicySelector.vue'
-import {
-  previewNetworkProbeWorkflowApi,
-  startNetworkProbeWorkflowApi
-} from '@/services/api.js'
+import { previewNetworkProbeWorkflowApi, startNetworkProbeWorkflowApi } from '@/services/api.js'
 
 const props = defineProps({
   sessionId: {
@@ -104,77 +174,86 @@ const formData = reactive({
 
 // 验证规则
 const rules = {
-  targets: [
-    { required: true, message: '请至少输入一个扫描目标', trigger: 'change' }
-  ]
+  targets: [{ required: true, message: '请至少输入一个扫描目标', trigger: 'change' }]
 }
 
 // 状态
 const previewing = ref(false)
 const starting = ref(false)
 const previewData = ref(null)
-
-// 计算属性
-const canStart = computed(() => {
-  return formData.targets.length > 0 && previewData.value && !starting.value
+let previewSequence = 0
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+  previewSequence += 1
 })
 
+// 计算属性
 const targetSummary = computed(() => {
   const first = formData.targets[0]?.input || '未设置目标'
-  const suffix = formData.targets.length > 1 ? ` 等 ${formData.targets.length.toLocaleString('zh-CN')} 个目标` : ''
+  const suffix =
+    formData.targets.length > 1
+      ? ` 等 ${formData.targets.length.toLocaleString('zh-CN')} 个目标`
+      : ''
   return `${first}${suffix}`
 })
 
 watch(
-  () => [formData.targets, formData.portPolicy, formData.concurrency, formData.connectTimeout],
+  () => [
+    props.sessionId,
+    formData.targets,
+    formData.portPolicy,
+    formData.concurrency,
+    formData.connectTimeout
+  ],
   () => {
-    if (previewData.value) previewData.value = null
+    previewSequence += 1
+    previewData.value = null
   },
-  { deep: true }
+  { deep: true, flush: 'sync' }
 )
 
 // 方法
 async function handlePreview() {
+  if (previewing.value || starting.value) return
+  const sequence = ++previewSequence
+  previewing.value = true
+  previewData.value = null
   try {
-    await formRef.value.validate()
-    if (!validateTargets()) return
-    previewing.value = true
-
-    const config = buildScanConfig()
+    if (!(await formRef.value.validate().catch(() => false))) return
+    if (disposed || sequence !== previewSequence || !validateTargets()) return
     const response = await previewNetworkProbeWorkflowApi({
       sessionId: props.sessionId,
-      scan: config
+      scan: buildScanConfig()
     })
-
+    if (disposed || sequence !== previewSequence) return
     const payload = response.data || {}
-    previewData.value = payload.preview || null
+    previewData.value = payload.errors?.length ? null : payload.preview || null
     if (payload.errors?.length) ElMessage.warning(payload.errors.join('；'))
   } catch (error) {
-    if (error.errors) return
-    ElMessage.error('预览失败: ' + (error.message || '未知错误'))
+    if (!disposed && sequence === previewSequence)
+      ElMessage.error('预览失败: ' + (error?.message || '未知错误'))
   } finally {
     previewing.value = false
   }
 }
 
 async function handleStart() {
+  if (starting.value || previewing.value || !previewData.value) return
+  const sessionId = props.sessionId
+  const sequence = previewSequence
+  starting.value = true
   try {
-    await formRef.value.validate()
-    if (!validateTargets()) return
-    starting.value = true
-
+    if (!(await formRef.value.validate().catch(() => false))) return
+    if (disposed || sequence !== previewSequence || !validateTargets()) return
     const config = buildScanConfig()
-    const response = await startNetworkProbeWorkflowApi({
-      sessionId: props.sessionId,
-      scan: config
-    })
-
-    emit('scan-started', { ...(response.data || {}), scan: config })
-  } catch (error) {
-    if (error.errors) {
-      return
+    const response = await startNetworkProbeWorkflowApi({ sessionId, scan: config })
+    if (!disposed && props.sessionId === sessionId) {
+      emit('scan-started', { ...(response.data || {}), sessionId, scan: config })
     }
-    ElMessage.error('启动失败: ' + (error.message || '未知错误'))
+  } catch (error) {
+    if (!disposed && props.sessionId === sessionId)
+      ElMessage.error('启动失败: ' + (error?.message || '未知错误'))
   } finally {
     starting.value = false
   }
@@ -194,16 +273,14 @@ function buildScanConfig() {
   return {
     name: formData.name || undefined,
     targets: {
-      items: formData.targets.map(target => target.input),
+      items: formData.targets.map((target) => target.input),
       exclude: []
     },
     portPolicy: {
       profile: String(formData.portPolicy.preset || 'STANDARD').toLowerCase(),
       ranges: [],
-      include: formData.portPolicy.preset === 'CUSTOM'
-        ? (formData.portPolicy.customPorts || [])
-        : [],
-      exclude: formData.portPolicy.excludePorts || [],
+      include: formData.portPolicy.preset === 'CUSTOM' ? formData.portPolicy.customPorts || [] : [],
+      exclude: formData.portPolicy.excludePorts || []
     },
     execution: {
       workers: formData.concurrency,

@@ -14,73 +14,181 @@
           no-data-text="暂无扫描任务"
           @change="selectTask"
         >
-          <el-option v-for="task in historyTasks" :key="getTaskId(task)" :label="task.name || task.targetLabel || '未命名扫描'" :value="getTaskId(task)">
+          <el-option
+            v-for="task in historyTasks"
+            :key="getTaskId(task)"
+            :label="task.name || task.targetLabel || '未命名扫描'"
+            :value="getTaskId(task)"
+          >
             <div class="task-option">
               <span class="task-option-name">{{ task.name || task.targetLabel || '未命名扫描' }}</span>
               <span class="task-option-meta">{{ getStatusText(task.status, task.outcome) }} · {{ formatCount(getMetrics(task).targetTotal) }} 个目标</span>
             </div>
           </el-option>
         </el-select>
-        <div v-if="activeTask" class="selector-task-meta">
-          <span class="status-mark" :class="statusClass(activeTask.status, activeTask.outcome)" />
+        <div
+          v-if="activeTask"
+          class="selector-task-meta"
+        >
+          <span
+            class="status-mark"
+            :class="statusClass(activeTask.status, activeTask.outcome)"
+          />
           <span>{{ getStatusText(activeTask.status, activeTask.outcome) }}</span>
           <span class="meta-divider" />
           <span>{{ shortTaskId(activeBackendTaskId) }}</span>
         </div>
       </div>
       <div class="head-actions">
-        <el-button :icon="Refresh" :loading="historyLoading" @click="syncTasks">刷新</el-button>
-        <el-button type="primary" :icon="Plus" @click="showComposer = true">新建扫描</el-button>
+        <el-button
+          :icon="Refresh"
+          :loading="historyLoading"
+          @click="syncTasks"
+        >
+          刷新
+        </el-button>
+        <el-button
+          type="primary"
+          :icon="Plus"
+          @click="showComposer = true"
+        >
+          新建扫描
+        </el-button>
       </div>
     </header>
 
-    <main v-if="activeTask" class="discovery-content">
+    <main
+      v-if="activeTask"
+      class="discovery-content"
+    >
       <section class="progress-card">
         <div class="progress-card-head">
           <div class="progress-card-info">
-            <p class="task-subtitle">{{ formatCount(metrics.targetTotal) }} 个目标 · {{ portPolicyLabel(activeTask) }} · {{ elapsedText }}</p>
-            <span v-if="isRunning(activeTask)" class="throughput">{{ throughputText }}</span>
+            <p class="task-subtitle">
+              {{ formatCount(metrics.targetTotal) }} 个目标 · {{ portPolicyLabel(activeTask) }} · {{ elapsedText }}
+            </p>
+            <span
+              v-if="isRunning(activeTask)"
+              class="throughput"
+            >{{ throughputText }}</span>
           </div>
-          <div v-if="isRunning(activeTask) || isPaused(activeTask)" class="progress-actions">
-            <el-button v-if="isRunning(activeTask)" size="small" :icon="VideoPause" @click="pauseActiveTask">暂停</el-button>
-            <el-button v-if="isPaused(activeTask)" size="small" :icon="VideoPlay" @click="resumeActiveTask">继续</el-button>
-            <el-button size="small" type="danger" plain :icon="Close" @click="stopActiveTask">停止</el-button>
+          <div
+            v-if="isRunning(activeTask) || isPaused(activeTask)"
+            class="progress-actions"
+          >
+            <el-button
+              v-if="isRunning(activeTask)"
+              size="small"
+              :disabled="controlPending"
+              :icon="VideoPause"
+              @click="pauseActiveTask"
+            >
+              暂停
+            </el-button>
+            <el-button
+              v-if="isPaused(activeTask)"
+              size="small"
+              :disabled="controlPending"
+              :icon="VideoPlay"
+              @click="resumeActiveTask"
+            >
+              继续
+            </el-button>
+            <el-button
+              size="small"
+              type="danger"
+              plain
+              :disabled="controlPending"
+              :icon="Close"
+              @click="stopActiveTask"
+            >
+              停止
+            </el-button>
           </div>
         </div>
 
         <div class="progress-card-body">
           <div class="stage-track">
-            <div v-for="(stage, index) in stageDefinitions" :key="stage.name" class="stage-node" :class="stageClass(stage.name)">
-              <div class="stage-node-marker"><el-icon v-if="stageIsComplete(stage.name)"><Check /></el-icon><span v-else>{{ index + 1 }}</span></div>
-              <div class="stage-node-copy"><strong>{{ stage.label }}</strong><span>{{ stageStatusText(stage.name) }}</span></div>
+            <div
+              v-for="(stage, index) in stageDefinitions"
+              :key="stage.name"
+              class="stage-node"
+              :class="stageClass(stage.name)"
+            >
+              <div class="stage-node-marker">
+                <el-icon v-if="stageIsComplete(stage.name)">
+                  <Check />
+                </el-icon><span v-else>{{ index + 1 }}</span>
+              </div>
+              <div class="stage-node-copy">
+                <strong>{{ stage.label }}</strong><span>{{ stageStatusText(stage.name) }}</span>
+              </div>
             </div>
           </div>
           <div class="progress-line">
             <span class="progress-line-label">整体进度</span>
-            <el-progress :percentage="clampProgress(activeTask.progress)" :show-text="false" :stroke-width="5" :status="getProgressStatus(activeTask)" :aria-label="`整体进度 · ${currentStageLabel}`" />
+            <el-progress
+              :percentage="clampProgress(activeTask.progress)"
+              :show-text="false"
+              :stroke-width="5"
+              :status="getProgressStatus(activeTask)"
+              :aria-label="`整体进度 · ${currentStageLabel}`"
+            />
             <strong>{{ Math.round(clampProgress(activeTask.progress)) }}%</strong>
           </div>
         </div>
       </section>
 
       <section class="hosts-strip">
-        <div class="hosts-heading"><strong>存活主机</strong><b>{{ formatCount(metrics.reachableHostCount) }}</b></div>
-        <div v-if="visibleReachableHosts.length" class="host-list">
-          <span v-for="host in visibleReachableHosts" :key="host" class="host-chip">{{ host }}</span>
-          <span v-if="reachableHostOverflow > 0" class="host-more">+{{ formatCount(reachableHostOverflow) }} 个</span>
+        <div class="hosts-heading">
+          <strong>存活主机</strong><b>{{ formatCount(metrics.reachableHostCount) }}</b>
         </div>
-        <span v-else class="stage-output-empty">探活完成后将在这里显示存活主机</span>
+        <div
+          v-if="visibleReachableHosts.length"
+          class="host-list"
+        >
+          <span
+            v-for="host in visibleReachableHosts"
+            :key="host"
+            class="host-chip"
+          >{{ host }}</span>
+          <span
+            v-if="reachableHostOverflow > 0"
+            class="host-more"
+          >+{{ formatCount(reachableHostOverflow) }} 个</span>
+        </div>
+        <span
+          v-else
+          class="stage-output-empty"
+        >探活完成后将在这里显示存活主机</span>
       </section>
 
-      <AssetResultTable :task-id="activeBackendTaskId" :session-id="sessionId" :refresh-token="resultRefreshToken" />
+      <AssetResultTable
+        :task-id="activeBackendTaskId"
+        :session-id="sessionId"
+        :refresh-token="resultRefreshToken"
+      />
     </main>
 
-    <section v-else class="page-empty">
-      <div class="empty-icon"><DataAnalysis /></div>
+    <section
+      v-else
+      class="page-empty"
+    >
+      <div class="empty-icon">
+        <DataAnalysis />
+      </div>
       <h2>开始发现网络资产</h2>
       <p>配置目标和端口策略后，系统会依次完成主机探活、端口扫描和服务识别。</p>
-      <el-button type="primary" :icon="Plus" @click="showComposer = true">新建扫描</el-button>
-      <div class="empty-notes"><span><el-icon><Check /></el-icon>主机是否可达</span><span><el-icon><Check /></el-icon>开放端口和服务</span></div>
+      <el-button
+        type="primary"
+        :icon="Plus"
+        @click="showComposer = true"
+      >
+        新建扫描
+      </el-button>
+      <div class="empty-notes">
+        <span><el-icon><Check /></el-icon>主机是否可达</span><span><el-icon><Check /></el-icon>开放端口和服务</span>
+      </div>
     </section>
 
     <el-dialog
@@ -91,43 +199,81 @@
       class="scan-composer-dialog"
       destroy-on-close
     >
-      <ScanComposer :session-id="sessionId" @scan-started="handleScanStarted" @cancel="showComposer = false" />
+      <ScanComposer
+        :session-id="sessionId"
+        @scan-started="handleScanStarted"
+        @cancel="showComposer = false"
+      />
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { Check, Close, DataAnalysis, Plus, Refresh, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import { ref, computed, toRef, watch } from 'vue'
+import {
+  Check,
+  Close,
+  DataAnalysis,
+  Plus,
+  Refresh,
+  VideoPause,
+  VideoPlay
+} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AssetResultTable from './AssetResultTable.vue'
 import ScanComposer from './ScanComposer.vue'
 import { taskEngine } from '../File/TaskEngine.js'
-import { TaskStatus, TaskType } from '@/constants/task.js'
+import { TaskStatus } from '@/constants/task.js'
+import { useAssetDiscoveryTasks } from './useAssetDiscoveryTasks.js'
 
 const props = defineProps({ sessionId: { type: String, required: true } })
-const tasks = ref([])
-const selectedTaskId = ref(null)
 const showComposer = ref(false)
-const historyLoading = ref(false)
-const resultRefreshToken = ref(0)
+const controlPending = ref(false)
+const {
+  tasks,
+  selectedTaskId,
+  activeTask,
+  loading: historyLoading,
+  resultRefreshToken,
+  selectTask,
+  syncTasks,
+  refreshTaskList
+} = useAssetDiscoveryTasks({
+  sessionId: toRef(props, 'sessionId'),
+  taskEngine,
+  onError: (error) => ElMessage.error(`加载扫描任务失败: ${error?.message || '未知错误'}`)
+})
+watch(
+  () => props.sessionId,
+  () => {
+    showComposer.value = false
+  }
+)
 const stageDefinitions = [
   { name: 'REACHABILITY', label: '主机探活' },
   { name: 'PORT_SCAN', label: '端口扫描' },
   { name: 'SERVICE_PROBE', label: '服务识别' }
 ]
 
-const activeTask = computed(() => tasks.value.find(task => getTaskId(task) === selectedTaskId.value) || null)
 const activeBackendTaskId = computed(() => {
   const task = activeTask.value
-  return task?.backendTaskId || task?.serverTaskId || task?.taskId || task?.result?.taskId || selectedTaskId.value
+  return (
+    task?.backendTaskId ||
+    task?.serverTaskId ||
+    task?.taskId ||
+    task?.result?.taskId ||
+    selectedTaskId.value
+  )
 })
 const metrics = computed(() => getMetrics(activeTask.value))
 const currentStageLabel = computed(() => {
   const outcome = normalizedOutcome(activeTask.value?.status, activeTask.value?.outcome)
   if (outcome === 'COMPLETED') return '已完成'
   if (outcome === 'FAILED') return '扫描失败'
-  return stageDefinitions.find(stage => stage.name === activeTask.value?.currentStage)?.label || '准备扫描'
+  return (
+    stageDefinitions.find((stage) => stage.name === activeTask.value?.currentStage)?.label ||
+    '准备扫描'
+  )
 })
 const throughputText = computed(() => {
   const task = activeTask.value
@@ -152,69 +298,152 @@ const elapsedText = computed(() => {
   const minutes = Math.floor(seconds / 60)
   return `${minutes} 分 ${seconds % 60} 秒`
 })
-const visibleReachableHosts = computed(() => Array.isArray(activeTask.value?.reachableHostList)
-  ? activeTask.value.reachableHostList.slice(0, 160)
-  : [])
-const reachableHostOverflow = computed(() => Math.max(0,
-  getMetrics(activeTask.value).reachableHostCount - visibleReachableHosts.value.length))
-const historyTasks = computed(() => [...tasks.value].sort((left, right) => timestampValue(right.createdAt || right.createdTime) - timestampValue(left.createdAt || left.createdTime)))
-function getTaskId(task) { return task?.id || task?.taskId || task?.backendTaskId || null }
-function selectTask(taskId) {
-  selectedTaskId.value = taskId
-  const task = tasks.value.find(item => getTaskId(item) === taskId)
-  if (!task || isRunning(task) || task.reachabilityLoaded || task.reachableHostList?.length) return
-  void taskEngine.queryScanTask(task).then(() => {
-    refreshTaskList()
-    resultRefreshToken.value += 1
-  }).catch(() => {})
+const visibleReachableHosts = computed(() =>
+  Array.isArray(activeTask.value?.reachableHostList)
+    ? activeTask.value.reachableHostList.slice(0, 160)
+    : []
+)
+const reachableHostOverflow = computed(() =>
+  Math.max(0, getMetrics(activeTask.value).reachableHostCount - visibleReachableHosts.value.length)
+)
+const historyTasks = computed(() =>
+  [...tasks.value].sort(
+    (left, right) =>
+      timestampValue(right.createdAt || right.createdTime) -
+      timestampValue(left.createdAt || left.createdTime)
+  )
+)
+function getTaskId(task) {
+  return task?.id || task?.taskId || task?.backendTaskId || null
 }
 function handleScanStarted(task) {
+  if (task?.sessionId && task.sessionId !== props.sessionId) return
   const backendTaskId = task?.taskId || task?.result?.taskId
-  if (!backendTaskId) { ElMessage.error('启动响应缺少任务编号'); return }
+  if (!backendTaskId) {
+    ElMessage.error('启动响应缺少任务编号')
+    return
+  }
   const scan = task.scan || {}
   const targetItems = scan.targets?.items || []
-  const taskId = taskEngine.createScanTask(props.sessionId, 'network_workflow', scan.name || '网络资产发现', 4, { backendTaskId, targetCount: targetItems.length, scanHosts: targetItems, scanPorts: scan.portPolicy?.include || [] })
-  taskEngine.hydrateScanTask(taskId, { taskId: backendTaskId, scanKind: 'network_workflow', status: 'RUNNING', outcome: 'RUNNING', targetLabel: scan.name || '网络资产发现', targetCount: targetItems.length, hosts: targetItems, currentStage: 'REACHABILITY', stageCount: 4, completedStageCount: 0, progress: 0 })
+  const taskId = taskEngine.createScanTask(
+    props.sessionId,
+    'network_workflow',
+    scan.name || '网络资产发现',
+    stageDefinitions.length,
+    {
+      backendTaskId,
+      targetCount: targetItems.length,
+      scanHosts: targetItems,
+      scanPorts: scan.portPolicy?.include || []
+    }
+  )
+  taskEngine.hydrateScanTask(taskId, {
+    taskId: backendTaskId,
+    scanKind: 'network_workflow',
+    status: 'RUNNING',
+    outcome: 'RUNNING',
+    targetLabel: scan.name || '网络资产发现',
+    targetCount: targetItems.length,
+    hosts: targetItems,
+    currentStage: 'REACHABILITY',
+    stageCount: stageDefinitions.length,
+    completedStageCount: 0,
+    progress: 0
+  })
   selectedTaskId.value = taskId
   showComposer.value = false
-  startRefreshTimer()
   refreshTaskList()
+  void syncTasks({ discover: false })
   ElMessage.success('扫描已启动')
 }
-async function pauseActiveTask() { if (!activeTask.value) return; try { await taskEngine.pauseTask(activeTask.value.id); ElMessage.success('扫描已暂停') } catch (error) { ElMessage.error(error.message || '暂停失败') } }
-async function resumeActiveTask() { if (!activeTask.value) return; try { await taskEngine.resumeTask(activeTask.value.id); ElMessage.success('扫描已继续') } catch (error) { ElMessage.error(error.message || '继续失败') } }
-async function stopActiveTask() {
-  if (!activeTask.value) return
+async function controlActiveTask(action, successMessage) {
+  const task = activeTask.value
+  if (!task || controlPending.value) return
+  const sessionId = props.sessionId
+  controlPending.value = true
   try {
-    await ElMessageBox.confirm('停止后将保留当前已发现结果。', '停止扫描', { type: 'warning', confirmButtonText: '停止', cancelButtonText: '取消' })
-    await taskEngine.stopTask(activeTask.value.id)
-    ElMessage.success('扫描已停止')
+    if (action === 'stopTask') {
+      await ElMessageBox.confirm('停止后将保留当前已发现结果。', '停止扫描', {
+        type: 'warning',
+        confirmButtonText: '停止',
+        cancelButtonText: '取消'
+      })
+    }
+    if (props.sessionId !== sessionId || !taskEngine.getTaskById(task.id)) return
+    await taskEngine[action](task.id)
+    if (props.sessionId !== sessionId) return
+    ElMessage.success(successMessage)
+    await taskEngine.queryScanTask(task)
+    if (props.sessionId === sessionId) resultRefreshToken.value += 1
   } catch (error) {
-    if (error !== 'cancel' && error !== 'close') ElMessage.error(error.message || '停止失败')
+    if (props.sessionId === sessionId && error !== 'cancel' && error !== 'close') {
+      ElMessage.error(error?.message || '操作失败')
+    }
+  } finally {
+    controlPending.value = false
   }
 }
+const pauseActiveTask = () => controlActiveTask('pauseTask', '扫描已暂停')
+const resumeActiveTask = () => controlActiveTask('resumeTask', '扫描已继续')
+const stopActiveTask = () => controlActiveTask('stopTask', '扫描已停止')
 function normalizedOutcome(status, outcome) {
   const normalizedStatus = String(status || '').toUpperCase()
   const normalizedOutcome = String(outcome || '').toUpperCase()
   if (normalizedStatus !== 'STOPPED') return normalizedStatus
   return normalizedOutcome || normalizedStatus
 }
-function statusClass(status, outcome) { return `status-${String(normalizedOutcome(status, outcome) || '').toLowerCase()}` }
-function getStatusText(status, outcome) { return { PENDING: '等待中', RUNNING: '扫描中', SCANNING: '扫描中', PAUSED: '已暂停', STOPPED: '已结束', COMPLETED: '已完成', FAILED: '失败', CANCELLED: '已取消' }[normalizedOutcome(status, outcome)] || status || '等待中' }
-function isRunning(task) { return [TaskStatus.SCANNING, 'RUNNING'].includes(task?.status) }
-function isPaused(task) { return [TaskStatus.PAUSED, 'PAUSED'].includes(task?.status) }
+function statusClass(status, outcome) {
+  return `status-${String(normalizedOutcome(status, outcome) || '').toLowerCase()}`
+}
+function getStatusText(status, outcome) {
+  return (
+    {
+      PENDING: '等待中',
+      RUNNING: '扫描中',
+      SCANNING: '扫描中',
+      PAUSED: '已暂停',
+      STOPPED: '已结束',
+      COMPLETED: '已完成',
+      FAILED: '失败',
+      CANCELLED: '已取消'
+    }[normalizedOutcome(status, outcome)] ||
+    status ||
+    '等待中'
+  )
+}
+function isRunning(task) {
+  return [TaskStatus.SCANNING, 'RUNNING'].includes(task?.status)
+}
+function isPaused(task) {
+  return [TaskStatus.PAUSED, 'PAUSED'].includes(task?.status)
+}
 function getMetrics(task) {
-  const targetTotal = Number(task?.targetCount || task?.metrics?.targetTotal || task?.totalCount || 0)
-  const rawProcessed = Number(task?.processedCount ?? task?.scannedCount ?? task?.metrics?.processed ?? 0)
+  const targetTotal = Number(
+    task?.targetCount || task?.metrics?.targetTotal || task?.totalCount || 0
+  )
+  const rawProcessed = Number(
+    task?.processedCount ?? task?.scannedCount ?? task?.metrics?.processed ?? 0
+  )
   const progress = Number(task?.progress || 0)
   const processed = rawProcessed > 0 || progress < 100 ? rawProcessed : targetTotal
   return {
     targetTotal,
     processed: Math.max(0, processed),
-    reachableHostCount: Number(task?.reachableHostCount ?? task?.reachableHostList?.length ?? task?.metrics?.reachableHostCount ?? 0),
-    openCount: Number(task?.openCount ?? (Array.isArray(task?.openPortResults) ? task.openPortResults.length : 0)),
-    serviceCount: Number(task?.serviceCount ?? (Array.isArray(task?.serviceResults) ? task.serviceResults.length : 0)),
-    errorCount: Number(task?.errorCount ?? (Array.isArray(task?.errors) ? task.errors.length : task?.error ? 1 : 0))
+    reachableHostCount: Number(
+      task?.reachableHostCount ??
+        task?.reachableHostList?.length ??
+        task?.metrics?.reachableHostCount ??
+        0
+    ),
+    openCount: Number(
+      task?.openCount ?? (Array.isArray(task?.openPortResults) ? task.openPortResults.length : 0)
+    ),
+    serviceCount: Number(
+      task?.serviceCount ?? (Array.isArray(task?.serviceResults) ? task.serviceResults.length : 0)
+    ),
+    errorCount: Number(
+      task?.errorCount ?? (Array.isArray(task?.errors) ? task.errors.length : task?.error ? 1 : 0)
+    )
   }
 }
 function portPolicyLabel(task) {
@@ -222,12 +451,32 @@ function portPolicyLabel(task) {
   if (ports) return `${formatCount(ports)} 个端口`
   return task?.options?.portPolicy?.profile || task?.portPolicy?.profile || '预设策略'
 }
-function getProgressStatus(task) { if (!task) return undefined; if (String(task.status || '').toUpperCase() === 'FAILED') return 'exception'; if (isPaused(task)) return 'warning'; return undefined }
-function clampProgress(value) { const number = Number(value || 0); return Number.isFinite(number) ? Math.max(0, Math.min(100, number)) : 0 }
-function formatCount(value) { return Number(value || 0).toLocaleString('zh-CN') }
-function shortTaskId(value) { const text = String(value || ''); return text ? `#${text.slice(0, 8)}` : '未连接任务' }
-function timestampValue(value) { const number = Number(value); if (typeof value === 'number' && Number.isFinite(number)) return number; const parsed = Date.parse(String(value || '')); return Number.isFinite(parsed) ? parsed : 0 }
-function stageSnapshot(name) { return activeTask.value?.stages?.find(stage => stage.name === name) || null }
+function getProgressStatus(task) {
+  if (!task) return undefined
+  if (String(task.status || '').toUpperCase() === 'FAILED') return 'exception'
+  if (isPaused(task)) return 'warning'
+  return undefined
+}
+function clampProgress(value) {
+  const number = Number(value || 0)
+  return Number.isFinite(number) ? Math.max(0, Math.min(100, number)) : 0
+}
+function formatCount(value) {
+  return Number(value || 0).toLocaleString('zh-CN')
+}
+function shortTaskId(value) {
+  const text = String(value || '')
+  return text ? `#${text.slice(0, 8)}` : '未连接任务'
+}
+function timestampValue(value) {
+  const number = Number(value)
+  if (value != null && value !== '' && Number.isFinite(number)) return number
+  const parsed = Date.parse(String(value || ''))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+function stageSnapshot(name) {
+  return activeTask.value?.stages?.find((stage) => stage.name === name) || null
+}
 function stageIsComplete(name) {
   const stage = stageSnapshot(name)
   if (stage) return ['COMPLETED', 'SKIPPED'].includes(String(stage.status || '').toUpperCase())
@@ -236,10 +485,15 @@ function stageIsComplete(name) {
 function stageClass(name) {
   const stage = stageSnapshot(name)
   const status = String(stage?.status || '').toLowerCase()
-  const terminalWithoutSnapshot = !stage && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(normalizedOutcome(activeTask.value?.status, activeTask.value?.outcome))
+  const terminalWithoutSnapshot =
+    !stage &&
+    ['COMPLETED', 'FAILED', 'CANCELLED'].includes(
+      normalizedOutcome(activeTask.value?.status, activeTask.value?.outcome)
+    )
   return {
     complete: stageIsComplete(name),
-    current: !terminalWithoutSnapshot && (activeTask.value?.currentStage === name || status === 'running'),
+    current:
+      !terminalWithoutSnapshot && (activeTask.value?.currentStage === name || status === 'running'),
     failed: status === 'failed'
   }
 }
@@ -247,9 +501,12 @@ function stageStatusText(name) {
   const stage = stageSnapshot(name)
   if (stage) {
     if (stage.reason === 'DISABLED' || stage.status === 'SKIPPED') return '已跳过'
-    if (name === 'REACHABILITY' && activeTask.value?.reachableHostList) return `${formatCount(getMetrics(activeTask.value).reachableHostCount)} 台存活`
-    if (name === 'PORT_SCAN' && getMetrics(activeTask.value).openCount) return `${formatCount(getMetrics(activeTask.value).openCount)} 个开放端口`
-    if (name === 'SERVICE_PROBE' && getMetrics(activeTask.value).serviceCount) return `${formatCount(getMetrics(activeTask.value).serviceCount)} 个服务`
+    if (name === 'REACHABILITY' && activeTask.value?.reachableHostList)
+      return `${formatCount(getMetrics(activeTask.value).reachableHostCount)} 台存活`
+    if (name === 'PORT_SCAN' && getMetrics(activeTask.value).openCount)
+      return `${formatCount(getMetrics(activeTask.value).openCount)} 个开放端口`
+    if (name === 'SERVICE_PROBE' && getMetrics(activeTask.value).serviceCount)
+      return `${formatCount(getMetrics(activeTask.value).serviceCount)} 个服务`
     return getStatusText(stage.status, stage.outcome)
   }
   const outcome = normalizedOutcome(activeTask.value?.status, activeTask.value?.outcome)
@@ -258,46 +515,6 @@ function stageStatusText(name) {
   if (outcome === 'CANCELLED') return '已取消'
   return '等待中'
 }
-function refreshTaskList() {
-  tasks.value = taskEngine.getTasksBySession(props.sessionId)
-    .filter(task => task.type === TaskType.SCAN && task.scanKind === 'network_workflow')
-  if (!selectedTaskId.value && tasks.value.length) selectTask(getTaskId(historyTasks.value[0]))
-}
-
-let refreshTimer = null
-const taskEvents = ['taskCreated', 'taskProgress', 'taskCompleted', 'taskFailed', 'taskPaused', 'taskResumed', 'taskCancelled']
-function isTerminalTask(task) {
-  return ['completed', 'cancelled', 'failed'].includes(String(task?.status || '').toLowerCase())
-}
-async function syncTasks() {
-  historyLoading.value = true
-  try {
-    const previousSelectedTask = tasks.value.find(task => getTaskId(task) === selectedTaskId.value)
-    await taskEngine.syncNetworkWorkflowTasks(props.sessionId)
-    const currentTasks = taskEngine.getTasksBySession(props.sessionId).filter(task => task.type === TaskType.SCAN && task.scanKind === 'network_workflow')
-    const selectedTask = currentTasks.find(task => getTaskId(task) === selectedTaskId.value)
-    const selectedWasActive = (previousSelectedTask && !isTerminalTask(previousSelectedTask)) || (selectedTask && !isTerminalTask(selectedTask))
-    const activeTasks = currentTasks.filter(task => !isTerminalTask(task))
-    await Promise.allSettled(activeTasks.map(task => taskEngine.queryScanTask(task)))
-    if (selectedWasActive) resultRefreshToken.value += 1
-    if (activeTasks.length === 0) stopRefreshTimer()
-  } catch (error) {
-    if (!tasks.value.length) ElMessage.error(`加载扫描任务失败: ${error.message || '未知错误'}`)
-  }
-  refreshTaskList()
-  historyLoading.value = false
-}
-function startRefreshTimer() {
-  if (refreshTimer) return
-  refreshTimer = window.setInterval(syncTasks, 2000)
-}
-function stopRefreshTimer() {
-  if (!refreshTimer) return
-  window.clearInterval(refreshTimer)
-  refreshTimer = null
-}
-onMounted(() => { taskEvents.forEach(event => taskEngine.on(event, refreshTaskList)); void syncTasks(); startRefreshTimer() })
-onUnmounted(() => { taskEvents.forEach(event => taskEngine.off(event, refreshTaskList)); stopRefreshTimer() })
 </script>
 
 <style scoped lang="scss">
