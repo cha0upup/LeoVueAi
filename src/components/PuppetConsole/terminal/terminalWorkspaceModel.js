@@ -1,21 +1,21 @@
-export function createTerminalSession({ id, title, hostSessionId, now = Date.now() }) {
+import { isCommandTerminal } from './terminalProtocol.js'
+
+export function createTerminalSession({
+  id,
+  title,
+  hostSessionId,
+  terminalMode = null,
+  now = Date.now()
+}) {
   return {
     id,
     title,
     hostSessionId,
-    pendingWrites: 0,
-    writeChain: Promise.resolve(),
-    readPromise: null,
-    readErrorCount: 0,
-    nextReadTime: 0,
-    isLoading: false,
+    terminalMode,
+    terminalModes: [],
     lastActivityTime: now,
-    lastPollTime: 0,
     hasUnread: false,
     viewportReady: false,
-    initializing: false,
-    initPromise: null,
-    resizeTimer: null,
     cols: 80,
     rows: 24,
     pty: null,
@@ -23,13 +23,13 @@ export function createTerminalSession({ id, title, hostSessionId, now = Date.now
     backend: 'detecting',
     backendFailures: [],
     longPolling: false,
+    batchRead: false,
+    lineInput: false,
+    processExited: false,
     ended: false,
     endReason: '',
-    endNoticeShown: false,
     instanceId: '',
-    routingMismatch: false,
-    routingWarningShown: false,
-    disposed: false
+    routingMismatch: false
   }
 }
 
@@ -66,14 +66,25 @@ export function describeTerminalCapability(session) {
 
   if (session?.pty === false) {
     const failureText = failures.length ? `；PTY 启动记录：${failures.join('；')}` : ''
+    if (isCommandTerminal(session)) {
+      return {
+        mode: 'COMMAND',
+        resizeMode: 'FIXED',
+        streamMode: 'POLL',
+        shellLabel: 'COMMAND SESSION',
+        hint: '命令模式 · 支持目录切换、输出读取和中断',
+        details: `每条命令独立执行，单次提交最多运行 20 秒；环境变量不会跨命令保留，不支持交互式输入、历史方向键和全屏程序${failureText}`,
+        degraded: true
+      }
+    }
     return {
       mode: 'PIPE',
       resizeMode: 'FIXED',
       streamMode: session.longPolling ? 'LONG-POLL' : 'POLL',
       shellLabel: 'PIPE SHELL',
-      hint: `兼容模式 · ${backend}`,
-      details: `当前使用固定尺寸管道终端，全屏程序和作业控制可能受限${failureText}`,
-      degraded: true
+      hint: `原生管道 · ${backend}`,
+      details: `支持持续 shell 和工作目录；全屏程序、作业控制及 Ctrl+C 可能受限，可新建 Python PTY 终端${failureText}`,
+      degraded: false
     }
   }
 
@@ -82,7 +93,7 @@ export function describeTerminalCapability(session) {
     resizeMode: 'WAIT',
     streamMode: 'WAIT',
     shellLabel: 'SHELL DETECTING',
-    hint: '正在协商终端能力',
+    hint: session?.terminalMode === 'python-pty' ? '正在启动 Python PTY' : '正在初始化终端',
     details: '终端初始化完成后显示实际 PTY 或 PIPE 后端',
     degraded: false
   }
@@ -97,15 +108,36 @@ export function formatTerminalRelativeTime(timestamp, now = Date.now()) {
   return `${Math.floor(delta / 3600000)} 小时前`
 }
 
-export function decodeTerminalOutput(response) {
-  const payload = response?.data
-  const encoded = payload && typeof payload === 'object' ? payload.data : payload
-  if (typeof encoded !== 'string' || !encoded) return ''
-  try {
-    return new TextDecoder('utf-8').decode(
-      Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))
-    )
-  } catch {
-    return ''
+/** Monotonic process/EOF state; stale instance responses never mutate capability. */
+export function applyTerminalMetadata(session, payload, fromRead = false) {
+  const instanceId = typeof payload.instanceId === 'string' ? payload.instanceId : ''
+  if (instanceId && session.instanceId && instanceId !== session.instanceId) {
+    session.routingMismatch = true
+    return false
   }
+  if (instanceId) session.instanceId = instanceId
+  session.routingMismatch = false
+  for (const key of ['pty', 'resizable', 'longPolling', 'lineInput', 'batchRead']) {
+    if (typeof payload[key] === 'boolean') session[key] = payload[key]
+  }
+  if (typeof payload.backend === 'string' && payload.backend) session.backend = payload.backend
+  if (Array.isArray(payload.terminalModes)) session.terminalModes = payload.terminalModes
+  if (Array.isArray(payload.backendFailures)) session.backendFailures = payload.backendFailures
+  if (payload.missing === true) {
+    session.processExited = true
+    session.ended = true
+    session.endReason = '终端会话记录已失效'
+  } else if (payload.alive === false) {
+    session.processExited = true
+    session.endReason =
+      payload.exitCode === null || payload.exitCode === undefined
+        ? session.endReason || '终端进程已结束'
+        : `终端进程已结束，退出码 ${payload.exitCode}`
+  }
+  if (fromRead && payload.eof === true) {
+    session.processExited = true
+    session.ended = true
+    session.endReason ||= '终端进程已结束'
+  }
+  return true
 }

@@ -1,5 +1,5 @@
 <template>
-  <div :class="['terminal-viewport', { 'is-active': active }]">
+  <div class="terminal-viewport">
     <div class="terminal-viewport__chrome">
       <span
         :class="['terminal-viewport__mode', { 'is-degraded': capability.degraded }]"
@@ -46,13 +46,6 @@ const props = defineProps({
 const emit = defineEmits(['ready', 'input', 'activity', 'resize'])
 const capability = computed(() => describeTerminalCapability(props.terminalSession))
 
-const TERMINAL_CONFIG = {
-  fontSize: 14,
-  fontFamily: 'JetBrains Mono, Fira Code, Consolas, Monaco, monospace',
-  scrollback: 3000,
-  tabStopWidth: 4
-}
-
 const containerRef = ref(null)
 let terminal = null
 let fitAddon = null
@@ -80,10 +73,10 @@ const initializeTerminal = async () => {
     convertEol: true,
     cursorBlink: true,
     cursorStyle: 'block',
-    fontFamily: TERMINAL_CONFIG.fontFamily,
-    fontSize: TERMINAL_CONFIG.fontSize,
-    scrollback: TERMINAL_CONFIG.scrollback,
-    tabStopWidth: TERMINAL_CONFIG.tabStopWidth,
+    fontFamily: 'JetBrains Mono, Fira Code, Consolas, Monaco, monospace',
+    fontSize: 14,
+    scrollback: 3000,
+    tabStopWidth: 4,
     theme: {
       background: '#07111b',
       foreground: '#e6edf3',
@@ -153,20 +146,9 @@ const clear = () => {
   terminal?.clear()
 }
 
-const searchNext = (term, options = {}) => {
+const search = (direction, term, options = {}) => {
   if (!term) return false
-  return searchAddon?.findNext(term, {
-    caseSensitive: false,
-    incremental: false,
-    regex: false,
-    wholeWord: false,
-    ...options
-  })
-}
-
-const searchPrevious = (term, options = {}) => {
-  if (!term) return false
-  return searchAddon?.findPrevious(term, {
+  return searchAddon?.[direction](term, {
     caseSensitive: false,
     incremental: false,
     regex: false,
@@ -193,11 +175,12 @@ const dispose = () => {
 }
 
 defineExpose({
+  isVisible: () => Boolean(containerRef.value?.getClientRects().length),
   clear,
   fit,
   focus,
-  searchNext,
-  searchPrevious,
+  searchNext: (term, options) => search('findNext', term, options),
+  searchPrevious: (term, options) => search('findPrevious', term, options),
   write
 })
 
@@ -234,10 +217,6 @@ onBeforeUnmount(() => {
   border: 0;
   background: var(--app-code-background);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 5%, transparent);
-}
-
-.terminal-viewport.is-active {
-  border-color: transparent;
 }
 
 .terminal-viewport__chrome {

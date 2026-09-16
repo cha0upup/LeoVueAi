@@ -235,8 +235,9 @@ const initializedModules = reactive({ info: true })
 const serverConnLinkChain = ref([])
 const currentHostId = ref('')
 const serverCapabilities = ref([])
-const puppetRuntime = ref('java')
+const puppetRuntime = ref('')
 const runtimeProfile = ref(null)
+let initializationVersion = 0
 const iconMap = icons
 const refreshKey = ref(0)
 const paletteVisible = ref(false)
@@ -428,10 +429,10 @@ const onWindowKeydown = (e) => {
 }
 
 // ── Session & initialization ───────────────────────────────────────────────
-const fetchConnLinkChain = async () => {
-  if (!props.sessionId) return
+const fetchConnLinkChain = async (sessionId, isCurrent) => {
   try {
-    const response = await getConnLinkChainApi({ sessionId: props.sessionId })
+    const response = await getConnLinkChainApi({ sessionId })
+    if (!isCurrent()) return
     const raw = response?.data?.connLinkChain
     if (!Array.isArray(raw)) { serverConnLinkChain.value = []; return }
     serverConnLinkChain.value = raw.map((item) => {
@@ -440,69 +441,66 @@ const fetchConnLinkChain = async () => {
       return ''
     })
   } catch {
-    serverConnLinkChain.value = []
+    if (isCurrent()) serverConnLinkChain.value = []
   }
 }
 
-const fetchCurrentHostId = async () => {
-  if (!props.sessionId) { currentHostId.value = ''; return }
+const fetchCurrentHostId = async (sessionId, isCurrent) => {
   try {
-    const response = await getCurrentHostIdApi({ sessionId: props.sessionId })
+    const response = await getCurrentHostIdApi({ sessionId })
+    if (!isCurrent()) return
     currentHostId.value = response?.data?.currentHostId || ''
   } catch {
-    currentHostId.value = ''
+    if (isCurrent()) currentHostId.value = ''
   }
 }
 
-const fetchCapabilities = async () => {
-  if (!props.sessionId) {
-    serverCapabilities.value = []
-    puppetRuntime.value = 'java'
-    runtimeProfile.value = null
-    return
-  }
+const fetchCapabilities = async (sessionId, isCurrent) => {
   try {
-    const response = await getPuppetNodeCapabilitiesApi({ sessionId: props.sessionId })
+    const response = await getPuppetNodeCapabilitiesApi({ sessionId })
+    if (!isCurrent()) return
     const raw = response?.data?.capabilities
     serverCapabilities.value = Array.isArray(raw) ? raw : []
     puppetRuntime.value = response?.data?.runtimeProfile?.runtime || 'java'
     runtimeProfile.value = response?.data?.runtimeProfile || null
   } catch {
+    if (!isCurrent()) return
     serverCapabilities.value = Array.isArray(props.capabilities) ? [...props.capabilities] : []
   }
 }
 
 const retryInitialization = () => {
-  hasError.value = false
-  errorMessage.value = ''
-  isInitialized.value = false
-  if (props.sessionId) setTimeout(initializeComponent, 100)
+  if (props.sessionId) initializeComponent()
 }
 
 const initializeComponent = async () => {
+  const sessionId = props.sessionId
+  const version = ++initializationVersion
+  const isCurrent = () => version === initializationVersion && sessionId === props.sessionId
+  isInitialized.value = false
+  hasError.value = false
+  errorMessage.value = ''
   try {
-    if (props.cacheMode) {
-      await fetchCapabilities()
-      await fetchConnLinkChain()
-      initStep.value = ''
-      isInitialized.value = true
-      return
-    }
-
     initStep.value = '校验模块配置…'
     if (!moduleEntries?.length) throw new Error('菜单配置为空')
-    if (!props.sessionId) throw new Error('会话ID不能为空')
-    await fetchCapabilities()
+    if (!sessionId) throw new Error('会话ID不能为空')
+    await fetchCapabilities(sessionId, isCurrent)
+    if (!isCurrent()) return
 
     initStep.value = '获取连接链路…'
-    await fetchConnLinkChain()
+    await fetchConnLinkChain(sessionId, isCurrent)
+    if (!isCurrent()) return
 
-    initStep.value = '读取主机信息…'
-    await fetchCurrentHostId()
+    if (!props.cacheMode) {
+      initStep.value = '读取主机信息…'
+      await fetchCurrentHostId(sessionId, isCurrent)
+      if (!isCurrent()) return
+    }
 
     initStep.value = ''
     isInitialized.value = true
   } catch (error) {
+    if (!isCurrent()) return
     initStep.value = ''
     hasError.value = true
     errorMessage.value = error.message
@@ -531,6 +529,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  initializationVersion += 1
   window.removeEventListener('keydown', onWindowKeydown)
   taskEngine.off('taskCreated', _onTaskEvent)
   taskEngine.off('taskStarted', _onTaskEvent)
@@ -556,9 +555,15 @@ watch(activeKey, (key) => {
 watch(
   () => props.sessionId,
   (newSessionId, oldSessionId) => {
-    if (newSessionId && !isInitialized.value) {
-      initializeComponent()
-    } else if (newSessionId && newSessionId !== oldSessionId) {
+    if (newSessionId === oldSessionId) return
+    initializationVersion += 1
+    isInitialized.value = false
+    currentHostId.value = ''
+    serverConnLinkChain.value = []
+    serverCapabilities.value = []
+    puppetRuntime.value = ''
+    runtimeProfile.value = null
+    if (newSessionId) {
       // Session switched: reset tabs and lazy-mount state, then restore persisted tabs
       resetTabs()
       Object.keys(initializedModules).forEach((k) => delete initializedModules[k])
@@ -567,14 +572,7 @@ watch(
       // Only initialize the active tab — others load lazily on first activation
       initializedModules[activeKey.value] = true
       _updateTaskBadge()
-      fetchConnLinkChain()
-      fetchCurrentHostId()
-      fetchCapabilities()
-    } else if (!newSessionId) {
-      currentHostId.value = ''
-      serverCapabilities.value = []
-      puppetRuntime.value = 'java'
-      runtimeProfile.value = null
+      initializeComponent()
     }
   }
 )

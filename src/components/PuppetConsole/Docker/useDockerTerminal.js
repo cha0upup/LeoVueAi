@@ -1,214 +1,104 @@
-import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
+import { computed, onScopeDispose, reactive, ref, shallowRef, watch } from 'vue'
 import { v4 as uuidV4 } from 'uuid'
 import { getDockerResourceId, quoteShellArg } from './dockerManagerModel.js'
+import { createTerminalSession } from '../terminal/terminalWorkspaceModel.js'
+import { createTerminalSessionController } from '../terminal/createTerminalSessionController.js'
+import { useTerminalPolling } from '../terminal/useTerminalPolling.js'
+import { isCommandTerminal, terminalNotice } from '../terminal/terminalProtocol.js'
 
-const DEFAULT_POLLING_INTERVAL = 500
-const DEFAULT_IDLE_TIMEOUT = 15000
-
-function decodeBase64(value) {
-  if (typeof value !== 'string' || !value) return ''
-  try {
-    return new TextDecoder('utf-8').decode(
-      Uint8Array.from(atob(value), (character) => character.charCodeAt(0))
-    )
-  } catch {
-    return ''
-  }
-}
-
-function getCommandOutput(response) {
-  const payload = response?.data
-  const encoded = payload && typeof payload === 'object' ? payload.data : payload
-  return decodeBase64(encoded)
-}
-
+/** Container attachment only; terminal transport/lifecycle is shared with the workspace. */
 export function useDockerTerminal({
   sessionId,
   executeCommand,
   createProcessId = uuidV4,
-  pollingInterval = DEFAULT_POLLING_INTERVAL,
-  idleTimeout = DEFAULT_IDLE_TIMEOUT,
-  delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+  pollingInterval = 500,
+  onError = () => {}
 }) {
-  const active = ref(false)
-  const ready = ref(false)
-  const containerId = ref('')
-  const containerName = ref('')
-  const processId = ref('')
+  const context = shallowRef(null)
   const viewportRef = ref(null)
-
-  let currentContext = null
-  let pollingTimer = null
-
-  const isCurrent = (context) => currentContext === context && active.value
-
-  const writeViewport = (context, output) => {
-    if (isCurrent(context) && output) viewportRef.value?.write(output)
-  }
-
-  const readOutput = async (context, { silent = true } = {}) => {
-    if (!isCurrent(context) || context.pollInFlight) return
-    context.pollInFlight = true
-    try {
-      const response = await executeCommand({
-        sessionId: context.sessionId,
-        processId: context.processId,
-        cmd: 'read',
-        type: 'read'
-      })
-      if (!isCurrent(context)) return
-      const output = getCommandOutput(response)
-      if (output) {
-        writeViewport(context, output)
-        context.lastActivity = Date.now()
-      }
-    } catch (error) {
-      if (!silent) writeViewport(context, `\x1b[31mError: ${error.message || error}\x1b[0m\r\n`)
-    } finally {
-      context.pollInFlight = false
-    }
-  }
-
-  const stopPolling = () => {
-    if (pollingTimer === null) return
-    clearInterval(pollingTimer)
-    pollingTimer = null
-  }
-
-  const startPolling = (context) => {
-    if (!isCurrent(context) || pollingTimer !== null) return
-    pollingTimer = setInterval(() => {
-      if (!isCurrent(context) || Date.now() - context.lastActivity > idleTimeout) {
-        stopPolling()
-        return
-      }
-      readOutput(context)
-    }, pollingInterval)
-  }
-
-  const stopContextProcess = (context) => {
-    if (!context?.sessionId || !context.processId) return
-    executeCommand({
-      sessionId: context.sessionId,
-      processId: context.processId,
-      cmd: '',
-      type: 'stop'
-    }).catch(() => {})
-  }
-
+  const { start: startPolling, stop: stopPolling } = useTerminalPolling({
+    getControllers: () => (context.value ? [context.value.controller] : []),
+    interval: pollingInterval
+  })
   const close = () => {
-    const context = currentContext
-    currentContext = null
+    const previous = context.value
+    context.value = null
     stopPolling()
-    active.value = false
-    ready.value = false
-    containerId.value = ''
-    containerName.value = ''
-    processId.value = ''
-    if (context) stopContextProcess(context)
+    return previous?.controller.dispose()
   }
-
-  const open = async (row) => {
+  const open = (row) => {
     const id = getDockerResourceId(row)
     if (!id || !sessionId.value) return
-    if (currentContext) {
-      close()
-      await nextTick()
-    }
-
-    const context = {
-      token: Symbol('docker-terminal'),
-      sessionId: sessionId.value,
-      processId: createProcessId(),
-      containerId: id,
-      containerName: row?.name || id,
-      lastActivity: Date.now(),
-      pollInFlight: false,
-      writeChain: Promise.resolve()
-    }
-    currentContext = context
-    containerId.value = context.containerId
-    containerName.value = context.containerName
-    processId.value = context.processId
-    ready.value = false
-    active.value = true
-  }
-
-  const handleReady = async () => {
-    const context = currentContext
-    if (!isCurrent(context)) return
-    try {
-      await executeCommand({
-        sessionId: context.sessionId,
-        processId: context.processId,
-        cmd: 'init',
-        type: 'write'
+    close()
+    const session = reactive(
+      createTerminalSession({
+        id: createProcessId(),
+        title: row?.name || id,
+        hostSessionId: sessionId.value
       })
-      if (!isCurrent(context)) return
-      await delay(300)
-      if (!isCurrent(context)) return
-      await readOutput(context)
-      if (!isCurrent(context)) return
-
-      await executeCommand({
-        sessionId: context.sessionId,
-        processId: context.processId,
-        cmd: `docker exec -it ${quoteShellArg(context.containerId)} /bin/sh\n`,
-        type: 'write'
-      })
-      if (!isCurrent(context)) return
-      await delay(500)
-      if (!isCurrent(context)) return
-      await readOutput(context)
-      if (!isCurrent(context)) return
-
-      ready.value = true
-      context.lastActivity = Date.now()
-      startPolling(context)
-    } catch (error) {
-      writeViewport(context, `\x1b[31mFailed to attach: ${error.message || error}\x1b[0m\r\n`)
-    }
+    )
+    const next = { session, containerId: id, ready: ref(false), attaching: null, controller: null }
+    next.controller = createTerminalSessionController({
+      session,
+      executeCommand,
+      onError,
+      isCurrent: () => context.value === next,
+      isForeground: () =>
+        viewportRef.value?.isVisible?.() !== false &&
+        (typeof document === 'undefined' || !document.hidden),
+      onOutput: (output) => viewportRef.value?.write(output),
+      onActivity: startPolling
+    })
+    context.value = next
   }
-
-  const write = (data) => {
-    const context = currentContext
-    if (!isCurrent(context) || !data) return Promise.resolve()
-    context.lastActivity = Date.now()
-    startPolling(context)
-    context.writeChain = context.writeChain
-      .catch(() => {})
-      .then(async () => {
-        if (!isCurrent(context)) return
-        try {
-          await executeCommand({
-            sessionId: context.sessionId,
-            processId: context.processId,
-            cmd: data,
-            type: 'write'
-          })
-          if (isCurrent(context)) await readOutput(context, { silent: false })
-        } catch (error) {
-          writeViewport(context, `\x1b[31mError: ${error.message || error}\x1b[0m\r\n`)
-        }
-      })
-    return context.writeChain
+  const handleReady = () => {
+    const current = context.value
+    if (!current) return Promise.resolve()
+    if (current.attaching) return current.attaching
+    current.attaching = (async () => {
+      if (!(await current.controller.initialize()) || context.value !== current) return
+      if (isCommandTerminal(current.session)) {
+        current.session.endReason = '容器交互终端需要持续运行的 shell，请使用支持 PTY 或管道的节点'
+        current.session.processExited = true
+        current.session.ended = true
+        viewportRef.value?.write(terminalNotice(current.session.endReason, true))
+        await current.controller.dispose()
+        return
+      }
+      const flags = current.session.pty === false ? '-i' : '-it'
+      const attached = await current.controller.write(
+        `docker exec ${flags} ${quoteShellArg(current.containerId)} /bin/sh\n`
+      )
+      if (context.value !== current) return
+      current.ready.value = attached
+      if (!attached) {
+        current.session.endReason ||= '容器终端连接失败'
+        current.session.processExited = true
+        current.session.ended = true
+        await current.controller.dispose()
+      }
+    })()
+    return current.attaching
   }
-
-  watch(sessionId, (nextSessionId) => {
-    if (currentContext && currentContext.sessionId !== nextSessionId) close()
+  watch(sessionId, (nextId) => {
+    if (context.value && context.value.session.hostSessionId !== nextId) close()
   })
   onScopeDispose(close)
 
   return {
-    terminalActive: computed(() => active.value),
-    terminalReady: computed(() => ready.value),
-    terminalContainerId: computed(() => containerId.value),
-    terminalContainerName: computed(() => containerName.value),
-    terminalProcessId: computed(() => processId.value),
+    terminalActive: computed(() => context.value !== null),
+    terminalReady: computed(() =>
+      Boolean(context.value?.ready.value && !context.value.session.processExited)
+    ),
+    terminalContainerId: computed(() => context.value?.containerId || ''),
+    terminalContainerName: computed(() => context.value?.session.title || ''),
+    terminalProcessId: computed(() => context.value?.session.id || ''),
+    terminalSession: computed(() => context.value?.session || null),
     containerViewportRef: viewportRef,
     openContainerTerminal: open,
     closeContainerTerminal: close,
     handleContainerTerminalReady: handleReady,
-    handleContainerTerminalInput: write
+    handleContainerTerminalInput: (data) => context.value?.controller.write(data),
+    handleContainerTerminalResize: (size) => context.value?.controller.resize(size)
   }
 }

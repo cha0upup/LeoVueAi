@@ -326,9 +326,14 @@
               {{ terminalContainerId.slice(0, 12) }}
             </el-tag>
             <span
-              :class="['terminal-status-dot', terminalReady ? 'is-connected' : 'is-connecting']"
+              :class="[
+                'terminal-status-dot',
+                terminalSession?.processExited ? 'is-ended' : terminalReady ? 'is-connected' : 'is-connecting'
+              ]"
             />
-            <span class="terminal-status-text">{{ terminalReady ? '已连接' : '连接中...' }}</span>
+            <span class="terminal-status-text">
+              {{ terminalSession?.processExited ? '已结束' : terminalReady ? '已连接' : '连接中...' }}
+            </span>
           </div>
           <div class="terminal-panel-actions">
             <el-button
@@ -346,8 +351,10 @@
             :key="terminalProcessId"
             ref="containerViewportRef"
             :active="terminalActive"
+            :terminal-session="terminalSession"
             @ready="handleContainerTerminalReady"
             @input="handleContainerTerminalInput"
+            @resize="handleContainerTerminalResize"
           />
         </div>
       </section>
@@ -436,12 +443,14 @@ const {
   terminalContainerId,
   terminalContainerName,
   terminalProcessId,
+  terminalSession,
   containerViewportRef,
   openContainerTerminal,
   closeContainerTerminal,
   handleContainerTerminalReady,
-  handleContainerTerminalInput
-} = useDockerTerminal({ sessionId: sessionIdRef, executeCommand: execCommandApi })
+  handleContainerTerminalInput,
+  handleContainerTerminalResize
+} = useDockerTerminal({ sessionId: sessionIdRef, executeCommand: execCommandApi, onError: showError })
 
 const currentList = computed(() => listsByTab[activeTab.value]?.value || [])
 const currentLoaded = computed(() => loadedByTab[activeTab.value])
@@ -842,6 +851,10 @@ const statusTag = getDockerStatusTag
   animation: blink 1s ease-in-out infinite;
 }
 
+.terminal-status-dot.is-ended {
+  background: var(--el-text-color-secondary);
+}
+
 .terminal-status-text {
   font-size: 11px;
   color: var(--el-text-color-secondary);
@@ -851,11 +864,6 @@ const statusTag = getDockerStatusTag
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-
-.terminal-panel-body :deep(.terminal-viewport) {
-  border-radius: 0;
-  border: none;
 }
 
 .terminal-panel-body :deep(.terminal-viewport__chrome) {

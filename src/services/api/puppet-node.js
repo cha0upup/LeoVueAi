@@ -1,4 +1,5 @@
 import http from '../http.js'
+import { createTerminalReadBatcher } from '../terminalReadBatcher.js'
 
 export function initPuppetApi(puppetId, projectId, hostId) {
   return http.get('/puppet-node/init', {
@@ -36,8 +37,25 @@ export function testPuppetConfigApi(puppet) {
   return http.post('/puppet-node/test-config', puppet)
 }
 
+function sendTerminalCommand(params) {
+  // Leave transport headroom around command execution and the 10-second long poll.
+  let config
+  if (['init', 'write', 'write-line'].includes(params.type)) config = { timeout: 45000 }
+  else if (params.type === 'read' && Number(params.cmd) > 0) config = { timeout: 30000 }
+  return http.post('/puppet-node/command/exec-command', params, config)
+}
+
+const readTerminalBatch = createTerminalReadBatcher({
+  readOne: sendTerminalCommand,
+  readBatch: (sessionId, processIds) =>
+    http.post('/puppet-node/command/read-batch', { sessionId, processIds })
+})
+
 export function execCommandApi(params) {
-  return http.post('/puppet-node/command/exec-command', params)
+  const { batchRead, ...command } = params
+  if (batchRead === true && command.type === 'read' && !command.cmd)
+    return readTerminalBatch(command)
+  return sendTerminalCommand(command)
 }
 
 export function getBasicInfoApi(params) {

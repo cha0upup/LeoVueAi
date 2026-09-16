@@ -4,27 +4,49 @@
       <div>
         <span class="rail-title">终端会话</span>
         <span class="rail-meta">
-          <template v-if="sessions.length === 0">支持多会话并行 — 点击 + 新建</template>
+          <template v-if="sessions.length === 0">点击新建开始会话</template>
           <template v-else-if="sessions.length === 1">1 个会话 · 可并行新建更多</template>
           <template v-else>{{ sessions.length }} 个会话</template>
         </span>
       </div>
       <div class="rail-actions">
-        <el-tooltip
-          content="新建终端会话（支持多会话并行运行）"
-          placement="bottom"
-          :show-after="400"
+        <el-dropdown
+          v-if="terminalModeOptions.length"
+          trigger="click"
+          @command="(mode) => $emit('create-session', mode)"
         >
           <button
             type="button"
             class="rail-new-btn"
-            aria-label="新建终端会话"
-            @click="$emit('create-session')"
+            aria-label="新建终端会话，选择模式"
           >
             <el-icon><Icon :icon="iconMap.plus" /></el-icon>
-            <span class="rail-new-label">新建</span>
+            新建
+            <el-icon><Icon :icon="iconMap.arrowDown" /></el-icon>
           </button>
-        </el-tooltip>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item
+                v-for="option in terminalModeOptions"
+                :key="option.value"
+                :command="option.value"
+                :disabled="option.disabled"
+              >
+                {{ option.label }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <button
+          v-else
+          type="button"
+          class="rail-new-btn"
+          aria-label="新建终端会话"
+          @click="$emit('create-session')"
+        >
+          <el-icon><Icon :icon="iconMap.plus" /></el-icon>
+          新建
+        </button>
         <el-button
           class="rail-tool-button is-danger"
           circle
@@ -47,20 +69,14 @@
           <el-icon><Icon :icon="iconMap.terminal" /></el-icon>
         </span>
         <span class="rail-empty-text">暂无会话</span>
-        <button
-          type="button"
-          class="rail-empty-btn"
-          @click="$emit('create-session')"
-        >
-          + 新建终端会话
-        </button>
+        <span class="rail-empty-hint">点击上方“新建”开始</span>
       </div>
       <div
         v-for="session in sessions"
         :key="session.id"
         :class="[
           'session-card',
-          { 'is-active': session.id === activeSessionId, 'has-unread': session.hasUnread }
+          { 'is-active': session.id === activeSessionId }
         ]"
       >
         <button
@@ -72,6 +88,7 @@
           <span class="session-card__head">
             <span class="session-card__title">
               <span class="session-card__name">{{ session.title }}</span>
+              <span class="session-card__mode">{{ session.pty === true || session.terminalMode === 'python-pty' ? 'PTY' : session.terminalMode === 'pipe' ? 'PIPE' : '' }}</span>
               <span
                 v-if="session.hasUnread"
                 class="session-card__unread"
@@ -83,7 +100,7 @@
 
           <span class="session-card__foot">
             <span class="session-card__id">{{ session.id.slice(0, 8) }}</span>
-            <span>{{ formatRelativeTime(session.lastActivityTime) }}</span>
+            <span>{{ formatTerminalRelativeTime(session.lastActivityTime, now) }}</span>
           </span>
         </button>
 
@@ -140,7 +157,6 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
 import { formatTerminalRelativeTime } from './terminalWorkspaceModel.js'
 
 defineProps({
@@ -155,6 +171,14 @@ defineProps({
   activeSessionId: {
     type: String,
     default: ''
+  },
+  now: {
+    type: Number,
+    required: true
+  },
+  terminalModeOptions: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -166,23 +190,6 @@ defineEmits([
   'interrupt-session',
   'clear-screen'
 ])
-
-// Reactive tick — causes formatRelativeTime to re-evaluate every 30 s
-const tick = ref(0)
-let _timer = null
-onMounted(() => {
-  _timer = setInterval(() => {
-    tick.value++
-  }, 30000)
-})
-onUnmounted(() => {
-  clearInterval(_timer)
-})
-
-const formatRelativeTime = (timestamp) => {
-  void tick.value // reactive dependency
-  return formatTerminalRelativeTime(timestamp)
-}
 </script>
 
 <style scoped>
@@ -230,9 +237,8 @@ const formatRelativeTime = (timestamp) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  width: 26px;
-  padding: 0;
+  gap: 4px;
+  padding: 0 6px;
   border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--el-border-color) 34%, transparent);
   background: color-mix(in srgb, var(--workspace-surface) 82%, transparent);
@@ -256,17 +262,17 @@ const formatRelativeTime = (timestamp) => {
   font-size: 14px;
 }
 
-.rail-new-label {
-  display: none;
-  line-height: 1;
-  white-space: nowrap;
-}
-
 .rail-title {
   display: block;
   font-size: 12px;
   font-weight: 650;
   color: var(--el-text-color-primary);
+}
+
+.session-card__mode {
+  font-size: 10px;
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
 }
 
 .rail-meta {
@@ -316,21 +322,9 @@ const formatRelativeTime = (timestamp) => {
   color: var(--el-text-color-placeholder);
 }
 
-.rail-empty-btn {
-  margin-top: 4px;
-  padding: 5px 14px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--workspace-soft-border) 92%, transparent);
-  background: var(--workspace-control-surface);
-  color: var(--el-text-color-primary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.rail-empty-btn:hover {
-  background: var(--app-control-background-hover);
+.rail-empty-hint {
+  color: var(--el-text-color-placeholder);
+  font-size: 11px;
 }
 
 .session-card {
@@ -498,13 +492,6 @@ const formatRelativeTime = (timestamp) => {
     var(--el-color-danger) 14%,
     var(--workspace-control-surface)
   );
-}
-
-:global(html:not(.dark) .terminal-rail) {
-  --workspace-surface: var(--app-card-background);
-  --workspace-muted-surface: var(--app-control-background-soft);
-  --workspace-control-surface: var(--app-control-background);
-  --workspace-soft-border: color-mix(in srgb, var(--el-border-color) 20%, transparent);
 }
 
 @media (max-width: 1100px) {

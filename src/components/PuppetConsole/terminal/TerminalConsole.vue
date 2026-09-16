@@ -2,9 +2,11 @@
   <div class="terminal-console">
     <div class="terminal-console__body">
       <TerminalSessionRail
-        :icon-map="iconMap"
+        :icon-map="icons"
         :sessions="sessions"
         :active-session-id="activeSessionId"
+        :now="clockNow"
+        :terminal-mode-options="terminalModeOptions"
         @activate="activateSession"
         @create-session="createSession"
         @reset-workspace="handleResetWorkspace"
@@ -21,7 +23,7 @@
                 class="stage-title-icon"
                 aria-hidden="true"
               >
-                <el-icon><Icon :icon="iconMap.terminal" /></el-icon>
+                <el-icon><Icon :icon="icons.terminal" /></el-icon>
               </span>
               <div class="stage-identity">
                 <span class="stage-title">{{ activeSession?.title || '终端' }}</span>
@@ -38,7 +40,7 @@
                   @update:model-value="(value) => handleSearchKeywordChange(value || '')"
                 >
                   <template #prefix>
-                    <el-icon><Icon :icon="iconMap.search" /></el-icon>
+                    <el-icon><Icon :icon="icons.search" /></el-icon>
                   </template>
                 </el-input>
                 <el-button
@@ -47,7 +49,7 @@
                   aria-label="上一个搜索结果"
                   @click="searchInActiveSession('prev')"
                 >
-                  <el-icon><Icon :icon="iconMap.arrowUp" /></el-icon>
+                  <el-icon><Icon :icon="icons.arrowUp" /></el-icon>
                 </el-button>
                 <el-button
                   circle
@@ -55,7 +57,7 @@
                   aria-label="下一个搜索结果"
                   @click="searchInActiveSession('next')"
                 >
-                  <el-icon><Icon :icon="iconMap.arrowDown" /></el-icon>
+                  <el-icon><Icon :icon="icons.arrowDown" /></el-icon>
                 </el-button>
               </div>
               <div class="stage-actions">
@@ -64,7 +66,7 @@
                   size="small"
                   @click="interruptActiveSession"
                 >
-                  <el-icon><Icon :icon="iconMap.stop" /></el-icon>
+                  <el-icon><Icon :icon="icons.stop" /></el-icon>
                   中断
                 </el-button>
                 <el-button
@@ -72,7 +74,7 @@
                   size="small"
                   @click="clearActiveViewport"
                 >
-                  <el-icon><Icon :icon="iconMap.remove" /></el-icon>
+                  <el-icon><Icon :icon="icons.remove" /></el-icon>
                   清屏
                 </el-button>
                 <el-button
@@ -80,7 +82,7 @@
                   size="small"
                   @click="closeActiveSession"
                 >
-                  <el-icon><Icon :icon="iconMap.close" /></el-icon>
+                  <el-icon><Icon :icon="icons.close" /></el-icon>
                   关闭
                 </el-button>
               </div>
@@ -138,7 +140,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onUnmounted, toRef, watch } from 'vue'
+import { computed, inject, onUnmounted, ref, toRef, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
@@ -156,14 +158,16 @@ const props = defineProps({
   }
 })
 
-const iconMap = icons
 const updateSidebarBadge = inject('updateSidebarBadge', () => {})
+const runtime = inject('puppetRuntime', ref('java'))
 const {
   sessions,
   activeSessionId,
   activeSession,
   activeSessionLabel,
   activeSessionTimeLabel,
+  clockNow,
+  terminalModeOptions,
   searchKeyword,
   setViewportRef,
   createSession,
@@ -183,6 +187,7 @@ const {
   searchInActiveSession
 } = useTerminalWorkspace({
   hostSessionId: toRef(props, 'sessionId'),
+  runtime,
   executeCommand: execCommandApi,
   onError: showError
 })
@@ -224,14 +229,6 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 0;
   color: var(--el-text-color-primary);
-}
-
-:global(html:not(.dark) .terminal-console),
-:global(html[data-theme='light'] .terminal-console) {
-  --workspace-surface: var(--app-card-background);
-  --workspace-muted-surface: var(--app-control-background-soft);
-  --workspace-control-surface: var(--app-control-background);
-  --workspace-soft-border: color-mix(in srgb, var(--el-border-color) 20%, transparent);
 }
 
 .terminal-console__body {
@@ -301,8 +298,6 @@ onUnmounted(() => {
 }
 
 .stage-head__primary {
-  align-items: center;
-  gap: 8px;
   flex: 0 1 auto;
 }
 

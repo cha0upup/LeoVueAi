@@ -1,17 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import {
-  decodeTerminalOutput,
-  describeTerminalCapability
-} from './terminalWorkspaceModel.js'
+import { describeTerminalCapability } from './terminalWorkspaceModel.js'
 
 describe('terminalWorkspaceModel', () => {
-  it('decodes the command response data field', () => {
-    const encoded = btoa(String.fromCharCode(...new TextEncoder().encode('hello 世界')))
-    expect(decodeTerminalOutput({ data: { data: encoded } })).toBe('hello 世界')
-    expect(decodeTerminalOutput({ data: { data: 'not-base64!' } })).toBe('')
-  })
-
   it('describes negotiated PTY, fallback, and detecting terminal modes', () => {
+    expect(describeTerminalCapability({ pty: false, backend: 'unix-command' })).toMatchObject({
+      mode: 'COMMAND',
+      details: expect.stringContaining('20 秒')
+    })
     expect(
       describeTerminalCapability({ pty: true, resizable: true, backend: 'python3-pty' })
     ).toMatchObject({
@@ -33,7 +28,7 @@ describe('terminalWorkspaceModel', () => {
       resizeMode: 'FIXED',
       streamMode: 'POLL',
       shellLabel: 'PIPE SHELL',
-      degraded: true,
+      degraded: false,
       details: expect.stringContaining('python3-pty: startup failed')
     })
     expect(describeTerminalCapability(null)).toMatchObject({
