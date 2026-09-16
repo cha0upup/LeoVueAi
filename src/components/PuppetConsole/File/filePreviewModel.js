@@ -68,7 +68,3 @@ export function splitPreviewDownloadPath(path) {
     fileName: normalized.slice(separatorIndex + 1) || 'file'
   }
 }
-
-export function isSamePreviewTarget(left, right) {
-  return left?.sessionId === right?.sessionId && left?.filePath === right?.filePath
-}

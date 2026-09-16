@@ -5,6 +5,7 @@ import {
   getDownloadRelativePath,
   getIndicatorStatus,
   getPrimaryTaskAction,
+  getSecondaryTaskActions,
   normalizeServerDownloadTask,
   normalizeServerSqlExportTask
 } from './taskManagerModel.js'
@@ -18,7 +19,23 @@ const icons = {
 }
 
 describe('taskManagerModel', () => {
-  it('normalizes malformed server snapshots and recognizes completed downloads', () => {
+  it.each([true, false])(
+    'disables upload cancellation during commit (local=%s)',
+    (isManagedLocally) => {
+      const task = {
+        type: TaskType.UPLOAD,
+        status: TaskStatus.UPLOADING,
+        currentStage: 'COMMITTING',
+        serverTaskId: 'u1',
+        isManagedLocally
+      }
+      expect(getPrimaryTaskAction(task, icons)).toBeNull()
+      expect(getSecondaryTaskActions(task, icons).some((action) => action.key === 'stop')).toBe(
+        false
+      )
+    }
+  )
+  it('keeps a fully transferred download running until the server commits it', () => {
     const download = normalizeServerDownloadTask(
       {
         taskId: 'd1',
@@ -35,7 +52,7 @@ describe('taskManagerModel', () => {
     expect(download).toMatchObject({
       serverTaskId: 'd1',
       sessionId: 's1',
-      status: TaskStatus.COMPLETED,
+      status: TaskStatus.DOWNLOADING,
       progress: 100,
       fileName: 'a.txt'
     })
@@ -71,15 +88,29 @@ describe('taskManagerModel', () => {
       ]
     })
 
-    expect(tasks.map(task => task.viewId)).toEqual(['scan-1', 'local-download'])
+    expect(tasks.map((task) => task.viewId)).toEqual(['scan-1', 'local-download'])
     expect(tasks[1]).toMatchObject({
       taskId: 'local-download',
       serverTaskId: 'd1',
-      status: TaskStatus.COMPLETED,
+      status: TaskStatus.DOWNLOADING,
       fileName: 'server.txt',
       isManagedLocally: true
     })
   })
+
+  it.each(['FAILED', 'CANCELLED', 'PAUSED'])(
+    'preserves %s after every byte is transferred',
+    (state) => {
+      const task = normalizeServerDownloadTask({
+        taskId: 'd',
+        state,
+        expectedLength: 10,
+        downloadedBytes: 10,
+        downloadPath: 'downloads/file'
+      })
+      expect(task.status).toBe(state.toLowerCase())
+    }
+  )
 
   it('derives stable presentation states and task actions', () => {
     expect(getIndicatorStatus(TaskStatus.PENDING)).toBe('waiting')

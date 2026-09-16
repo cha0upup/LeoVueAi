@@ -6,6 +6,25 @@ import {
 import { formatFilePath } from '@/utils/format.js'
 import { TaskStatus } from '@/constants/task.js'
 
+// 启动与轮询共用快照处理，零值和清空的错误信息也按服务端结果更新。
+function applyDownloadSnapshot(task, payload = {}) {
+  const snap = payload.meta ? { ...payload, ...payload.meta } : payload
+  task.engineTaskId = snap.taskId || task.engineTaskId
+  task.fileSize = Number(snap.expectedLength ?? task.fileSize ?? 0)
+  task.expectedMd5 = snap.expectedMd5 ?? task.expectedMd5
+  task.totalChunks = Number(snap.totalChunks ?? task.totalChunks ?? 0)
+  task.completedChunksCount = Number(snap.doneChunks ?? task.completedChunksCount ?? 0)
+  task.downloadedSize = Number(snap.downloadedBytes ?? task.downloadedSize ?? 0)
+  task.speed = Number(snap.speedBytesPerSec ?? 0)
+  task.downloadPath = snap.downloadPath ?? task.downloadPath
+  task.taskTempPath = snap.taskTempPath ?? task.taskTempPath
+  task.lastError = snap.lastError ?? null
+  task.currentStage = snap.currentStage ?? task.currentStage
+  task.errorStage = snap.errorStage ?? null
+  task.progress = task.fileSize > 0 ? Math.min(100, (task.downloadedSize / task.fileSize) * 100) : 0
+  return snap
+}
+
 export function applyDownloadExecutor(TaskEngine) {
   TaskEngine.prototype.executeDownloadTask = async function (task) {
     // 新逻辑：使用后端 Download Engine（断点续传 + 服务端落盘）
@@ -22,21 +41,7 @@ export function applyDownloadExecutor(TaskEngine) {
         chunkSize: Number(chunkSize) || 1048576
       })
 
-      const snap = startRes.data || {}
-      task.engineTaskId = snap.taskId || task.engineTaskId
-      task.fileSize = Number(snap.expectedLength || task.fileSize || 0)
-      task.expectedMd5 = snap.expectedMd5 || task.expectedMd5
-      task.totalChunks = Number(snap.totalChunks || task.totalChunks || 0)
-      task.completedChunksCount = Number(snap.doneChunks || 0)
-      task.downloadedSize = Number(snap.downloadedBytes || 0)
-      task.speed = Number(snap.speedBytesPerSec || 0)
-      // 后端应返回相对 root/users/{userId}/ 的路径（downloads/...）
-      task.downloadPath = snap.downloadPath || task.downloadPath
-      task.taskTempPath = snap.taskTempPath || task.taskTempPath
-      task.lastError = snap.lastError || null
-      task.currentStage = snap.currentStage || task.currentStage
-      task.errorStage = snap.errorStage || null
-      task.progress = task.fileSize > 0 ? (task.downloadedSize / task.fileSize) * 100 : 0
+      applyDownloadSnapshot(task, startRes.data || {})
       this.emit('taskProgress', task)
     }
 
@@ -76,24 +81,8 @@ export function applyDownloadExecutor(TaskEngine) {
 
       const progressRes = await downloadEngineProgressApi({ taskId: task.engineTaskId })
 
-      // progress 可能返回 snapshot 或 {taskId,state,meta:{...}}
-      const payload = progressRes.data || {}
-      const snap = payload.meta ? { taskId: payload.taskId, state: payload.state, ...(payload.meta || {}) } : payload
-
+      const snap = applyDownloadSnapshot(task, progressRes.data || {})
       const state = snap.state
-      task.fileSize = Number(snap.expectedLength || task.fileSize || 0)
-      task.expectedMd5 = snap.expectedMd5 || task.expectedMd5
-      task.totalChunks = Number(snap.totalChunks || task.totalChunks || 0)
-      task.completedChunksCount = Number(snap.doneChunks || task.completedChunksCount || 0)
-      task.downloadedSize = Number(snap.downloadedBytes || task.downloadedSize || 0)
-      task.speed = Number(snap.speedBytesPerSec || task.speed || 0)
-      task.downloadPath = snap.downloadPath || task.downloadPath
-      task.taskTempPath = snap.taskTempPath || task.taskTempPath
-      task.lastError = snap.lastError || task.lastError
-      task.currentStage = snap.currentStage || task.currentStage
-      task.errorStage = snap.errorStage || task.errorStage
-      task.progress =
-        task.fileSize > 0 ? Math.min(100, (task.downloadedSize / task.fileSize) * 100) : task.progress
 
       if (state === 'COMPLETED') {
         task.status = TaskStatus.COMPLETED
@@ -109,17 +98,6 @@ export function applyDownloadExecutor(TaskEngine) {
         task.error = task.lastError || '下载失败'
         this.emit('taskFailed', task, new Error(task.error))
         throw new Error(task.error)
-      }
-
-      const hasCompletedPayload =
-        task.downloadPath && task.fileSize > 0 && task.downloadedSize >= task.fileSize
-
-      if (hasCompletedPayload) {
-        task.status = TaskStatus.COMPLETED
-        task.endTime = Date.now()
-        task.progress = 100
-        this.emit('taskCompleted', task)
-        return
       }
 
       if (state === 'CANCELLED') {

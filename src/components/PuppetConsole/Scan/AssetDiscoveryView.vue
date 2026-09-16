@@ -160,10 +160,11 @@
         <span
           v-else
           class="stage-output-empty"
-        >探活完成后将在这里显示存活主机</span>
+        >{{ isRunning(activeTask) || isPaused(activeTask) ? '发现存活主机后将在这里显示' : '未发现存活主机' }}</span>
       </section>
 
       <AssetResultTable
+        v-if="stageDefinitions.some(stage => stage.name === 'PORT_SCAN')"
         :task-id="activeBackendTaskId"
         :session-id="sessionId"
         :refresh-token="resultRefreshToken"
@@ -178,7 +179,7 @@
         <DataAnalysis />
       </div>
       <h2>开始发现网络资产</h2>
-      <p>配置目标和端口策略后，系统会依次完成主机探活、端口扫描和服务识别。</p>
+      <p>选择扫描阶段、目标和端口策略，按需执行主机探活、端口扫描和服务识别。</p>
       <el-button
         type="primary"
         :icon="Plus"
@@ -194,8 +195,8 @@
     <el-dialog
       v-model="showComposer"
       title="新建扫描"
-      width="min(960px, calc(100vw - 32px))"
-      top="5vh"
+      width="min(840px, calc(100vw - 32px))"
+      top="8vh"
       class="scan-composer-dialog"
       destroy-on-close
     >
@@ -222,6 +223,7 @@ import {
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AssetResultTable from './AssetResultTable.vue'
 import ScanComposer from './ScanComposer.vue'
+import { selectScanStages } from './scanStages.js'
 import { taskEngine } from '../File/TaskEngine.js'
 import { TaskStatus } from '@/constants/task.js'
 import { useAssetDiscoveryTasks } from './useAssetDiscoveryTasks.js'
@@ -249,11 +251,10 @@ watch(
     showComposer.value = false
   }
 )
-const stageDefinitions = [
-  { name: 'REACHABILITY', label: '主机探活' },
-  { name: 'PORT_SCAN', label: '端口扫描' },
-  { name: 'SERVICE_PROBE', label: '服务识别' }
-]
+const stageDefinitions = computed(() => {
+  const stages = activeTask.value?.stages
+  return selectScanStages(stages?.length ? stages.map(stage => stage.name) : undefined)
+})
 
 const activeBackendTaskId = computed(() => {
   const task = activeTask.value
@@ -271,7 +272,7 @@ const currentStageLabel = computed(() => {
   if (outcome === 'COMPLETED') return '已完成'
   if (outcome === 'FAILED') return '扫描失败'
   return (
-    stageDefinitions.find((stage) => stage.name === activeTask.value?.currentStage)?.label ||
+    stageDefinitions.value.find((stage) => stage.name === activeTask.value?.currentStage)?.label ||
     '准备扫描'
   )
 })
@@ -325,11 +326,12 @@ function handleScanStarted(task) {
   }
   const scan = task.scan || {}
   const targetItems = scan.targets?.items || []
+  const stages = selectScanStages(scan.stages)
   const taskId = taskEngine.createScanTask(
     props.sessionId,
     'network_workflow',
     scan.name || '网络资产发现',
-    stageDefinitions.length,
+    stages.length,
     {
       backendTaskId,
       targetCount: targetItems.length,
@@ -345,8 +347,9 @@ function handleScanStarted(task) {
     targetLabel: scan.name || '网络资产发现',
     targetCount: targetItems.length,
     hosts: targetItems,
-    currentStage: 'REACHABILITY',
-    stageCount: stageDefinitions.length,
+    currentStage: stages[0]?.name,
+    stages: stages.map(stage => ({ name: stage.name, status: 'PENDING', progress: 0 })),
+    stageCount: stages.length,
     completedStageCount: 0,
     progress: 0
   })
@@ -447,6 +450,7 @@ function getMetrics(task) {
   }
 }
 function portPolicyLabel(task) {
+  if (task?.stages?.length === 1 && task.stages[0].name === 'REACHABILITY') return '仅主机探活'
   const ports = Array.isArray(task?.scanPorts) ? task.scanPorts.length : 0
   if (ports) return `${formatCount(ports)} 个端口`
   return task?.options?.portPolicy?.profile || task?.portPolicy?.profile || '预设策略'
@@ -958,26 +962,33 @@ p {
 }
 
 :deep(.scan-composer-dialog.el-dialog) {
-  width: min(960px, calc(100vw - 32px));
-  margin: 5vh auto 0;
+  width: min(840px, calc(100vw - 32px));
+  margin: 8vh auto 0;
+  padding: 0;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 :deep(.scan-composer-dialog .el-dialog__header) {
   margin: 0;
-  padding: 20px 28px 12px;
-  border-bottom: 1px solid var(--line);
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 :deep(.scan-composer-dialog .el-dialog__title) {
-  color: var(--ink);
-  font-size: 18px;
-  font-weight: 650;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+:deep(.scan-composer-dialog .el-dialog__headerbtn) {
+  top: 8px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
 }
 
 :deep(.scan-composer-dialog .el-dialog__body) {
-  height: min(600px, 76vh);
   padding: 0;
   overflow: hidden;
 }
@@ -1045,8 +1056,5 @@ p {
     margin-top: 2vh;
   }
 
-  :deep(.scan-composer-dialog .el-dialog__body) {
-    height: 88vh;
-  }
 }
 </style>

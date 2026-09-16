@@ -1,29 +1,131 @@
 <template>
   <div class="port-policy-selector">
-    <div class="policy-heading"><strong>端口范围</strong><span class="policy-summary">{{ localPolicy.preset === 'CUSTOM' ? totalPortCount.toLocaleString('zh-CN') + ' 个端口' : presets.find(item => item.value === localPolicy.preset)?.portCount }}</span></div>
-    <el-radio-group v-model="localPolicy.preset" class="preset-grid" @change="handlePresetChange">
-      <el-radio-button v-for="preset in presets" :key="preset.value" :label="preset.value">
+    <div class="policy-heading">
+      <strong>端口范围</strong><span class="policy-summary">{{ localPolicy.preset === 'CUSTOM' ? totalPortCount.toLocaleString('zh-CN') + ' 个端口' : presets.find(item => item.value === localPolicy.preset)?.portCount }}</span>
+    </div>
+    <el-radio-group
+      v-model="localPolicy.preset"
+      class="preset-grid"
+      @change="handlePresetChange"
+    >
+      <el-radio-button
+        v-for="preset in presets"
+        :key="preset.value"
+        :value="preset.value"
+      >
         <span class="preset-option"><strong>{{ preset.label }}</strong><small>{{ preset.portCount }}</small></span>
       </el-radio-button>
     </el-radio-group>
 
-    <div v-if="localPolicy.preset === 'CUSTOM'" class="custom-panel">
-      <div class="custom-heading"><strong>自定义端口</strong><el-button v-if="totalPortCount || localPolicy.excludePorts.length" text size="small" @click="clearCustom">清空自定义</el-button></div>
-      <div class="port-groups" aria-label="常用端口组">
-        <button v-for="group in portGroups" :key="group.value" type="button" class="group-chip" :class="{ selected: isGroupSelected(group), partial: isGroupPartial(group) }" :aria-pressed="isGroupSelected(group)" @click="toggleGroup(group)">
+    <div
+      v-if="localPolicy.preset === 'CUSTOM'"
+      class="custom-panel"
+    >
+      <div class="custom-heading">
+        <strong>自定义端口</strong><el-button
+          v-if="totalPortCount || localPolicy.excludePorts.length"
+          text
+          size="small"
+          @click="clearCustom"
+        >
+          清空自定义
+        </el-button>
+      </div>
+      <div
+        class="port-groups"
+        aria-label="常用端口组"
+      >
+        <button
+          v-for="group in portGroups"
+          :key="group.value"
+          type="button"
+          class="group-chip"
+          :class="{ selected: isGroupSelected(group), partial: isGroupPartial(group) }"
+          :aria-pressed="isGroupSelected(group)"
+          @click="toggleGroup(group)"
+        >
           <span>{{ group.label }}</span><small>{{ group.ports.length }}</small>
         </button>
       </div>
       <div class="custom-fields">
-        <div class="custom-field"><label for="include-ports">包含端口</label><el-input id="include-ports" v-model="customPortsText" type="textarea" :rows="3" resize="none" placeholder="80, 443, 8000-9000" @input="parseCustomPorts" /></div>
-        <div class="custom-field"><label for="exclude-ports">排除端口</label><el-input id="exclude-ports" v-model="excludePortsText" type="textarea" :rows="3" resize="none" placeholder="例如：22, 23" @input="parseExcludePorts" /></div>
+        <div class="custom-field">
+          <label for="include-ports">包含端口</label><el-input
+            id="include-ports"
+            v-model="customPortsText"
+            placeholder="80, 443, 8000-9000"
+            @input="parseCustomPorts"
+          />
+        </div>
+        <div class="custom-field">
+          <label for="exclude-ports">排除端口</label><el-input
+            id="exclude-ports"
+            v-model="excludePortsText"
+            placeholder="例如：22, 23"
+            @input="parseExcludePorts"
+          />
+        </div>
       </div>
-      <div class="range-row">
-        <label>添加连续范围</label><el-input-number v-model="rangeStart" :min="1" :max="65535" controls-position="right" /><span>至</span><el-input-number v-model="rangeEnd" :min="1" :max="65535" controls-position="right" /><el-button size="small" plain @click="addRange">添加范围</el-button>
+      <details class="range-editor">
+        <summary>添加连续范围</summary>
+        <div class="range-row">
+          <el-input-number
+            v-model="rangeStart"
+            aria-label="起始端口"
+            :min="1"
+            :max="65535"
+            controls-position="right"
+          /><span>至</span><el-input-number
+            v-model="rangeEnd"
+            aria-label="结束端口"
+            :min="1"
+            :max="65535"
+            controls-position="right"
+          /><el-button
+            size="small"
+            plain
+            @click="addRange"
+          >
+            添加范围
+          </el-button>
+        </div>
+      </details>
+      <div
+        v-if="portRanges.length"
+        class="range-tags"
+      >
+        <el-tag
+          v-for="(range, index) in portRanges"
+          :key="range.start + '-' + range.end + '-' + index"
+          closable
+          size="small"
+          @close="removeRange(index)"
+        >
+          {{ range.start }}-{{ range.end }}
+        </el-tag>
       </div>
-      <div v-if="portRanges.length" class="range-tags"><el-tag v-for="(range, index) in portRanges" :key="range.start + '-' + range.end + '-' + index" closable size="small" @close="removeRange(index)">{{ range.start }}-{{ range.end }}</el-tag></div>
-      <p v-if="parseError" class="parse-error">{{ parseError }}</p>
-      <div class="port-summary"><span>本次包含</span><div class="summary-values"><el-tag v-for="port in previewPorts" :key="port" size="small">{{ port }}</el-tag><span v-if="totalPortCount > previewPorts.length" class="summary-more">+{{ totalPortCount - previewPorts.length }} 个</span><span v-if="!totalPortCount" class="summary-empty">尚未选择端口</span></div></div>
+      <p
+        v-if="parseError"
+        class="parse-error"
+      >
+        {{ parseError }}
+      </p>
+      <div class="port-summary">
+        <span>本次包含</span><div class="summary-values">
+          <el-tag
+            v-for="port in previewPorts"
+            :key="port"
+            size="small"
+          >
+            {{ port }}
+          </el-tag><span
+            v-if="totalPortCount > previewPorts.length"
+            class="summary-more"
+          >+{{ totalPortCount - previewPorts.length }} 个</span><span
+            v-if="!totalPortCount"
+            class="summary-empty"
+          >尚未选择端口</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -80,7 +182,7 @@ const allSelectedPorts = computed(() => {
   return Array.from(ports).sort((left, right) => left - right)
 })
 const totalPortCount = computed(() => localPolicy.preset === 'CUSTOM' ? allSelectedPorts.value.length : 0)
-const previewPorts = computed(() => allSelectedPorts.value.slice(0, 24))
+const previewPorts = computed(() => allSelectedPorts.value.slice(0, 8))
 
 watch(
   [() => localPolicy.preset, () => localPolicy.excludePorts, selectedPorts, manualPorts, portRanges],
@@ -188,44 +290,42 @@ function clearCustom() {
 </script>
 
 <style scoped lang="scss">
-.port-policy-selector { color: #374151; }
-.policy-heading, .policy-heading > div, .custom-heading, .custom-heading > div, .port-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.policy-heading { margin-bottom: 10px; }
-.policy-heading > div, .custom-heading > div { align-items: flex-start; flex-direction: column; gap: 3px; }
-.policy-heading strong, .custom-heading strong { font-size: 12px; font-weight: 650; }
-.policy-heading span, .custom-heading span { color: #9ca3af; font-size: 10px; font-weight: 400; }
-.policy-summary { color: #2563eb !important; white-space: nowrap; }
+.port-policy-selector { min-width: 0; color: var(--el-text-color-primary); }
+.policy-heading, .custom-heading, .port-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.policy-heading { margin-bottom: 8px; }
+.policy-heading strong, .custom-heading strong { font-size: 12px; font-weight: 600; }
+.policy-summary { color: var(--el-text-color-secondary); font-size: 11px; white-space: nowrap; }
 .preset-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
 .preset-grid :deep(.el-radio-button), .preset-grid :deep(.el-radio-button__inner) { width: 100%; }
-.preset-grid :deep(.el-radio-button__inner) { min-height: 58px; padding: 9px 6px; }
-.preset-option { display: flex; align-items: center; flex-direction: column; gap: 4px; }
-.preset-option strong { font-size: 13px; font-weight: 650; }
-.preset-option small { color: #9ca3af; font-size: 10px; }
-.custom-panel { margin-top: 18px; padding-top: 16px; border-top: 1px solid #eef0f2; }
-.custom-heading { align-items: flex-start; margin-bottom: 13px; }
-.port-groups { display: flex; flex-wrap: wrap; gap: 7px; }
-.group-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid #d8e0e8; border-radius: 5px; color: #596875; background: #fff; cursor: pointer; font-size: 11px; transition: border-color .16s, color .16s, background .16s; }
-.group-chip small { color: #9ca3af; font-size: 10px; }
-.group-chip:hover, .group-chip.partial { border-color: #9dbcf8; color: #1d4ed8; }
-.group-chip.selected { border-color: #8db0f5; color: #1d4ed8; background: #eef4ff; }
+.preset-grid :deep(.el-radio-button__inner) { padding: 10px 4px; }
+.preset-grid :deep(.el-radio-button.is-active .el-radio-button__inner) { color: var(--el-color-primary); background: var(--el-color-primary-light-9); border-color: var(--el-color-primary); }
+.preset-option { display: flex; align-items: center; flex-direction: column; gap: 5px; }
+.preset-option strong { font-size: 12px; font-weight: 600; }
+.preset-option small { color: var(--el-text-color-secondary); font-size: 10px; }
+.preset-grid :deep(.el-radio-button.is-active small) { color: var(--el-color-primary); }
+.custom-panel { margin-top: 12px; }
+.custom-heading { min-height: 24px; margin-bottom: 8px; }
+.port-groups { display: flex; flex-wrap: wrap; gap: 6px; }
+.group-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--el-border-color); border-radius: 4px; color: var(--el-text-color-regular); background: var(--el-fill-color-blank); cursor: pointer; font-size: 11px; }
+.group-chip small { color: var(--el-text-color-secondary); font-size: 10px; }
+.group-chip:hover, .group-chip.partial { border-color: var(--el-color-primary-light-5); color: var(--el-color-primary); }
+.group-chip.selected { border-color: var(--el-color-primary); color: var(--el-color-primary); background: var(--el-color-primary-light-9); }
 .group-chip.selected small, .group-chip.partial small { color: inherit; }
-.custom-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
-.custom-field label, .range-row label { display: block; margin-bottom: 6px; color: #667481; font-size: 11px; font-weight: 600; }
-.custom-field :deep(.el-textarea__inner) { min-height: 70px !important; padding: 8px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.5; }
-.range-row { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
-.range-row label { margin: 0 5px 0 0; }
-.range-row > span { color: #9ca3af; font-size: 11px; }
-.range-row :deep(.el-input-number) { width: 112px; }
-.range-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
-.parse-error { margin: 10px 0 0; color: #b91c1c; font-size: 11px; }
-.port-summary { align-items: flex-start; margin-top: 14px; padding: 10px 0 0; border-top: 1px solid #eef0f2; }
-.port-summary > span { flex: 0 0 auto; padding-top: 3px; color: #667481; font-size: 11px; font-weight: 600; }
+.group-chip:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 2px; }
+.custom-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.custom-field label { display: block; margin-bottom: 6px; color: var(--el-text-color-regular); font-size: 11px; }
+.custom-field :deep(.el-input__inner) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.5; }
+.range-editor { margin-top: 10px; }
+.range-editor summary { color: var(--el-text-color-secondary); cursor: pointer; font-size: 11px; }
+.range-editor summary:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 3px; }
+.range-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.range-row > span { color: var(--el-text-color-secondary); font-size: 11px; }
+.range-row :deep(.el-input-number) { flex: 1; min-width: 70px; width: 90px; }
+.range-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.parse-error { margin: 8px 0 0; color: var(--el-color-danger); font-size: 11px; }
+.port-summary { align-items: flex-start; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--el-border-color-lighter); }
+.port-summary > span { flex-shrink: 0; padding-top: 3px; color: var(--el-text-color-secondary); font-size: 11px; }
 .summary-values { display: flex; flex: 1; flex-wrap: wrap; gap: 5px; min-width: 0; }
 .summary-values :deep(.el-tag) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.summary-more, .summary-empty { padding-top: 3px; color: #9ca3af; font-size: 10px; }
-@media (max-width: 640px) {
-  .preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .custom-fields { grid-template-columns: 1fr; }
-  .range-row :deep(.el-input-number) { width: 100px; }
-}
+.summary-more, .summary-empty { padding-top: 3px; color: var(--el-text-color-secondary); font-size: 10px; }
 </style>

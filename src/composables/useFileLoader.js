@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { previewFileApi } from '@/services/api.js'
-import { showError, showWarning } from '@/utils/messageUtils.js'
+import { showWarning } from '@/utils/messageUtils.js'
 
 // 图片扩展名
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']
@@ -50,7 +50,12 @@ const LANGUAGE_MAP = {
 /**
  * 文件加载与类型检测逻辑
  */
-export function useFileLoader({ decodeBase64ToString, detectEncoding, currentEncoding, originalEncoding }) {
+export function useFileLoader({
+  decodeBase64ToString,
+  detectEncoding,
+  currentEncoding,
+  originalEncoding
+}) {
   const fileContent = ref('')
   const fileType = ref('text')
   const codeLanguage = ref('plaintext')
@@ -70,8 +75,7 @@ export function useFileLoader({ decodeBase64ToString, detectEncoding, currentEnc
       if (isZeroSizePreview(payload, fallbackMeta)) {
         return ''
       }
-      showError('后端返回数据为空')
-      return null
+      throw new Error('后端返回数据为空')
     }
     return String(fileData)
   }
@@ -98,23 +102,25 @@ export function useFileLoader({ decodeBase64ToString, detectEncoding, currentEnc
   }
 
   /**
-   * 加载文件预览（普通模式）
+   * 加载预览；显式 encoding 用于重新解析，否则自动检测编码。
    * @returns {{ truncated: boolean, responseData: Object }|null}
    */
-  const loadFile = async (sessionId, filePath, fileMeta = {}) => {
+  const loadFile = async (sessionId, filePath, fileMeta = {}, options = {}) => {
     const generation = ++loadGeneration
+    const isCurrent = () => generation === loadGeneration && (options.isCurrent?.() ?? true)
+    let encoding = options.encoding ?? currentEncoding.value
     let response
     try {
       response = await previewFileApi({
         sessionId,
         path: filePath,
-        encoding: currentEncoding.value
+        encoding
       })
     } catch (error) {
-      if (generation !== loadGeneration) return null
+      if (!isCurrent()) return null
       throw error
     }
-    if (generation !== loadGeneration) return null
+    if (!isCurrent()) return null
 
     const responseData = {
       ...fileMeta,
@@ -122,14 +128,11 @@ export function useFileLoader({ decodeBase64ToString, detectEncoding, currentEnc
     }
 
     if (responseData.truncated) {
+      if (options.encoding !== undefined) throw new Error('文件过大，仅支持预览1MB以下内容')
       return { truncated: true, responseData }
     }
 
     const fileData = resolvePreviewData(responseData, fileMeta)
-    if (fileData === null) {
-      return null
-    }
-
     setFileType(filePath)
 
     if (fileType.value === 'image') {
@@ -137,68 +140,24 @@ export function useFileLoader({ decodeBase64ToString, detectEncoding, currentEnc
     } else if (fileType.value === 'pdf') {
       fileContent.value = `data:application/pdf;base64,${fileData}`
     } else {
-      fileContent.value = decodeBase64ToString(fileData, currentEncoding.value)
+      let content
+      try {
+        content = decodeBase64ToString(fileData, encoding)
+      } catch (error) {
+        if (options.encoding === undefined) throw error
+        encoding = 'utf-8'
+        content = decodeBase64ToString(fileData, encoding)
+        showWarning('编码解析失败，已回退到UTF-8')
+      }
+      fileContent.value = content
       originalContent.value = fileContent.value
       isModified.value = false
 
-      // 检测文件编码
-      const detectedEnc = detectEncoding(fileContent.value)
-      currentEncoding.value = detectedEnc
-      originalEncoding.value = detectedEnc
+      originalEncoding.value = detectEncoding(content)
+      currentEncoding.value = options.encoding === undefined ? originalEncoding.value : encoding
     }
 
     return { truncated: false, responseData }
-  }
-
-  /**
-   * 以指定编码重新加载文件
-   */
-  const reloadWithEncoding = async (sessionId, filePath, fileMeta = {}) => {
-    const generation = ++loadGeneration
-    let response
-    try {
-      response = await previewFileApi({
-        sessionId,
-        path: filePath,
-        encoding: currentEncoding.value
-      })
-    } catch (error) {
-      if (generation !== loadGeneration) return null
-      throw error
-    }
-    if (generation !== loadGeneration) return null
-
-    const responseData = {
-      ...fileMeta,
-      ...(response.data || {})
-    }
-
-    if (responseData.truncated) {
-      showError('文件过大，仅支持预览1MB以下内容')
-      return null
-    }
-
-    const fileData = resolvePreviewData(responseData, fileMeta)
-    if (fileData === null) {
-      return null
-    }
-
-    if (fileType.value === 'image') {
-      fileContent.value = `data:image/${getFileExtension(filePath)};base64,${fileData}`
-    } else {
-      let decodedContent
-      try {
-        decodedContent = decodeBase64ToString(fileData, currentEncoding.value)
-      } catch {
-        decodedContent = decodeBase64ToString(fileData, 'utf-8')
-        showWarning('编码解析失败，已回退到UTF-8')
-      }
-
-      fileContent.value = decodedContent
-      originalContent.value = decodedContent
-      isModified.value = false
-    }
-    return responseData
   }
 
   const resetFileState = () => {
@@ -219,7 +178,6 @@ export function useFileLoader({ decodeBase64ToString, detectEncoding, currentEnc
     getFileExtension,
     setFileType,
     loadFile,
-    reloadWithEncoding,
     resetFileState
   }
 }

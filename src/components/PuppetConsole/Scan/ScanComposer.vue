@@ -1,11 +1,5 @@
 <template>
   <div class="scan-composer">
-    <div class="composer-intro">
-      <div>
-        <h2>配置一次网络资产发现</h2>
-      </div>
-    </div>
-
     <el-form
       ref="formRef"
       :model="formData"
@@ -13,130 +7,143 @@
       label-position="top"
       class="composer-form"
     >
-      <div class="composer-layout">
-        <div class="config-column">
-          <section class="config-section">
-            <div class="section-heading">
-              <div><span class="section-index">01</span><strong>扫描目标</strong></div><span class="section-note">{{ formData.targets.length.toLocaleString('zh-CN') }} 个有效目标</span>
-            </div>
-            <el-form-item prop="targets">
-              <TargetInput v-model="formData.targets" />
-            </el-form-item>
-          </section>
-
-          <section class="config-section">
-            <div class="section-heading">
-              <div><span class="section-index">02</span><strong>扫描策略</strong></div>
-            </div>
-            <div class="name-field">
-              <label for="scan-name">任务名称 <small>可选</small></label>
-              <el-input
-                id="scan-name"
-                v-model="formData.name"
-                placeholder="例如：生产网段周检"
-                clearable
-              />
-            </div>
-            <PortPolicySelector v-model="formData.portPolicy" />
-          </section>
-
-          <section class="config-section">
-            <div class="section-heading">
-              <div><span class="section-index">03</span><strong>执行参数</strong></div><span class="section-note">高级设置</span>
-            </div>
-            <div class="execution-grid">
-              <el-form-item label="并发度">
-                <el-slider
-                  v-model="formData.concurrency"
-                  :min="1"
-                  :max="256"
-                  show-input
-                />
-              </el-form-item>
-              <el-form-item label="连接超时">
-                <div class="timeout-field">
-                  <el-input-number
-                    v-model="formData.connectTimeout"
-                    :min="100"
-                    :max="300000"
-                    :step="100"
-                    controls-position="right"
-                  /><span>ms</span>
-                </div>
-              </el-form-item>
-            </div>
-          </section>
+      <div class="stage-selection">
+        <div
+          class="stage-options"
+          role="group"
+          aria-label="扫描阶段"
+        >
+          <strong>扫描阶段</strong>
+          <el-checkbox
+            v-for="stage in SCAN_STAGES"
+            :key="stage.name"
+            :model-value="formData.stages.includes(stage.name)"
+            @change="enabled => changeStage(stage.name, enabled)"
+          >
+            {{ stage.label }}
+          </el-checkbox>
         </div>
-
-        <aside class="plan-column">
-          <div class="plan-card">
-            <div class="plan-heading">
-              <div><h3>执行预览</h3></div><span
-                class="plan-state"
-                :class="{ ready: previewData }"
-              >{{ previewData ? '已生成' : '待生成' }}</span>
-            </div>
-            <div class="plan-target">
-              <span>任务</span><strong>{{ formData.name || '网络资产发现' }}</strong><em>{{ targetSummary }}</em>
-            </div>
-            <div class="pipeline">
-              <div
-                v-for="(stage, index) in ['主机探活', '端口扫描', '服务识别']"
-                :key="stage"
-                class="pipeline-row"
-              >
-                <span>{{ String(index + 1).padStart(2, '0') }}</span><i /><strong>{{ stage }}</strong>
-              </div>
-            </div>
-            <template v-if="previewData">
-              <div class="plan-stats">
-                <div><strong>{{ Number(previewData.hostCount || 0).toLocaleString('zh-CN') }}</strong><span>目标</span></div>
-                <div><strong>{{ Number(previewData.portCount || 0).toLocaleString('zh-CN') }}</strong><span>端口</span></div>
-                <div><strong>{{ Number(previewData.combinationCount || 0).toLocaleString('zh-CN') }}</strong><span>检测组合</span></div>
-                <div><strong>{{ Number(previewData.serviceProbeCount || 0).toLocaleString('zh-CN') }}</strong><span>深度请求</span></div>
-              </div>
-              <div class="plan-estimate">
-                <span>预计结果规模</span><strong>{{ previewData.estimatedSize || '-' }}</strong>
-              </div>
-              <el-alert
-                v-if="(previewData.warnings || []).length"
-                type="warning"
-                :closable="false"
-                class="preview-warning"
-              >
-                <ul>
-                  <li
-                    v-for="(warning, index) in previewData.warnings"
-                    :key="index"
-                  >
-                    {{ warning }}
-                  </li>
-                </ul>
-              </el-alert>
-            </template>
-            <div
-              v-else
-              class="plan-placeholder"
-            >
-              <span>暂无预览</span>
-            </div>
-          </div>
-        </aside>
+        <p>{{ stageHint }}</p>
       </div>
+      <div class="composer-layout">
+        <el-form-item
+          prop="targets"
+          class="targets-field"
+        >
+          <TargetInput v-model="formData.targets" />
+        </el-form-item>
+
+        <div class="scan-settings">
+          <div class="name-field">
+            <label for="scan-name">任务名称 <span>可选</span></label>
+            <el-input
+              id="scan-name"
+              v-model="formData.name"
+              placeholder="例如：生产网段周检"
+              clearable
+            />
+          </div>
+          <PortPolicySelector
+            v-show="scansPorts"
+            v-model="formData.portPolicy"
+          />
+          <div class="execution-fields">
+            <el-form-item label="并发数">
+              <el-input-number
+                v-model="formData.concurrency"
+                :min="1"
+                :max="256"
+                :precision="0"
+                controls-position="right"
+              />
+            </el-form-item>
+            <el-form-item label="连接超时">
+              <div class="timeout-field">
+                <el-input-number
+                  v-model="formData.connectTimeout"
+                  :min="100"
+                  :max="300000"
+                  :step="100"
+                  :precision="0"
+                  controls-position="right"
+                />
+                <span>ms</span>
+              </div>
+            </el-form-item>
+          </div>
+        </div>
+      </div>
+
+      <section
+        class="scan-preview"
+        :class="{ ready: previewData }"
+        aria-label="执行预览"
+        aria-live="polite"
+      >
+        <div class="preview-heading">
+          <strong>执行预览</strong>
+          <span>{{ previewing ? '正在计算…' : previewData ? '已就绪' : '待生成' }}</span>
+        </div>
+        <div
+          v-if="previewData"
+          class="preview-stats"
+        >
+          <div><span>主机</span><strong>{{ Number(previewData.hostCount || 0).toLocaleString('zh-CN') }}</strong></div>
+          <div><span>{{ scansPorts ? '扫描端口' : '探活请求' }}</span><strong>{{ Number((scansPorts ? previewData.portCount : previewData.reachabilityProbeCount) || 0).toLocaleString('zh-CN') }}</strong></div>
+          <div v-if="scansPorts">
+            <span>检测组合</span><strong>{{ Number(previewData.combinationCount || 0).toLocaleString('zh-CN') }}</strong>
+          </div>
+          <div v-if="formData.stages.includes('SERVICE_PROBE')">
+            <span>服务请求</span><strong>{{ Number(previewData.serviceProbeCount || 0).toLocaleString('zh-CN') }}</strong>
+          </div>
+          <div><span>预计结果</span><strong>{{ previewData.estimatedSize || '—' }}</strong></div>
+        </div>
+        <p
+          v-else
+          class="preview-hint"
+        >
+          填写目标后生成预览，确认扫描范围与探测规模。
+        </p>
+        <el-alert
+          v-if="previewData?.warnings?.length"
+          type="warning"
+          :closable="false"
+          class="preview-warning"
+        >
+          <ul>
+            <li
+              v-for="(warning, index) in previewData.warnings"
+              :key="index"
+            >
+              {{ warning }}
+            </li>
+          </ul>
+        </el-alert>
+      </section>
     </el-form>
 
     <footer class="composer-footer">
-      <el-button @click="handleCancel">
-        取消
-      </el-button>
-      <el-button
-        type="primary"
-        :loading="previewing || starting"
-        :disabled="!formData.targets.length || previewing || starting"
-        @click="previewData ? handleStart() : handlePreview()"
+      <div
+        class="scan-stages"
+        aria-label="扫描流程"
       >
-        <el-icon><CaretRight /></el-icon>{{ previewData ? '开始扫描' : '生成预览' }}
-      </el-button>
+        {{ selectedStages.map(stage => stage.label).join(' → ') || '请选择扫描阶段' }}
+      </div>
+      <div class="footer-actions">
+        <el-button @click="handleCancel">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="previewing || starting"
+          :disabled="!formData.targets.length || !formData.stages.length || previewing || starting"
+          @click="previewData ? handleStart() : handlePreview()"
+        >
+          <el-icon v-if="!previewing && !starting">
+            <CaretRight />
+          </el-icon>{{ previewData ? '开始扫描' : '生成预览' }}
+        </el-button>
+      </div>
     </footer>
   </div>
 </template>
@@ -147,6 +154,7 @@ import { CaretRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import TargetInput from './TargetInput.vue'
 import PortPolicySelector from './PortPolicySelector.vue'
+import { SCAN_STAGES, selectScanStages, toggleScanStage } from './scanStages.js'
 import { previewNetworkProbeWorkflowApi, startNetworkProbeWorkflowApi } from '@/services/api.js'
 
 const props = defineProps({
@@ -163,6 +171,7 @@ const formRef = ref(null)
 const formData = reactive({
   name: '',
   targets: [],
+  stages: SCAN_STAGES.map(stage => stage.name),
   portPolicy: {
     preset: 'QUICK',
     customPorts: [],
@@ -171,6 +180,18 @@ const formData = reactive({
   concurrency: 256,
   connectTimeout: 1000
 })
+
+const selectedStages = computed(() => selectScanStages(formData.stages))
+const scansPorts = computed(() => formData.stages.includes('PORT_SCAN'))
+const stageHint = computed(() => {
+  if (!formData.stages.length) return '请至少选择一个扫描阶段。'
+  if (!scansPorts.value) return '仅探活：使用常用 TCP 端口；输入主机:端口可指定探活端口。'
+  const scope = formData.stages.includes('REACHABILITY') ? '先探活，仅扫描存活主机。' : '跳过探活，直接扫描所有输入目标。'
+  return scope + (formData.stages.includes('SERVICE_PROBE') ? '识别开放端口上的服务。' : '仅检查端口开放状态。')
+})
+function changeStage(name, enabled) {
+  formData.stages = toggleScanStage(formData.stages, name, enabled)
+}
 
 // 验证规则
 const rules = {
@@ -188,20 +209,11 @@ onScopeDispose(() => {
   previewSequence += 1
 })
 
-// 计算属性
-const targetSummary = computed(() => {
-  const first = formData.targets[0]?.input || '未设置目标'
-  const suffix =
-    formData.targets.length > 1
-      ? ` 等 ${formData.targets.length.toLocaleString('zh-CN')} 个目标`
-      : ''
-  return `${first}${suffix}`
-})
-
 watch(
   () => [
     props.sessionId,
     formData.targets,
+    formData.stages,
     formData.portPolicy,
     formData.concurrency,
     formData.connectTimeout
@@ -228,6 +240,11 @@ async function handlePreview() {
     })
     if (disposed || sequence !== previewSequence) return
     const payload = response.data || {}
+    const plannedStages = payload.preview?.stages || SCAN_STAGES.map(stage => stage.name)
+    if (payload.preview && plannedStages.join(',') !== formData.stages.join(',')) {
+      ElMessage.warning('服务端尚未支持当前阶段配置，请更新服务端后重试')
+      return
+    }
     previewData.value = payload.errors?.length ? null : payload.preview || null
     if (payload.errors?.length) ElMessage.warning(payload.errors.join('；'))
   } catch (error) {
@@ -264,6 +281,10 @@ function handleCancel() {
 }
 
 function validateTargets() {
+  if (!formData.stages.length) {
+    ElMessage.warning('请至少选择一个扫描阶段')
+    return false
+  }
   if (formData.targets.length > 0) return true
   ElMessage.warning('请至少输入一个扫描目标')
   return false
@@ -272,16 +293,17 @@ function validateTargets() {
 function buildScanConfig() {
   return {
     name: formData.name || undefined,
+    stages: [...formData.stages],
     targets: {
       items: formData.targets.map((target) => target.input),
       exclude: []
     },
-    portPolicy: {
+    portPolicy: scansPorts.value ? {
       profile: String(formData.portPolicy.preset || 'STANDARD').toLowerCase(),
       ranges: [],
       include: formData.portPolicy.preset === 'CUSTOM' ? formData.portPolicy.customPorts || [] : [],
       exclude: formData.portPolicy.excludePorts || []
-    },
+    } : undefined,
     execution: {
       workers: formData.concurrency,
       timeoutMs: formData.connectTimeout
@@ -296,409 +318,117 @@ defineExpose({
 
 <style scoped lang="scss">
 .scan-composer {
-  --ink: #1f2937;
-  --muted: #6b7280;
-  --subtle: #9ca3af;
-  --line: #e5e7eb;
-  --blue: #2563eb;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  color: var(--ink);
-  background: #fff;
-}
-
-.composer-intro {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 22px 28px 20px;
-  border-bottom: 1px solid var(--line);
-}
-
-.eyebrow {
-  color: var(--blue);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .11em;
-}
-
-.composer-intro h2 {
-  margin: 6px 0 7px;
-  font-size: 19px;
-  font-weight: 650;
-}
-
-.composer-intro p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.intro-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 9px;
-  border-radius: 5px;
-  color: #1d4ed8;
-  background: #eff6ff;
-  font-size: 11px;
-  white-space: nowrap;
+  min-height: 0;
+  max-height: calc(90dvh - 60px);
+  color: var(--el-text-color-primary);
+  background: var(--el-bg-color-overlay);
 }
 
 .composer-form {
-  flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 24px 28px 32px;
+  padding: 20px;
 }
+
+.stage-selection { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--el-border-color-lighter); }
+.stage-options { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; }
+.stage-options > strong { font-size: 12px; font-weight: 600; }
+.stage-options :deep(.el-checkbox) { height: 24px; margin-right: 0; }
+.stage-selection p { margin: 6px 0 0; color: var(--el-text-color-secondary); font-size: 11px; line-height: 1.5; }
 
 .composer-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   align-items: start;
-  gap: 26px;
-  max-width: 1040px;
-  margin: 0 auto;
+  gap: 22px;
 }
 
-.config-column {
+.targets-field { min-width: 0; margin: 0; }
+.targets-field :deep(.el-form-item__content) { display: block; line-height: normal; }
+
+.scan-settings {
+  display: grid;
+  gap: 18px;
   min-width: 0;
-}
-
-.config-section {
-  padding: 0 0 25px;
-  border-bottom: 1px solid #eef0f2;
-}
-
-.config-section + .config-section {
-  margin-top: 25px;
-}
-
-.section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.section-heading > div {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.section-index {
-  color: var(--blue);
-  font-family: monospace;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.section-heading strong {
-  font-size: 14px;
-  font-weight: 650;
-}
-
-.section-note {
-  color: var(--subtle);
-  font-size: 11px;
-}
-
-.name-field {
-  margin-bottom: 18px;
+  padding-left: 22px;
+  border-left: 1px solid var(--el-border-color-lighter);
 }
 
 .name-field label {
-  display: block;
-  margin-bottom: 7px;
-  color: #4b5563;
-  font-size: 11px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
   font-weight: 600;
 }
+.name-field label span { color: var(--el-text-color-placeholder); font-size: 11px; font-weight: 400; }
 
-.name-field label small {
-  margin-left: 5px;
-  color: var(--subtle);
-  font-weight: 400;
-}
-
-.execution-grid {
+.execution-fields {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
+.execution-fields :deep(.el-form-item) { min-width: 0; margin: 0; }
+.execution-fields :deep(.el-form-item__label) { height: auto; margin-bottom: 8px; line-height: 1.4; font-size: 12px; font-weight: 600; }
+.execution-fields :deep(.el-input-number) { width: 100%; min-width: 0; }
+.timeout-field { display: flex; align-items: center; gap: 7px; width: 100%; }
+.timeout-field > span { flex-shrink: 0; color: var(--el-text-color-secondary); font-size: 12px; }
 
-.execution-grid :deep(.el-form-item) {
-  margin-bottom: 0;
-}
-
-.execution-grid :deep(.el-slider) {
-  padding: 0 7px;
-}
-
-.field-help {
-  display: block;
-  margin-top: 7px;
-  color: var(--subtle);
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-.timeout-field {
-  display: flex;
+.scan-preview {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-}
-
-.timeout-field :deep(.el-input-number) {
-  width: 150px;
-}
-
-.timeout-field > span {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.plan-column {
-  position: sticky;
-  top: 0;
-}
-
-.plan-card {
-  padding: 17px;
-  border: 1px solid #dbe4ee;
+  column-gap: 18px;
+  margin-top: 20px;
+  padding: 13px 16px;
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 6px;
-  background: #fbfcfe;
+  background: var(--el-fill-color-light);
 }
-
-.plan-heading,
-.plan-heading > div,
-.plan-target,
-.plan-estimate {
-  display: flex;
-  align-items: center;
-}
-
-.plan-heading {
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 13px;
-  border-bottom: 1px solid var(--line);
-}
-
-.plan-heading > div {
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.plan-heading h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 650;
-}
-
-.plan-state {
-  padding: 3px 7px;
-  border-radius: 4px;
-  color: var(--muted);
-  background: #f0f2f4;
-  font-size: 10px;
-}
-
-.plan-state.ready {
-  color: #047857;
-  background: #ecfdf5;
-}
-
-.plan-target {
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 0;
-}
-
-.plan-target span,
-.plan-target em,
-.plan-estimate span {
-  color: var(--subtle);
-  font-size: 10px;
-  font-style: normal;
-}
-
-.plan-target strong {
-  max-width: 100%;
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.plan-target em {
-  max-width: 100%;
-  overflow: hidden;
-  color: #64748b;
-  font-family: monospace;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pipeline {
-  padding: 12px 0;
-  border-top: 1px solid #eef0f2;
-  border-bottom: 1px solid #eef0f2;
-}
-
-.pipeline-row {
-  display: grid;
-  grid-template-columns: 22px 12px minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
-  min-height: 27px;
-}
-
-.pipeline-row span {
-  color: var(--subtle);
-  font-family: monospace;
-  font-size: 10px;
-}
-
-.pipeline-row i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #9dbcf8;
-}
-
-.pipeline-row strong {
-  color: #4b5563;
-  font-size: 11px;
-  font-weight: 550;
-}
-
-.plan-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1px;
-  margin-top: 14px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--line);
-}
-
-.plan-stats div {
-  padding: 9px;
-  background: #fff;
-}
-
-.plan-stats strong,
-.plan-stats span {
-  display: block;
-}
-
-.plan-stats strong {
-  color: var(--blue);
-  font-size: 16px;
-  font-weight: 650;
-}
-
-.plan-stats span {
-  margin-top: 3px;
-  color: var(--subtle);
-  font-size: 10px;
-}
-
-.plan-estimate {
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.plan-estimate strong {
-  color: #374151;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.plan-placeholder {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 18px 0 2px;
-  color: var(--subtle);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.plan-placeholder .el-icon {
-  color: #9dbcf8;
-}
-
-.preview-warning {
-  margin-top: 12px;
-}
-
-.preview-warning :deep(.el-alert__content) {
-  padding: 0;
-}
-
-.preview-warning ul {
-  margin: 0;
-  padding-left: 16px;
-}
-
-.preview-warning li {
-  font-size: 11px;
-}
+.preview-heading { display: grid; gap: 5px; }
+.preview-heading strong { font-size: 12px; font-weight: 600; }
+.preview-heading > span { color: var(--el-text-color-secondary); font-size: 11px; }
+.ready .preview-heading > span { color: var(--el-color-success); }
+.preview-hint { margin: 0; color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.6; }
+.preview-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 12px; }
+.preview-stats > div { display: grid; gap: 5px; }
+.preview-stats span { color: var(--el-text-color-secondary); font-size: 11px; }
+.preview-stats strong { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.preview-warning { grid-column: 1 / -1; margin-top: 12px; }
+.preview-warning ul { margin: 0; padding-left: 16px; font-size: 12px; }
 
 .composer-footer {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 14px 28px 18px;
-  border-top: 1px solid var(--line);
-  background: #fff;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
+.scan-stages { display: flex; flex-wrap: wrap; gap: 8px; color: var(--el-text-color-secondary); font-size: 11px; }
+.footer-actions { display: flex; flex-shrink: 0; gap: 8px; }
+.footer-actions :deep(.el-button + .el-button) { margin-left: 0; }
+.footer-actions :deep(.el-icon) { margin-right: 4px; }
 
-@media (max-width: 760px) {
-  .composer-intro,
-  .composer-form {
-    padding-right: 16px;
-    padding-left: 16px;
-  }
-
-  .composer-intro {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .composer-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .plan-column {
-    position: static;
-    grid-row: 1;
-  }
-
-  .config-column {
-    grid-row: 2;
-  }
-
-  .execution-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .composer-footer {
-    padding-right: 16px;
-    padding-left: 16px;
-  }
+@media (max-width: 680px) {
+  .scan-composer { max-height: calc(96dvh - 60px); }
+  .composer-form { padding: 16px; }
+  .composer-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .scan-settings { padding-left: 0; border-left: 0; }
+  .scan-preview { grid-template-columns: 1fr; gap: 12px; padding: 12px; }
+  .preview-heading { display: flex; align-items: center; justify-content: space-between; }
+  .preview-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .composer-footer { padding: 12px 16px; }
+  .scan-stages { gap: 4px; font-size: 10px; }
+}
+@media (max-width: 440px) {
+  .scan-stages { display: none; }
+  .composer-footer { justify-content: flex-end; }
 }
 </style>

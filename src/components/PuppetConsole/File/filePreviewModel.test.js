@@ -3,7 +3,6 @@ import {
   detectFileLineEnding,
   getPreviewDisplayName,
   getTextPreviewStats,
-  isSamePreviewTarget,
   isTextFilePreview,
   normalizeFileLineEndings,
   resolvePreviewFileSize,
@@ -30,16 +29,5 @@ describe('filePreviewModel', () => {
       directoryPath: 'C:/Temp/',
       fileName: 'a.txt'
     })
-  })
-
-  it('compares preview request identities', () => {
-    expect(isSamePreviewTarget(
-      { sessionId: 's', filePath: '/a' },
-      { sessionId: 's', filePath: '/a' }
-    )).toBe(true)
-    expect(isSamePreviewTarget(
-      { sessionId: 's', filePath: '/a' },
-      { sessionId: 's2', filePath: '/a' }
-    )).toBe(false)
   })
 })

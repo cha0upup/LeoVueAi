@@ -337,7 +337,11 @@ class TaskEngine {
       return
     }
 
-    if (task.type === TaskType.DB_EXPORT && task.serverTaskId && task.status === TaskStatus.PAUSED) {
+    if (
+      task.type === TaskType.DB_EXPORT &&
+      task.serverTaskId &&
+      task.status === TaskStatus.PAUSED
+    ) {
       if (!task.connection) {
         throw new Error('缺少数据库连接信息，无法恢复导出任务')
       }
@@ -363,6 +367,9 @@ class TaskEngine {
   async stopTask(taskId) {
     const task = this.getTaskById(taskId)
     if (!task) return
+    if (task.type === TaskType.UPLOAD && task.currentStage === 'COMMITTING') {
+      throw new Error('文件正在提交，请等待提交结果')
+    }
 
     if (task.type === TaskType.SCAN) {
       await this.stopScanTask(task)
@@ -539,7 +546,6 @@ class TaskEngine {
   getStatusText(status) {
     return TASK_STATUS_TEXT[status] || status
   }
-
 }
 
 applyDownloadExecutor(TaskEngine)

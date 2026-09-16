@@ -208,6 +208,7 @@
             </div>
             <div class="main-actions__group is-utility">
               <el-button
+                v-if="fileCapabilities.grep"
                 class="semantic-button is-search"
                 size="small"
                 title="递归搜索文件内容"
@@ -217,6 +218,7 @@
                 内容搜索
               </el-button>
               <el-button
+                v-if="fileCapabilities.pack"
                 class="semantic-button is-archive"
                 size="small"
                 title="打包当前目录为 tar.gz"
@@ -264,7 +266,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, nextTick } from 'vue'
+import { computed, ref, watch, onMounted, nextTick, provide } from 'vue'
 import { icons } from '@/utils/icons.js'
 import { formatFilePath } from '@/utils/format.js'
 import {
@@ -273,6 +275,7 @@ import {
   parseAbsolutePath
 } from '@/composables/useFilePath.js'
 import { useFileSystem } from '@/composables/useFileSystem.js'
+import { FILE_CAPABILITIES_KEY } from './fileCapabilities.js'
 import FileTree from '@/components/PuppetConsole/File/FileTree.vue'
 import FileTable from '@/components/PuppetConsole/File/FileTable.vue'
 import FileCreate from '@/components/PuppetConsole/File/FileCreate.vue'
@@ -321,6 +324,9 @@ const {
   isLoading,
   loadDisks
 } = useFileSystem({ sessionId: props.sessionId })
+
+const fileCapabilities = computed(() => fileSystemProfile.value?.capabilities || {})
+provide(FILE_CAPABILITIES_KEY, fileCapabilities)
 
 // 路径导航相关
 const { breadcrumbs, currentFullPath, canGoBack } = useFilePath({ disk, currentPath })

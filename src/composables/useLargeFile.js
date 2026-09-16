@@ -1,19 +1,21 @@
 import { ref, toRaw } from 'vue'
 import { previewFileChunkApi } from '@/services/api.js'
 import { formatFileSize } from '@/utils/format.js'
+import { createBase64StreamDecoder } from './useFileEncoding.js'
 
 const CHUNK_SIZE = 256 * 1024 // 256KB per chunk
 
 /**
  * 大文件懒加载逻辑：分片请求、滚动监听、追加内容
  */
-export function useLargeFile({ decodeBase64ToString, currentEncoding, onChunkError }) {
+export function useLargeFile({ currentEncoding, onChunkError }) {
   const isLargeFileMode = ref(false)
   const totalFileSize = ref(0)
   const loadedOffset = ref(0)
   const isLoadingChunk = ref(false)
   const scrollDisposer = ref(null)
   let loadGeneration = 0
+  let decodeChunk = null
 
   const resolveNextOffset = (payload, fallbackOffset, fallbackSize) => {
     const nextOffset = Number(payload?.nextOffset)
@@ -48,35 +50,32 @@ export function useLargeFile({ decodeBase64ToString, currentEncoding, onChunkErr
 
       const result = response.data
       if (!result || !result.data) {
-        // 没有更多数据
-        loadedOffset.value = totalFileSize.value
-        return
+        throw new Error('文件内容提前结束，请刷新后重试')
       }
 
-      const chunkText = decodeBase64ToString(result.data, currentEncoding.value)
-      if (!chunkText) return
+      const nextOffset = resolveNextOffset(result, loadedOffset.value, CHUNK_SIZE)
+      if (nextOffset <= loadedOffset.value) throw new Error('文件分片偏移未推进')
+      const editor = getEditorFn()
+      const model = editor && toRaw(editor).getModel()
+      if (!model) return
+      const chunkText = decodeChunk(result.data, nextOffset >= totalFileSize.value)
 
       // 追加到编辑器内容
-      const editor = getEditorFn()
-      if (editor) {
-        const rawEditor = toRaw(editor)
-        const model = rawEditor.getModel()
-        if (model) {
-          const lastLine = model.getLineCount()
-          const lastCol = model.getLineMaxColumn(lastLine)
-          model.applyEdits([{
-            range: {
-              startLineNumber: lastLine,
-              startColumn: lastCol,
-              endLineNumber: lastLine,
-              endColumn: lastCol
-            },
-            text: chunkText
-          }])
+      const lastLine = model.getLineCount()
+      const lastCol = model.getLineMaxColumn(lastLine)
+      model.applyEdits([
+        {
+          range: {
+            startLineNumber: lastLine,
+            startColumn: lastCol,
+            endLineNumber: lastLine,
+            endColumn: lastCol
+          },
+          text: chunkText
         }
-      }
+      ])
 
-      loadedOffset.value = resolveNextOffset(result, loadedOffset.value, CHUNK_SIZE)
+      loadedOffset.value = nextOffset
       if (loadedOffset.value >= totalFileSize.value) {
         loadedOffset.value = totalFileSize.value
       }
@@ -126,6 +125,7 @@ export function useLargeFile({ decodeBase64ToString, currentEncoding, onChunkErr
    */
   const initLargeFileMode = async (responseData, sessionId, filePath) => {
     const generation = ++loadGeneration
+    decodeChunk = createBase64StreamDecoder(currentEncoding.value)
     isLargeFileMode.value = true
 
     const chunkBase64 = responseData?.data
@@ -145,18 +145,19 @@ export function useLargeFile({ decodeBase64ToString, currentEncoding, onChunkErr
         throw new Error('后端返回数据为空')
       }
       totalFileSize.value = result.size || 0
-      const text = decodeBase64ToString(result.data, currentEncoding.value)
       loadedOffset.value = resolveNextOffset(result, 0, CHUNK_SIZE)
+      const text = decodeChunk(result.data, loadedOffset.value >= totalFileSize.value)
       return text
     } else {
-      const text = decodeBase64ToString(chunkBase64, currentEncoding.value)
       loadedOffset.value = resolveNextOffset(responseData, 0, 1024 * 1024)
+      const text = decodeChunk(chunkBase64, loadedOffset.value >= totalFileSize.value)
       return text
     }
   }
 
   const resetLargeFile = () => {
     loadGeneration += 1
+    decodeChunk = null
     if (scrollDisposer.value) {
       scrollDisposer.value.dispose()
       scrollDisposer.value = null

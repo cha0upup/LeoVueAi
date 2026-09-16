@@ -111,17 +111,17 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
 import { formatFilePath } from '@/utils/format.js'
-import { editFileApi } from '@/services/api.js'
+import { useFileSave } from '@/composables/useFileSave.js'
 import FileDownload from '@/components/PuppetConsole/File/FileDownload.vue'
 import FilePreviewHeader from './FilePreviewHeader.vue'
 import ImagePreview from './preview/ImagePreview.vue'
 import PdfPreview from './preview/PdfPreview.vue'
 import TextPreview from './preview/TextPreview.vue'
-import { showError, showInfo, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { showError, showInfo, showSuccess } from '@/utils/messageUtils.js'
 import { useFileEncoding } from '@/composables/useFileEncoding.js'
 import { useFileLoader } from '@/composables/useFileLoader.js'
 import { useLargeFile } from '@/composables/useLargeFile.js'
-import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
+import { useFilePreviewRequest } from '@/composables/useFilePreviewRequest.js'
 import {
   FILE_PREVIEW_DEFAULT_FONT_SIZE,
   FILE_PREVIEW_DEFAULT_LINE_ENDING,
@@ -130,9 +130,7 @@ import {
   getPreviewDisplayName,
   getPreviewTypeLabel,
   getTextPreviewStats,
-  isSamePreviewTarget,
   isTextFilePreview,
-  normalizeFileLineEndings,
   resolvePreviewFileSize,
   shortenPreviewPath,
   splitPreviewDownloadPath
@@ -147,7 +145,6 @@ const {
   encodingOptions,
   decodeBase64ToString,
   detectEncoding,
-  convertEncoding,
   resetEncoding
 } = useFileEncoding()
 
@@ -159,7 +156,6 @@ const {
   isModified,
   setFileType,
   loadFile,
-  reloadWithEncoding,
   resetFileState
 } = useFileLoader({ decodeBase64ToString, detectEncoding, currentEncoding, originalEncoding })
 
@@ -173,9 +169,8 @@ const {
   resetLargeFile,
   formatFileSize
 } = useLargeFile({
-  decodeBase64ToString,
   currentEncoding,
-  onChunkError: error => showError(`文件分片加载失败：${error?.message || '未知错误'}`)
+  onChunkError: (error) => showError(`文件分片加载失败：${error?.message || '未知错误'}`)
 })
 
 // ── 组件状态 ──
@@ -185,13 +180,10 @@ const sessionId = ref('')
 const previewFileMeta = ref({})
 const fileDownloadRef = ref(null)
 const textPreviewRef = ref(null)
-const requestGuard = createLatestRequestGuard(['preview', 'save', 'encoding'])
+const previewRequest = useFilePreviewRequest()
+const { isPreviewLoading, isRefreshing, isEncoding } = previewRequest
 
 const isFullscreen = ref(false)
-const isPreviewLoading = ref(false)
-const isSaving = ref(false)
-const isEncoding = ref(false)
-const isRefreshing = ref(false)
 const canUndo = ref(false)
 const canRedo = ref(false)
 const fontSize = ref(FILE_PREVIEW_DEFAULT_FONT_SIZE)
@@ -214,20 +206,24 @@ const isTextPreview = computed(() => isTextFilePreview(fileType.value))
 const lineEndingOptions = FILE_PREVIEW_LINE_ENDING_OPTIONS
 
 const lineEndingLabel = computed(() => {
-  const matched = FILE_PREVIEW_LINE_ENDING_OPTIONS.find((option) => option.value === lineEnding.value)
+  const matched = FILE_PREVIEW_LINE_ENDING_OPTIONS.find(
+    (option) => option.value === lineEnding.value
+  )
   return matched?.label || lineEnding.value
 })
 
-const canSaveFile = computed(() =>
-  isTextPreview.value &&
-  isModified.value &&
-  !isLargeFileMode.value &&
-  !isSaving.value &&
-  !isEncoding.value
+const canSaveFile = computed(
+  () =>
+    isTextPreview.value &&
+    isModified.value &&
+    !isLargeFileMode.value &&
+    !isSaving.value &&
+    !isEncoding.value &&
+    !isPreviewLoading.value
 )
 const largeFileProgress = computed(() => {
   if (totalFileSize.value <= 0) return 0
-  return Math.min(100, Math.round(loadedOffset.value / totalFileSize.value * 100))
+  return Math.min(100, Math.round((loadedOffset.value / totalFileSize.value) * 100))
 })
 
 const shortenedFilePath = computed(() => shortenPreviewPath(filePath.value))
@@ -259,7 +255,8 @@ const setLineEndingFromContent = (content) => {
 }
 
 const updateModifiedState = (content = getEditorContent()) => {
-  isModified.value = content !== originalContent.value || lineEnding.value !== originalLineEnding.value
+  isModified.value =
+    content !== originalContent.value || lineEnding.value !== originalLineEnding.value
 }
 
 const updateStatsFromContent = (content) => {
@@ -360,99 +357,69 @@ const currentPreviewTarget = () => ({
   filePath: filePath.value
 })
 
-const isCurrentPreviewTarget = (target) => isSamePreviewTarget(target, currentPreviewTarget())
-
-const reloadPreviewEncoding = async (encoding, successMessage, sequence) => {
-  const target = currentPreviewTarget()
-  try {
-    currentEncoding.value = encoding
-    const result = await reloadWithEncoding(target.sessionId, target.filePath, previewFileMeta.value)
-    if (
-      !result ||
-      !requestGuard.isCurrent('encoding', sequence) ||
-      !isCurrentPreviewTarget(target)
-    ) return false
-    activeDisplayEncoding.value = encoding
-    setLineEndingFromContent(fileContent.value)
-    updateStatsFromContent(fileContent.value)
-    showSuccess(successMessage)
-    return true
-  } catch (error) {
-    if (
-      requestGuard.isCurrent('encoding', sequence) &&
-      isCurrentPreviewTarget(target)
-    ) {
-      currentEncoding.value = activeDisplayEncoding.value
-      showError('编码切换失败：' + (error?.message || '未知错误'))
-    }
-    return false
-  } finally {
-    if (requestGuard.isCurrent('encoding', sequence) && isCurrentPreviewTarget(target)) {
-      isEncoding.value = false
-    }
-  }
+const syncTextPreview = () => {
+  activeDisplayEncoding.value = currentEncoding.value
+  setLineEndingFromContent(fileContent.value)
+  updateStatsFromContent(fileContent.value)
 }
 
-const changeDisplayEncoding = async () => {
-  if (!textPreviewRef.value || isSaving.value || isEncoding.value) {
+const canChangeEncoding = () =>
+  textPreviewRef.value && !isSaving.value && !isEncoding.value && !isPreviewLoading.value
+
+const switchPreviewEncoding = async (encoding, confirmation, successMessage) => {
+  if (!canChangeEncoding()) {
     currentEncoding.value = activeDisplayEncoding.value
-    return
+    return false
   }
-  const requestedEncoding = currentEncoding.value
-  const previousEncoding = activeDisplayEncoding.value
   const target = currentPreviewTarget()
-  const sequence = requestGuard.next('encoding')
-  isEncoding.value = true
-  const confirmed = await confirmAction({
-    title: '确认编码切换',
-    message: `确定要使用 ${requestedEncoding.toUpperCase()} 编码重新解析文件内容吗？\n\n注意：这可能会改变文件的显示效果。`
+  return previewRequest.run('encoding', async (isCurrent) => {
+    try {
+      if (!(await confirmAction(confirmation)) || !isCurrent()) return false
+      const result = await loadFile(target.sessionId, target.filePath, previewFileMeta.value, {
+        encoding,
+        isCurrent
+      })
+      if (!result || !isCurrent()) return false
+      syncPreviewMetadata(result.responseData)
+      syncTextPreview()
+      showSuccess(successMessage)
+      return true
+    } catch (error) {
+      if (isCurrent()) showError(`编码切换失败：${error?.message || '未知错误'}`)
+      return false
+    } finally {
+      if (isCurrent()) currentEncoding.value = activeDisplayEncoding.value
+    }
   })
-  if (
-    !requestGuard.isCurrent('encoding', sequence) ||
-    !isCurrentPreviewTarget(target)
-  ) return
-  if (!confirmed) {
-    currentEncoding.value = previousEncoding
-    isEncoding.value = false
-    return
-  }
-  await reloadPreviewEncoding(
-    requestedEncoding,
-    `已切换到 ${requestedEncoding.toUpperCase()} 编码显示`,
-    sequence
+}
+
+const changeDisplayEncoding = () => {
+  const encoding = currentEncoding.value
+  return switchPreviewEncoding(
+    encoding,
+    {
+      title: '确认编码切换',
+      message: `确定要使用 ${encoding.toUpperCase()} 编码重新解析文件内容吗？\n\n注意：这可能会改变文件的显示效果。`
+    },
+    `已切换到 ${encoding.toUpperCase()} 编码显示`
   )
 }
 
-const detectFileEncoding = async () => {
-  if (!textPreviewRef.value || isSaving.value || isEncoding.value) return
-  const detectedEncoding = detectEncoding(getEditorContent())
-  if (detectedEncoding === activeDisplayEncoding.value) {
-    showInfo(`当前编码 ${detectedEncoding.toUpperCase()} 可能正确`)
+const detectFileEncoding = () => {
+  if (!canChangeEncoding()) return
+  const encoding = detectEncoding(getEditorContent())
+  if (encoding === activeDisplayEncoding.value) {
+    showInfo(`当前编码 ${encoding.toUpperCase()} 可能正确`)
     return
   }
-
-  const target = currentPreviewTarget()
-  const sequence = requestGuard.next('encoding')
-  isEncoding.value = true
-  const confirmed = await confirmAction({
-    title: '编码检测',
-    message: `前端检测到文件编码可能为 ${detectedEncoding.toUpperCase()}，是否切换到检测到的编码？\n\n注意：前端检测可能不够准确。`,
-    confirmButtonText: '切换'
-  })
-  if (
-    !confirmed ||
-    !requestGuard.isCurrent('encoding', sequence) ||
-    !isCurrentPreviewTarget(target)
-  ) {
-    if (requestGuard.isCurrent('encoding', sequence) && isCurrentPreviewTarget(target)) {
-      isEncoding.value = false
-    }
-    return
-  }
-  await reloadPreviewEncoding(
-    detectedEncoding,
-    `已切换到 ${detectedEncoding.toUpperCase()} 编码`,
-    sequence
+  return switchPreviewEncoding(
+    encoding,
+    {
+      title: '编码检测',
+      message: `前端检测到文件编码可能为 ${encoding.toUpperCase()}，是否切换到检测到的编码？\n\n注意：前端检测可能不够准确。`,
+      confirmButtonText: '切换'
+    },
+    `已切换到 ${encoding.toUpperCase()} 编码`
   )
 }
 
@@ -469,76 +436,44 @@ const downloadFile = async () => {
   }
 }
 
-const refreshFile = async () => {
-  const target = currentPreviewTarget()
-  isRefreshing.value = true
-  const success = await preView(target.sessionId, target.filePath, previewFileMeta.value)
-  if (isCurrentPreviewTarget(target)) {
-    isRefreshing.value = false
-    if (success) showSuccess('文件刷新成功')
-  }
+const refreshFile = () => {
+  if (isSaving.value || isPreviewLoading.value || isEncoding.value) return false
+  return preView(sessionId.value, filePath.value, previewFileMeta.value, 'refresh')
 }
 
-const saveFile = async () => {
-  if (!textPreviewRef.value || isLargeFileMode.value || isSaving.value || isEncoding.value) return
-
-  const sequence = requestGuard.next('save')
-  const target = currentPreviewTarget()
-  const content = getEditorContent()
-  const targetLineEnding = lineEnding.value
-  const targetEncoding = currentEncoding.value
-  const normalizedContent = normalizeFileLineEndings(content, targetLineEnding)
-  isSaving.value = true
-  try {
-    let finalContent = normalizedContent
-    if (targetEncoding !== originalEncoding.value) {
-      try {
-        finalContent = await convertEncoding(
-          normalizedContent,
-          originalEncoding.value,
-          targetEncoding
-        )
-      } catch {
-        if (requestGuard.isCurrent('save', sequence) && isCurrentPreviewTarget(target)) {
-          showWarning('编码转换失败，将使用原始内容保存')
-        }
-      }
+const {
+  save: saveFile,
+  isSaving,
+  reset: resetSave
+} = useFileSave({
+  getSnapshot: () => {
+    if (
+      !textPreviewRef.value ||
+      isLargeFileMode.value ||
+      isEncoding.value ||
+      isPreviewLoading.value
+    )
+      return null
+    return {
+      ...currentPreviewTarget(),
+      content: getEditorContent(),
+      lineEnding: lineEnding.value,
+      encoding: currentEncoding.value
     }
-    if (!requestGuard.isCurrent('save', sequence) || !isCurrentPreviewTarget(target)) return
-
-    await editFileApi({
-      sessionId: target.sessionId,
-      path: target.filePath,
-      content: finalContent,
-      encoding: targetEncoding
-    })
-    if (!requestGuard.isCurrent('save', sequence) || !isCurrentPreviewTarget(target)) return
-
-    showSuccess(`文件保存成功 (${targetEncoding.toUpperCase()} / ${targetLineEnding})`)
-    fileContent.value = normalizedContent
-    originalContent.value = normalizedContent
-    originalEncoding.value = targetEncoding
-    activeDisplayEncoding.value = targetEncoding
-    originalLineEnding.value = targetLineEnding
-    updateStatsFromContent(normalizedContent)
-    isModified.value = false
-  } catch (error) {
-    if (requestGuard.isCurrent('save', sequence) && isCurrentPreviewTarget(target)) {
-      showError(`文件保存失败：${error?.message || '未知错误'}`)
-    }
-  } finally {
-    if (requestGuard.isCurrent('save', sequence) && isCurrentPreviewTarget(target)) {
-      isSaving.value = false
-    }
+  },
+  onSaved: ({ content, encoding, lineEnding: savedLineEnding }) => {
+    // 只推进已保存基线，保留请求等待期间继续输入的内容。
+    originalContent.value = content
+    originalEncoding.value = encoding
+    activeDisplayEncoding.value = encoding
+    originalLineEnding.value = savedLineEnding
+    updateStatsFromContent(getEditorContent())
+    updateModifiedState()
   }
-}
+})
 
-const clearPreviewState = ({ clearTarget = true } = {}) => {
-  requestGuard.invalidate(['preview', 'save', 'encoding'])
-  isSaving.value = false
-  isEncoding.value = false
-  isRefreshing.value = false
-  isPreviewLoading.value = false
+const clearPreviewState = () => {
+  resetSave()
   canUndo.value = false
   canRedo.value = false
   wordWrap.value = true
@@ -547,18 +482,22 @@ const clearPreviewState = ({ clearTarget = true } = {}) => {
   resetEncoding()
   resetLargeFile()
   activeDisplayEncoding.value = 'utf-8'
-  if (clearTarget) {
-    sessionId.value = ''
-    filePath.value = ''
-  }
+  sessionId.value = ''
+  filePath.value = ''
 }
 
 const resetPreviewState = () => {
+  previewRequest.reset()
   isFullscreen.value = false
   clearPreviewState()
 }
 
-const preView = async (sessionIdParam, filePathParam, fileMetaParam = {}) => {
+const preView = async (
+  sessionIdParam,
+  filePathParam,
+  fileMetaParam = {},
+  operation = 'preview'
+) => {
   const target = {
     sessionId: String(sessionIdParam || ''),
     filePath: formatFilePath(filePathParam || '')
@@ -568,76 +507,58 @@ const preView = async (sessionIdParam, filePathParam, fileMetaParam = {}) => {
     return false
   }
 
-  const intentSequence = requestGuard.next('preview')
-  if (preViewVisible.value && isModified.value) {
-    const confirmed = await confirmAction({
-      title: '确认切换文件',
-      message: '当前文件已修改但未保存，确定要打开其他文件吗？',
-      confirmButtonText: '继续打开'
-    })
-    if (!confirmed || !requestGuard.isCurrent('preview', intentSequence)) return false
-  }
-
-  clearPreviewState({ clearTarget: false })
-  const sequence = requestGuard.next('preview')
-  sessionId.value = target.sessionId
-  filePath.value = target.filePath
-  previewFileMeta.value = fileMetaParam || {}
-  preViewVisible.value = true
-  isPreviewLoading.value = true
-  const isCurrent = () =>
-    requestGuard.isCurrent('preview', sequence) && isCurrentPreviewTarget(target)
-
-  try {
-    const result = await loadFile(target.sessionId, target.filePath, previewFileMeta.value)
-    if (!result || !isCurrent()) return false
-    syncPreviewMetadata(result.responseData)
-
-    if (result.truncated) {
-      setFileType(target.filePath)
-      if (fileType.value !== 'text') {
-        showError('大文件仅支持文本预览')
-        return false
+  return previewRequest.run(operation, async (isCurrent) => {
+    // 新预览意图会替代编码切换，即使随后取消，也应保留当前内容的实际编码。
+    currentEncoding.value = activeDisplayEncoding.value
+    try {
+      if (preViewVisible.value && isModified.value) {
+        const confirmed = await confirmAction({
+          title: '确认切换文件',
+          message: '当前文件已修改但未保存，确定要打开其他文件吗？',
+          confirmButtonText: '继续打开'
+        })
+        if (!confirmed || !isCurrent()) return false
       }
 
-      const text = await initLargeFileMode(result.responseData, target.sessionId, target.filePath)
-      if (text === null || !isCurrent()) return false
-      fileContent.value = text
-      originalContent.value = text
-      setLineEndingFromContent(text)
-      updateStatsFromContent(text)
-      isModified.value = false
+      clearPreviewState()
+      sessionId.value = target.sessionId
+      filePath.value = target.filePath
+      previewFileMeta.value = fileMetaParam || {}
+      preViewVisible.value = true
+      const result = await loadFile(target.sessionId, target.filePath, previewFileMeta.value, {
+        isCurrent
+      })
+      if (!result || !isCurrent()) return false
+      syncPreviewMetadata(result.responseData)
 
-      const detectedEncoding = detectEncoding(text)
-      currentEncoding.value = detectedEncoding
-      originalEncoding.value = detectedEncoding
-      activeDisplayEncoding.value = detectedEncoding
+      if (result.truncated) {
+        setFileType(target.filePath)
+        if (fileType.value !== 'text') throw new Error('大文件仅支持文本预览')
+        const text = await initLargeFileMode(result.responseData, target.sessionId, target.filePath)
+        if (text === null || !isCurrent()) return false
+        fileContent.value = text
+        originalContent.value = text
+        isModified.value = false
+        currentEncoding.value = detectEncoding(text)
+        originalEncoding.value = currentEncoding.value
+      }
 
-      await nextTick()
-      if (!isCurrent()) return false
-      await initMonacoEditor()
-      await nextTick()
-      if (!isCurrent()) return false
-      setupScrollListener(getEditorInstance, target.sessionId, target.filePath)
-      showInfo(`大文件模式：文件大小 ${formatFileSize(totalFileSize.value)}，按需加载中`)
+      if (fileType.value === 'text') {
+        syncTextPreview()
+        await initMonacoEditor(isCurrent)
+        if (!isCurrent()) return false
+        if (result.truncated) {
+          setupScrollListener(getEditorInstance, target.sessionId, target.filePath)
+          showInfo(`大文件模式：文件大小 ${formatFileSize(totalFileSize.value)}，按需加载中`)
+        }
+      }
+      if (operation === 'refresh') showSuccess('文件刷新成功')
       return true
+    } catch (error) {
+      if (isCurrent()) showError(`文件加载失败：${error?.message || '未知错误'}`)
+      return false
     }
-
-    if (fileType.value === 'text') {
-      activeDisplayEncoding.value = currentEncoding.value
-      setLineEndingFromContent(fileContent.value)
-      updateStatsFromContent(fileContent.value)
-      await nextTick()
-      if (!isCurrent()) return false
-      await initMonacoEditor()
-    }
-    return isCurrent()
-  } catch (error) {
-    if (isCurrent()) showError(`文件加载失败：${error?.message || '未知错误'}`)
-    return false
-  } finally {
-    if (isCurrent()) isPreviewLoading.value = false
-  }
+  })
 }
 
 const confirmClose = async () => {
@@ -676,11 +597,11 @@ const handleHeaderAction = (action) => {
   handlers[action]?.()
 }
 
-const initMonacoEditor = async () => {
-  if (textPreviewRef.value) {
-    await nextTick()
-    textPreviewRef.value.initEditor()
-  }
+const initMonacoEditor = async (isCurrent) => {
+  await nextTick()
+  if (!isCurrent()) return
+  textPreviewRef.value?.initEditor()
+  await nextTick()
 }
 
 const toggleWordWrap = () => {

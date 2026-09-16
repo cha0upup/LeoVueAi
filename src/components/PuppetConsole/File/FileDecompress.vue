@@ -52,7 +52,7 @@
               style="width: 100%"
             >
               <el-option
-                v-for="format in COMPRESS_FORMATS"
+                v-for="format in availableFormats"
                 :key="format.value"
                 :label="format.label"
                 :value="format.value"
@@ -98,8 +98,9 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, inject } from 'vue'
 
+import { FILE_CAPABILITIES_KEY, archiveFormat, stripArchiveExtension } from './fileCapabilities.js'
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { formatFilePath } from '@/utils/format.js'
@@ -152,36 +153,9 @@ const filePath = computed(() => {
   return joinPath(`${props.disk}${props.currentPath}`, props.file.name)
 })
 
-// 压缩格式选项
-const COMPRESS_FORMATS = [
-  { label: 'ZIP', value: 'zip' },
-  { label: 'TAR.GZ', value: 'tar.gz' },
-  { label: 'TAR', value: 'tar' },
-  { label: 'GZIP', value: 'gzip' }
-]
-
-// 压缩格式映射
-const FORMAT_MAP = {
-  '.tar.gz': 'tar.gz',
-  '.tgz': 'tar.gz',
-  '.tar': 'tar',
-  '.zip': 'zip',
-  '.gzip': 'gzip',
-  '.gz': 'gzip'
-}
-
-// 自动检测文件格式
-const detectFormat = (filename) => {
-  const lowerName = String(filename || '').toLowerCase()
-  const matched = Object.keys(FORMAT_MAP).find((ext) => lowerName.endsWith(ext))
-  return matched ? FORMAT_MAP[matched] : 'zip'
-}
-
-const stripArchiveExtension = (filename) => (
-  String(filename || 'archive')
-    .replace(/\.tar\.gz$/i, '')
-    .replace(/\.tgz$/i, '')
-    .replace(/\.(zip|tar|gzip|gz)$/i, '')
+const capabilities = inject(FILE_CAPABILITIES_KEY, { value: {} })
+const availableFormats = computed(() =>
+  (capabilities.value.extractionFormats || []).map((value) => ({ value, label: value.toUpperCase() }))
 )
 
 const normalizeDirectoryPath = (path) => {
@@ -195,9 +169,7 @@ const joinPath = (base, name) => {
   return formatFilePath(`${normalizedBase}${normalizedBase.endsWith('/') ? '' : '/'}${name}`)
 }
 
-const activeFormatLabel = computed(() => (
-  COMPRESS_FORMATS.find((format) => format.value === form.format)?.label || form.format.toUpperCase()
-))
+const activeFormatLabel = computed(() => form.format.toUpperCase())
 
 const summaryBadges = computed(() => [
   { label: activeFormatLabel.value, type: 'info' },
@@ -230,7 +202,7 @@ const handleClose = () => {
 }
 
 const resetForm = () => {
-  form.format = detectFormat(props.file.name)
+  form.format = archiveFormat(props.file.name) || 'zip'
   const baseDir = normalizeDirectoryPath(`${props.disk}${props.currentPath}`)
   form.targetPath = joinPath(baseDir, stripArchiveExtension(props.file.name))
   formRef.value?.clearValidate()

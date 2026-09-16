@@ -50,17 +50,13 @@ export const normalizeServerDownloadTask = (raw, fallbackSessionId = '') => {
   const expectedLength = Number(snapshot.expectedLength || 0)
   const downloadedBytes = Number(snapshot.downloadedBytes || 0)
   const mappedStatus = normalizeStatus(snapshot.state, STATUS_BY_ENGINE_STATE)
-  const hasCompletePayload =
-    Boolean(getDownloadRelativePath(snapshot.downloadPath)) &&
-    expectedLength > 0 &&
-    downloadedBytes >= expectedLength
 
   return {
     viewId: `server:${snapshot.taskId || ''}`,
     taskId: null,
     serverTaskId: snapshot.taskId || '',
     type: TaskType.DOWNLOAD,
-    status: hasCompletePayload ? TaskStatus.COMPLETED : mappedStatus,
+    status: mappedStatus,
     progress: expectedLength > 0 ? (downloadedBytes / expectedLength) * 100 : 0,
     fileSize: expectedLength,
     speed: Number(snapshot.speedBytesPerSec || 0),
@@ -156,12 +152,7 @@ const prepareLocalTask = (task, serverTaskId) => ({
   isManagedLocally: true
 })
 
-const mergeSnapshots = ({
-  localTasks,
-  serverTasks,
-  getLocalServerId,
-  preserveCompleted = false
-}) => {
+const mergeSnapshots = ({ localTasks, serverTasks, getLocalServerId }) => {
   const localByServerId = new Map(
     localTasks
       .map((task) => [getLocalServerId(task), task])
@@ -181,10 +172,7 @@ const mergeSnapshots = ({
       taskId: local.taskId,
       serverTaskId: serverTask.serverTaskId || getLocalServerId(localTask) || null,
       fileName: serverTask.fileName || local.fileName,
-      status:
-        preserveCompleted && local.status === TaskStatus.COMPLETED
-          ? TaskStatus.COMPLETED
-          : serverTask.status,
+      status: serverTask.status,
       isManagedLocally: true
     }
   })
@@ -223,8 +211,7 @@ export const buildTaskList = ({
     ...mergeSnapshots({
       localTasks: downloads,
       serverTasks: serverDownloadTasks,
-      getLocalServerId: (task) => task.engineTaskId,
-      preserveCompleted: true
+      getLocalServerId: (task) => task.engineTaskId
     }),
     ...mergeSnapshots({
       localTasks: sqlExports,
@@ -280,6 +267,12 @@ export const getTaskTypeIcon = (type, iconMap) =>
 
 export const getPrimaryTaskAction = (task, iconMap) => {
   if (!task) return null
+  if (
+    task.type === TaskType.UPLOAD &&
+    task.currentStage === 'COMMITTING' &&
+    task.status === TaskStatus.UPLOADING
+  )
+    return null
   if (
     task.status === TaskStatus.FAILED &&
     ((task.isManagedLocally && [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type)) ||
@@ -357,7 +350,12 @@ export const getPrimaryTaskAction = (task, iconMap) => {
 export const getSecondaryTaskActions = (task, iconMap) => {
   if (!task) return []
   const actions = []
+  const committing =
+    task.type === TaskType.UPLOAD &&
+    task.currentStage === 'COMMITTING' &&
+    task.status === TaskStatus.UPLOADING
   if (
+    !committing &&
     ACTIVE_TASK_STATUSES.includes(task.status) &&
     task.isManagedLocally &&
     task.canControl !== false
@@ -365,6 +363,7 @@ export const getSecondaryTaskActions = (task, iconMap) => {
     actions.push({ key: 'stop', label: '停止', icon: iconMap.circleClose, type: 'warning' })
   }
   if (
+    !committing &&
     [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type) &&
     task.serverTaskId &&
     !task.isManagedLocally &&

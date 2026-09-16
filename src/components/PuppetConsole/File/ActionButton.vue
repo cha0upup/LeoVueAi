@@ -16,16 +16,16 @@
       <el-dropdown-menu class="action-menu">
         <el-dropdown-item
           v-for="action in actions"
-          :key="action.label"
+          :key="action.key"
           class="dropdown-item"
           :class="{
             'danger-item': action.danger,
             'is-separated': action.separated
           }"
-          @click="handleAction(action)"
+          @click="emit(action.key, props.file)"
         >
           <span class="item-icon-shell">
-            <el-icon :class="action.iconClass">
+            <el-icon :class="`${action.key}-icon`">
               <Icon :icon="action.icon" />
             </el-icon>
           </span>
@@ -37,7 +37,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
+import { FILE_CAPABILITIES_KEY, archiveFormat, supportsFileAction } from './fileCapabilities.js'
 import { icons } from '@/utils/icons.js'
 
 // Props
@@ -56,114 +57,28 @@ const props = defineProps({
 const emit = defineEmits(['copy', 'move', 'compress', 'decompress', 'download', 'touch', 'delete', 'rename', 'chmod', 'copy-path'])
 
 const iconMap = icons
+const capabilities = inject(FILE_CAPABILITIES_KEY, { value: {} })
 
-// 压缩文件扩展名
-const COMPRESSED_EXTENSIONS = ['.zip', '.tar.gz', '.tgz', '.tar', '.gzip', '.gz']
+const actionItems = [
+  { key: 'copy', label: '复制', icon: iconMap.copy },
+  { key: 'move', label: '移动', icon: iconMap.move },
+  { key: 'compress', label: '压缩', icon: iconMap.files },
+  { key: 'decompress', label: '解压', icon: iconMap.files },
+  { key: 'download', label: '下载', icon: iconMap.download },
+  { key: 'rename', label: '重命名', icon: iconMap.rename, separated: true },
+  { key: 'chmod', label: '改权限', icon: iconMap.chmod },
+  { key: 'copy-path', label: '复制路径', icon: iconMap.copyPath, separated: true },
+  { key: 'touch', label: '改时间戳', icon: iconMap.clock },
+  { key: 'delete', label: '删除', icon: iconMap.delete, separated: true, danger: true }
+]
 
-// 判断是否为压缩文件
-const isCompressedFile = (filename) => {
-  const lowerName = String(filename || '').toLowerCase()
-  return COMPRESSED_EXTENSIONS.some((ext) => lowerName.endsWith(ext))
-}
-
-// 计算属性
-const actions = computed(() => {
-  const baseActions = [
-    {
-      label: '复制',
-      icon: iconMap.copy,
-      iconClass: 'copy-icon',
-      method: () => emit('copy', props.file),
-      danger: false
-    },
-    {
-      label: '移动',
-      icon: iconMap.move,
-      iconClass: 'move-icon',
-      method: () => emit('move', props.file),
-      danger: false
-    }
-  ]
-
-  // 压缩文件特有操作
-  if (isCompressedFile(props.file.name)) {
-    baseActions.push({
-      label: '解压',
-      icon: iconMap.files,
-      iconClass: 'decompress-icon',
-      method: () => emit('decompress', props.file),
-      danger: false
-    })
-  } else {
-    baseActions.push({
-      label: '压缩',
-      icon: iconMap.files,
-      iconClass: 'compress-icon',
-      method: () => emit('compress', props.file),
-      danger: false
-    })
-  }
-
-  // 文件类型特有操作
-  if (props.type !== 'dir') {
-    baseActions.push({
-      label: '下载',
-      icon: iconMap.download,
-      iconClass: 'download-icon',
-      method: () => emit('download', props.file),
-      danger: false
-    })
-  }
-
-  baseActions.push({
-    label: '重命名',
-    icon: iconMap.rename,
-    iconClass: 'rename-icon',
-    method: () => emit('rename', props.file),
-    separated: true,
-    danger: false
+const actions = computed(() =>
+  actionItems.filter(({ key }) => {
+    if (key === 'download' && props.type === 'dir') return false
+    if (key === 'compress' && archiveFormat(props.file.name)) return false
+    return supportsFileAction(capabilities.value, key, props.file)
   })
-
-  baseActions.push({
-    label: '改权限',
-    icon: iconMap.chmod,
-    iconClass: 'chmod-icon',
-    method: () => emit('chmod', props.file),
-    danger: false
-  })
-
-  baseActions.push({
-    label: '复制路径',
-    icon: iconMap.copyPath,
-    iconClass: 'copy-path-icon',
-    method: () => emit('copy-path', props.file),
-    separated: true,
-    danger: false
-  })
-
-  baseActions.push({
-    label: '改时间戳',
-    icon: iconMap.clock,
-    iconClass: 'touch-icon',
-    method: () => emit('touch', props.file),
-    danger: false
-  })
-
-  baseActions.push({
-    label: '删除',
-    icon: iconMap.delete,
-    iconClass: 'delete-icon',
-    method: () => emit('delete', props.file),
-    separated: true,
-    danger: true
-  })
-
-  return baseActions
-})
-
-const handleAction = (action) => {
-  action.method()
-}
+)
 </script>
 
 <style scoped>
