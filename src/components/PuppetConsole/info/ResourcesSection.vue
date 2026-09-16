@@ -1,5 +1,5 @@
 <template>
-  <section class="content-grid">
+  <section class="info-section">
     <article class="content-card">
       <div class="card-header">
         <div>
@@ -15,8 +15,8 @@
             物理内存
           </div>
           <el-progress
-            :percentage="memoryUsagePercentage"
-            :color="memoryColor"
+            :percentage="resources.memory"
+            :color="getUsageColor(resources.memory)"
             :stroke-width="10"
           />
           <div class="usage-meta">
@@ -29,8 +29,8 @@
             交换空间
           </div>
           <el-progress
-            :percentage="swapUsagePercentage"
-            :color="swapColor"
+            :percentage="resources.swap"
+            :color="getUsageColor(resources.swap)"
             :stroke-width="10"
           />
           <div class="usage-meta">
@@ -62,7 +62,7 @@
       </div>
       <div class="table-shell">
         <el-table
-          :data="sortedFileSystems"
+          :data="resources.disks"
           stripe
         >
           <el-table-column
@@ -111,7 +111,7 @@
               <div class="usage-inline">
                 <el-progress
                   :percentage="Math.round(row.UsagePercent || 0)"
-                  :color="getDiskUsageColor(row.UsagePercent)"
+                  :color="getUsageColor(row.UsagePercent)"
                   :stroke-width="6"
                   :show-text="false"
                 />
@@ -208,6 +208,13 @@
 
 <script setup>
 import { computed } from 'vue'
+import {
+  formatMBValue,
+  formatPercent,
+  getUsageColor,
+  getIPType,
+  getResourceUsage
+} from './infoModel.js'
 
 const props = defineProps({
   basicInfo: {
@@ -216,108 +223,17 @@ const props = defineProps({
   }
 })
 
-const formatMemory = (bytes) => {
-  if (!bytes || bytes === 0) return '0 MB'
-  const mb = bytes / 1024 / 1024
-  if (mb >= 1024) {
-    return `${(mb / 1024).toFixed(1)} GB`
-  }
-  return `${Math.round(mb)} MB`
-}
-
-const formatMBValue = (value) => formatMemory((value || 0) * 1024 * 1024)
-
-const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`
-
-const getUsageColor = (usage) => {
-  if (usage > 90) return '#cf4e57'
-  if (usage > 75) return '#c27a1f'
-  return '#3f9a57'
-}
-
-const getDiskUsageColor = (usage) => getUsageColor(usage || 0)
-
-const getIPType = (ip) => {
-  if (ip.startsWith('127.') || ip === '::1') return 'info'
-  if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.'))
-    return 'primary'
-  return 'success'
-}
-
-const memoryUsagePercentage = computed(() => {
-  const total = props.basicInfo.HardwareInfo?.TotalPhysicalMemoryMB
-  const free = props.basicInfo.HardwareInfo?.FreePhysicalMemoryMB
-  if (!total || free === undefined) return 0
-  return Math.round(((total - free) / total) * 100)
-})
-
-const swapUsagePercentage = computed(() => {
-  const total = props.basicInfo.HardwareInfo?.TotalSwapSpaceMB
-  const free = props.basicInfo.HardwareInfo?.FreeSwapSpaceMB
-  if (!total || free === undefined) return 0
-  return Math.round(((total - free) / total) * 100)
-})
-
-const memoryColor = computed(() => getUsageColor(memoryUsagePercentage.value))
-const swapColor = computed(() => getUsageColor(swapUsagePercentage.value))
-
-const sortedFileSystems = computed(() =>
-  [...(props.basicInfo.FileSystemInfo || [])].sort(
-    (a, b) => (b.UsagePercent || 0) - (a.UsagePercent || 0)
-  )
-)
+const resources = computed(() => getResourceUsage(props.basicInfo))
 
 const hardwareFacts = computed(() => [
   { label: 'CPU 核心数', value: props.basicInfo.HardwareInfo?.AvailableProcessors || '-' },
-  { label: '系统负载', value: props.basicInfo.HardwareInfo?.SystemLoadAverage || '-' },
-  { label: '内存使用率', value: formatPercent(memoryUsagePercentage.value) },
-  { label: '交换空间使用率', value: formatPercent(swapUsagePercentage.value) }
+  { label: '系统负载', value: props.basicInfo.HardwareInfo?.SystemLoadAverage ?? '-' },
+  { label: '内存使用率', value: formatPercent(resources.value.memory) },
+  { label: '交换空间使用率', value: formatPercent(resources.value.swap) }
 ])
 </script>
 
 <style scoped>
-.content-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.content-card {
-  padding: 16px;
-  min-width: 0;
-  border: 1px solid var(--info-border);
-  border-radius: var(--radius-container);
-  background: var(--info-surface);
-  box-shadow: none;
-}
-
-.card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.card-header h3 {
-  margin: 2px 0 0;
-  font-size: 16px;
-  line-height: 1.3;
-  color: var(--el-text-color-primary);
-}
-
-.section-eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--el-color-primary);
-}
-
-.content-card-wide {
-  grid-column: 1 / -1;
-}
-
 .usage-stack {
   display: flex;
   flex-direction: column;
@@ -326,73 +242,15 @@ const hardwareFacts = computed(() => [
 }
 
 .usage-panel {
-  padding: 12px 13px;
   border-radius: 0;
   border: 0;
   border-bottom: 1px solid var(--info-border);
   background: transparent;
 }
 
-.usage-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--el-text-color-secondary);
-  text-transform: uppercase;
-  margin-bottom: 8px;
-}
-
-.usage-meta {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.usage-meta > span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.kv-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
 .kv-item {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 6px;
-  padding: 12px 13px;
   border-radius: 14px;
   border: 1px solid var(--info-border);
-  background: var(--info-surface-soft);
-}
-
-.kv-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--el-text-color-secondary);
-  text-transform: uppercase;
-}
-
-.kv-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.table-shell {
-  border: 1px solid var(--info-border);
-  border-radius: 14px;
-  overflow: hidden;
   background: var(--info-surface-soft);
 }
 
@@ -407,17 +265,8 @@ const hardwareFacts = computed(() => [
 }
 
 .mono-text {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 12px;
   word-break: break-word;
   overflow-wrap: anywhere;
-}
-
-.ip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
 }
 
 .ip-list :deep(.el-tag) {
@@ -432,51 +281,5 @@ const hardwareFacts = computed(() => [
   white-space: normal;
   word-break: break-all;
   overflow-wrap: anywhere;
-}
-
-.text-muted {
-  color: var(--el-text-color-placeholder);
-}
-
-.table-shell :deep(.el-table) {
-  --el-table-border-color: transparent;
-  --el-table-header-bg-color: var(--info-surface);
-  --el-table-row-hover-bg-color: color-mix(in srgb, var(--el-color-primary) 5%, var(--info-surface-soft));
-}
-
-.table-shell :deep(.el-table),
-.table-shell :deep(.el-table__inner-wrapper),
-.table-shell :deep(.el-table tr),
-.table-shell :deep(.el-table td),
-.table-shell :deep(.el-table th) {
-  background: transparent;
-}
-
-.table-shell :deep(.el-table__inner-wrapper::before) {
-  background: transparent;
-}
-
-.table-shell :deep(.el-table td),
-.table-shell :deep(.el-table th) {
-  padding-top: 7px;
-  padding-bottom: 7px;
-}
-
-.table-shell :deep(.cell) {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 980px) {
-  .content-grid,
-  .kv-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .usage-meta {
-    flex-direction: column;
-  }
 }
 </style>

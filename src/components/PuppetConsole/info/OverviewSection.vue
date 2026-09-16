@@ -1,5 +1,5 @@
 <template>
-  <section class="content-grid">
+  <section class="info-section">
     <div class="metric-grid content-card-wide">
       <article
         v-for="metric in headlineMetrics"
@@ -72,7 +72,7 @@
           </div>
           <el-progress
             :percentage="Math.round(disk.UsagePercent || 0)"
-            :color="getDiskUsageColor(disk.UsagePercent)"
+            :color="getUsageColor(disk.UsagePercent)"
             :stroke-width="8"
             :show-text="false"
           />
@@ -102,10 +102,10 @@
           <div class="network-card-top">
             <strong>{{ net.DisplayName || net.Name || '-' }}</strong>
             <el-tag
-              :type="net.IsUp ? 'success' : 'info'"
+              type="success"
               round
             >
-              {{ net.IsUp ? '在线' : '离线' }}
+              在线
             </el-tag>
           </div>
           <div class="network-card-meta mono-text">
@@ -139,6 +139,14 @@
 
 <script setup>
 import { computed } from 'vue'
+import {
+  formatMBValue,
+  formatPercent,
+  getUsageColor,
+  getIPType,
+  getResourceUsage,
+  getUsageType
+} from './infoModel.js'
 import { icons } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 
@@ -151,62 +159,8 @@ const props = defineProps({
   }
 })
 
-const getUsageColor = (usage) => {
-  if (usage > 90) return '#cf4e57'
-  if (usage > 75) return '#c27a1f'
-  return '#3f9a57'
-}
-
-const getUsageType = (usage) => {
-  if (usage > 90) return 'danger'
-  if (usage > 75) return 'warning'
-  return 'success'
-}
-
-const formatMemory = (bytes) => {
-  if (!bytes || bytes === 0) return '0 MB'
-  const mb = bytes / 1024 / 1024
-  if (mb >= 1024) {
-    return `${(mb / 1024).toFixed(1)} GB`
-  }
-  return `${Math.round(mb)} MB`
-}
-
-const formatMBValue = (value) => formatMemory((value || 0) * 1024 * 1024)
-
-const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`
-
-const getIPType = (ip) => {
-  if (ip.startsWith('127.') || ip === '::1') return 'info'
-  if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.'))
-    return 'primary'
-  return 'success'
-}
-
-const getDiskUsageColor = (usage) => getUsageColor(usage || 0)
-
-const memoryUsagePercentage = computed(() => {
-  const total = props.basicInfo.HardwareInfo?.TotalPhysicalMemoryMB
-  const free = props.basicInfo.HardwareInfo?.FreePhysicalMemoryMB
-  if (!total || free === undefined) return 0
-  return Math.round(((total - free) / total) * 100)
-})
-
-const swapUsagePercentage = computed(() => {
-  const total = props.basicInfo.HardwareInfo?.TotalSwapSpaceMB
-  const free = props.basicInfo.HardwareInfo?.FreeSwapSpaceMB
-  if (!total || free === undefined) return 0
-  return Math.round(((total - free) / total) * 100)
-})
-
-const sortedFileSystems = computed(() =>
-  [...(props.basicInfo.FileSystemInfo || [])].sort(
-    (a, b) => (b.UsagePercent || 0) - (a.UsagePercent || 0)
-  )
-)
-
-const topFileSystems = computed(() => sortedFileSystems.value.slice(0, 3))
-
+const resources = computed(() => getResourceUsage(props.basicInfo))
+const topFileSystems = computed(() => resources.value.disks.slice(0, 3))
 const activeNetworkInterfaces = computed(() =>
   (props.basicInfo.NetworkInfo || []).filter((item) => item.IsUp)
 )
@@ -214,13 +168,13 @@ const activeNetworkInterfaces = computed(() =>
 const headlineMetrics = computed(() => [
   {
     label: '物理内存',
-    value: formatPercent(memoryUsagePercentage.value),
+    value: formatPercent(resources.value.memory),
     helper: `${formatMBValue(props.basicInfo.HardwareInfo?.FreePhysicalMemoryMB)} 可用`,
     icon: iconMap.cpu
   },
   {
     label: '交换空间',
-    value: formatPercent(swapUsagePercentage.value),
+    value: formatPercent(resources.value.swap),
     helper: `${formatMBValue(props.basicInfo.HardwareInfo?.FreeSwapSpaceMB)} 可用`,
     icon: iconMap.hardDrive
   },
@@ -247,109 +201,42 @@ const runtimeFacts = computed(() => [
   { label: '运行时间', value: props.basicInfo.ProcessInfo?.Uptime || '-' },
   {
     label: props.basicInfo.PhpRuntimeInfo?.PHPVersion ? 'PHP' : 'JVM',
-    value: props.basicInfo.PhpRuntimeInfo?.PHPVersion || props.basicInfo.JavaRuntimeInfo?.JVMName || '未发现'
+    value:
+      props.basicInfo.PhpRuntimeInfo?.PHPVersion ||
+      props.basicInfo.JavaRuntimeInfo?.JVMName ||
+      '未发现'
   },
   {
     label: props.basicInfo.PhpRuntimeInfo?.PHPVersion ? 'SAPI' : '线程数',
-    value: props.basicInfo.PhpRuntimeInfo?.SAPI || props.basicInfo.JavaRuntimeInfo?.ThreadCount || '-'
+    value:
+      props.basicInfo.PhpRuntimeInfo?.SAPI || props.basicInfo.JavaRuntimeInfo?.ThreadCount || '-'
   }
 ])
-
 </script>
 
 <style scoped>
-.content-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.content-card,
 .metric-card {
   border: 1px solid var(--info-border);
   border-radius: var(--radius-container);
   background: var(--info-surface);
   box-shadow: none;
-}
-
-.content-card {
-  padding: 16px;
-  min-width: 0;
-}
-
-.card-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
-}
-
-.card-header h3 {
-  margin: 2px 0 0;
-  font-size: 16px;
-  line-height: 1.3;
-  color: var(--el-text-color-primary);
-}
-
-.section-eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--el-color-primary);
-}
-
-.kv-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  padding: 14px;
 }
 
 .kv-item {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 6px;
-  padding: 12px 13px;
   border-radius: 0;
   border: 0;
   border-bottom: 1px solid var(--info-border);
   background: transparent;
 }
 
-.kv-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--el-text-color-secondary);
-  text-transform: uppercase;
-}
-
-.kv-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.kv-value.mono {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 12px;
-}
-
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-}
-
-.metric-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
 }
 
 .metric-icon-shell {
@@ -395,10 +282,6 @@ const runtimeFacts = computed(() => [
   overflow-wrap: anywhere;
 }
 
-.content-card-wide {
-  grid-column: 1 / -1;
-}
-
 .storage-list {
   display: flex;
   flex-direction: column;
@@ -437,22 +320,23 @@ const runtimeFacts = computed(() => [
   flex-shrink: 0;
 }
 
-.storage-top span,
+.storage-top span {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
 .storage-meta {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .storage-meta > span {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.storage-meta {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
 }
 
 .network-card-list {
@@ -482,36 +366,26 @@ const runtimeFacts = computed(() => [
 .network-card-top strong {
   display: block;
   color: var(--el-text-color-primary);
-}
-
-.network-card-top > :first-child,
-.network-card-meta {
-  min-width: 0;
-}
-
-.network-card-top strong,
-.network-card-meta {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.network-card-top > :first-child {
+  min-width: 0;
+}
+
 .network-card-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 
-.mono-text {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 12px;
-}
-
 .ip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
   margin-top: 10px;
-  min-width: 0;
 }
 
 .network-card .ip-list :deep(.el-tag) {
@@ -536,25 +410,16 @@ const runtimeFacts = computed(() => [
   color: var(--el-text-color-regular);
 }
 
-.text-muted {
-  color: var(--el-text-color-placeholder);
-}
-
 @media (max-width: 1200px) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 980px) {
-  .content-grid,
-  .kv-grid {
+@media (max-width: 640px) {
+  .metric-grid {
     grid-template-columns: 1fr;
   }
-}
-
-@media (max-width: 640px) {
-  .metric-grid,
   .network-card-list {
     grid-template-columns: 1fr;
   }

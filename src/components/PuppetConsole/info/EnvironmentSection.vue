@@ -1,5 +1,5 @@
 <template>
-  <section class="content-grid">
+  <section class="info-section">
     <article class="content-card">
       <div class="card-header">
         <div>
@@ -16,10 +16,7 @@
           class="kv-item"
         >
           <span class="kv-label">{{ item.label }}</span>
-          <span
-            class="kv-value"
-            :class="{ mono: item.mono }"
-          >{{ item.value }}</span>
+          <span class="kv-value">{{ item.value }}</span>
         </div>
       </div>
     </article>
@@ -115,14 +112,9 @@ const props = defineProps({
 
 const envExpanded = ref(false)
 
-
-const mapEntries = (source) =>
-  Object.entries(source || {}).map(([key, value]) => ({
-    key,
-    value
-  }))
-
-const envVars = computed(() => mapEntries(props.basicInfo.EnvironmentInfo))
+const envVars = computed(() =>
+  Object.entries(props.basicInfo.EnvironmentInfo || {}).map(([key, value]) => ({ key, value }))
+)
 const visibleEnvVars = computed(() =>
   envExpanded.value ? envVars.value : envVars.value.slice(0, ENV_PREVIEW_LIMIT)
 )
@@ -146,146 +138,15 @@ const userFacts = computed(() => [
 </script>
 
 <style scoped>
-.content-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.content-card {
-  padding: 16px;
-  min-width: 0;
-  border: 1px solid var(--info-border);
-  border-radius: var(--radius-container);
-  background: var(--info-surface);
-  box-shadow: none;
-}
-
-.card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.card-header h3 {
-  margin: 2px 0 0;
-  font-size: 16px;
-  line-height: 1.3;
-  color: var(--el-text-color-primary);
-}
-
-.section-eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--el-color-primary);
-}
-
-.content-card-wide {
-  grid-column: 1 / -1;
-}
-
-.kv-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
 .kv-item {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 6px;
-  padding: 12px 13px;
   border-radius: 0;
   border: 0;
   border-bottom: 1px solid var(--info-border);
   background: transparent;
 }
 
-.kv-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--el-text-color-secondary);
-  text-transform: uppercase;
-}
-
-.kv-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.kv-value.mono {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 12px;
-}
-
-.table-shell {
-  border: 1px solid var(--info-border);
-  border-radius: 14px;
-  overflow: hidden;
-  background: var(--info-surface-soft);
-}
-
-.mono-text {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 12px;
-}
-
-.truncate-text {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.table-shell :deep(.el-table) {
-  --el-table-border-color: transparent;
-  --el-table-header-bg-color: var(--info-surface);
-  --el-table-row-hover-bg-color: color-mix(in srgb, var(--el-color-primary) 5%, var(--info-surface-soft));
-}
-
-.table-shell :deep(.el-table),
-.table-shell :deep(.el-table__inner-wrapper),
-.table-shell :deep(.el-table tr),
-.table-shell :deep(.el-table td),
-.table-shell :deep(.el-table th) {
-  background: transparent;
-}
-
-.table-shell :deep(.el-table__inner-wrapper::before) {
-  background: transparent;
-}
-
-.table-shell :deep(.el-table td),
-.table-shell :deep(.el-table th) {
-  padding-top: 7px;
-  padding-bottom: 7px;
-}
-
-.table-shell :deep(.cell) {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 980px) {
-  .content-grid,
-  .kv-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 640px) {
-  .content-card,
-  .content-card-wide {
+  .content-card {
     padding-left: 12px;
     padding-right: 12px;
   }
