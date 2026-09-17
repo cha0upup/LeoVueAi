@@ -35,6 +35,7 @@ export const createEmptyFingerprintForm = () => ({
   infoRemark: '',
   vulnerabilityList: [],
   requestList: [createEmptyRequest()],
+  versionExtractText: '',
   matchText: JSON.stringify(DEFAULT_MATCH, null, 2)
 })
 
@@ -55,10 +56,12 @@ export const normalizeRequests = (requests, ensureOne = true) => {
         : []
     return {
       method: String(request?.method || 'GET').toUpperCase(),
-      path: String(request?.path ?? '/').trim() || '/',
+      path: String(request?.uri || request?.path || '/').trim() || '/',
       timeout: toTimeout(request?.timeout),
       headers,
-      body: String(request?.body ?? '')
+      body: String(request?.body ?? ''),
+      ...(request?.charset ? { charset: request.charset } : {}),
+      ...(request?.maxBodyBytes != null ? { maxBodyBytes: request.maxBodyBytes } : {})
     }
   })
 }
@@ -90,6 +93,7 @@ export const loadFingerprintForm = (fingerprint) => {
     infoRemark: String(fingerprint.info?.remark || ''),
     vulnerabilityList: vulnerabilities,
     requestList: normalizeRequests(fingerprint.rule?.requests),
+    versionExtractText: fingerprint.rule?.version ? JSON.stringify(fingerprint.rule.version, null, 2) : '',
     matchText: JSON.stringify(fingerprint.rule?.match || DEFAULT_MATCH, null, 2)
   }
 }
@@ -143,6 +147,8 @@ const buildVulnerabilities = (vulnerabilities) =>
 export const buildFingerprintPayload = (form) => {
   const requests = normalizeRequests(form?.requestList, false).map((request) => {
     const result = { method: request.method, path: request.path, timeout: request.timeout }
+    if (request.charset) result.charset = request.charset
+    if (request.maxBodyBytes != null) result.maxBodyBytes = request.maxBodyBytes
     const headers = buildHeaders(request.headers)
     if (Object.keys(headers).length) result.headers = headers
     if (!['GET', 'HEAD'].includes(request.method) && request.body.trim()) {
@@ -161,6 +167,13 @@ export const buildFingerprintPayload = (form) => {
     name: String(form?.name || '').trim(),
     info,
     rule: { requests, match: JSON.parse(String(form?.matchText || '').trim()) }
+  }
+  if (String(form?.versionExtractText || '').trim()) {
+    const version = JSON.parse(form.versionExtractText)
+    if (!version || typeof version !== 'object' || Array.isArray(version)) {
+      throw new Error('版本提取配置必须是 JSON 对象')
+    }
+    payload.rule.version = version
   }
   const tags = parseFingerprintTags(form?.tagsStr)
   if (tags.length) payload.tags = tags

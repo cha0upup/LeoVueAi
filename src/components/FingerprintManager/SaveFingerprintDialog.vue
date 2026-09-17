@@ -64,7 +64,7 @@
             />
           </el-form-item>
           <el-form-item
-            label="版本"
+            label="规则适用版本"
             prop="version"
             required
           >
@@ -74,7 +74,7 @@
               clearable
             />
             <div class="form-tip">
-              与名称一起决定指纹ID（name_version），同名同版本会覆盖原文件
+              与名称一起决定指纹ID（name_version）。实际组件版本由下方“版本提取”配置识别。
             </div>
           </el-form-item>
           <el-form-item
@@ -134,7 +134,7 @@
             v-model="formData.requestList"
           />
           <div class="form-tip">
-            按顺序执行，至少保留一条请求
+            请求编号从 0 开始；至少保留一条请求，匹配时等待全部响应
           </div>
         </el-form-item>
         <el-form-item
@@ -145,7 +145,7 @@
           <el-input
             v-model="formData.matchText"
             type="textarea"
-            placeholder='声明式 JSON，例如 {"field":"body","operator":"contains","value":"nginx"}'
+            placeholder="声明式 JSON，例如 {&quot;field&quot;:&quot;body&quot;,&quot;operator&quot;:&quot;contains&quot;,&quot;value&quot;:&quot;nginx&quot;}"
             :rows="6"
             clearable
           />
@@ -153,8 +153,34 @@
             支持 all、any、not 组合；字段可用 status、body、headers、raw
           </div>
         </el-form-item>
+        <el-form-item label="版本提取">
+          <el-input
+            v-model="formData.versionExtractText"
+            type="textarea"
+            :rows="3"
+            placeholder="可选，例如 {&quot;request&quot;:0,&quot;field&quot;:&quot;headers&quot;,&quot;prefix&quot;:&quot;nginx/&quot;}"
+          />
+          <div class="form-tip">
+            从 body 或 headers 的文本前缀后提取版本，可指定 suffix 后缀。留空则仅识别组件。
+          </div>
+        </el-form-item>
+        <el-button @click="openDebug">
+          调试当前草稿
+        </el-button>
       </section>
     </el-form>
+    <el-dialog
+      v-model="debugVisible"
+      title="指纹规则调试"
+      width="min(900px, calc(100vw - 48px))"
+      append-to-body
+      destroy-on-close
+    >
+      <FingerprintDebugPanel
+        v-if="debugVisible"
+        :fingerprint="debugDraft"
+      />
+    </el-dialog>
 
     <template #footer>
       <div class="dialog-footer">
@@ -187,6 +213,7 @@ import { icons } from '@/utils/icons.js'
 import { showWarning } from '@/utils/messageUtils.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import FingerprintRequestEditor from './FingerprintRequestEditor.vue'
+import FingerprintDebugPanel from './FingerprintDebugPanel.vue'
 import FingerprintVulnerabilityEditor from './FingerprintVulnerabilityEditor.vue'
 import {
   buildFingerprintPayload,
@@ -206,6 +233,16 @@ const visible = useDialogVisible(props, emit)
 const iconMap = icons
 const formRef = ref(null)
 const formData = ref(createEmptyFingerprintForm())
+const debugVisible = ref(false)
+const debugDraft = ref(null)
+function openDebug() {
+  try {
+    debugDraft.value = buildFingerprintPayload(formData.value)
+    debugVisible.value = true
+  } catch (error) {
+    showWarning(error?.message || '请检查规则 JSON 格式')
+  }
+}
 const submitLocked = ref(false)
 const isEdit = computed(() => Boolean(props.fingerprint))
 const saving = computed(() => props.loading || submitLocked.value)
@@ -269,7 +306,7 @@ const handleSubmit = async () => {
     submitLocked.value = true
     emit('submit', payload)
   } catch {
-    showWarning('命中条件 JSON 格式无效')
+    showWarning('命中条件或版本提取 JSON 格式无效')
   }
 }
 </script>

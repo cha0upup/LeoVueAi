@@ -39,6 +39,11 @@
             v-model="formData.portPolicy"
             @validity-change="portPolicyValid = $event"
           />
+          <FingerprintRuleSelector
+            v-if="identifiesComponents"
+            v-model="formData.fingerprint"
+            @validity-change="fingerprintValid = $event"
+          />
           <details class="advanced-settings">
             <summary>高级设置 <span>名称、并发与超时</span></summary>
             <div class="name-field">
@@ -100,6 +105,15 @@
           <div v-if="formData.stages.includes('SERVICE_PROBE')">
             <span>服务请求</span><strong>{{ Number(previewData.serviceProbeCount || 0).toLocaleString('zh-CN') }}</strong>
           </div>
+          <div v-if="identifiesComponents">
+            <span>指纹规则</span><strong>{{ previewData.fingerprintRuleCount || 0 }}</strong>
+          </div>
+          <div v-if="identifiesComponents">
+            <span>每应用请求</span><strong>{{ previewData.fingerprintRequestsPerApplication || 0 }}</strong>
+          </div>
+          <div v-if="identifiesComponents">
+            <span>组件请求上界</span><strong>{{ Number(previewData.fingerprintProbeUpperBound || 0).toLocaleString('zh-CN') }}</strong>
+          </div>
           <div><span>预计结果</span><strong>{{ previewData.estimatedSize || '—' }}</strong></div>
         </div>
         <p
@@ -134,7 +148,7 @@
         <el-button
           type="primary"
           :loading="previewing || starting"
-          :disabled="!formData.targets.length || !formData.stages.length || (scansPorts && !portPolicyValid) || previewing || starting"
+          :disabled="!formData.targets.length || !formData.stages.length || (scansPorts && !portPolicyValid) || (identifiesComponents && !fingerprintValid) || previewing || starting"
           @click="previewData ? handleStart() : handlePreview()"
         >
           <el-icon v-if="!previewing && !starting">
@@ -152,7 +166,8 @@ import { CaretRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import TargetInput from './TargetInput.vue'
 import PortPolicySelector from './PortPolicySelector.vue'
-import { SCAN_STAGES, toggleScanStage } from './scanStages.js'
+import FingerprintRuleSelector from './FingerprintRuleSelector.vue'
+import { SCAN_STAGES, DEFAULT_SCAN_STAGES, toggleScanStage } from './scanStages.js'
 import { previewNetworkProbeWorkflowApi, startNetworkProbeWorkflowApi } from '@/services/api.js'
 
 const props = defineProps({
@@ -169,7 +184,8 @@ const formRef = ref(null)
 const formData = reactive({
   name: '',
   targets: [],
-  stages: SCAN_STAGES.map(stage => stage.name),
+  stages: [...DEFAULT_SCAN_STAGES],
+  fingerprint: { ids: [], tags: [] },
   portPolicy: {
     preset: 'QUICK',
     customPorts: [],
@@ -180,11 +196,14 @@ const formData = reactive({
 })
 
 const portPolicyValid = ref(true)
+const fingerprintValid = ref(false)
+const identifiesComponents = computed(() => formData.stages.includes('FINGERPRINT'))
 const scansPorts = computed(() => formData.stages.includes('PORT_SCAN'))
 const stageHint = computed(() => {
   if (!formData.stages.length) return '请至少选择一个扫描阶段。'
   if (!scansPorts.value) return '仅探活：使用常用 TCP 端口；输入主机:端口可指定探活端口。'
   const scope = formData.stages.includes('REACHABILITY') ? '先探活，仅扫描存活主机。' : '跳过探活，直接扫描所有输入目标。'
+  if (identifiesComponents.value) return scope + '读取所选指纹规则，识别 HTTP/HTTPS 应用组件。'
   return scope + (formData.stages.includes('SERVICE_PROBE') ? '识别开放端口上的服务。' : '仅检查端口开放状态。')
 })
 function changeStage(name, enabled) {
@@ -215,7 +234,9 @@ watch(
     formData.portPolicy,
     portPolicyValid.value,
     formData.concurrency,
-    formData.connectTimeout
+    formData.connectTimeout,
+    formData.fingerprint,
+    fingerprintValid.value
   ],
   () => {
     previewSequence += 1
@@ -239,7 +260,7 @@ async function handlePreview() {
     })
     if (disposed || sequence !== previewSequence) return
     const payload = response.data || {}
-    const plannedStages = payload.preview?.stages || SCAN_STAGES.map(stage => stage.name)
+    const plannedStages = payload.preview?.stages || DEFAULT_SCAN_STAGES
     if (payload.preview && plannedStages.join(',') !== formData.stages.join(',')) {
       ElMessage.warning('服务端尚未支持当前阶段配置，请更新服务端后重试')
       return
@@ -280,6 +301,10 @@ function handleCancel() {
 }
 
 function validateTargets() {
+  if (identifiesComponents.value && !fingerprintValid.value) {
+    ElMessage.warning('请选择有效的指纹规则')
+    return false
+  }
   if (scansPorts.value && !portPolicyValid.value) {
     ElMessage.warning('请修正端口配置')
     return false
@@ -306,6 +331,9 @@ function buildScanConfig() {
       ranges: [],
       include: formData.portPolicy.preset === 'CUSTOM' ? formData.portPolicy.customPorts || [] : [],
       exclude: formData.portPolicy.excludePorts || []
+    } : undefined,
+    fingerprint: identifiesComponents.value ? {
+      ids: [...formData.fingerprint.ids], tags: [...formData.fingerprint.tags]
     } : undefined,
     execution: {
       workers: formData.concurrency,

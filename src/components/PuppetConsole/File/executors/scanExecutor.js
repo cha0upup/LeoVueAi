@@ -149,6 +149,7 @@ export function applyScanExecutor(TaskEngine) {
     task.openCount = Number(snapshot.openCount ?? task.openCount ?? 0)
     task.serviceCount = Number(snapshot.serviceCount ?? task.serviceCount ?? 0)
     task.fingerprintCount = Number(snapshot.fingerprintCount ?? task.fingerprintCount ?? 0)
+    task.identifiedApplicationCount = Number(snapshot.identifiedApplicationCount ?? task.identifiedApplicationCount ?? 0)
     task.errorCount = Number(snapshot.errorCount ?? task.errorCount ?? 0)
     task.hitCount = Number(snapshot.hitCount ?? task.hitCount ?? 0)
     task.missCount = Number(snapshot.missCount ?? task.missCount ?? 0)

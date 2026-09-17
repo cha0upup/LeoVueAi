@@ -33,6 +33,12 @@
           刷新
         </el-button>
         <el-button
+          :disabled="!selectedRows.length || selectedRows.length > 256 || selectedRows.some(row => !['http', 'https'].includes(row.service))"
+          @click="emit('fingerprint-scan', { sourceTaskId: taskId, endpoints: [...selectedRows] })"
+        >
+          补扫组件{{ selectedRows.length ? ` (${selectedRows.length})` : '' }}
+        </el-button>
+        <el-button
           :icon="Download"
           :disabled="!tableData.length || loading || Boolean(loadError)"
           @click="handleExport"
@@ -152,6 +158,30 @@
         >
           <template #default="{ row }">
             <span :class="{ 'muted': !row.service }">{{ row.service || '未识别' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="组件"
+          min-width="170"
+        >
+          <template #default="{ row }">
+            <div
+              v-if="row.fingerprint?.components?.length"
+              class="component-tags"
+            >
+              <el-tag
+                v-for="name in componentNames(row)"
+                :key="name"
+                size="small"
+                @click="detailRow = row"
+              >
+                {{ name }}
+              </el-tag>
+            </div>
+            <span
+              v-else
+              class="muted"
+            >{{ fingerprintLabel(row.fingerprint) }}</span>
           </template>
         </el-table-column>
         <el-table-column
@@ -276,7 +306,17 @@
           </div>
           <span class="filter-hint">最大值 300000 表示不限</span>
         </el-form-item>
+        <el-form-item label="组件名称">
+          <el-input
+            v-model="filterDraft.component"
+            placeholder="例如 spring-boot-actuator"
+            clearable
+          />
+        </el-form-item>
         <el-form-item label="结果条件">
+          <el-checkbox v-model="filterDraft.hasFingerprint">
+            仅显示已识别组件
+          </el-checkbox>
           <el-checkbox v-model="filterDraft.hasService">
             仅显示已识别服务
           </el-checkbox>
@@ -303,7 +343,7 @@
     <el-drawer
       :model-value="Boolean(detailRow)"
       title="资产详情"
-      size="min(520px, 100vw)"
+      size="min(760px, 100vw)"
       append-to-body
       @close="detailRow = null"
     >
@@ -330,6 +370,12 @@
             <dt>{{ column.label }}</dt><dd>{{ column.key(detailRow) === '' ? '—' : column.key(detailRow) }}</dd>
           </template>
         </dl>
+        <FingerprintResults
+          :session-id="sessionId"
+          :task-id="taskId"
+          :endpoint-id="detailRow.endpointId"
+          :refresh-token="refreshToken"
+        />
       </template>
     </el-drawer>
   </section>
@@ -340,6 +386,7 @@ import { ref, reactive, computed, nextTick, onUnmounted, watch } from 'vue'
 import { Search, Filter, Download, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { queryNetworkProbeWorkflowResultsApi } from '@/services/api.js'
+import FingerprintResults from './FingerprintResults.vue'
 import { exportTsv } from '@/utils/exportUtils.js'
 
 const props = defineProps({
@@ -356,6 +403,8 @@ const props = defineProps({
     default: 0
   }
 })
+
+const emit = defineEmits(['fingerprint-scan'])
 
 // 状态
 const loading = ref(false)
@@ -382,7 +431,9 @@ const defaultFilters = () => ({
   portMax: null,
   responseTimeRange: [0, 300000],
   hasService: false,
-  hasTitle: false
+  hasTitle: false,
+  hasFingerprint: false,
+  component: ''
 })
 
 const filters = reactive(defaultFilters())
@@ -401,6 +452,8 @@ const activeFilterTags = computed(() => {
   if (filters.portMax) tags.portMax = `端口≤${filters.portMax}`
   if (filters.hasService) tags.hasService = '已识别服务'
   if (filters.hasTitle) tags.hasTitle = '有页面标题'
+  if (filters.hasFingerprint) tags.hasFingerprint = '已识别组件'
+  if (filters.component) tags.component = `组件: ${filters.component}`
   const [min, max] = filters.responseTimeRange
   if (min > 0 || max < 300000) tags.responseTimeRange = `响应: ${min}–${max >= 300000 ? '不限' : max + ' ms'}`
   return tags
@@ -435,6 +488,8 @@ async function loadData({ silent = false } = {}) {
         portMax: filters.portMax,
         hasService: filters.hasService,
         hasTitle: filters.hasTitle,
+        hasFingerprint: filters.hasFingerprint,
+        component: filters.component.trim(),
         responseTimeMin: filters.responseTimeRange[0],
         responseTimeMax:
           filters.responseTimeRange[1] >= 300000 ? null : filters.responseTimeRange[1]
@@ -562,6 +617,7 @@ const endpointColumns = [
   { label: '协议', key: (row) => row.protocol || '' },
   { label: '状态', key: (row) => row.state || '' },
   { label: '服务', key: (row) => row.service || '' },
+  { label: '组件', key: (row) => componentNames(row).join(', ') },
   { label: 'Banner', key: (row) => row.banner || '' },
   { label: 'HTTP 状态码', key: (row) => row.statusCode ?? '' },
   { label: '响应大小(bytes)', key: (row) => row.responseSize ?? '' },
@@ -569,6 +625,19 @@ const endpointColumns = [
   { label: '响应时间(ms)', key: (row) => row.responseTime ?? '' },
   { label: '发现时间', key: (row) => row.discoveredAt || '' }
 ]
+
+function componentNames(row) {
+  return [...new Set((row.fingerprint?.components || []).map(component => [component.ruleName || component.ruleId, component.detectedVersion].filter(Boolean).join(' ')))]
+}
+function fingerprintLabel(fingerprint) {
+  if (!fingerprint?.status) return '—'
+  if (fingerprint.status === 'RUNNING') return '识别中'
+  if (fingerprint.status === 'CANCELLED') return '已停止（部分结果）'
+  if (fingerprint.status === 'INTERRUPTED') return '识别中断'
+  if (fingerprint.errorCount) return '存在失败，请查看详情'
+  if (fingerprint.inconclusiveCount) return '证据不足'
+  return '未命中'
+}
 
 function getStateLabel(state) {
   const normalized = String(state || '').toUpperCase()
@@ -623,6 +692,7 @@ watch(() => props.refreshToken, refreshResults)
 </script>
 
 <style scoped lang="scss">
+.component-tags { display: flex; flex-wrap: wrap; gap: 4px; cursor: pointer; }
 .asset-result-table { container: results / inline-size; min-width: 0; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; background: var(--el-bg-color); color: var(--el-text-color-primary); }
 .result-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; }
 .result-heading, .result-actions, .active-filters, .detail-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }

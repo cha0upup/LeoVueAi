@@ -163,6 +163,12 @@
         </div>
       </section>
 
+      <p
+        v-if="fingerprintStats?.networkRequestCount != null"
+        class="stage-output-empty"
+      >
+        规则请求 {{ fingerprintStats.logicalRequestCount }} 次 · 合并后 {{ fingerprintStats.networkRequestCount }} 次 · 节省 {{ fingerprintStats.savedRequestCount }} 次
+      </p>
       <section
         v-if="hasReachability"
         class="hosts-strip"
@@ -194,14 +200,15 @@
         v-else
         class="stage-output-empty"
       >
-        未执行主机探活，直接扫描输入目标。
+        {{ stageDefinitions.length === 1 && stageDefinitions[0].name === 'FINGERPRINT' ? '对选定应用执行组件识别。' : '未执行主机探活，直接扫描输入目标。' }}
       </p>
 
       <AssetResultTable
-        v-if="stageDefinitions.some(stage => stage.name === 'PORT_SCAN')"
+        v-if="stageDefinitions.some(stage => ['PORT_SCAN', 'FINGERPRINT'].includes(stage.name))"
         :task-id="activeBackendTaskId"
         :session-id="sessionId"
         :refresh-token="resultRefreshToken"
+        @fingerprint-scan="supplementalSelection = $event"
       />
     </main>
 
@@ -240,7 +247,7 @@
         <DataAnalysis />
       </div>
       <h2>开始发现网络资产</h2>
-      <p>添加目标，按需执行主机探活、端口扫描和服务识别。开始前可预览扫描范围。</p>
+      <p>添加目标，按需执行主机探活、端口扫描、服务识别和组件识别。开始前可预览扫描范围。</p>
       <el-button
         type="primary"
         :icon="Plus"
@@ -250,6 +257,20 @@
       </el-button>
     </section>
 
+    <el-dialog
+      :model-value="Boolean(supplementalSelection)"
+      title="补扫组件"
+      width="min(640px, calc(100vw - 32px))"
+      destroy-on-close
+      @update:model-value="value => { if (!value) supplementalSelection = null }"
+    >
+      <FingerprintScanComposer
+        v-if="supplementalSelection"
+        :session-id="sessionId"
+        :selection="supplementalSelection"
+        @scan-started="handleScanStarted"
+      />
+    </el-dialog>
     <el-dialog
       v-model="showComposer"
       title="新建扫描"
@@ -281,6 +302,7 @@ import {
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AssetResultTable from './AssetResultTable.vue'
 import ScanComposer from './ScanComposer.vue'
+import FingerprintScanComposer from './FingerprintScanComposer.vue'
 import { selectScanStages } from './scanStages.js'
 import { taskEngine } from '../File/TaskEngine.js'
 import { TaskStatus } from '@/constants/task.js'
@@ -288,6 +310,7 @@ import { useAssetDiscoveryTasks } from './useAssetDiscoveryTasks.js'
 
 const props = defineProps({ sessionId: { type: String, required: true } })
 const showComposer = ref(false)
+const supplementalSelection = ref(null)
 const controlPending = ref(false)
 const {
   tasks,
@@ -308,12 +331,15 @@ watch(
   () => props.sessionId,
   () => {
     showComposer.value = false
+    supplementalSelection.value = null
   }
 )
 const stageDefinitions = computed(() => {
   const stages = activeTask.value?.stages
   return selectScanStages(stages?.length ? stages.map(stage => stage.name) : undefined)
 })
+
+const fingerprintStats = computed(() => activeTask.value?.stages?.find(stage => stage.name === 'FINGERPRINT'))
 
 const hasReachability = computed(() => stageDefinitions.value.some(stage => stage.name === 'REACHABILITY'))
 
@@ -415,6 +441,7 @@ function handleScanStarted(task) {
     progress: 0
   })
   selectedTaskId.value = taskId
+  supplementalSelection.value = null
   showComposer.value = false
   refreshTaskList()
   void syncTasks({ discover: false })
@@ -505,6 +532,8 @@ function getMetrics(task) {
     serviceCount: Number(
       task?.serviceCount ?? (Array.isArray(task?.serviceResults) ? task.serviceResults.length : 0)
     ),
+    fingerprintCount: Number(task?.fingerprintCount || 0),
+    identifiedApplicationCount: Number(task?.identifiedApplicationCount || 0),
     errorCount: Number(
       task?.errorCount ?? (Array.isArray(task?.errors) ? task.errors.length : task?.error ? 1 : 0)
     )
@@ -565,11 +594,16 @@ function stageClass(name) {
 function stageStatusText(name) {
   const stage = stageSnapshot(name)
   if (stage) {
+    if (stage.reason === 'NO_HTTP_APPLICATIONS') return '无 HTTP 应用，已跳过'
     if (stage.reason === 'DISABLED' || stage.status === 'SKIPPED') return '已跳过'
     if (name === 'REACHABILITY' && activeTask.value?.reachableHostList)
       return `${formatCount(getMetrics(activeTask.value).reachableHostCount)} 台存活`
     if (name === 'PORT_SCAN' && getMetrics(activeTask.value).openCount)
       return `${formatCount(getMetrics(activeTask.value).openCount)} 个开放端口`
+    if (name === 'FINGERPRINT') {
+      const counts = getMetrics(activeTask.value)
+      return `${formatCount(counts.identifiedApplicationCount)} 个应用 · ${formatCount(counts.fingerprintCount)} 个组件命中 · ${Number(stage.completed || 0)}/${Number(stage.total || 0)}`
+    }
     if (name === 'SERVICE_PROBE' && getMetrics(activeTask.value).serviceCount)
       return `${formatCount(getMetrics(activeTask.value).serviceCount)} 个服务`
     return getStatusText(stage.status, stage.outcome)

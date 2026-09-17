@@ -9,6 +9,31 @@ import {
 } from './saveFingerprintModel.js'
 
 describe('saveFingerprintModel', () => {
+  it('round-trips version extraction and response limits independently from rule metadata', () => {
+    const rule = {
+      requests: [{ path: '/', charset: 'GBK', maxBodyBytes: 4096 }],
+      match: { field: 'body', value: 'marker' },
+      version: { request: 0, field: 'headers', prefix: 'nginx/' }
+    }
+    const form = loadFingerprintForm({ name: 'Nginx', info: { version: 'any' }, rule })
+    const payload = buildFingerprintPayload(form)
+    expect(payload.info.version).toBe('any')
+    expect(payload.rule.version).toEqual(rule.version)
+    expect(payload.rule.requests[0]).toMatchObject(rule.requests[0])
+    form.versionExtractText = ''
+    expect(buildFingerprintPayload(form).rule).not.toHaveProperty('version')
+    form.versionExtractText = '[]'
+    expect(() => buildFingerprintPayload(form)).toThrow('版本提取配置必须是 JSON 对象')
+  })
+
+  it('preserves a built-in uri when editing and saving the rule', () => {
+    const form = loadFingerprintForm({ name: 'Actuator', rule: {
+      requests: [{ uri: '/actuator', headers: { Accept: 'application/json' } }],
+      match: { field: 'body', value: '_links' }
+    } })
+    expect(buildFingerprintPayload(form).rule.requests[0].path).toBe('/actuator')
+  })
+
   it('normalizes HTTP requests', () => {
     expect(normalizeRequests([{ body: 'PING', timeout: -1 }])).toEqual([
       { method: 'GET', path: '/', timeout: 0, headers: [], body: 'PING' }

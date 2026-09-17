@@ -191,12 +191,24 @@
         :can-manage="isAdmin"
         :detail-loading="detailLoading"
         :export-loading="detailExportLoading"
+        @debug="openDebug"
         @edit="selectedFingerprint && openEditDialog(selectedFingerprint)"
         @export="selectedFingerprint && handleDetailExport(selectedFingerprint)"
         @delete="selectedFingerprint && handleDelete(selectedFingerprint)"
       />
     </template>
 
+    <el-dialog
+      v-model="debugVisible"
+      title="指纹规则调试"
+      width="min(900px, calc(100vw - 48px))"
+      destroy-on-close
+    >
+      <FingerprintDebugPanel
+        v-if="debugVisible"
+        :fingerprint="debugDraft"
+      />
+    </el-dialog>
     <SaveFingerprintDialog
       v-model="showSaveDialog"
       :fingerprint="currentEditDetail"
@@ -227,6 +239,7 @@ import {
   exportFingerprintsBatchApi
 } from '@/services/api.js'
 import FingerprintDetail from './FingerprintDetail.vue'
+import FingerprintDebugPanel from './FingerprintDebugPanel.vue'
 import SaveFingerprintDialog from './SaveFingerprintDialog.vue'
 import ImportFingerprintDialog from './ImportFingerprintDialog.vue'
 import ManagerLayout from '@/components/common/ManagerLayout.vue'
@@ -241,6 +254,13 @@ const { isAdmin } = useAuth()
 const fingerprints = ref([])
 const selectedFingerprint = ref(null)
 const detailData = ref(null)
+const debugVisible = ref(false)
+const debugDraft = ref(null)
+function openDebug() {
+  if (!detailData.value) return
+  debugDraft.value = JSON.parse(JSON.stringify(detailData.value))
+  debugVisible.value = true
+}
 const searchKeyword = ref('')
 const listLoading = ref(false)
 const detailLoading = ref(false)

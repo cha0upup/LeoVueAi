@@ -35,3 +35,19 @@ export function listNetworkProbeWorkflowTasksApi(params) {
 export function queryNetworkProbeWorkflowResultsApi(params) {
   return http.post('/puppet-node/network-probe/workflow/results/query', params)
 }
+
+export function queryNetworkFingerprintMatchesApi(params) {
+  return http.post('/puppet-node/network-probe/workflow/fingerprints/query', params)
+}
+
+export function queryNetworkFingerprintEvidenceApi(params) {
+  return http.post('/puppet-node/network-probe/workflow/fingerprints/evidence', params)
+}
+
+export function startNetworkFingerprintScanApi(params) {
+  return http.post('/puppet-node/network-probe/workflow/fingerprints/start', params)
+}
+
+export function debugNetworkFingerprintApi(params) {
+  return http.post('/puppet-node/network-probe/workflow/fingerprints/debug', params)
+}

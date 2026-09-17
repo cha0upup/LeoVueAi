@@ -44,6 +44,9 @@
         </div>
 
         <div class="detail-actions">
+          <el-button @click="$emit('debug')">
+            调试
+          </el-button>
           <el-button
             :loading="exportLoading"
             @click="$emit('export')"
@@ -315,6 +318,15 @@
         </div>
         <pre class="script-block">{{ formattedMatch }}</pre>
       </div>
+      <div
+        v-if="detail.rule?.version"
+        class="script-panel panel"
+      >
+        <div class="panel-header">
+          版本提取
+        </div>
+        <pre class="script-block">{{ JSON.stringify(detail.rule.version, null, 2) }}</pre>
+      </div>
     </div>
 
     <div
@@ -336,7 +348,7 @@ import { computed } from 'vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { icons } from '@/utils/icons.js'
 
-const emit = defineEmits(['edit', 'export', 'delete'])
+const emit = defineEmits(['edit', 'export', 'delete', 'debug'])
 
 const props = defineProps({
   detail: {
