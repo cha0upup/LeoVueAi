@@ -1,26 +1,24 @@
 <template>
   <section class="preview-panel">
     <div class="preview-heading">
-      <div>
-        <span class="panel-kicker">
-          <Icon :icon="iconMap.codeFile" />
-          Build Artifact · 构建产物
+      <div class="preview-title-row">
+        <h2>生成结果</h2>
+        <span
+          v-if="outputResult"
+          class="artifact-state"
+          :class="{ stale: isResultStale }"
+        >
+          {{ isResultStale ? '待重新生成' : '已生成' }}
         </span>
-        <div class="preview-title-row">
-          <strong>{{ outputResult ? '产物已生成' : '等待构建' }}</strong>
-          <span :class="['artifact-state', { stale: isResultStale, ready: outputResult && !isResultStale }]">
-            {{ isResultStale ? '配置已变更' : (outputResult ? 'Ready' : 'Draft') }}
-          </span>
-        </div>
       </div>
       <div class="result-actions">
         <el-dropdown
           v-if="classArtifacts.length"
           trigger="click"
-          :disabled="isResultStale"
+          :disabled="isResultStale || isGenerating"
           @command="emit('download-class-artifact', $event)"
         >
-          <el-button :disabled="isResultStale">
+          <el-button :disabled="isResultStale || isGenerating">
             <el-icon><Icon :icon="iconMap.download" /></el-icon>
             Class 产物 {{ classArtifacts.length }}
             <el-icon class="el-icon--right">
@@ -43,7 +41,8 @@
           </template>
         </el-dropdown>
         <el-button
-          :disabled="!outputResult || isResultStale"
+          v-if="outputResult"
+          :disabled="isResultStale || isGenerating"
           :loading="isSavingArtifact"
           @click="emit('save-artifact')"
         >
@@ -58,72 +57,68 @@
           <span class="gen-btn-wrap">
             <el-button
               :disabled="!isFormValid"
+              :loading="isGenerating"
               type="primary"
               class="gen-button"
               @click="emit('generate')"
             >
-              <el-icon><Icon :icon="iconMap.codeGenerator" /></el-icon>
-              生成脚本
+              <el-icon v-if="!isGenerating"><Icon :icon="iconMap.codeGenerator" /></el-icon>
+              {{ isGenerating ? '正在生成' : isResultStale ? '重新生成' : '生成脚本' }}
             </el-button>
           </span>
         </el-tooltip>
       </div>
     </div>
 
-    <section
-      class="config-context"
-      aria-label="生成配置"
-    >
-      <button
-        type="button"
-        class="summary-copy-btn"
-        title="复制配置"
-        aria-label="复制配置"
-        @click="emit('copy-summary')"
-      >
-        <Icon :icon="iconMap.copy" />
-      </button>
-      <div class="manifest-heading">
-        <strong>Build Manifest</strong>
-        <small>当前配置与生成元数据</small>
-      </div>
-      <div class="manifest-grid">
-        <div
-          v-for="item in mergedContextItems"
-          :key="item.label"
-          class="manifest-item"
-        >
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
+    <details class="config-context">
+      <summary>
+        <span class="summary-label">当前配置</span>
+        <strong :title="buildOverview">{{ buildOverview }}</strong>
+        <span class="summary-toggle">详情 <Icon :icon="iconMap.arrowDown" /></span>
+      </summary>
+      <div class="context-details">
+        <div class="manifest-heading">
+          <strong>{{ outputResult && !isResultStale ? '生成详情' : '配置详情' }}</strong>
+          <button
+            type="button"
+            class="summary-copy-btn"
+            @click="emit('copy-summary')"
+          >
+            <Icon :icon="iconMap.copy" />复制当前配置
+          </button>
         </div>
+        <dl class="manifest-grid">
+          <template
+            v-for="item in contextItems"
+            :key="item.label"
+          >
+            <dt>{{ item.label }}</dt>
+            <dd>{{ item.value }}</dd>
+          </template>
+        </dl>
       </div>
-    </section>
+    </details>
 
     <div
       v-if="isResultStale"
       class="stale-banner"
+      role="status"
     >
       <Icon
         :icon="iconMap.warning"
         class="stale-icon"
       />
-      配置已变更，当前结果可能已过期
-      <button
-        type="button"
-        class="stale-regen-btn"
-        @click="emit('generate')"
-      >
-        重新生成
-      </button>
+      配置已变更，请重新生成。下方保留上次结果供查看。
     </div>
 
     <div class="editor-shell">
       <button
+        v-if="outputResult"
         type="button"
         class="code-copy-btn"
         title="复制代码"
         aria-label="复制代码"
-        :disabled="!outputResult"
+        :disabled="isResultStale || isGenerating"
         @click="emit('copy')"
       >
         <CopyDocument />
@@ -136,11 +131,12 @@
         v-if="!outputResult"
         class="result-empty"
       >
-        <div class="empty-icon">
-          <Icon :icon="iconMap.codeGenerator" />
-        </div>
-        <h3>等待生成脚本</h3>
-        <p>完成左侧必填配置后，生成结果会显示在这里。</p>
+        <Icon
+          class="empty-icon"
+          :icon="isGenerating ? iconMap.loading : iconMap.codeGenerator"
+          :class="{ 'u-spin': isGenerating }"
+        />
+        <p>{{ isGenerating ? '正在生成，请稍候…' : '完成配置后，点击「生成脚本」。' }}</p>
       </div>
     </div>
 
@@ -166,6 +162,8 @@ const monacoContainer = ref(null)
 
 const props = defineProps({
   outputResult:      { type: String,  default: '' },
+  buildOverview:     { type: String,  default: '' },
+  isGenerating:      { type: Boolean, default: false },
   isFormValid:       { type: Boolean, default: false },
   isResultStale:     { type: Boolean, default: false },
   isSavingArtifact:  { type: Boolean, default: false },
@@ -195,7 +193,8 @@ const resultStats = computed(() => {
 
 // ── 配置摘要 ──────────────────────────────────────────────────────────────────
 
-const mergedContextItems = computed(() => {
+const contextItems = computed(() => {
+  if (!props.outputResult || props.isResultStale) return props.configSummary
   const seen = new Set()
   return [...props.resultMeta, ...props.configSummary]
     .filter(item => {
@@ -238,22 +237,10 @@ onBeforeUnmount(() => {
   background: var(--app-container-background);
 }
 
-.panel-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
-  color: var(--el-text-color-placeholder);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-}
-
-.preview-title-row { display: flex; align-items: center; gap: 8px; }
-.preview-title-row strong { color: var(--sg-ink); font-size: 14px; }
-.artifact-state { padding: 2px 6px; border-radius: 999px; background: var(--sg-panel-soft); color: var(--sg-muted); font-size: 8px; font-weight: 700; }
-.artifact-state.ready { background: var(--sg-green-soft); color: var(--sg-green); }
-.artifact-state.stale { background: color-mix(in srgb, var(--el-color-warning) 12%, var(--sg-panel-strong)); color: var(--el-color-warning); }
+.preview-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 30px; }
+.preview-title-row h2 { margin: 0; color: var(--sg-ink); font-size: 14px; }
+.artifact-state { color: var(--sg-green); font-size: 11px; }
+.artifact-state.stale { color: var(--el-color-warning); }
 
 .result-actions {
   display: flex;
@@ -293,29 +280,13 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: color-mix(in srgb, var(--sg-panel-soft) 86%, transparent);
+  padding: 20px;
+  background: var(--el-bg-color);
   text-align: center;
   pointer-events: none;
 }
 
-.empty-icon {
-  width: 48px;
-  height: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  color: var(--sg-blue);
-  background: var(--sg-blue-soft);
-  font-size: 24px;
-}
-
-.result-empty h3 {
-  margin: 0;
-  color: var(--sg-ink);
-  font-size: 16px;
-  font-weight: 700;
-}
+.empty-icon { color: var(--el-text-color-placeholder); font-size: 28px; }
 
 .result-empty p {
   margin: 0;
@@ -327,47 +298,36 @@ onBeforeUnmount(() => {
 
 /* ── 配置摘要 ── */
 .config-context {
-  position: relative;
-  flex: 0 0 auto;
-  margin: 10px 14px 8px;
-  padding: 9px 38px 9px 10px;
-  border: 1px solid var(--sg-border);
-  border-radius: 10px;
-  background: var(--sg-panel-soft);
+  flex: 0 1 auto;
+  min-height: 42px;
+  max-height: 280px;
+  overflow: auto;
+  margin: 0 14px;
+  border-bottom: 1px solid var(--app-divider-color);
 }
 
-.summary-copy-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
+.config-context summary {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid var(--sg-border);
-  border-radius: var(--radius-control);
-  background: var(--sg-panel-strong);
-  color: var(--sg-blue);
+  gap: 10px;
+  padding: 11px 0;
+  list-style: none;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 900;
 }
 
-.summary-copy-btn:hover {
-  border-color: color-mix(in srgb, var(--sg-blue) 36%, transparent);
-  background: var(--sg-blue-soft);
-}
-
-.manifest-heading { display: flex; align-items: baseline; gap: 7px; margin-bottom: 7px; }
-.manifest-heading strong { color: var(--sg-ink); font-size: 10px; }
-.manifest-heading small { color: var(--sg-muted); font-size: 8px; }
-.manifest-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
-.manifest-item { min-width: 0; padding: 5px 7px; border-radius: 6px; background: var(--sg-panel-strong); }
-.manifest-item span, .manifest-item strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.manifest-item span { margin-bottom: 2px; color: var(--sg-muted); font-size: 8px; }
-.manifest-item strong { color: var(--sg-ink); font-size: 9px; font-weight: 600; }
+.config-context summary::-webkit-details-marker { display: none; }
+.summary-label { flex-shrink: 0; color: var(--sg-muted); font-size: 11px; }
+.config-context summary > strong { min-width: 0; overflow: hidden; color: var(--sg-ink); font-size: 12px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.summary-toggle { display: inline-flex; align-items: center; flex-shrink: 0; gap: 4px; margin-left: auto; color: var(--sg-blue); font-size: 11px; }
+.config-context[open] .summary-toggle svg { transform: rotate(180deg); }
+.context-details { padding: 0 0 12px; }
+.manifest-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.manifest-heading strong { color: var(--sg-muted); font-size: 11px; font-weight: 500; }
+.summary-copy-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 0; border: 0; background: transparent; color: var(--sg-blue); cursor: pointer; font-size: 11px; }
+.summary-copy-btn:focus-visible, .config-context summary:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
+.manifest-grid { display: grid; grid-template-columns: minmax(85px, 28%) minmax(0, 1fr); gap: 7px 12px; margin: 0; font-size: 12px; line-height: 1.5; }
+.manifest-grid dt { color: var(--sg-muted); overflow-wrap: anywhere; }
+.manifest-grid dd { margin: 0; color: var(--sg-ink); overflow-wrap: anywhere; }
 
 /* ── 过期提示 ── */
 .stale-banner {
@@ -389,30 +349,12 @@ onBeforeUnmount(() => {
   color: var(--el-color-warning);
 }
 
-.stale-regen-btn {
-  margin-left: auto;
-  padding: 2px 10px;
-  border-radius: 5px;
-  border: 1px solid color-mix(in srgb, var(--el-color-warning) 50%, transparent);
-  background: color-mix(in srgb, var(--el-color-warning) 14%, transparent);
-  color: color-mix(in srgb, var(--el-color-warning) 90%, var(--el-text-color-primary));
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.stale-regen-btn:hover {
-  background: color-mix(in srgb, var(--el-color-warning) 22%, transparent);
-  border-color: color-mix(in srgb, var(--el-color-warning) 70%, transparent);
-}
-
 /* ── Monaco 编辑器壳 ── */
 .editor-shell {
   position: relative;
   flex: 1;
-  min-height: 360px;
-  margin: 0 14px 12px;
+  min-height: 180px;
+  margin: 10px 14px 12px;
   display: block;
   overflow: hidden;
   border-radius: var(--radius-container);
@@ -465,7 +407,7 @@ onBeforeUnmount(() => {
 .stats-sep { opacity: 0.5; }
 
 @media (max-width: 1220px) {
-  .preview-panel { min-height: 760px; }
+  .preview-panel { min-height: 480px; }
 }
 
 @media (max-width: 760px) {
@@ -477,8 +419,6 @@ onBeforeUnmount(() => {
   }
 
   .result-actions { justify-content: flex-start; }
-
-  .manifest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .editor-shell,
   .config-context {

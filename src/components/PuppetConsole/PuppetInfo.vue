@@ -43,22 +43,23 @@
               <span>{{ basicInfo.UserInfo?.UserName || '未知用户' }}</span>
               <span class="meta-divider" />
               <span>PID {{ basicInfo.ProcessInfo?.ProcessId || '-' }}</span>
-              <span
-                v-if="lastUpdatedAt"
-                class="refresh-time"
-              >{{ cacheMode ? '快照时间' : '采集时间' }} {{ lastUpdatedAt }}</span>
             </div>
           </div>
         </div>
 
         <div class="toolbar-actions">
-          <div class="view-switcher">
+          <div
+            class="view-switcher"
+            role="group"
+            aria-label="基础信息视图"
+          >
             <button
               v-for="option in viewOptions"
               :key="option.key"
               type="button"
               class="view-button"
               :class="{ active: activeView === option.key }"
+              :aria-pressed="activeView === option.key"
               @click="activeView = option.key"
             >
               <el-icon>
@@ -67,8 +68,11 @@
               {{ option.label }}
             </button>
           </div>
+          <span
+            v-if="lastUpdatedAt"
+            class="refresh-time"
+          >{{ cacheMode ? '快照时间' : '采集时间' }} {{ lastUpdatedAt }}</span>
           <el-button
-            type="primary"
             size="small"
             :loading="loading"
             @click="fetchBasicInfo"
@@ -82,7 +86,7 @@
       </div>
 
       <div
-        v-if="loading"
+        v-if="loading && !hasInfo"
         class="state-container"
       >
         <el-skeleton
@@ -92,7 +96,7 @@
       </div>
 
       <div
-        v-else-if="error"
+        v-else-if="error && !hasInfo"
         class="state-container"
       >
         <el-result
@@ -122,10 +126,27 @@
       <div
         v-else
         class="info-content"
+        :class="{ 'is-overview': activeView === 'overview' }"
       >
+        <div
+          v-if="error"
+          class="refresh-error"
+          role="alert"
+        >
+          <span>刷新失败，当前保留上次快照：{{ error }}</span>
+          <el-button
+            text
+            type="primary"
+            :loading="loading"
+            @click="fetchBasicInfo"
+          >
+            重试
+          </el-button>
+        </div>
         <OverviewSection
           v-if="activeView === 'overview'"
           :basic-info="basicInfo"
+          @navigate="activeView = $event"
         />
         <RuntimeSection
           v-else-if="activeView === 'runtime'"
@@ -167,8 +188,8 @@ const lastUpdatedAt = computed(() => {
   return timestamp ? formatDate(timestamp) : ''
 })
 const connectionStatus = computed(() => {
-  if (loading.value) return { status: 'waiting', label: cacheMode.value ? '读取缓存' : '连接中' }
-  if (error.value) return { status: 'failed', label: cacheMode.value ? '缓存读取失败' : '连接失败' }
+  if (loading.value) return { status: 'waiting', label: hasInfo.value ? '刷新中' : cacheMode.value ? '读取缓存' : '连接中' }
+  if (error.value) return { status: 'failed', label: hasInfo.value ? '刷新失败' : cacheMode.value ? '缓存读取失败' : '连接失败' }
   if (cacheMode.value) return { status: 'offline', label: '缓存快照' }
   return hasInfo.value
     ? { status: 'online', label: '已连接' }
@@ -200,196 +221,42 @@ watch(
 </script>
 
 <style scoped>
-.info-page {
-  height: 100%;
-  min-height: 0;
-}
-
+.info-page { container: basic-info / inline-size; height: 100%; min-height: 0; }
 .info-panel {
-  --info-surface: color-mix(in srgb, var(--app-card-background) 94%, var(--el-bg-color-overlay));
-  --info-surface-soft: color-mix(
-    in srgb,
-    var(--app-control-background-soft) 88%,
-    var(--el-bg-color-overlay)
-  );
-  --info-border: color-mix(in srgb, var(--el-border-color) 34%, transparent);
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  border-radius: 0;
-  background: var(--app-container-background);
-  overflow: hidden;
+  --info-surface: var(--el-bg-color);
+  --info-surface-soft: var(--el-fill-color-light);
+  --info-border: var(--el-border-color-lighter);
+  height: 100%; min-height: 0; display: flex; flex-direction: column;
+  color: var(--el-text-color-primary); background: var(--app-container-background); overflow: hidden;
 }
-
-:global(html:not(.dark) .info-panel),
-:global(html[data-theme='light'] .info-panel) {
-  --info-surface: var(--app-surface-background);
-  --info-surface-soft: #f5f5f4;
-  --info-border: color-mix(in srgb, var(--el-border-color) 78%, transparent);
+.info-toolbar { flex-shrink: 0; display: grid; gap: 12px; padding: 14px 16px 12px; border-bottom: 1px solid var(--info-border); }
+.toolbar-primary, .identity-shell { min-width: 0; }
+.identity-title-row, .identity-meta, .toolbar-actions, .view-switcher { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.identity-title { margin: 0; font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }
+.identity-meta { margin-top: 5px; font-size: 12px; color: var(--el-text-color-secondary); }
+.identity-meta > span { min-width: 0; overflow-wrap: anywhere; }
+.meta-divider { width: 3px; height: 3px; border-radius: 50%; background: var(--el-text-color-placeholder); }
+.toolbar-actions { gap: 8px 12px; }
+.view-switcher { gap: 4px; }
+.view-button { display: inline-flex; align-items: center; gap: 5px; padding: 0 10px; min-height: 30px; border: 0; border-radius: var(--radius-control); color: var(--el-text-color-regular); background: transparent; font-size: 12px; cursor: pointer; }
+.view-button:hover { background: var(--el-fill-color-light); }
+.view-button.active { color: var(--el-color-primary); background: var(--app-brand-background); font-weight: 600; }
+.view-button:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 2px; }
+.refresh-time { margin-left: auto; color: var(--el-text-color-secondary); font-size: 11px; }
+.toolbar-actions > :deep(.el-button) { margin-left: auto; }
+.refresh-time + :deep(.el-button) { margin-left: 0; }
+.state-container { padding: 18px; overflow: auto; }
+.info-content { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 16px; }
+.info-content.is-overview { display: flex; flex-direction: column; }
+.refresh-error { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 8px 12px; border-radius: var(--radius-control); background: var(--el-color-danger-light-9); color: var(--el-color-danger); font-size: 12px; overflow-wrap: anywhere; }
+@container basic-info (max-width: 700px) {
+  .refresh-time { order: 3; flex-basis: 100%; margin-left: 0; }
+  .refresh-time + :deep(.el-button) { margin-left: auto; }
 }
-
-.info-toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--info-border);
-  background: var(--app-container-background);
-}
-
-.toolbar-primary,
-.toolbar-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.toolbar-primary {
-  flex: 1;
-  min-width: 0;
-}
-
-.toolbar-actions {
-  flex-shrink: 0;
-  align-items: flex-end;
-}
-
-.identity-shell {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-.identity-title-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.identity-title {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.1;
-  letter-spacing: -0.03em;
-  color: var(--el-text-color-primary);
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.identity-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: var(--el-text-color-regular);
-  font-size: 12px;
-}
-
-.identity-meta > span:not(.meta-divider) {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.meta-divider {
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--el-text-color-secondary) 42%, transparent);
-}
-
-.refresh-time {
-  margin-left: 6px;
-  color: var(--el-color-primary);
-  font-weight: 600;
-}
-
-.view-switcher {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border-radius: var(--radius-control);
-  background: var(--info-surface-soft);
-  border: 1px solid var(--info-border);
-}
-
-.view-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  min-height: 28px;
-  border-radius: var(--radius-tag);
-  padding: 0 12px;
-  background: transparent;
-  color: var(--el-text-color-regular);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.view-button:hover {
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 8%, white);
-}
-
-.view-button.active {
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 12%, white);
-  box-shadow: none;
-}
-
-.view-button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--el-color-primary) 36%, transparent);
-  outline-offset: 2px;
-}
-
-.state-container {
-  padding: 18px;
-}
-
-.info-content {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 14px 16px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  background: var(--app-container-background);
-}
-
-@media (max-width: 980px) {
-  .info-toolbar {
-    flex-direction: column;
-  }
-  .toolbar-actions {
-    width: 100%;
-    align-items: stretch;
-  }
-  .view-switcher {
-    width: 100%;
-    overflow-x: auto;
-  }
-}
-
-@media (max-width: 640px) {
-  .info-content,
-  .info-toolbar {
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-  .identity-title {
-    font-size: 18px;
-  }
+@container basic-info (max-width: 440px) {
+  .info-content, .info-toolbar { padding-left: 12px; padding-right: 12px; }
+  .view-button { padding: 0 7px; }
+  .view-button .el-icon { display: none; }
 }
 </style>
 <style src="./info/infoSections.css"></style>

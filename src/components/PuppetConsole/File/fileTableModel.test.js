@@ -7,7 +7,6 @@ import {
   normalizeFileEntries,
   resolveCurrentFileDirectory,
   resolveFileEntryPath,
-  resolveFileExtensionTagType,
   settleWithConcurrency,
   sortFileEntries,
   summarizeFileEntries
@@ -19,7 +18,7 @@ describe('fileTableModel', () => {
       { path: '/z.txt', isFile: 1, size: '3' },
       { name: '目录', isDirectory: 1 }
     ])
-    expect(sortFileEntries(entries).map(file => file.name)).toEqual(['目录', '/z.txt'])
+    expect(sortFileEntries(entries).map((file) => file.name)).toEqual(['目录', '/z.txt'])
     expect(summarizeFileEntries(entries)).toEqual({ total: 2, directories: 1, files: 1 })
     expect(getFilePreviewMeta(entries[0])).toEqual({ name: '/z.txt', size: 3, extension: '' })
     expect(getFileEntryKey(entries[1])).toBe('dir:目录')
@@ -37,16 +36,17 @@ describe('fileTableModel', () => {
   it('resolves paths and presentation metadata across platforms', () => {
     expect(resolveCurrentFileDirectory('/', 'var/log')).toBe('/var/log')
     expect(resolveCurrentFileDirectory('C:', 'Temp')).toBe('C:/Temp')
-    expect(resolveFileEntryPath({ name: 'app.log' }, { absolutePath: '/var/log' })).toBe('/var/log/app.log')
+    expect(resolveFileEntryPath({ name: 'app.log' }, { absolutePath: '/var/log' })).toBe(
+      '/var/log/app.log'
+    )
     expect(resolveFileEntryPath({ path: 'C:\\Temp\\a.txt' })).toBe('C:/Temp/a.txt')
-    expect(resolveFileExtensionTagType('ZIP')).toBe('warning')
     expect(formatFileModifiedDate('bad')).toBe('-')
   })
 
   it('settles work with bounded concurrency and preserves item order', async () => {
     let active = 0
     let maxActive = 0
-    const worker = vi.fn(async value => {
+    const worker = vi.fn(async (value) => {
       active += 1
       maxActive = Math.max(maxActive, active)
       await Promise.resolve()
@@ -56,7 +56,7 @@ describe('fileTableModel', () => {
     })
     const results = await settleWithConcurrency([1, 2, 3], 2, worker)
     expect(maxActive).toBe(2)
-    expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected', 'fulfilled'])
+    expect(results.map((result) => result.status)).toEqual(['fulfilled', 'rejected', 'fulfilled'])
     expect(results[2].value).toBe(6)
   })
 })

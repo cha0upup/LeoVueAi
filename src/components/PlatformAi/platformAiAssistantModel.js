@@ -6,12 +6,6 @@ import {
   createToolNode,
   createUserInputNode
 } from '@/composables/aiTurnModel.js'
-import { normalizeAiStatus } from '@/utils/aiRuntime.js'
-
-export const getPlatformThreadStatus = (thread, conversationStatus = {}) => {
-  const local = conversationStatus?.[thread?.threadId]
-  return normalizeAiStatus(local?.status || thread?.runStatus || 'idle')
-}
 
 export const findLatestAssistantPlan = messages =>
   [...(Array.isArray(messages) ? messages : [])]

@@ -1,11 +1,27 @@
 <template>
   <section class="strategy-grid">
     <article class="info-panel">
-      <div class="panel-title">
-        流量伪装策略
+      <div class="strategy-heading">
+        <div class="panel-title">
+          流量伪装策略
+        </div>
+        <span class="strategy-summary">{{ enabledCount ? `已启用 ${enabledCount} 项` : '未启用' }}</span>
+        <button
+          v-if="enabledCount < 4"
+          type="button"
+          class="strategy-toggle"
+          :aria-expanded="showDisabled"
+          @click="showDisabled = !showDisabled"
+        >
+          {{ showDisabled ? '收起未启用项' : `查看未启用项（${4 - enabledCount}）` }}
+        </button>
       </div>
-      <div class="strategy-table">
+      <div
+        v-if="enabledCount || showDisabled"
+        class="strategy-table"
+      >
         <div
+          v-if="urlStrategy.enabled || showDisabled"
           class="strategy-row"
           :class="{ active: urlStrategy.enabled }"
         >
@@ -38,6 +54,7 @@
           </div>
         </div>
         <div
+          v-if="paddingStrategy.enabled || showDisabled"
           class="strategy-row"
           :class="{ active: paddingStrategy.enabled }"
         >
@@ -59,6 +76,7 @@
           </div>
         </div>
         <div
+          v-if="headerNoiseStrategy.enabled || showDisabled"
           class="strategy-row"
           :class="{ active: headerNoiseStrategy.enabled }"
         >
@@ -80,6 +98,7 @@
           </div>
         </div>
         <div
+          v-if="tlsFingerprintStrategy.enabled || showDisabled"
           class="strategy-row"
           :class="{ active: tlsFingerprintStrategy.enabled }"
         >
@@ -109,7 +128,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 const props = defineProps({
@@ -122,7 +141,8 @@ const props = defineProps({
 const parseStrategy = (json) => {
   if (!json) return { enabled: false }
   try {
-    return JSON.parse(json)
+    const parsed = typeof json === 'string' ? JSON.parse(json) : json
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : { enabled: false }
   } catch {
     return { enabled: false }
   }
@@ -132,6 +152,12 @@ const urlStrategy = computed(() => parseStrategy(props.puppet.urlStrategy))
 const paddingStrategy = computed(() => parseStrategy(props.puppet.paddingStrategy))
 const headerNoiseStrategy = computed(() => parseStrategy(props.puppet.headerNoiseStrategy))
 const tlsFingerprintStrategy = computed(() => parseStrategy(props.puppet.tlsFingerprintStrategy))
+
+const showDisabled = ref(false)
+const enabledCount = computed(() =>
+  [urlStrategy, paddingStrategy, headerNoiseStrategy, tlsFingerprintStrategy].filter((strategy) => strategy.value.enabled).length
+)
+watch(() => props.puppet.puppetId, () => { showDisabled.value = false })
 
 const urlModeLabel = computed(() => {
   const map = { POOL: '路径池', TEMPLATE: '模板', STATIC_ASSET: '静态资源' }
@@ -175,7 +201,7 @@ const tlsProfileLabel = computed(() => {
 
 .panel-title {
   position: relative;
-  margin-bottom: 8px;
+  margin-bottom: 0;
   padding-left: 12px;
   color: var(--pm-ink);
   font-size: 13px;
@@ -193,7 +219,34 @@ const tlsProfileLabel = computed(() => {
   background: var(--pm-blue);
 }
 
+.strategy-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.strategy-summary {
+  font-size: 11px;
+  color: var(--pm-muted);
+}
+
+.strategy-toggle {
+  margin-left: auto;
+  border: 0;
+  padding: 2px 0;
+  background: transparent;
+  color: var(--pm-blue);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.strategy-toggle:focus-visible {
+  outline: var(--focus-outline);
+}
+
 .strategy-table {
+  margin-top: 8px;
   display: flex;
   flex-direction: column;
 }
@@ -219,10 +272,6 @@ const tlsProfileLabel = computed(() => {
 
 .strategy-row.active {
   background: color-mix(in srgb, var(--pm-blue) 4%, transparent);
-}
-
-.strategy-row:not(.active) {
-  opacity: 0.6;
 }
 
 .strategy-row-icon {
@@ -265,6 +314,7 @@ const tlsProfileLabel = computed(() => {
   flex-wrap: wrap;
   gap: 6px;
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .strategy-row-value code {

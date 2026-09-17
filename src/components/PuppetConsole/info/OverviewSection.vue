@@ -1,431 +1,259 @@
 <template>
-  <section class="info-section">
-    <div class="metric-grid content-card-wide">
+  <section class="info-section overview-section">
+    <div class="metric-grid">
       <article
         v-for="metric in headlineMetrics"
         :key="metric.label"
         class="metric-card"
+        :class="metric.tone"
       >
-        <div class="metric-icon-shell">
-          <el-icon class="metric-icon">
-            <Icon :icon="metric.icon" />
-          </el-icon>
-        </div>
-        <div class="metric-copy">
-          <span class="metric-label">{{ metric.label }}</span>
-          <strong class="metric-value">{{ metric.value }}</strong>
-          <span class="metric-helper">{{ metric.helper }}</span>
-        </div>
+        <span class="metric-label">{{ metric.label }}</span>
+        <strong class="metric-value">{{ metric.value }}</strong>
+        <span class="metric-helper">{{ metric.helper }}</span>
       </article>
     </div>
 
-    <article class="content-card">
-      <div class="card-header">
-        <div>
-          <div class="section-eyebrow">
-            运行画像
-          </div>
-          <h3>当前进程与运行时</h3>
-        </div>
-      </div>
-      <div class="kv-grid">
-        <div
-          v-for="item in runtimeFacts"
-          :key="item.label"
-          class="kv-item"
-        >
-          <span class="kv-label">{{ item.label }}</span>
-          <span
-            class="kv-value"
-            :class="{ mono: item.mono }"
-          >{{ item.value }}</span>
-        </div>
-      </div>
-    </article>
-
-    <article class="content-card">
-      <div class="card-header">
-        <div>
-          <div class="section-eyebrow">
-            存储快照
-          </div>
-          <h3>优先看最接近瓶颈的挂载点</h3>
-        </div>
-      </div>
-      <div class="storage-list">
-        <div
-          v-for="disk in topFileSystems"
-          :key="disk.Root || disk.Type"
-          class="storage-item"
-        >
-          <div class="storage-top">
-            <div>
-              <strong>{{ disk.Root || '-' }}</strong>
-              <span>{{ disk.Type || '未知类型' }}</span>
-            </div>
-            <el-tag
-              :type="getUsageType(disk.UsagePercent || 0)"
-              round
-            >
-              {{ formatPercent(disk.UsagePercent) }}
-            </el-tag>
-          </div>
-          <el-progress
-            :percentage="Math.round(disk.UsagePercent || 0)"
-            :color="getUsageColor(disk.UsagePercent)"
-            :stroke-width="8"
-            :show-text="false"
-          />
-          <div class="storage-meta">
-            <span>已用 {{ formatMBValue(disk.UsedSpaceMB) }}</span>
-            <span>可用 {{ formatMBValue(disk.UsableSpaceMB) }}</span>
-          </div>
-        </div>
-      </div>
-    </article>
-
-    <article class="content-card content-card-wide">
-      <div class="card-header">
-        <div>
-          <div class="section-eyebrow">
-            网络快照
-          </div>
-          <h3>优先看在线接口与可达地址</h3>
-        </div>
-      </div>
-      <div class="network-card-list">
-        <div
-          v-for="net in activeNetworkInterfaces"
-          :key="net.Name || net.DisplayName"
-          class="network-card"
-        >
-          <div class="network-card-top">
-            <strong>{{ net.DisplayName || net.Name || '-' }}</strong>
-            <el-tag
-              type="success"
-              round
-            >
-              在线
-            </el-tag>
-          </div>
-          <div class="network-card-meta mono-text">
-            {{ net.Name || '-' }}
-          </div>
-          <div class="ip-list">
-            <el-tag
-              v-for="ip in net.IPAddresses || []"
-              :key="ip"
-              :type="getIPType(ip)"
+    <div class="overview-details">
+      <div class="overview-sidebar">
+        <article class="content-card">
+          <header class="overview-heading">
+            <h3>进程信息</h3>
+            <el-button
+              text
+              type="primary"
               size="small"
+              @click="emit('navigate', 'runtime')"
             >
-              {{ ip }}
-            </el-tag>
-            <span
-              v-if="!net.IPAddresses?.length"
-              class="text-muted"
-            >无地址</span>
+              运行详情
+            </el-button>
+          </header>
+          <div class="process-name">
+            <span class="fact-label">进程名称</span>
+            <div class="process-value">
+              <code>{{ basicInfo.ProcessInfo?.ProcessName || '—' }}</code>
+              <el-button
+                v-if="basicInfo.ProcessInfo?.ProcessName"
+                text
+                size="small"
+                aria-label="复制进程名称"
+                @click="copyProcessName"
+              >
+                复制
+              </el-button>
+            </div>
           </div>
-        </div>
-        <div
-          v-if="!activeNetworkInterfaces.length"
-          class="empty-note"
-        >
-          当前没有检测到已启用网卡。
-        </div>
+          <dl class="process-facts">
+            <div
+              v-for="item in runtimeFacts"
+              :key="item.label"
+              :class="{ 'fact-wide': item.wide }"
+            >
+              <dt>{{ item.label }}</dt><dd>{{ item.value }}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="content-card">
+          <header class="overview-heading">
+            <h3>主要网络接口</h3>
+            <el-button
+              text
+              type="primary"
+              size="small"
+              @click="emit('navigate', 'resources')"
+            >
+              全部接口{{ Array.isArray(basicInfo.NetworkInfo) ? `（${basicInfo.NetworkInfo.length}）` : '' }}
+            </el-button>
+          </header>
+          <div class="network-list">
+            <div
+              v-for="net in primaryNetworks"
+              :key="net.Name || net.DisplayName"
+              class="network-row"
+            >
+              <div class="network-name">
+                <strong>{{ net.Name || net.DisplayName || '—' }}</strong>
+                <span v-if="net.DisplayName && net.DisplayName !== net.Name">{{ net.DisplayName }}</span>
+              </div>
+              <div class="network-addresses">
+                <code
+                  v-for="ip in net.IPAddresses"
+                  :key="ip"
+                >{{ ip }}</code>
+              </div>
+              <span class="network-status">已启用</span>
+            </div>
+            <p
+              v-if="!primaryNetworks.length"
+              class="empty-note"
+            >
+              暂无主要接口地址，可在资源页查看隧道、回环及其他接口。
+            </p>
+          </div>
+          <p class="section-note">
+            最多展示 3 个已启用的主要接口；隧道、回环及链路本地地址见全部接口。启用状态不代表可达性。
+          </p>
+        </article>
       </div>
-    </article>
+
+      <article class="content-card storage-card">
+        <header class="overview-heading">
+          <h3>磁盘使用</h3>
+          <el-button
+            text
+            type="primary"
+            size="small"
+            @click="emit('navigate', 'resources')"
+          >
+            全部挂载点
+          </el-button>
+        </header>
+        <p class="section-note">
+          按容量使用率排序，特殊文件系统不参与排名。
+        </p>
+        <div class="storage-list">
+          <div
+            v-for="disk in capacityDisks"
+            :key="disk.Root || disk.Name"
+            class="storage-item"
+          >
+            <div class="storage-top">
+              <code>{{ disk.Root || '—' }}</code>
+              <span class="storage-type">{{ disk.Type || '未知类型' }}</span>
+              <strong :style="{ color: getUsageColor(disk.UsagePercent) }">{{ formatPercent(disk.UsagePercent) }}</strong>
+            </div>
+            <el-progress
+              v-if="disk.UsagePercent != null"
+              :percentage="Math.min(100, Math.max(0, Number(disk.UsagePercent) || 0))"
+              :color="getUsageColor(disk.UsagePercent)"
+              :stroke-width="5"
+              :show-text="false"
+            />
+            <div class="storage-meta">
+              <span>可用 {{ formatMBValue(disk.UsableSpaceMB) }}</span><span>总计 {{ formatMBValue(disk.TotalSpaceMB) }}</span>
+            </div>
+          </div>
+          <p
+            v-if="!capacityDisks.length"
+            class="empty-note"
+          >
+            暂无可用于容量统计的挂载点。
+          </p>
+        </div>
+      </article>
+    </div>
+    <p class="measurement-note">
+      内存占用率按（总量 − 空闲）/ 总量计算，不等同于系统内存压力。数据为最近一次采集快照。
+    </p>
   </section>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import {
-  formatMBValue,
-  formatPercent,
-  getUsageColor,
-  getIPType,
-  getResourceUsage,
-  getUsageType
-} from './infoModel.js'
-import { icons } from '@/utils/icons.js'
+import { ElMessage } from 'element-plus'
+import { formatMBValue, formatPercent, getUsageColor, getUsageType, getResourceUsage, getNetworkOverview } from './infoModel.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 
-const iconMap = icons
-
-const props = defineProps({
-  basicInfo: {
-    type: Object,
-    required: true
-  }
-})
-
+const props = defineProps({ basicInfo: { type: Object, required: true } })
+const emit = defineEmits(['navigate'])
 const resources = computed(() => getResourceUsage(props.basicInfo))
-const topFileSystems = computed(() => resources.value.disks.slice(0, 3))
-const activeNetworkInterfaces = computed(() =>
-  (props.basicInfo.NetworkInfo || []).filter((item) => item.IsUp)
-)
-
-const headlineMetrics = computed(() => [
-  {
-    label: '物理内存',
-    value: formatPercent(resources.value.memory),
-    helper: `${formatMBValue(props.basicInfo.HardwareInfo?.FreePhysicalMemoryMB)} 可用`,
-    icon: iconMap.cpu
-  },
-  {
-    label: '交换空间',
-    value: formatPercent(resources.value.swap),
-    helper: `${formatMBValue(props.basicInfo.HardwareInfo?.FreeSwapSpaceMB)} 可用`,
-    icon: iconMap.hardDrive
-  },
-  {
-    label: '磁盘挂载',
-    value: `${props.basicInfo.FileSystemInfo?.length || 0}`,
-    helper: topFileSystems.value[0]
-      ? `${topFileSystems.value[0].Root || '-'} ${formatPercent(topFileSystems.value[0].UsagePercent)}`
-      : '无挂载信息',
-    icon: iconMap.folder
-  },
-  {
-    label: '在线网卡',
-    value: `${activeNetworkInterfaces.value.length}`,
-    helper: `${props.basicInfo.NetworkInfo?.length || 0} 个接口`,
-    icon: iconMap.connection
-  }
-])
-
+const capacityDisks = computed(() => resources.value.capacityDisks)
+const primaryNetworks = computed(() => getNetworkOverview(props.basicInfo.NetworkInfo).slice(0, 3))
+const headlineMetrics = computed(() => {
+  const hardware = props.basicInfo.HardwareInfo || {}
+  const noSwap = hardware.TotalSwapSpaceMB != null && Number(hardware.TotalSwapSpaceMB) === 0
+  return [
+    {
+      label: '物理内存占用', value: formatPercent(resources.value.memory),
+      helper: `空闲 ${formatMBValue(hardware.FreePhysicalMemoryMB)} / ${formatMBValue(hardware.TotalPhysicalMemoryMB)}`,
+      tone: getUsageType(resources.value.memory)
+    },
+    {
+      label: '交换空间占用', value: noSwap ? '未启用' : formatPercent(resources.value.swap),
+      helper: `空闲 ${formatMBValue(hardware.FreeSwapSpaceMB)} / ${formatMBValue(hardware.TotalSwapSpaceMB)}`,
+      tone: getUsageType(resources.value.swap)
+    },
+    {
+      label: '容量挂载点', value: Array.isArray(props.basicInfo.FileSystemInfo) ? resources.value.capacityDisks.length : '—',
+      helper: capacityDisks.value[0] ? `最高 ${formatPercent(capacityDisks.value[0].UsagePercent)}` : '暂无容量信息'
+    },
+    {
+      label: '已启用接口', value: Array.isArray(props.basicInfo.NetworkInfo) ? props.basicInfo.NetworkInfo.filter(net => net.IsUp).length : '—',
+      helper: Array.isArray(props.basicInfo.NetworkInfo) ? `共 ${props.basicInfo.NetworkInfo.length} 个接口` : '暂无接口信息'
+    }
+  ]
+})
 const runtimeFacts = computed(() => [
-  { label: '进程名称', value: props.basicInfo.ProcessInfo?.ProcessName || '-' },
-  { label: 'PID', value: props.basicInfo.ProcessInfo?.ProcessId || '-', mono: true },
-  { label: '启动时间', value: formatDateTime(props.basicInfo.ProcessInfo?.StartTime) },
-  { label: '运行时间', value: props.basicInfo.ProcessInfo?.Uptime || '-' },
+  { label: 'PID', value: props.basicInfo.ProcessInfo?.ProcessId ?? '—' },
+  { label: '运行时间', value: props.basicInfo.ProcessInfo?.Uptime || '—' },
+  { label: '启动时间', value: formatDateTime(props.basicInfo.ProcessInfo?.StartTime), wide: true },
   {
-    label: props.basicInfo.PhpRuntimeInfo?.PHPVersion ? 'PHP' : 'JVM',
-    value:
-      props.basicInfo.PhpRuntimeInfo?.PHPVersion ||
-      props.basicInfo.JavaRuntimeInfo?.JVMName ||
-      '未发现'
-  },
-  {
-    label: props.basicInfo.PhpRuntimeInfo?.PHPVersion ? 'SAPI' : '线程数',
-    value:
-      props.basicInfo.PhpRuntimeInfo?.SAPI || props.basicInfo.JavaRuntimeInfo?.ThreadCount || '-'
+    label: props.basicInfo.PhpRuntimeInfo?.PHPVersion ? 'PHP / SAPI' : 'JVM / 线程数', wide: true,
+    value: props.basicInfo.PhpRuntimeInfo?.PHPVersion
+      ? `${props.basicInfo.PhpRuntimeInfo.PHPVersion} / ${props.basicInfo.PhpRuntimeInfo.SAPI || '—'}`
+      : `${props.basicInfo.JavaRuntimeInfo?.JVMName || '—'} / ${props.basicInfo.JavaRuntimeInfo?.ThreadCount ?? '—'}`
   }
 ])
+async function copyProcessName() {
+  try {
+    await navigator.clipboard.writeText(props.basicInfo.ProcessInfo.ProcessName)
+    ElMessage.success('已复制进程名称')
+  } catch {
+    ElMessage.error('复制失败，请手动复制')
+  }
+}
 </script>
 
 <style scoped>
-.metric-card {
-  border: 1px solid var(--info-border);
-  border-radius: var(--radius-container);
-  background: var(--info-surface);
-  box-shadow: none;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
+.info-section.overview-section { display: flex; flex-direction: column; align-items: stretch; flex: 1; }
+.overview-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; flex: 1; }
+.overview-sidebar { display: grid; align-content: start; gap: 12px; min-width: 0; }
+.storage-card { display: flex; flex-direction: column; min-height: 0; }
+.storage-list { flex: 1; min-height: 180px; contain: size; overflow: auto; scrollbar-gutter: stable; }
+.storage-card > .overview-heading, .storage-card > .section-note { flex-shrink: 0; }
+.metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.metric-card { display: grid; gap: 6px; min-width: 0; padding: 12px 14px; border: 1px solid var(--info-border); border-radius: var(--radius-container); background: var(--info-surface); }
+.metric-label, .fact-label, .process-facts dt { color: var(--el-text-color-secondary); font-size: 12px; }
+.metric-value { color: var(--el-text-color-primary); font-size: 20px; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.metric-card.danger .metric-value { color: var(--el-color-danger); }
+.metric-card.warning .metric-value { color: var(--el-color-warning); }
+.metric-card.danger { border-color: color-mix(in srgb, var(--el-color-danger) 40%, var(--info-border)); }
+.metric-helper { color: var(--el-text-color-secondary); font-size: 11px; overflow-wrap: anywhere; }
+.overview-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.overview-heading h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.overview-heading :deep(.el-button) { min-height: 24px; height: 24px; padding: 0; }
+.process-name { padding-bottom: 12px; border-bottom: 1px solid var(--info-border); }
+.process-value { display: flex; align-items: flex-start; gap: 8px; margin-top: 6px; }
+.process-value code { flex: 1; min-width: 0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.process-value :deep(.el-button) { flex-shrink: 0; min-height: 24px; height: 24px; padding: 0 4px; }
+.process-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 14px 0 0; }
+.process-facts .fact-wide { grid-column: 1 / -1; }
+.process-facts dd { margin: 5px 0 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.section-note, .measurement-note { margin: 0; color: var(--el-text-color-secondary); font-size: 11px; line-height: 1.6; }
+.storage-item { padding: 12px 0; border-bottom: 1px solid var(--info-border); }
+.storage-item:last-child { padding-bottom: 0; border-bottom: 0; }
+.storage-top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 8px; font-size: 12px; }
+.storage-top code { overflow-wrap: anywhere; min-width: 0; }
+.storage-type { color: var(--el-text-color-secondary); font-size: 11px; }
+.storage-top strong { margin-left: auto; }
+.storage-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 7px; color: var(--el-text-color-secondary); font-size: 11px; }
+.network-row { display: grid; grid-template-columns: minmax(64px, 90px) minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--info-border); }
+.network-row:first-child { padding-top: 0; }
+.network-row:last-child { border-bottom: 0; }
+.network-name { display: grid; gap: 4px; min-width: 0; font-size: 12px; overflow-wrap: anywhere; }
+.network-name span { color: var(--el-text-color-secondary); font-size: 11px; }
+.network-addresses { display: flex; flex-wrap: wrap; gap: 6px 16px; min-width: 0; font-size: 12px; }
+.network-addresses code { overflow-wrap: anywhere; }
+.network-status { color: var(--el-text-color-secondary); font-size: 11px; }
+.empty-note { margin: 12px 0; color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.6; }
+@container basic-info (max-width: 720px) {
+  .overview-details { grid-template-columns: 1fr; flex: none; }
+  .storage-list { contain: none; min-height: 0; overflow: visible; }
 }
-
-.kv-item {
-  border-radius: 0;
-  border: 0;
-  border-bottom: 1px solid var(--info-border);
-  background: transparent;
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.metric-icon-shell {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--el-color-primary) 12%, white);
-  color: var(--el-color-primary);
-}
-
-.metric-icon {
-  font-size: 20px;
-}
-
-.metric-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.metric-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--el-text-color-secondary);
-  text-transform: uppercase;
-}
-
-.metric-value {
-  font-size: 18px;
-  line-height: 1.1;
-  color: var(--el-text-color-primary);
-}
-
-.metric-helper {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  overflow-wrap: anywhere;
-}
-
-.storage-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.storage-item {
-  min-width: 0;
-  padding: 12px 13px;
-  border-radius: 14px;
-  border: 1px solid var(--info-border);
-  background: var(--info-surface-soft);
-}
-
-.storage-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.storage-top strong {
-  display: block;
-  color: var(--el-text-color-primary);
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.storage-top > div {
-  flex: 1;
-  min-width: 0;
-}
-
-.storage-top > :deep(.el-tag) {
-  flex-shrink: 0;
-}
-
-.storage-top span {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.storage-meta {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.storage-meta > span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.network-card-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 10px;
-  min-width: 0;
-}
-
-.network-card {
-  padding: 12px 13px;
-  border-radius: 14px;
-  border: 1px solid var(--info-border);
-  background: var(--info-surface-soft);
-  min-width: 0;
-  overflow: hidden;
-}
-
-.network-card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.network-card-top strong {
-  display: block;
-  color: var(--el-text-color-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.network-card-top > :first-child {
-  min-width: 0;
-}
-
-.network-card-meta {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.ip-list {
-  margin-top: 10px;
-}
-
-.network-card .ip-list :deep(.el-tag) {
-  max-width: 100%;
-  height: auto;
-  line-height: 1.35;
-  white-space: normal;
-  word-break: break-all;
-  overflow-wrap: anywhere;
-}
-
-.network-card .ip-list :deep(.el-tag__content) {
-  white-space: normal;
-  word-break: break-all;
-  overflow-wrap: anywhere;
-}
-
-.empty-note {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--el-text-color-regular);
-}
-
-@media (max-width: 1200px) {
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  .metric-grid {
-    grid-template-columns: 1fr;
-  }
-  .network-card-list {
-    grid-template-columns: 1fr;
-  }
-
-  .storage-meta {
-    flex-direction: column;
-  }
+@container basic-info (max-width: 650px) {
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .network-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .network-addresses { grid-row: 2; grid-column: 1 / -1; }
+  .network-status { grid-column: 2; grid-row: 1; }
 }
 </style>

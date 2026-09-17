@@ -10,6 +10,18 @@ export function normalizeAiStatus(status, fallback = 'idle') {
   return status || fallback
 }
 
+export const getThreadStatus = (thread, conversationStatus = {}) => {
+  const localStatus = normalizeAiStatus(conversationStatus?.[thread?.threadId]?.status)
+  if (localStatus && localStatus !== 'idle') return localStatus
+  return normalizeAiStatus(thread?.runStatus || (thread?.executing ? 'running' : 'idle'))
+}
+
+export const isDefaultThreadTitle = title => !title?.trim() || /^(对话\s*\d+|新对话|未命名对话|平台\s*AI)$/.test(title.trim())
+
+export const getThreadTitle = thread => isDefaultThreadTitle(thread?.title)
+  ? (thread?.messageCount > 0 ? '未命名对话' : '新对话')
+  : thread.title
+
 function formatRuntimeSeconds(seconds) {
   const safe = Math.max(0, Number(seconds) || 0)
   if (safe < 60) return `${safe}s`

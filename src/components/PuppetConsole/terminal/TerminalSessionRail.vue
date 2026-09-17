@@ -1,510 +1,150 @@
 <template>
-  <aside class="terminal-rail">
-    <div class="terminal-rail__head">
-      <div>
-        <span class="rail-title">终端会话</span>
-        <span class="rail-meta">
-          <template v-if="sessions.length === 0">点击新建开始会话</template>
-          <template v-else-if="sessions.length === 1">1 个会话 · 可并行新建更多</template>
-          <template v-else>{{ sessions.length }} 个会话</template>
-        </span>
-      </div>
-      <div class="rail-actions">
-        <el-dropdown
-          v-if="terminalModeOptions.length"
-          trigger="click"
-          @command="(mode) => $emit('create-session', mode)"
-        >
-          <button
-            type="button"
-            class="rail-new-btn"
-            aria-label="新建终端会话，选择模式"
-          >
-            <el-icon><Icon :icon="iconMap.plus" /></el-icon>
-            新建
-            <el-icon><Icon :icon="iconMap.arrowDown" /></el-icon>
-          </button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item
-                v-for="option in terminalModeOptions"
-                :key="option.value"
-                :command="option.value"
-                :disabled="option.disabled"
-              >
-                {{ option.label }}
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <button
-          v-else
-          type="button"
-          class="rail-new-btn"
-          aria-label="新建终端会话"
-          @click="$emit('create-session')"
-        >
-          <el-icon><Icon :icon="iconMap.plus" /></el-icon>
-          新建
-        </button>
-        <el-button
-          class="rail-tool-button is-danger"
-          circle
-          size="small"
-          aria-label="重置终端工作区"
-          @click="$emit('reset-workspace')"
-        >
-          <el-icon><Icon :icon="iconMap.delete" /></el-icon>
-        </el-button>
-      </div>
+  <aside
+    class="terminal-rail"
+    aria-label="终端会话列表"
+  >
+    <div class="rail-heading">
+      <strong>会话</strong><span>{{ sessions.length }}</span>
     </div>
-
-    <div class="terminal-rail__list">
-      <!-- Empty state -->
-      <div
-        v-if="!sessions.length"
-        class="rail-empty"
-      >
-        <span class="rail-empty-icon">
-          <el-icon><Icon :icon="iconMap.terminal" /></el-icon>
-        </span>
-        <span class="rail-empty-text">暂无会话</span>
-        <span class="rail-empty-hint">点击上方“新建”开始</span>
-      </div>
+    <div class="session-list">
       <div
         v-for="session in sessions"
         :key="session.id"
-        :class="[
-          'session-card',
-          { 'is-active': session.id === activeSessionId }
-        ]"
+        class="session-item"
+        :class="{ 'is-active': session.id === activeSessionId }"
       >
         <button
           type="button"
-          class="session-card__select"
+          class="session-select"
           :aria-current="session.id === activeSessionId ? 'true' : undefined"
           @click="$emit('activate', session.id)"
         >
-          <span class="session-card__head">
-            <span class="session-card__title">
-              <span class="session-card__name">{{ session.title }}</span>
-              <span class="session-card__mode">{{ session.pty === true || session.terminalMode === 'python-pty' ? 'PTY' : session.terminalMode === 'pipe' ? 'PIPE' : '' }}</span>
-              <span
-                v-if="session.hasUnread"
-                class="session-card__unread"
-                aria-label="有新输出"
-                title="有新输出"
-              />
-            </span>
-          </span>
-
-          <span class="session-card__foot">
-            <span class="session-card__id">{{ session.id.slice(0, 8) }}</span>
-            <span>{{ formatTerminalRelativeTime(session.lastActivityTime, now) }}</span>
-          </span>
+          <span class="session-title">{{ session.title
+          }}<i
+            v-if="session.hasUnread"
+            class="unread-dot"
+            aria-label="有新输出"
+            title="有新输出"
+          /></span>
+          <span class="session-meta">{{
+            session.ended ? '已结束' : formatTerminalRelativeTime(session.lastActivityTime, now)
+          }}</span>
         </button>
-
-        <div class="session-card__tools">
-          <el-tooltip
-            content="中断"
-            placement="top"
-            :show-after="300"
-          >
-            <el-button
-              class="rail-tool-button is-interrupt"
-              circle
-              size="small"
-              :aria-label="`中断终端 ${session.title || session.id}`"
-              @click="$emit('interrupt-session', session.id)"
-            >
-              <el-icon><Icon :icon="iconMap.stop" /></el-icon>
-            </el-button>
-          </el-tooltip>
-          <el-tooltip
-            content="清屏"
-            placement="top"
-            :show-after="300"
-          >
-            <el-button
-              class="rail-tool-button"
-              circle
-              size="small"
-              :aria-label="`清屏 ${session.title || session.id}`"
-              @click="$emit('clear-screen', session.id)"
-            >
-              <el-icon><Icon :icon="iconMap.remove" /></el-icon>
-            </el-button>
-          </el-tooltip>
-          <el-tooltip
-            content="关闭"
-            placement="top"
-            :show-after="300"
-          >
-            <el-button
-              class="rail-tool-button is-close"
-              circle
-              size="small"
-              :aria-label="`关闭终端 ${session.title || session.id}`"
-              @click="$emit('close-session', session.id)"
-            >
-              <el-icon><Icon :icon="iconMap.close" /></el-icon>
-            </el-button>
-          </el-tooltip>
-        </div>
+        <el-button
+          text
+          size="small"
+          class="session-close"
+          :aria-label="`关闭${session.title}`"
+          :title="`关闭${session.title}`"
+          @click="$emit('close-session', session.id)"
+        >
+          <Icon :icon="icons.close" />
+        </el-button>
       </div>
     </div>
   </aside>
 </template>
 
 <script setup>
+import { Icon } from '@iconify/vue'
+import { icons } from '@/utils/icons.js'
 import { formatTerminalRelativeTime } from './terminalWorkspaceModel.js'
 
 defineProps({
-  iconMap: {
-    type: Object,
-    required: true
-  },
-  sessions: {
-    type: Array,
-    required: true
-  },
-  activeSessionId: {
-    type: String,
-    default: ''
-  },
-  now: {
-    type: Number,
-    required: true
-  },
-  terminalModeOptions: {
-    type: Array,
-    default: () => []
-  }
+  sessions: { type: Array, required: true },
+  activeSessionId: { type: String, default: '' },
+  now: { type: Number, required: true }
 })
-
-defineEmits([
-  'activate',
-  'create-session',
-  'reset-workspace',
-  'close-session',
-  'interrupt-session',
-  'clear-screen'
-])
+defineEmits(['activate', 'close-session'])
 </script>
 
 <style scoped>
 .terminal-rail {
-  --workspace-surface: var(--app-card-background);
-  --workspace-muted-surface: var(--app-control-background-soft);
-  --workspace-control-surface: var(--app-control-background);
-  --workspace-soft-border: color-mix(in srgb, var(--el-border-color) 20%, transparent);
   min-height: 0;
   min-width: 0;
-  box-sizing: border-box;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 6px;
-  padding: 8px 7px;
-  border-radius: 0;
-  border: 0;
-  border-right: 1px solid color-mix(in srgb, var(--el-border-color) 24%, transparent);
-  background: color-mix(in srgb, var(--workspace-muted-surface) 66%, transparent);
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px;
+  border-right: 1px solid var(--el-border-color-lighter);
+  background: var(--app-control-background-soft);
 }
-
-.terminal-rail__head {
+.rail-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 0 2px 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--workspace-soft-border) 76%, transparent);
-}
-
-.terminal-rail__head > div:first-child {
-  min-width: 0;
-}
-
-.rail-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.rail-new-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 0 6px;
-  border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 34%, transparent);
-  background: color-mix(in srgb, var(--workspace-surface) 82%, transparent);
-  color: var(--el-text-color-primary);
+  padding: 0 8px 12px;
   font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    background 0.15s,
-    border-color 0.15s;
-  height: 26px;
 }
-
-.rail-new-btn:hover {
-  background: color-mix(in srgb, var(--el-color-primary) 6%, transparent);
-  border-color: color-mix(in srgb, var(--el-color-primary) 28%, transparent);
-}
-
-.rail-new-btn .el-icon {
-  font-size: 14px;
-}
-
-.rail-title {
-  display: block;
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--el-text-color-primary);
-}
-
-.session-card__mode {
-  font-size: 10px;
+.rail-heading span {
   color: var(--el-text-color-secondary);
-  flex-shrink: 0;
 }
-
-.rail-meta {
-  display: block;
-  margin-top: 2px;
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--el-text-color-placeholder);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.terminal-rail__list {
+.session-list {
   min-height: 0;
-  min-width: 0;
-  width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-content: start;
-  gap: 3px;
-  overflow: auto;
-  padding-right: 0;
+  overflow-y: auto;
 }
-
-.rail-empty {
+.session-item {
+  position: relative;
+  margin-bottom: 4px;
+  border-radius: 6px;
+}
+.session-item:hover {
+  background: var(--app-control-background);
+}
+.session-item.is-active {
+  background: color-mix(in srgb, var(--el-color-primary) 9%, var(--app-card-background));
+  box-shadow: inset 2px 0 var(--el-color-primary);
+}
+.session-select {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 24px 10px;
-  border: 1px dashed color-mix(in srgb, var(--el-border-color) 55%, transparent);
-  border-radius: 8px;
-  text-align: center;
-}
-
-.rail-empty-icon {
-  font-size: 22px;
-  opacity: 0.45;
-  display: flex;
-  justify-content: center;
-}
-
-.rail-empty-text {
-  font-size: 12px;
-  color: var(--el-text-color-placeholder);
-}
-
-.rail-empty-hint {
-  color: var(--el-text-color-placeholder);
-  font-size: 11px;
-}
-
-.session-card {
+  gap: 6px;
   width: 100%;
   min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-  position: relative;
-  min-height: 58px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  overflow: hidden;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
-}
-
-.session-card:hover {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--workspace-surface) 72%, transparent);
-}
-
-.session-card.is-active {
-  border-color: color-mix(in srgb, var(--el-color-primary) 12%, transparent);
-  background: color-mix(in srgb, var(--el-color-primary) 7%, var(--workspace-surface));
-  box-shadow: inset 2px 0 0 var(--el-color-primary);
-}
-
-.session-card:focus-within {
-  border-color: color-mix(in srgb, var(--el-color-primary) 36%, transparent);
-  box-shadow: inset 2px 0 0 var(--el-color-primary);
-}
-
-.session-card__select {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  min-height: 56px;
-  display: grid;
-  align-content: center;
-  gap: 8px;
-  padding: 6px 7px 6px 9px;
+  padding: 10px 34px 10px 10px;
   border: 0;
   border-radius: inherit;
   background: transparent;
-  color: inherit;
-  cursor: pointer;
+  color: var(--el-text-color-primary);
   text-align: left;
+  cursor: pointer;
 }
-
-.session-card__head,
-.session-card__title,
-.session-card__tools,
-.session-card__foot {
+.session-select:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: -2px;
+}
+.session-title {
   display: flex;
   align-items: center;
-}
-
-.session-card__head {
-  padding-right: 70px;
-  min-width: 0;
-}
-
-.session-card__title {
-  flex: 1 1 auto;
   gap: 6px;
-  min-width: 0;
-}
-
-.session-card__unread {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--el-color-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-primary) 13%, transparent);
-}
-
-.session-card__name {
-  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 13px;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-
-.session-card__tools {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  gap: 2px;
-  flex-shrink: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.16s ease;
-}
-
-.session-card:hover .session-card__tools,
-.session-card.is-active .session-card__tools {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.session-card__foot {
-  justify-content: space-between;
-  gap: 8px;
+.session-meta {
   font-size: 11px;
-  color: var(--el-text-color-placeholder);
-}
-
-.session-card.is-active .session-card__foot,
-.session-card:hover .session-card__foot {
-  padding-right: 0;
-}
-
-.session-card__id {
-  max-width: 74px;
-  font-family: var(--app-font-mono, 'SFMono-Regular', Consolas, monospace);
   color: var(--el-text-color-secondary);
 }
-
-.session-card__foot span {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.unread-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--el-color-primary);
 }
-
-.terminal-rail :deep(.el-button.el-button--small) {
-  height: 22px;
-  min-height: 22px;
-  width: 22px;
-  border-radius: 5px;
+.session-close {
+  position: absolute;
+  right: 4px;
+  top: 5px;
+  opacity: 0;
 }
-
-.terminal-rail :deep(.el-button + .el-button) {
-  margin-left: 0;
+.session-item:hover .session-close,
+.session-item:focus-within .session-close {
+  opacity: 1;
 }
-
-.rail-tool-button.is-interrupt,
-.rail-tool-button.is-close,
-.rail-tool-button.is-danger {
-  --el-button-text-color: var(--el-color-danger);
-  --el-button-border-color: color-mix(in srgb, var(--el-color-danger) 24%, transparent);
-  --el-button-bg-color: color-mix(
-    in srgb,
-    var(--el-color-danger) 7%,
-    var(--workspace-control-surface)
-  );
-  --el-button-hover-text-color: var(--el-color-danger);
-  --el-button-hover-border-color: color-mix(in srgb, var(--el-color-danger) 38%, transparent);
-  --el-button-hover-bg-color: color-mix(
-    in srgb,
-    var(--el-color-danger) 11%,
-    var(--workspace-control-surface)
-  );
-  --el-button-active-text-color: var(--el-color-danger-dark-2);
-  --el-button-active-border-color: color-mix(in srgb, var(--el-color-danger) 44%, transparent);
-  --el-button-active-bg-color: color-mix(
-    in srgb,
-    var(--el-color-danger) 14%,
-    var(--workspace-control-surface)
-  );
-}
-
-@media (max-width: 1100px) {
-  .terminal-rail {
-    grid-template-rows: auto auto;
-    padding: 8px;
-    border-right: 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 24%, transparent);
-  }
-
-  .terminal-rail__list {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    overflow: visible;
+@media (hover: none) {
+  .session-close {
+    opacity: 1;
   }
 }
 </style>

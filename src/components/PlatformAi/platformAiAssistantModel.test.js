@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import { getThreadStatus } from '@/utils/aiRuntime.js'
 import {
   buildRequestAttachments,
   findLatestAssistantPlan,
-  getPlatformThreadStatus,
   mapPlatformPersistedMessages
 } from './platformAiAssistantModel.js'
 
 describe('platformAiAssistantModel', () => {
   it('prefers local status and finds the latest assistant plan', () => {
-    expect(getPlatformThreadStatus(
+    expect(getThreadStatus(
       { threadId: 'thread-1', runStatus: 'idle' },
       { 'thread-1': { status: 'running' } }
     )).toBe('running')

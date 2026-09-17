@@ -44,10 +44,7 @@ export function describeTerminalCapability(session) {
       mode: 'ENDED',
       resizeMode: 'N/A',
       streamMode: 'STOPPED',
-      shellLabel: 'SHELL ENDED',
-      hint: session.endReason || '终端进程已结束',
-      details: '创建新终端后可继续操作',
-      degraded: true
+      details: `${session.endReason || '终端进程已结束'}；创建新终端后可继续操作`
     }
   }
 
@@ -57,10 +54,7 @@ export function describeTerminalCapability(session) {
       mode: 'PTY',
       resizeMode: resizable ? 'RESIZE' : 'FIXED',
       streamMode: session.longPolling ? 'LONG-POLL' : 'POLL',
-      shellLabel: 'PTY SHELL',
-      hint: `${resizable ? '完整交互' : '交互模式（固定尺寸）'} · ${backend}`,
-      details: `终端后端：${backend}`,
-      degraded: false
+      details: `终端后端：${backend}`
     }
   }
 
@@ -71,20 +65,14 @@ export function describeTerminalCapability(session) {
         mode: 'COMMAND',
         resizeMode: 'FIXED',
         streamMode: 'POLL',
-        shellLabel: 'COMMAND SESSION',
-        hint: '命令模式 · 支持目录切换、输出读取和中断',
-        details: `每条命令独立执行，单次提交最多运行 20 秒；环境变量不会跨命令保留，不支持交互式输入、历史方向键和全屏程序${failureText}`,
-        degraded: true
+        details: `每条命令独立执行，单次提交最多运行 20 秒；环境变量不会跨命令保留，不支持交互式输入、历史方向键和全屏程序${failureText}`
       }
     }
     return {
       mode: 'PIPE',
       resizeMode: 'FIXED',
       streamMode: session.longPolling ? 'LONG-POLL' : 'POLL',
-      shellLabel: 'PIPE SHELL',
-      hint: `原生管道 · ${backend}`,
-      details: `支持持续 shell 和工作目录；全屏程序、作业控制及 Ctrl+C 可能受限，可新建 Python PTY 终端${failureText}`,
-      degraded: false
+      details: `支持持续 shell 和工作目录；全屏程序、作业控制及 Ctrl+C 可能受限，可新建 Python PTY 终端${failureText}`
     }
   }
 
@@ -92,10 +80,7 @@ export function describeTerminalCapability(session) {
     mode: 'DETECTING',
     resizeMode: 'WAIT',
     streamMode: 'WAIT',
-    shellLabel: 'SHELL DETECTING',
-    hint: session?.terminalMode === 'python-pty' ? '正在启动 Python PTY' : '正在初始化终端',
-    details: '终端初始化完成后显示实际 PTY 或 PIPE 后端',
-    degraded: false
+    details: '终端初始化完成后显示实际 PTY 或 PIPE 后端'
   }
 }
 

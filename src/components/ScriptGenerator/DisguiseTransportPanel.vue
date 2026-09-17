@@ -48,6 +48,8 @@
           v-model="form.respCode"
           :min="100"
           :max="599"
+          :controls="false"
+          :precision="0"
         />
       </el-form-item>
       <el-form-item
@@ -82,25 +84,31 @@
           <strong>{{ headerGateTitle }}</strong>
           <small v-if="form.runtime === 'php'">留空时关闭；填写时名称和值必须成对配置</small>
         </div>
-        <button
+        <el-button
           class="random-button"
-          type="button"
+          text
+          size="small"
+          :title="`随机生成 ${headerGateTitle}`"
+          :aria-label="`随机生成 ${headerGateTitle}`"
           @click="emit('generate-random-header')"
         >
           <Icon :icon="iconMap.refresh" />
-          随机
-        </button>
+          随机生成
+        </el-button>
       </div>
       <div class="header-pair">
-        <el-input
-          v-model="form.headerName"
-          :placeholder="form.protocol === 'websocket' ? '查询参数名，如 token' : 'Header 名，如 X-Token'"
-        />
-        <span>:</span>
-        <el-input
-          v-model="form.headerValue"
-          :placeholder="form.protocol === 'websocket' ? '查询参数值' : 'Header 值'"
-        />
+        <el-form-item :label="form.protocol === 'websocket' ? '查询参数名称' : 'Header 名称'">
+          <el-input
+            v-model="form.headerName"
+            :placeholder="form.protocol === 'websocket' ? '如 token' : '如 X-Token'"
+          />
+        </el-form-item>
+        <el-form-item :label="form.protocol === 'websocket' ? '查询参数值' : 'Header 值'">
+          <el-input
+            v-model="form.headerValue"
+            placeholder="输入校验值"
+          />
+        </el-form-item>
       </div>
     </div>
   </section>
@@ -120,8 +128,8 @@ const emit = defineEmits(['generate-random-header'])
 
 const iconMap = icons
 const headerGateTitle = computed(() => {
-  if (form.value.runtime === 'php') return '可选 Header 门禁'
-  return form.value.protocol === 'websocket' ? 'WebSocket 查询门禁' : 'Header 门禁'
+  if (form.value.runtime === 'php') return '可选 Header 校验'
+  return form.value.protocol === 'websocket' ? 'WebSocket 查询校验' : 'Header 校验'
 })
 </script>
 
@@ -133,10 +141,11 @@ const headerGateTitle = computed(() => {
 .transport-gate { margin-top: 11px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--el-border-color) 18%, transparent); }
 .gate-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
 .gate-heading > div { display: flex; flex-direction: column; gap: 2px; }
-.gate-heading strong { color: var(--sg-ink); font-size: 10px; }
-.gate-heading small { color: var(--sg-muted); font-size: 8px; }
-.random-button { height: 25px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; border: 1px solid var(--sg-border); border-radius: 7px; background: var(--sg-panel-strong); color: var(--sg-blue); font-size: 9px; cursor: pointer; }
-.header-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 7px; }
-.header-pair > span { color: var(--sg-muted); font-weight: 700; }
+.gate-heading strong { color: var(--sg-ink); font-size: 12px; }
+.gate-heading small { color: var(--sg-muted); font-size: 11px; }
+.random-button { height: 28px; padding: 0 6px; color: var(--sg-blue); font-size: 11px; }
+.random-button :deep(.iconify) { margin-right: 4px; }
+.header-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.transport-panel :deep(.el-input-number .el-input__inner) { text-align: left; }
 @media (max-width: 760px) { .form-grid, .header-pair { grid-template-columns: 1fr; } }
 </style>

@@ -180,6 +180,8 @@
       {{ compatibilityMessage }}
     </div>
 
+    <slot name="transport" />
+
     <slot />
 
     <details class="advanced-card form-group">

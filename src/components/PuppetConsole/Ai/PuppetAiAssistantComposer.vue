@@ -16,7 +16,8 @@
             type="textarea"
             :autosize="{ minRows: 1, maxRows: 8 }"
             :maxlength="8000"
-            :placeholder="waitingForUserInput ? '请先回答上方问题' : '给助理发送消息…'"
+            :placeholder="waitingForUserInput ? '请先回答上方问题' : '描述要在当前节点完成的任务…'"
+            aria-label="节点任务输入"
             :disabled="sending || waitingForUserInput"
             resize="none"
             @update:model-value="onInput"
@@ -64,7 +65,7 @@
           :type="sending ? 'warning' : 'primary'"
           :disabled="sending ? false : (!modelValue.trim() && !attachments.length) || !sessionId || waitingForUserInput"
           circle
-          :title="sending ? '取消请求' : '发送'"
+          :title="sending ? '取消请求' : '发送（Enter），Shift + Enter 换行'"
           :aria-label="sending ? '取消请求' : '发送消息'"
           @click="emit('fab-click')"
         >
@@ -126,6 +127,7 @@ const SLASH_COMMANDS = [
 ]
 
 const inputRef       = ref(null)
+defineExpose({ focus: () => inputRef.value?.focus() })
 const slashQuery     = ref('')
 const showSlashMenu  = ref(false)
 const slashActiveIdx = ref(0)
@@ -256,132 +258,9 @@ function onKeydown(e) {
 }
 </script>
 
+<style scoped src="@/styles/ai-composer-shared.css" />
+
 <style scoped>
-.composer-dock {
-  flex-shrink: 0;
-  container-type: inline-size;
-  container-name: ai-composer;
-  padding: 12px 10px 16px;
-  background: linear-gradient(
-    180deg,
-    transparent,
-    color-mix(in srgb, var(--ai-panel-surface, var(--app-surface-background)) 96%, transparent) 18px
-  );
-}
-
-.composer-inner {
-  max-width: var(--thread-max, 48rem);
-  margin: 0 auto;
-}
-
-.composer-box {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  padding: 12px 11px 10px 15px;
-  border: 0;
-  border-radius: 16px;
-  background: var(--el-bg-color-overlay, #fff);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--el-text-color-primary) 5%, transparent);
-  backdrop-filter: none;
-}
-
-.composer-shell {
-  flex: 1;
-  min-width: 0;
-}
-
-.composer-toolbar {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 12px;
-  margin-top: 8px;
-}
-
-.composer-attachments { margin-bottom: 10px; }
-
-.composer-input {
-  display: block;
-}
-
-.composer-input :deep(.el-textarea__inner) {
-  border: none;
-  box-shadow: none;
-  background: transparent;
-  color: var(--el-text-color-primary);
-  padding: 0 0 6px;
-  font-size: 14px;
-  line-height: 1.55;
-  min-height: 52px !important;
-  resize: none;
-}
-
-.composer-input :deep(.el-textarea__inner:focus) {
-  box-shadow: none;
-}
-
-.composer-input :deep(.el-input__count) {
-  background: transparent;
-  bottom: 2px;
-  font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-.send-fab {
-  flex-shrink: 0;
-  width: 38px !important;
-  height: 38px !important;
-  padding: 0 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--el-color-primary) 18%, transparent);
-}
-
-.send-fab-icon {
-  font-size: 16px;
-}
-
-@container ai-composer (max-width: 560px) {
-  .composer-box {
-    gap: 8px;
-    padding: 10px 9px 9px 11px;
-  }
-
-  .composer-input :deep(.el-textarea__inner) {
-    min-height: 46px !important;
-  }
-
-  .send-fab {
-    width: 36px !important;
-    height: 36px !important;
-  }
-}
-
-@container ai-composer (max-width: 420px) {
-  .composer-box {
-    gap: 6px;
-    padding-right: 7px;
-  }
-
-  .send-fab {
-    width: 34px !important;
-    height: 34px !important;
-    border-radius: 10px !important;
-  }
-}
-
-@media (max-width: 768px) {
-  .composer-dock {
-    padding: 8px 10px 10px;
-  }
-
-  .composer-box {
-    padding: 9px 9px 9px 10px;
-    border-radius: 12px;
-  }
-
-}
-
 /* ── 斜杠菜单 ─────────────────────────────────────────────────────────── */
 :global(.slash-menu) {
   background: var(--el-bg-color-overlay, #fff);

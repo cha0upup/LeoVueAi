@@ -101,4 +101,18 @@ describe('asset discovery task synchronization', () => {
       expect.objectContaining({ id: 'second' })
     )
   })
+
+  it('distinguishes initial loading, a failed load and a successful empty retry', async () => {
+    current = fixture([])
+    current.engine.syncNetworkWorkflowTasks.mockRejectedValueOnce(new Error('连接断开'))
+    expect(current.view.loading.value).toBe(true)
+    expect(current.view.hasLoaded.value).toBe(false)
+    await current.view.syncTasks()
+    expect(current.view.loading.value).toBe(false)
+    expect(current.view.hasLoaded.value).toBe(true)
+    expect(current.view.loadError.value).toBe('连接断开')
+    await current.view.syncTasks()
+    expect(current.view.loadError.value).toBe('')
+    expect(current.view.tasks.value).toEqual([])
+  })
 })

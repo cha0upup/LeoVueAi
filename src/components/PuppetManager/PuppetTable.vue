@@ -1,5 +1,8 @@
 <template>
-  <div v-loading="loading" class="tree-wrapper">
+  <div
+    v-loading="loading"
+    class="tree-wrapper"
+  >
     <!-- Empty state -->
     <EmptyState
       v-if="!loading && !puppets.length"
@@ -31,20 +34,33 @@
       @node-click="handleNodeClick"
     >
       <template #default="{ data }">
-        <div class="tree-node" @dblclick="handleQuickEnter(data)">
-          <div class="node-card" :class="{ 'is-child': isChildHost(data) }">
+        <div
+          class="tree-node"
+          @dblclick="handleQuickEnter(data)"
+        >
+          <div
+            class="node-card"
+            :class="{ 'is-child': isChildHost(data) }"
+          >
             <!-- Left: icon -->
             <div class="node-icon-shell">
               <el-icon class="node-icon">
                 <Icon :icon="getHostIcon(data)" />
               </el-icon>
-              <span class="node-dot" :class="getStatusDotClass(data)" />
+              <span
+                class="node-dot"
+                :class="{ online: getHostSessions(data).length }"
+                :title="getHostSessions(data).length ? '有在线会话' : '无在线会话'"
+              />
             </div>
 
             <!-- Center: two lines -->
             <div class="node-content">
               <div class="node-line1">
-                <span class="node-name">{{ data.puppetName || '-' }}</span>
+                <span
+                  class="node-name"
+                  :title="getHostDisplayName(data)"
+                >{{ getHostDisplayName(data) }}</span>
                 <el-tag
                   v-if="isChildHost(data)"
                   size="small"
@@ -54,34 +70,47 @@
                 >
                   子机
                 </el-tag>
-                <span v-if="getProjectMemberships(data).length" class="node-projects">
-                  <span
-                    v-for="project in getProjectMemberships(data).slice(0, 2)"
-                    :key="project.projectId"
-                    class="node-project-tag"
-                    :class="{ archived: project.status === 'archived' }"
-                    :title="project.projectName"
-                  >
-                    {{ project.projectName }}
-                  </span>
-                  <span v-if="getProjectMemberships(data).length > 2" class="node-project-more"
-                    >+{{ getProjectMemberships(data).length - 2 }}</span
-                  >
-                </span>
               </div>
               <div class="node-line2">
-                <span class="node-link">{{ getHostSubtitle(data) }}</span>
+                <span
+                  class="node-link"
+                  :title="data.connLink"
+                >{{ data.connLink || '未配置连接地址' }}</span>
               </div>
+              <span
+                v-if="getProjectMemberships(data).length"
+                class="node-projects"
+              >
+                <span
+                  v-for="project in getProjectMemberships(data).slice(0, 2)"
+                  :key="project.projectId"
+                  class="node-project-tag"
+                  :class="{ archived: project.status === 'archived' }"
+                  :title="project.projectName"
+                >
+                  {{ project.projectName }}
+                </span>
+                <span
+                  v-if="getProjectMemberships(data).length > 2"
+                  class="node-project-more"
+                >+{{ getProjectMemberships(data).length - 2 }}</span>
+              </span>
             </div>
 
-            <!-- Right: state + heartbeat stacked -->
+            <!-- Sessions and connection test are independent states. -->
             <div class="node-right">
               <StatusIndicator
-                :status="getIndicatorStatus(data)"
-                :label="getStateText(data)"
+                :status="getHostSessions(data).length ? 'online' : 'offline'"
+                :label="getHostSessions(data).length ? `${getHostSessions(data).length} 会话` : '无会话'"
                 compact
               />
-              <span class="node-heartbeat">{{ formatHeartbeat(data.lastHeartbeat) }}</span>
+              <span
+                class="node-test"
+                :class="{ failed: getConnectionResult(data)?.success === false, testing: isTestingPuppet(data) }"
+                :title="getConnectionStatusTitle(data)"
+              >
+                {{ getConnectionStatusText(data) }}
+              </span>
             </div>
 
             <!-- Quick enter (hover) -->
@@ -105,17 +134,9 @@ import { ref, watch, nextTick } from 'vue'
 import { icons } from '@/utils/icons.js'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
-import { resolvePuppetRuntimeStatus } from './puppetRuntimeStatus.js'
+import { getHostDisplayName, getHostIcon, isChildHost } from './puppetDetailUtils.js'
 
 const iconMap = icons
-const STATUS_DOT_CLASS_MAP = {
-  online: 'online',
-  running: 'testing',
-  success: 'online',
-  failed: 'error',
-  untested: 'muted',
-  offline: 'offline'
-}
 
 const props = defineProps({
   puppets: { type: Array, default: () => [] },
@@ -143,12 +164,6 @@ const treeProps = {
   isLeaf: (data) => !data?.hasChildren
 }
 
-const isChildHost = (row) => row?.parentPuppetId && row.parentPuppetId !== 'root'
-
-const getHostIcon = (row) => {
-  return isChildHost(row) ? iconMap.connection : iconMap.server
-}
-
 const getConnectionResult = (row) => {
   const puppetId = row?.puppetId
   return puppetId ? props.connectionResults?.[puppetId] : null
@@ -169,33 +184,19 @@ const getProjectMemberships = (row) => {
   return puppetId ? props.projectMemberships?.[puppetId] || [] : []
 }
 
-const getHostSubtitle = (row) => {
-  const name = String(row?.puppetName || '').trim()
-  const link = String(row?.connLink || '').trim()
-  if (!link) return '未配置连接地址'
-  if (name === link) return isChildHost(row) ? '挂载于上级主机' : '根主机'
-  return link
+const getConnectionStatusText = (row) => {
+  if (isTestingPuppet(row)) return '测试中…'
+  const result = getConnectionResult(row)
+  if (result) return result.success ? '测试成功' : '测试失败'
+  return row?.connLink ? '未测试' : '未配置地址'
 }
 
-const getRuntimeStatus = (row) =>
-  resolvePuppetRuntimeStatus({
-    puppet: row,
-    sessions: getHostSessions(row),
-    isTesting: isTestingPuppet(row),
-    connectionResult: getConnectionResult(row)
-  })
-
-const getStatusDotClass = (row) => {
-  return STATUS_DOT_CLASS_MAP[getRuntimeStatus(row).status] || 'muted'
-}
-
-const getStateText = (row) => getRuntimeStatus(row).label
-
-const getIndicatorStatus = (row) => getRuntimeStatus(row).status
+const getConnectionStatusTitle = (row) =>
+  `连接测试：${getConnectionStatusText(row)} · 最近心跳：${formatHeartbeat(row.lastHeartbeat)}`
 
 const handleLoad = (node, resolve) => {
   if (node.level === 0) {
-    resolve([])
+    resolve(props.puppets)
     return
   }
   props.loadChildren(node.data, node, resolve)
@@ -364,10 +365,12 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 9px;
+  position: relative;
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
   min-height: 50px;
-  padding: 7px 8px 7px 30px;
+  padding: 8px 8px 8px 26px;
   border-radius: var(--radius-tag);
   border: 1px solid transparent;
   border-bottom-color: var(--app-divider-color);
@@ -395,8 +398,8 @@ defineExpose({
 /* ─── Icon shell ─── */
 .node-icon-shell {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -433,42 +436,12 @@ defineExpose({
   height: 8px;
   border-radius: 999px;
   border: 2px solid var(--pm-panel, var(--app-surface-background));
-  background: var(--pm-green, var(--el-color-success));
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--pm-green, var(--el-color-success)) 24%, transparent);
+  background: var(--el-text-color-placeholder);
 }
 
-.node-dot.offline {
-  background: var(--pm-placeholder, var(--el-text-color-placeholder));
-  box-shadow: none;
-}
-
-.node-dot.warning {
-  background: var(--el-color-warning);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-warning) 22%, transparent);
-}
-
-.node-dot.error {
-  background: var(--el-color-danger);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-danger) 22%, transparent);
-}
-
-.node-dot.testing {
-  background: var(--pm-blue, var(--el-color-primary));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pm-blue, var(--el-color-primary)) 22%, transparent);
-  animation: dotPulse 1s ease-in-out infinite;
-}
-
-@keyframes dotPulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.55;
-    transform: scale(0.8);
-  }
+.node-dot.online {
+  background: var(--el-color-success);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-success) 20%, transparent);
 }
 
 /* ─── Content (two lines) ─── */
@@ -555,7 +528,7 @@ defineExpose({
   min-width: 0;
 }
 
-/* ─── Right column (state + heartbeat) ─── */
+/* ─── Right column ─── */
 .node-right {
   flex: 0 0 auto;
   display: flex;
@@ -565,16 +538,26 @@ defineExpose({
   min-width: 54px;
 }
 
-.node-heartbeat {
+.node-test {
   font-size: 10px;
   color: var(--pm-placeholder, var(--el-text-color-placeholder));
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   white-space: nowrap;
+}
+
+.node-test.failed {
+  color: var(--el-color-danger);
+}
+
+.node-test.testing {
+  color: var(--el-color-primary);
 }
 
 /* ─── Quick enter button ─── */
 .quick-enter {
-  flex: 0 0 auto;
+  position: absolute;
+  left: 26px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -582,15 +565,22 @@ defineExpose({
   height: 26px;
   border-radius: 6px;
   border: 1px solid transparent;
-  background: transparent;
+  background: var(--pm-panel-strong, var(--app-card-background));
   color: var(--pm-muted, var(--el-text-color-secondary));
   cursor: pointer;
+  pointer-events: none;
   opacity: 0;
   transition: all 0.15s ease;
 }
 
-.node-card:hover .quick-enter {
+.node-card:hover .quick-enter,
+.node-card:focus-within .quick-enter {
+  pointer-events: auto;
   opacity: 1;
+}
+
+.host-tree.batch-mode .quick-enter {
+  left: 8px;
 }
 
 .quick-enter:hover {
@@ -607,10 +597,6 @@ defineExpose({
 
 /* ─── Responsive ─── */
 @media (max-width: 720px) {
-  .node-right {
-    display: none;
-  }
-
   .quick-enter {
     display: none;
   }

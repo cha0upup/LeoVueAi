@@ -4,17 +4,17 @@
       <el-tabs
         v-model="activeTabId"
         type="card"
-        editable
-        @edit="handleTabEdit"
+        @tab-remove="removeDatabaseTab"
       >
         <el-tab-pane
           v-for="databaseTab in databaseTabs"
           :key="databaseTab.id"
           :name="databaseTab.id"
+          :closable="databaseTab.id !== TAB_CONSTANTS.HOME_TAB_ID"
         >
           <template #label>
             <span
-              v-if="databaseTab.title === TAB_CONSTANTS.HOME_TAB_TITLE"
+              v-if="databaseTab.id === TAB_CONSTANTS.HOME_TAB_ID"
               class="tab-label"
             >
               <el-icon><Icon :icon="iconMap.database" /></el-icon>
@@ -108,12 +108,6 @@ const getConnectionUrl = (databaseTab) => {
   return databaseTab?.url || formatDatabaseConnectionTarget(connection)
 }
 
-const handleTabEdit = (targetName, action) => {
-  if (action === 'remove' && targetName !== TAB_CONSTANTS.HOME_TAB_ID) {
-    removeDatabaseTab(targetName)
-  }
-}
-
 const addDatabaseTab = (payload) => {
   if (!payload || typeof payload !== 'object') return
   const connectionId = payload.connectionId
@@ -151,6 +145,7 @@ const addDatabaseTab = (payload) => {
 }
 
 const removeDatabaseTab = (targetTabId) => {
+  if (targetTabId === TAB_CONSTANTS.HOME_TAB_ID) return
   const tabs = databaseTabs.value
   if (activeTabId.value === targetTabId) {
     const currentIndex = tabs.findIndex((tab) => tab.id === targetTabId)

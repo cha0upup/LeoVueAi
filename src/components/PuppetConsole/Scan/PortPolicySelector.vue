@@ -1,29 +1,30 @@
 <template>
   <div class="port-policy-selector">
     <div class="policy-heading">
-      <strong>端口范围</strong><span class="policy-summary">{{ localPolicy.preset === 'CUSTOM' ? totalPortCount.toLocaleString('zh-CN') + ' 个端口' : presets.find(item => item.value === localPolicy.preset)?.portCount }}</span>
+      <strong>端口范围</strong><span class="policy-summary">{{ preset === 'CUSTOM' ? totalPortCount.toLocaleString('zh-CN') + ' 个端口' : presets.find(item => item.value === preset)?.portCount }}</span>
     </div>
     <el-radio-group
-      v-model="localPolicy.preset"
+      v-model="preset"
       class="preset-grid"
-      @change="handlePresetChange"
+      fill="var(--app-brand-background)"
+      text-color="var(--el-color-primary)"
     >
       <el-radio-button
-        v-for="preset in presets"
-        :key="preset.value"
-        :value="preset.value"
+        v-for="option in presets"
+        :key="option.value"
+        :value="option.value"
       >
-        <span class="preset-option"><strong>{{ preset.label }}</strong><small>{{ preset.portCount }}</small></span>
+        <span class="preset-option"><strong>{{ option.label }}</strong><small>{{ option.portCount }}</small></span>
       </el-radio-button>
     </el-radio-group>
 
     <div
-      v-if="localPolicy.preset === 'CUSTOM'"
+      v-if="preset === 'CUSTOM'"
       class="custom-panel"
     >
       <div class="custom-heading">
         <strong>自定义端口</strong><el-button
-          v-if="totalPortCount || localPolicy.excludePorts.length"
+          v-if="customPortsText || excludePortsText"
           text
           size="small"
           @click="clearCustom"
@@ -42,6 +43,7 @@
           class="group-chip"
           :class="{ selected: isGroupSelected(group), partial: isGroupPartial(group) }"
           :aria-pressed="isGroupSelected(group)"
+          :disabled="Boolean(parsedPolicy.error)"
           @click="toggleGroup(group)"
         >
           <span>{{ group.label }}</span><small>{{ group.ports.length }}</small>
@@ -53,7 +55,6 @@
             id="include-ports"
             v-model="customPortsText"
             placeholder="80, 443, 8000-9000"
-            @input="parseCustomPorts"
           />
         </div>
         <div class="custom-field">
@@ -61,47 +62,8 @@
             id="exclude-ports"
             v-model="excludePortsText"
             placeholder="例如：22, 23"
-            @input="parseExcludePorts"
           />
         </div>
-      </div>
-      <details class="range-editor">
-        <summary>添加连续范围</summary>
-        <div class="range-row">
-          <el-input-number
-            v-model="rangeStart"
-            aria-label="起始端口"
-            :min="1"
-            :max="65535"
-            controls-position="right"
-          /><span>至</span><el-input-number
-            v-model="rangeEnd"
-            aria-label="结束端口"
-            :min="1"
-            :max="65535"
-            controls-position="right"
-          /><el-button
-            size="small"
-            plain
-            @click="addRange"
-          >
-            添加范围
-          </el-button>
-        </div>
-      </details>
-      <div
-        v-if="portRanges.length"
-        class="range-tags"
-      >
-        <el-tag
-          v-for="(range, index) in portRanges"
-          :key="range.start + '-' + range.end + '-' + index"
-          closable
-          size="small"
-          @close="removeRange(index)"
-        >
-          {{ range.start }}-{{ range.end }}
-        </el-tag>
       </div>
       <p
         v-if="parseError"
@@ -109,39 +71,17 @@
       >
         {{ parseError }}
       </p>
-      <div class="port-summary">
-        <span>本次包含</span><div class="summary-values">
-          <el-tag
-            v-for="port in previewPorts"
-            :key="port"
-            size="small"
-          >
-            {{ port }}
-          </el-tag><span
-            v-if="totalPortCount > previewPorts.length"
-            class="summary-more"
-          >+{{ totalPortCount - previewPorts.length }} 个</span><span
-            v-if="!totalPortCount"
-            class="summary-empty"
-          >尚未选择端口</span>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
-  modelValue: {
-    type: Object,
-    default: () => ({ preset: 'QUICK', customPorts: [], excludePorts: [] })
-  }
+  modelValue: { type: Object, default: () => ({ preset: 'QUICK', customPorts: [], excludePorts: [] }) }
 })
-
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'validity-change'])
 
 const presets = [
   { value: 'QUICK', label: '快速', portCount: '约 100 端口' },
@@ -159,88 +99,55 @@ const portGroups = [
   { value: 'middleware', label: '中间件', ports: [2181, 5601, 7001, 9090, 9092, 9200] }
 ]
 
-const initialPorts = normalizePorts(props.modelValue?.customPorts)
-const localPolicy = reactive({
-  preset: props.modelValue?.preset || 'QUICK',
-  excludePorts: normalizePorts(props.modelValue?.excludePorts)
+const preset = ref(props.modelValue.preset || 'QUICK')
+const customPortsText = ref(formatPorts(props.modelValue.customPorts || []))
+const excludePortsText = ref(formatPorts(props.modelValue.excludePorts || []))
+const parsedPolicy = computed(() => {
+  try {
+    const include = parsePortString(customPortsText.value)
+    const exclude = parsePortString(excludePortsText.value)
+    const excluded = new Set(exclude)
+    return { include, exclude, ports: include.filter(port => !excluded.has(port)), error: '' }
+  } catch (error) {
+    return { include: [], exclude: [], ports: [], error: error.message }
+  }
 })
-const selectedPorts = ref(initialPorts)
-const customPortsText = ref(initialPorts.join(', '))
-const excludePortsText = ref(localPolicy.excludePorts.join(', '))
-const manualPorts = ref([])
-const parseError = ref('')
-const rangeStart = ref(1)
-const rangeEnd = ref(1000)
-const portRanges = ref([])
+const totalPortCount = computed(() => parsedPolicy.value.ports.length)
+const parseError = computed(() => parsedPolicy.value.error || (!totalPortCount.value ? '请至少包含一个有效端口' : ''))
 
-const allSelectedPorts = computed(() => {
-  const ports = new Set([...selectedPorts.value, ...manualPorts.value])
-  portRanges.value.forEach(range => {
-    for (let port = range.start; port <= range.end; port += 1) ports.add(port)
-  })
-  localPolicy.excludePorts.forEach(port => ports.delete(port))
-  return Array.from(ports).sort((left, right) => left - right)
-})
-const totalPortCount = computed(() => localPolicy.preset === 'CUSTOM' ? allSelectedPorts.value.length : 0)
-const previewPorts = computed(() => allSelectedPorts.value.slice(0, 8))
-
-watch(
-  [() => localPolicy.preset, () => localPolicy.excludePorts, selectedPorts, manualPorts, portRanges],
-  emitPolicy,
-  { deep: true }
-)
-
-function normalizePorts(value) {
-  return Array.from(new Set((Array.isArray(value) ? value : []).map(Number).filter(port => Number.isInteger(port) && port >= 1 && port <= 65535))).sort((left, right) => left - right)
-}
-
-function emitPolicy() {
+watch([preset, parsedPolicy], () => {
+  const valid = preset.value !== 'CUSTOM' || !parseError.value
+  emit('validity-change', valid)
   emit('update:modelValue', {
-    preset: localPolicy.preset,
-    customPorts: allSelectedPorts.value,
-    excludePorts: [...localPolicy.excludePorts]
+    preset: preset.value,
+    customPorts: parsedPolicy.value.ports,
+    excludePorts: parsedPolicy.value.exclude
   })
-}
-
-function handlePresetChange() {
-  emitPolicy()
-}
+}, { immediate: true, flush: 'sync' })
 
 function isGroupSelected(group) {
-  return group.ports.every(port => selectedPorts.value.includes(port))
+  return group.ports.every(port => parsedPolicy.value.include.includes(port))
 }
-
 function isGroupPartial(group) {
-  const selected = group.ports.filter(port => selectedPorts.value.includes(port)).length
+  const selected = group.ports.filter(port => parsedPolicy.value.include.includes(port)).length
   return selected > 0 && selected < group.ports.length
 }
-
 function toggleGroup(group) {
-  const groupPorts = new Set(group.ports)
-  if (isGroupSelected(group)) {
-    selectedPorts.value = selectedPorts.value.filter(port => !groupPorts.has(port))
-  } else {
-    selectedPorts.value = normalizePorts([...selectedPorts.value, ...group.ports])
-  }
+  if (parsedPolicy.value.error) return
+  const ports = new Set(parsedPolicy.value.include)
+  const remove = isGroupSelected(group)
+  group.ports.forEach(port => remove ? ports.delete(port) : ports.add(port))
+  customPortsText.value = formatPorts([...ports])
 }
-
-function parseCustomPorts() {
-  try {
-    manualPorts.value = parsePortString(customPortsText.value)
-    parseError.value = ''
-  } catch (error) {
-    manualPorts.value = []
-    parseError.value = error.message
+function formatPorts(ports) {
+  const sorted = [...new Set(ports)].sort((a, b) => a - b)
+  const parts = []
+  for (let index = 0; index < sorted.length; index++) {
+    const start = sorted[index]
+    while (sorted[index + 1] === sorted[index] + 1) index++
+    parts.push(start === sorted[index] ? String(start) : `${start}-${sorted[index]}`)
   }
-}
-
-function parseExcludePorts() {
-  try {
-    localPolicy.excludePorts = parsePortString(excludePortsText.value)
-    parseError.value = ''
-  } catch (error) {
-    parseError.value = error.message
-  }
+  return parts.join(', ')
 }
 
 function parsePortString(value) {
@@ -265,40 +172,21 @@ function parsePortString(value) {
   return Array.from(ports).sort((left, right) => left - right)
 }
 
-function addRange() {
-  if (rangeStart.value > rangeEnd.value) {
-    ElMessage.error('起始端口不能大于结束端口')
-    return
-  }
-  const next = { start: rangeStart.value, end: rangeEnd.value }
-  if (!portRanges.value.some(range => range.start === next.start && range.end === next.end)) portRanges.value.push(next)
-}
-
-function removeRange(index) {
-  portRanges.value.splice(index, 1)
-}
-
 function clearCustom() {
-  selectedPorts.value = []
-  manualPorts.value = []
   customPortsText.value = ''
   excludePortsText.value = ''
-  localPolicy.excludePorts = []
-  portRanges.value = []
-  parseError.value = ''
 }
 </script>
 
 <style scoped lang="scss">
 .port-policy-selector { min-width: 0; color: var(--el-text-color-primary); }
-.policy-heading, .custom-heading, .port-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.policy-heading, .custom-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .policy-heading { margin-bottom: 8px; }
 .policy-heading strong, .custom-heading strong { font-size: 12px; font-weight: 600; }
 .policy-summary { color: var(--el-text-color-secondary); font-size: 11px; white-space: nowrap; }
 .preset-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
 .preset-grid :deep(.el-radio-button), .preset-grid :deep(.el-radio-button__inner) { width: 100%; }
 .preset-grid :deep(.el-radio-button__inner) { padding: 10px 4px; }
-.preset-grid :deep(.el-radio-button.is-active .el-radio-button__inner) { color: var(--el-color-primary); background: var(--el-color-primary-light-9); border-color: var(--el-color-primary); }
 .preset-option { display: flex; align-items: center; flex-direction: column; gap: 5px; }
 .preset-option strong { font-size: 12px; font-weight: 600; }
 .preset-option small { color: var(--el-text-color-secondary); font-size: 10px; }
@@ -309,23 +197,12 @@ function clearCustom() {
 .group-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--el-border-color); border-radius: 4px; color: var(--el-text-color-regular); background: var(--el-fill-color-blank); cursor: pointer; font-size: 11px; }
 .group-chip small { color: var(--el-text-color-secondary); font-size: 10px; }
 .group-chip:hover, .group-chip.partial { border-color: var(--el-color-primary-light-5); color: var(--el-color-primary); }
-.group-chip.selected { border-color: var(--el-color-primary); color: var(--el-color-primary); background: var(--el-color-primary-light-9); }
+.group-chip.selected { border-color: var(--el-color-primary); color: var(--el-color-primary); background: var(--app-brand-background); }
 .group-chip.selected small, .group-chip.partial small { color: inherit; }
+.group-chip:disabled { opacity: 0.5; cursor: not-allowed; }
 .group-chip:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 2px; }
-.custom-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.custom-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 12px; }
 .custom-field label { display: block; margin-bottom: 6px; color: var(--el-text-color-regular); font-size: 11px; }
 .custom-field :deep(.el-input__inner) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.5; }
-.range-editor { margin-top: 10px; }
-.range-editor summary { color: var(--el-text-color-secondary); cursor: pointer; font-size: 11px; }
-.range-editor summary:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 3px; }
-.range-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.range-row > span { color: var(--el-text-color-secondary); font-size: 11px; }
-.range-row :deep(.el-input-number) { flex: 1; min-width: 70px; width: 90px; }
-.range-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .parse-error { margin: 8px 0 0; color: var(--el-color-danger); font-size: 11px; }
-.port-summary { align-items: flex-start; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--el-border-color-lighter); }
-.port-summary > span { flex-shrink: 0; padding-top: 3px; color: var(--el-text-color-secondary); font-size: 11px; }
-.summary-values { display: flex; flex: 1; flex-wrap: wrap; gap: 5px; min-width: 0; }
-.summary-values :deep(.el-tag) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.summary-more, .summary-empty { padding-top: 3px; color: var(--el-text-color-secondary); font-size: 10px; }
 </style>

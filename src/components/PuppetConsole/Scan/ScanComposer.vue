@@ -34,43 +34,47 @@
         </el-form-item>
 
         <div class="scan-settings">
-          <div class="name-field">
-            <label for="scan-name">任务名称 <span>可选</span></label>
-            <el-input
-              id="scan-name"
-              v-model="formData.name"
-              placeholder="例如：生产网段周检"
-              clearable
-            />
-          </div>
           <PortPolicySelector
             v-show="scansPorts"
             v-model="formData.portPolicy"
+            @validity-change="portPolicyValid = $event"
           />
-          <div class="execution-fields">
-            <el-form-item label="并发数">
-              <el-input-number
-                v-model="formData.concurrency"
-                :min="1"
-                :max="256"
-                :precision="0"
-                controls-position="right"
+          <details class="advanced-settings">
+            <summary>高级设置 <span>名称、并发与超时</span></summary>
+            <div class="name-field">
+              <label for="scan-name">任务名称 <span>可选</span></label>
+              <el-input
+                id="scan-name"
+                v-model="formData.name"
+                placeholder="例如：生产网段周检"
+                clearable
               />
-            </el-form-item>
-            <el-form-item label="连接超时">
-              <div class="timeout-field">
+            </div>
+            <div class="execution-fields">
+              <el-form-item label="并发数">
                 <el-input-number
-                  v-model="formData.connectTimeout"
-                  :min="100"
-                  :max="300000"
-                  :step="100"
+                  v-model="formData.concurrency"
+                  :min="1"
+                  :max="256"
                   :precision="0"
                   controls-position="right"
                 />
-                <span>ms</span>
-              </div>
-            </el-form-item>
-          </div>
+              </el-form-item>
+              <el-form-item label="连接超时">
+                <div class="timeout-field">
+                  <el-input-number
+                    v-model="formData.connectTimeout"
+                    :min="100"
+                    :max="300000"
+                    :step="100"
+                    :precision="0"
+                    controls-position="right"
+                  />
+                  <span>ms</span>
+                </div>
+              </el-form-item>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -123,12 +127,6 @@
     </el-form>
 
     <footer class="composer-footer">
-      <div
-        class="scan-stages"
-        aria-label="扫描流程"
-      >
-        {{ selectedStages.map(stage => stage.label).join(' → ') || '请选择扫描阶段' }}
-      </div>
       <div class="footer-actions">
         <el-button @click="handleCancel">
           取消
@@ -136,7 +134,7 @@
         <el-button
           type="primary"
           :loading="previewing || starting"
-          :disabled="!formData.targets.length || !formData.stages.length || previewing || starting"
+          :disabled="!formData.targets.length || !formData.stages.length || (scansPorts && !portPolicyValid) || previewing || starting"
           @click="previewData ? handleStart() : handlePreview()"
         >
           <el-icon v-if="!previewing && !starting">
@@ -154,7 +152,7 @@ import { CaretRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import TargetInput from './TargetInput.vue'
 import PortPolicySelector from './PortPolicySelector.vue'
-import { SCAN_STAGES, selectScanStages, toggleScanStage } from './scanStages.js'
+import { SCAN_STAGES, toggleScanStage } from './scanStages.js'
 import { previewNetworkProbeWorkflowApi, startNetworkProbeWorkflowApi } from '@/services/api.js'
 
 const props = defineProps({
@@ -181,7 +179,7 @@ const formData = reactive({
   connectTimeout: 1000
 })
 
-const selectedStages = computed(() => selectScanStages(formData.stages))
+const portPolicyValid = ref(true)
 const scansPorts = computed(() => formData.stages.includes('PORT_SCAN'))
 const stageHint = computed(() => {
   if (!formData.stages.length) return '请至少选择一个扫描阶段。'
@@ -215,6 +213,7 @@ watch(
     formData.targets,
     formData.stages,
     formData.portPolicy,
+    portPolicyValid.value,
     formData.concurrency,
     formData.connectTimeout
   ],
@@ -281,6 +280,10 @@ function handleCancel() {
 }
 
 function validateTargets() {
+  if (scansPorts.value && !portPolicyValid.value) {
+    ElMessage.warning('请修正端口配置')
+    return false
+  }
   if (!formData.stages.length) {
     ElMessage.warning('请至少选择一个扫描阶段')
     return false
@@ -321,7 +324,7 @@ defineExpose({
   display: flex;
   flex-direction: column;
   min-height: 0;
-  max-height: calc(90dvh - 60px);
+  max-height: calc(92dvh - 64px);
   color: var(--el-text-color-primary);
   background: var(--el-bg-color-overlay);
 }
@@ -356,6 +359,10 @@ defineExpose({
   border-left: 1px solid var(--el-border-color-lighter);
 }
 
+.advanced-settings summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.advanced-settings summary span { margin-left: 6px; color: var(--el-text-color-secondary); font-size: 11px; font-weight: 400; }
+.advanced-settings[open] summary { margin-bottom: 16px; }
+.name-field { margin-bottom: 16px; }
 .name-field label {
   display: flex;
   align-items: baseline;
@@ -406,18 +413,16 @@ defineExpose({
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   padding: 12px 20px;
   border-top: 1px solid var(--el-border-color-lighter);
 }
-.scan-stages { display: flex; flex-wrap: wrap; gap: 8px; color: var(--el-text-color-secondary); font-size: 11px; }
 .footer-actions { display: flex; flex-shrink: 0; gap: 8px; }
 .footer-actions :deep(.el-button + .el-button) { margin-left: 0; }
 .footer-actions :deep(.el-icon) { margin-right: 4px; }
 
 @media (max-width: 680px) {
-  .scan-composer { max-height: calc(96dvh - 60px); }
   .composer-form { padding: 16px; }
   .composer-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .scan-settings { padding-left: 0; border-left: 0; }
@@ -425,10 +430,5 @@ defineExpose({
   .preview-heading { display: flex; align-items: center; justify-content: space-between; }
   .preview-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .composer-footer { padding: 12px 16px; }
-  .scan-stages { gap: 4px; font-size: 10px; }
-}
-@media (max-width: 440px) {
-  .scan-stages { display: none; }
-  .composer-footer { justify-content: flex-end; }
 }
 </style>

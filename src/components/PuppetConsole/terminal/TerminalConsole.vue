@@ -1,170 +1,284 @@
 <template>
-  <div class="terminal-console">
-    <div class="terminal-console__body">
+  <div
+    class="terminal-console"
+    :class="{ 'is-sidebar-collapsed': sidebarCollapsed || !sessions.length }"
+    @keydown.capture="handleShortcut"
+  >
+    <header class="terminal-toolbar">
+      <div class="toolbar-identity">
+        <el-button
+          text
+          class="sidebar-toggle"
+          :disabled="!sessions.length"
+          :aria-expanded="!sidebarCollapsed"
+          :aria-label="sidebarCollapsed ? '展开会话列表' : '收起会话列表'"
+          :title="sidebarCollapsed ? '展开会话列表' : '收起会话列表'"
+          @click="sidebarCollapsed = !sidebarCollapsed"
+        >
+          <Icon :icon="icons.menu" />
+        </el-button>
+        <strong class="active-session-title">{{ activeSession?.title || '终端' }}</strong>
+        <el-select
+          v-if="sessions.length"
+          :model-value="activeSessionId"
+          class="compact-session-picker"
+          aria-label="切换终端会话"
+          @change="activateSession"
+        >
+          <el-option
+            v-for="session in sessions"
+            :key="session.id"
+            :value="session.id"
+            :label="`${session.title}${session.ended ? ' · 已结束' : ''}${session.hasUnread ? ' · 有新输出' : ''}`"
+          />
+        </el-select>
+      </div>
+      <div class="toolbar-actions">
+        <el-dropdown
+          v-if="terminalModeOptions.length"
+          trigger="click"
+          @command="createSession"
+        >
+          <el-button
+            size="small"
+            aria-label="新建终端，选择模式"
+          >
+            <Icon :icon="icons.plus" /> 新建 <Icon :icon="icons.arrowDown" />
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item
+                v-for="option in terminalModeOptions"
+                :key="option.value"
+                :command="option.value"
+                :disabled="option.disabled"
+              >
+                {{ option.label }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button
+          v-else
+          size="small"
+          @click="createSession()"
+        >
+          <Icon :icon="icons.plus" /> 新建
+        </el-button>
+        <el-button
+          text
+          :disabled="!activeSession"
+          aria-label="查找终端输出"
+          title="查找终端输出（Ctrl/⌘+F）"
+          :aria-expanded="searchVisible"
+          @click="openSearch"
+        >
+          <Icon :icon="icons.search" />
+        </el-button>
+        <el-button
+          size="small"
+          :disabled="!canInterrupt"
+          title="中断当前命令（Ctrl+C）"
+          @click="interruptActiveSession"
+        >
+          <Icon :icon="icons.stop" /> 中断
+        </el-button>
+        <el-dropdown
+          trigger="click"
+          @command="handleAction"
+        >
+          <el-button
+            text
+            aria-label="终端更多操作"
+            title="更多操作"
+          >
+            <Icon :icon="icons.more" />
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item
+                command="clear"
+                :disabled="!activeSession"
+              >
+                清屏
+              </el-dropdown-item>
+              <el-dropdown-item
+                command="close"
+                :disabled="!activeSession"
+              >
+                关闭当前会话
+              </el-dropdown-item>
+              <el-dropdown-item
+                command="reset"
+                divided
+                :disabled="!sessions.length"
+              >
+                重置全部会话
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+    </header>
+
+    <div class="terminal-body">
       <TerminalSessionRail
-        :icon-map="icons"
         :sessions="sessions"
         :active-session-id="activeSessionId"
         :now="clockNow"
-        :terminal-mode-options="terminalModeOptions"
         @activate="activateSession"
-        @create-session="createSession"
-        @reset-workspace="handleResetWorkspace"
         @close-session="removeSession"
-        @interrupt-session="interruptSession"
-        @clear-screen="clearSessionViewport"
       />
-
-      <section class="terminal-stage">
-        <div class="terminal-stage__surface">
-          <div class="terminal-stage__head">
-            <div class="stage-head__primary">
-              <span
-                class="stage-title-icon"
-                aria-hidden="true"
-              >
-                <el-icon><Icon :icon="icons.terminal" /></el-icon>
-              </span>
-              <div class="stage-identity">
-                <span class="stage-title">{{ activeSession?.title || '终端' }}</span>
-                <span class="stage-subtitle">进程 {{ activeSessionLabel }}</span>
-              </div>
-            </div>
-            <div class="stage-head__secondary">
-              <div class="stage-search">
-                <el-input
-                  :model-value="searchKeyword"
-                  size="small"
-                  clearable
-                  placeholder="检索终端输出"
-                  @update:model-value="(value) => handleSearchKeywordChange(value || '')"
-                >
-                  <template #prefix>
-                    <el-icon><Icon :icon="icons.search" /></el-icon>
-                  </template>
-                </el-input>
-                <el-button
-                  circle
-                  size="small"
-                  aria-label="上一个搜索结果"
-                  @click="searchInActiveSession('prev')"
-                >
-                  <el-icon><Icon :icon="icons.arrowUp" /></el-icon>
-                </el-button>
-                <el-button
-                  circle
-                  size="small"
-                  aria-label="下一个搜索结果"
-                  @click="searchInActiveSession('next')"
-                >
-                  <el-icon><Icon :icon="icons.arrowDown" /></el-icon>
-                </el-button>
-              </div>
-              <div class="stage-actions">
-                <el-button
-                  class="stage-action-button is-interrupt"
-                  size="small"
-                  @click="interruptActiveSession"
-                >
-                  <el-icon><Icon :icon="icons.stop" /></el-icon>
-                  中断
-                </el-button>
-                <el-button
-                  class="stage-action-button"
-                  size="small"
-                  @click="clearActiveViewport"
-                >
-                  <el-icon><Icon :icon="icons.remove" /></el-icon>
-                  清屏
-                </el-button>
-                <el-button
-                  class="stage-action-button is-close"
-                  size="small"
-                  @click="closeActiveSession"
-                >
-                  <el-icon><Icon :icon="icons.close" /></el-icon>
-                  关闭
-                </el-button>
-              </div>
-            </div>
-          </div>
-
-          <div class="terminal-stage__viewport">
-            <TerminalViewport
-              v-for="session in sessions"
-              v-show="session.id === activeSessionId"
-              :key="session.id"
-              :ref="(instance) => setViewportRef(instance, session.id)"
-              :active="session.id === activeSessionId"
-              :terminal-session="session"
-              @ready="handleViewportReady(session.id)"
-              @input="(data) => handleTerminalInput(data, session)"
-              @resize="(size) => handleTerminalResize(size, session)"
-              @activity="markSessionActive(session)"
-            />
-          </div>
-
-          <div class="terminal-stage__foot">
-            <div class="stage-foot__block">
-              <span class="stage-foot__label">会话 ID</span>
-              <span class="stage-foot__value">{{ activeSessionLabel }}</span>
-            </div>
-            <div class="stage-foot__block">
-              <span class="stage-foot__label">最后交互</span>
-              <span class="stage-foot__value">{{ activeSessionTimeLabel }}</span>
-            </div>
-            <div class="stage-foot__block is-compact">
-              <span :class="['stage-foot__meta', { 'is-warning': activeCapability.degraded }]">
-                {{ activeCapability.mode }}
-              </span>
-              <span class="stage-foot__divider" />
-              <span class="stage-foot__meta">{{ activeCapability.resizeMode }}</span>
-              <span class="stage-foot__divider" />
-              <span class="stage-foot__meta">{{ activeCapability.streamMode }}</span>
-              <span class="stage-foot__divider" />
-              <span class="stage-foot__meta">{{ activeSession?.backend || 'detecting' }}</span>
-              <span class="stage-foot__divider" />
-              <template v-if="activeSession?.routingMismatch">
-                <span class="stage-foot__meta is-warning">ROUTE?</span>
-                <span class="stage-foot__divider" />
-              </template>
-              <span class="stage-foot__meta">UTF-8</span>
-              <span class="stage-foot__divider" />
-              <span class="stage-foot__shortcut"><kbd>Ctrl</kbd><span>+</span><kbd>C</kbd> 中断</span>
-            </div>
-          </div>
+      <section
+        class="terminal-stage"
+        aria-label="终端输出"
+      >
+        <div
+          v-if="searchVisible && activeSession"
+          class="terminal-search"
+          role="search"
+          aria-label="查找终端输出"
+          @keydown.esc.stop.prevent="closeSearch"
+          @keydown.enter.stop.prevent="searchInActiveSession($event.shiftKey ? 'prev' : 'next')"
+        >
+          <el-input
+            ref="searchInput"
+            :model-value="searchKeyword"
+            size="small"
+            clearable
+            placeholder="查找终端输出"
+            aria-label="查找终端输出"
+            @update:model-value="handleSearchKeywordChange($event || '')"
+          />
+          <span
+            class="search-result"
+            role="status"
+            aria-live="polite"
+          >{{
+            searchResultLabel
+          }}</span>
+          <el-button
+            text
+            :disabled="!searchResult.resultCount || !searchKeyword.trim()"
+            aria-label="上一个匹配"
+            title="上一个匹配（Shift+Enter）"
+            @click="searchInActiveSession('prev')"
+          >
+            <Icon :icon="icons.arrowUp" />
+          </el-button>
+          <el-button
+            text
+            :disabled="!searchResult.resultCount || !searchKeyword.trim()"
+            aria-label="下一个匹配"
+            title="下一个匹配（Enter）"
+            @click="searchInActiveSession('next')"
+          >
+            <Icon :icon="icons.arrowDown" />
+          </el-button>
+          <el-button
+            text
+            aria-label="关闭查找"
+            title="关闭查找（Esc）"
+            @click="closeSearch"
+          >
+            <Icon :icon="icons.close" />
+          </el-button>
         </div>
+        <div
+          v-if="!sessions.length"
+          class="terminal-empty"
+        >
+          <Icon :icon="icons.terminal" />
+          <h3>暂无终端会话</h3>
+          <p>新建一个会话开始操作。</p>
+          <el-button
+            type="primary"
+            @click="createSession()"
+          >
+            <Icon :icon="icons.plus" /> 新建终端
+          </el-button>
+        </div>
+        <TerminalViewport
+          v-for="session in sessions"
+          v-show="session.id === activeSessionId"
+          :key="session.id"
+          :ref="(instance) => setViewportRef(instance, session.id)"
+          :active="session.id === activeSessionId"
+          @ready="handleViewportReady(session.id)"
+          @input="handleTerminalInput($event, session)"
+          @resize="handleTerminalResize($event, session)"
+          @activity="markSessionActive(session)"
+          @search-results="handleSearchResults(session.id, $event)"
+        />
+        <footer
+          v-if="activeSession"
+          class="terminal-status"
+        >
+          <span
+            class="session-status"
+            :class="{ 'is-warning': activeSession.routingMismatch || activeSession.ended }"
+          ><i aria-hidden="true" />{{ sessionStatus }}</span>
+          <span
+            v-if="modeSummary"
+            class="mode-summary"
+          >{{ modeSummary }}</span>
+          <el-popover
+            placement="top-start"
+            title="会话详情"
+            :width="360"
+            trigger="click"
+          >
+            <template #reference>
+              <el-button
+                text
+                size="small"
+                aria-label="查看会话详情"
+              >
+                详情 <Icon :icon="icons.info" />
+              </el-button>
+            </template>
+            <dl class="session-details">
+              <dt>会话 ID</dt>
+              <dd>{{ activeSession.id }}</dd>
+              <dt>后端</dt>
+              <dd>{{ activeSession.backend }}</dd>
+              <dt>尺寸</dt>
+              <dd>{{ activeCapability.resizeMode }}</dd>
+              <dt>传输方式</dt>
+              <dd>{{ activeCapability.streamMode }}</dd>
+              <dt>最后交互</dt>
+              <dd>{{ activeSessionTimeLabel }}</dd>
+            </dl>
+            <p class="capability-details">
+              {{ activeCapability.details }}
+            </p>
+          </el-popover>
+          <span class="terminal-shortcut">Ctrl+C 中断</span>
+        </footer>
       </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, inject, onUnmounted, ref, toRef, watch } from 'vue'
+import { computed, inject, nextTick, onUnmounted, ref, toRef, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
 import { execCommandApi } from '@/services/api.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
-import TerminalSessionRail from '@/components/PuppetConsole/terminal/TerminalSessionRail.vue'
-import TerminalViewport from '@/components/PuppetConsole/terminal/TerminalViewport.vue'
+import TerminalSessionRail from './TerminalSessionRail.vue'
+import TerminalViewport from './TerminalViewport.vue'
 import { describeTerminalCapability } from './terminalWorkspaceModel.js'
 import { useTerminalWorkspace } from './useTerminalWorkspace.js'
 
-const props = defineProps({
-  sessionId: {
-    type: String,
-    required: true
-  }
-})
-
+const props = defineProps({ sessionId: { type: String, required: true } })
 const updateSidebarBadge = inject('updateSidebarBadge', () => {})
 const runtime = inject('puppetRuntime', ref('java'))
 const {
   sessions,
   activeSessionId,
   activeSession,
-  activeSessionLabel,
   activeSessionTimeLabel,
   clockNow,
   terminalModeOptions,
@@ -174,9 +288,7 @@ const {
   activateSession,
   removeSession,
   closeActiveSession,
-  clearSessionViewport,
   clearActiveViewport,
-  interruptSession,
   interruptActiveSession,
   resetWorkspace,
   markSessionActive,
@@ -184,316 +296,305 @@ const {
   handleTerminalInput,
   handleTerminalResize,
   handleSearchKeywordChange,
-  searchInActiveSession
+  searchInActiveSession,
+  focusActiveViewport
 } = useTerminalWorkspace({
   hostSessionId: toRef(props, 'sessionId'),
   runtime,
   executeCommand: execCommandApi,
   onError: showError
 })
+const sidebarCollapsed = ref(true)
+const searchVisible = ref(false)
+const searchInput = ref(null)
+const searchResult = ref({ resultIndex: -1, resultCount: 0 })
 const activeCapability = computed(() => describeTerminalCapability(activeSession.value))
-
-async function handleResetWorkspace() {
-  const confirmed = await confirmAction({
-    title: '重置终端工作台',
-    message: '将关闭当前所有终端并创建一个新的会话。',
-    confirmButtonText: '重置'
-  })
-  if (!confirmed) return
-  await resetWorkspace()
-  showSuccess('终端工作台已重置')
+const sessionStatus = computed(() => {
+  const session = activeSession.value
+  if (session?.routingMismatch) return '会话路由异常'
+  if (session?.ended) return '已结束'
+  if (session?.processExited) return '正在结束'
+  return session?.pty == null ? '初始化中' : '已就绪'
+})
+const canInterrupt = computed(
+  () =>
+    activeSession.value?.pty != null &&
+    !activeSession.value.processExited &&
+    !activeSession.value.ended
+)
+const modeSummary = computed(
+  () =>
+    ({
+      PIPE: 'PIPE · 交互能力受限',
+      PTY: activeSession.value?.resizable === false ? 'PTY · 固定尺寸' : 'PTY · 完整交互',
+      COMMAND: '命令模式 · 不支持交互输入'
+    })[activeCapability.value.mode] || ''
+)
+const searchResultLabel = computed(() => {
+  if (!searchKeyword.value.trim()) return ''
+  const { resultIndex, resultCount } = searchResult.value
+  if (!resultCount) return '无匹配'
+  return resultIndex < 0 ? `${resultCount}+ 项` : `${resultIndex + 1} / ${resultCount}`
+})
+function handleSearchResults(sessionId, result) {
+  if (sessionId === activeSessionId.value) searchResult.value = result
 }
-
+async function openSearch() {
+  if (!activeSession.value) return
+  searchVisible.value = true
+  await nextTick()
+  searchInput.value?.focus()
+  searchInput.value?.select()
+}
+function closeSearch() {
+  searchVisible.value = false
+  handleSearchKeywordChange('')
+  focusActiveViewport()
+}
+function handleShortcut(event) {
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    event.key.toLowerCase() === 'f' &&
+    activeSession.value
+  ) {
+    event.preventDefault()
+    event.stopPropagation()
+    openSearch()
+  }
+}
+async function handleAction(action) {
+  if (action === 'clear') clearActiveViewport()
+  else if (action === 'close') closeActiveSession()
+  else if (action === 'reset') {
+    const hostSessionId = props.sessionId
+    const confirmed = await confirmAction({
+      title: '重置全部会话',
+      message: '将关闭当前所有终端并创建一个新的会话。',
+      confirmButtonText: '重置'
+    })
+    if (!confirmed || props.sessionId !== hostSessionId) return
+    await resetWorkspace()
+    showSuccess('终端工作台已重置')
+  }
+}
+watch(activeSessionId, () => {
+  searchVisible.value = false
+  searchResult.value = { resultIndex: -1, resultCount: 0 }
+})
 watch(
   () => sessions.value.length,
-  (count) => {
-    updateSidebarBadge('terminal', count || undefined)
-  },
+  (count) => updateSidebarBadge('terminal', count || undefined),
   { immediate: true }
 )
-
-onUnmounted(() => {
-  updateSidebarBadge('terminal', undefined)
-})
+onUnmounted(() => updateSidebarBadge('terminal', undefined))
 </script>
 
 <style scoped>
 .terminal-console {
-  --workspace-surface: var(--app-card-background);
-  --workspace-muted-surface: var(--app-control-background-soft);
-  --workspace-control-surface: var(--app-control-background);
-  --workspace-soft-border: color-mix(in srgb, var(--el-border-color) 20%, transparent);
   height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0;
+  container-type: inline-size;
   color: var(--el-text-color-primary);
+  background: var(--app-card-background);
 }
-
-.terminal-console__body {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(168px, 180px) minmax(0, 1fr);
-  gap: 0;
-  padding: 0;
-  border-radius: 0;
-  background: color-mix(in srgb, var(--workspace-muted-surface) 64%, transparent);
-  overflow: hidden;
-}
-
-.terminal-stage {
-  min-height: 0;
-  display: flex;
-}
-
-.terminal-stage__surface {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: hidden;
-  border-radius: 0;
-  border: 0;
-  background: var(--workspace-surface);
-  box-shadow: -1px 0 0 color-mix(in srgb, var(--workspace-soft-border) 84%, transparent);
-}
-
-.terminal-stage__head,
-.terminal-stage__foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
-  background: var(--workspace-surface);
-}
-
-.terminal-stage__head {
-  min-height: 44px;
-  border-bottom: 1px solid color-mix(in srgb, var(--workspace-soft-border) 88%, transparent);
-}
-
-.terminal-stage__viewport {
-  min-height: 0;
-  padding: 0;
-  background: var(--app-code-background);
-}
-
-.terminal-stage__foot {
-  border-top: 1px solid color-mix(in srgb, var(--workspace-soft-border) 88%, transparent);
-  justify-content: flex-start;
-  min-height: 30px;
-  padding: 3px 12px;
-  background: color-mix(in srgb, var(--workspace-muted-surface) 44%, transparent);
-}
-
-.stage-head__primary,
-.stage-head__secondary {
+.terminal-toolbar,
+.toolbar-identity,
+.toolbar-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
-
-.stage-head__primary {
-  flex: 0 1 auto;
-}
-
-.stage-title-icon {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.terminal-toolbar {
   flex: 0 0 auto;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--el-color-primary) 8%, transparent);
-  color: var(--el-color-primary);
-  font-size: 14px;
-}
-
-.stage-identity {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.stage-head__secondary {
-  flex: 1 1 auto;
-  justify-content: flex-end;
+  justify-content: space-between;
   flex-wrap: wrap;
-  row-gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
-
-.stage-title {
+.toolbar-identity {
+  flex: 1;
+}
+.active-session-title {
   font-size: 13px;
-  font-weight: 650;
-  line-height: 1.25;
-}
-
-.stage-subtitle {
-  min-width: 0;
-  max-width: 220px;
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
-.stage-search {
-  width: clamp(176px, 20vw, 248px);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 6px;
+.toolbar-actions {
+  flex-shrink: 0;
 }
-
-.stage-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.terminal-console :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
-
-.stage-foot__block {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.terminal-console :deep(.el-button.is-text) {
+  padding: 6px;
+  height: 28px;
 }
-
-.stage-foot__block + .stage-foot__block:not(.is-compact) {
-  padding-left: 10px;
-  margin-left: 4px;
-  border-left: 1px solid color-mix(in srgb, var(--workspace-soft-border) 88%, transparent);
+.terminal-console :deep(.el-button .iconify) {
+  font-size: 16px;
 }
-
-.stage-foot__block.is-compact {
-  margin-left: auto;
-}
-
-.stage-foot__label {
-  font-size: 11px;
-  letter-spacing: 0;
-  color: var(--el-text-color-secondary);
-}
-
-.stage-foot__value {
+.compact-session-picker {
+  display: none;
+  width: 150px;
   max-width: 100%;
+}
+.terminal-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+}
+.terminal-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #07111b;
+}
+.is-sidebar-collapsed .terminal-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+.is-sidebar-collapsed .terminal-rail {
+  display: none;
+}
+.is-sidebar-collapsed .compact-session-picker {
+  display: block;
+}
+.is-sidebar-collapsed .toolbar-identity:has(.compact-session-picker) .active-session-title {
+  display: none;
+}
+.terminal-search {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(430px, calc(100% - 24px));
+  padding: 6px;
+  box-sizing: border-box;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: var(--app-card-background);
+  box-shadow: var(--el-box-shadow-light);
+}
+.terminal-search .el-input {
+  flex: 1;
+  min-width: 60px;
+}
+.search-result {
   font-size: 12px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.stage-foot__meta,
-.stage-foot__shortcut {
-  font-size: 11px;
-  color: var(--el-text-color-placeholder);
+  color: var(--el-text-color-secondary);
   white-space: nowrap;
 }
-
-.stage-foot__meta.is-warning {
-  color: var(--el-color-warning);
-  font-weight: 700;
+.terminal-status {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-height: 30px;
+  padding: 2px 12px;
+  font-size: 12px;
+  background: var(--app-card-background);
+  border-top: 1px solid var(--el-border-color-lighter);
 }
-
-.stage-foot__divider {
-  width: 1px;
-  height: 10px;
-  background: color-mix(in srgb, var(--workspace-soft-border) 88%, transparent);
-}
-
-.stage-foot__shortcut {
+.session-status {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 6px;
 }
-
-.stage-foot__shortcut kbd {
-  min-width: 17px;
-  height: 17px;
-  display: inline-flex;
+.session-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--el-color-primary);
+}
+.session-status.is-warning {
+  color: var(--el-color-warning);
+}
+.session-status.is-warning i {
+  background: currentColor;
+}
+.mode-summary,
+.terminal-shortcut {
+  color: var(--el-text-color-secondary);
+}
+.terminal-shortcut {
+  margin-left: auto;
+  font-size: 11px;
+}
+.session-details {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 12px;
+  font-size: 12px;
+}
+.session-details dt {
+  color: var(--el-text-color-secondary);
+}
+.session-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.capability-details {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.6;
+}
+.terminal-empty {
+  flex: 1;
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 4px;
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 54%, transparent);
-  border-radius: 4px;
-  background: var(--workspace-control-surface);
-  color: var(--el-text-color-secondary);
-  font: inherit;
-  line-height: 1;
+  flex-direction: column;
+  color: #e6edf3;
+  padding: 24px;
 }
-
-.terminal-console :deep(.el-input__wrapper) {
-  border-radius: 6px;
-  background: var(--workspace-control-surface);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--workspace-soft-border) 92%, transparent);
+.terminal-empty > .iconify {
+  font-size: 32px;
+  color: #8b949e;
 }
-
-.terminal-console :deep(.el-button) {
-  border-radius: 6px;
-  font-weight: 600;
-  box-shadow: none;
+.terminal-empty h3 {
+  margin: 16px 0 0;
+  font-size: 16px;
 }
-
-.terminal-console :deep(.el-button--small) {
-  min-height: 28px;
+.terminal-empty p {
+  color: #8b949e;
+  font-size: 13px;
+  margin: 8px 0 20px;
 }
-
-.stage-action-button.is-interrupt,
-.stage-action-button.is-close {
-  --el-button-text-color: var(--el-color-danger);
-  --el-button-border-color: color-mix(in srgb, var(--el-color-danger) 24%, transparent);
-  --el-button-bg-color: color-mix(
-    in srgb,
-    var(--el-color-danger) 7%,
-    var(--workspace-control-surface)
-  );
-  --el-button-hover-text-color: var(--el-color-danger);
-  --el-button-hover-border-color: color-mix(in srgb, var(--el-color-danger) 38%, transparent);
-  --el-button-hover-bg-color: color-mix(
-    in srgb,
-    var(--el-color-danger) 11%,
-    var(--workspace-control-surface)
-  );
-  --el-button-active-text-color: var(--el-color-danger-dark-2);
-  --el-button-active-border-color: color-mix(in srgb, var(--el-color-danger) 44%, transparent);
-  --el-button-active-bg-color: color-mix(
-    in srgb,
-    var(--el-color-danger) 14%,
-    var(--workspace-control-surface)
-  );
-}
-
-@media (max-width: 1100px) {
-  .terminal-console__body {
-    grid-template-columns: 1fr;
+@container (max-width: 700px) {
+  .terminal-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .terminal-rail,
+  .sidebar-toggle,
+  .toolbar-identity:has(.compact-session-picker) .active-session-title {
+    display: none;
+  }
+  .compact-session-picker {
+    display: block;
   }
 }
-
-@media (max-width: 768px) {
-  .terminal-stage__head,
-  .terminal-stage__foot {
-    flex-direction: column;
-    align-items: flex-start;
+@container (max-width: 440px) {
+  .toolbar-identity {
+    flex-basis: 100%;
   }
-
-  .stage-search {
+  .compact-session-picker {
     width: 100%;
   }
-
-  .stage-head__secondary {
-    width: 100%;
-    flex-wrap: wrap;
+  .toolbar-actions {
+    margin-left: auto;
   }
-
-  .stage-foot__block.is-compact {
-    margin-left: 0;
+  .terminal-shortcut {
+    display: none;
   }
 }
 </style>

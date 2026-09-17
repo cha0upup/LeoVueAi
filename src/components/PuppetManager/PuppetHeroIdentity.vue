@@ -4,27 +4,37 @@
       <Icon :icon="getHostIcon(puppet)" />
       <span
         class="presence-dot"
-        :class="{ online: liveSessionCount > 0, muted: !puppet.connLink }"
+        :class="{ online: liveSessionCount > 0 }"
       />
     </div>
     <div class="identity-copy">
       <div class="identity-line">
-        <h2>{{ puppet.puppetName || '-' }}</h2>
+        <h2 :title="getHostDisplayName(puppet)">
+          {{ getHostDisplayName(puppet) }}
+        </h2>
         <span class="type-chip">{{ isChildHost(puppet) ? '子主机' : '主机' }}</span>
-        <StatusIndicator
-          :status="liveSessionCount > 0 ? 'online' : puppet.connLink ? 'normal' : 'unconfigured'"
-          :label="liveSessionCount > 0 ? `${liveSessionCount} 个会话在线` : puppet.connLink ? '已配置' : '未配置'"
-          compact
-        />
       </div>
-      <p>{{ puppet.connLink || '未配置连接地址' }}</p>
+      <div class="identity-address">
+        <p :title="puppet.connLink">
+          {{ puppet.connLink || '未配置连接地址' }}
+        </p>
+        <button
+          v-if="puppet.connLink"
+          type="button"
+          class="copy-address"
+          aria-label="复制连接地址"
+          title="复制连接地址"
+          @click="copyHostDetail(puppet.connLink)"
+        >
+          <Icon icon="ep:copy-document" />
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { getHostIcon, isChildHost } from './puppetDetailUtils.js'
-import StatusIndicator from '@/components/common/StatusIndicator.vue'
+import { getHostIcon, isChildHost, getHostDisplayName, copyHostDetail } from './puppetDetailUtils.js'
 
 defineProps({
   puppet: {
@@ -44,6 +54,7 @@ defineProps({
   align-items: center;
   gap: 12px;
   min-width: 0;
+  flex: 1;
 }
 
 .host-avatar {
@@ -69,15 +80,11 @@ defineProps({
   height: 9px;
   border: 2px solid var(--pm-panel-strong);
   border-radius: 999px;
-  background: var(--pm-blue);
+  background: var(--el-text-color-placeholder);
 }
 
 .presence-dot.online {
   background: var(--el-color-success);
-}
-
-.presence-dot.muted {
-  background: var(--pm-placeholder);
 }
 
 .identity-copy {
@@ -87,7 +94,6 @@ defineProps({
 .identity-line {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 3px;
 }
@@ -97,7 +103,10 @@ defineProps({
   font-size: 16px;
   line-height: 1.2;
   color: var(--pm-ink);
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .type-chip {
@@ -108,9 +117,7 @@ defineProps({
   border-radius: var(--radius-tag);
   font-size: 11px;
   font-weight: 600;
-}
-
-.type-chip {
+  flex-shrink: 0;
   color: var(--pm-blue);
   background: var(--pm-blue-soft);
 }
@@ -120,7 +127,34 @@ defineProps({
   color: var(--el-text-color-regular);
   font-size: 12px;
   line-height: 1.4;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.identity-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.copy-address {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--pm-muted);
+  cursor: pointer;
+}
+
+.copy-address:hover {
+  color: var(--pm-blue);
+  background: var(--pm-panel-soft);
+}
+
+.copy-address:focus-visible {
+  outline: var(--focus-outline);
 }
 
 @media (max-width: 720px) {

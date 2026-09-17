@@ -1,29 +1,81 @@
 <template>
   <div class="context-detail-container">
     <div class="asset-workbench">
-      <div class="asset-switcher">
-        <button
-          v-for="tab in tabDefinitions"
-          :key="tab.key"
-          type="button"
-          class="asset-switch"
-          :class="{ active: activeTab === tab.key }"
-          @click="activeTab = tab.key"
+      <div class="asset-toolbar">
+        <div
+          class="asset-switcher"
+          role="tablist"
+          aria-label="组件类型"
         >
-          <el-icon>
-            <Icon :icon="tab.icon" />
-          </el-icon>
-          <span class="asset-switch-name">{{ tab.label }}</span>
-          <span class="asset-switch-count">{{ tab.count }}</span>
-        </button>
+          <button
+            v-for="tab in tabDefinitions"
+            :key="tab.key"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === tab.key"
+            class="asset-switch"
+            :class="{ active: activeTab === tab.key }"
+            @click="activeTab = tab.key"
+          >
+            <el-icon>
+              <Icon :icon="tab.icon" />
+            </el-icon>
+            <span class="asset-switch-name">{{ tab.label }}</span>
+            <span class="asset-switch-count">{{ tab.count }}</span>
+          </button>
+        </div>
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索当前组件"
+          aria-label="搜索当前组件"
+          clearable
+          class="asset-search"
+        >
+          <template #prefix>
+            <Icon :icon="iconMap.search" />
+          </template>
+        </el-input>
       </div>
 
-      <div class="asset-panel-shell">
+      <div
+        class="asset-panel-shell"
+        role="tabpanel"
+        :aria-label="selectedTab?.label"
+      >
         <component
-          :is="activeComponent"
-          v-if="activeComponent"
+          :is="selectedTab.component"
+          v-if="selectedTab?.component"
           v-bind="activeComponentProps"
           @refresh="emit('refresh')"
+          @view-bytecode="emit('view-bytecode', $event)"
+          @view-detail="emit('view-detail', $event)"
+        />
+        <ContainerAssetPanel
+          v-else-if="selectedTab?.key === 'runtime'"
+          title="框架运行时组件"
+          :total="selectedTab.items.length"
+          :filtered="runtimeItems.length"
+        >
+          <el-table
+            :data="runtimeItems"
+            height="100%"
+            empty-text="暂无运行时组件"
+          >
+            <el-table-column
+              prop="role"
+              label="类型"
+              min-width="150"
+            />
+            <el-table-column
+              prop="className"
+              label="类名"
+              min-width="260"
+            />
+          </el-table>
+        </ContainerAssetPanel>
+        <el-empty
+          v-else
+          description="暂无可查看的组件"
         />
       </div>
     </div>
@@ -32,248 +84,104 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import ServletList from './ServletList.vue'
 import FilterList from './FilterList.vue'
 import ValveList from './ValveList.vue'
 import ListenerList from './ListenerList.vue'
 import ControllerList from './ControllerList.vue'
 import InterceptorList from './InterceptorList.vue'
+import ContainerAssetPanel from './ContainerAssetPanel.vue'
 
-const iconMap = icons
-
-// Props
 const props = defineProps({
-  context: {
-    type: Object,
-    required: true
-  },
-  frameworkInfo: {
-    type: Object,
-    required: false,
-    default: null
-  },
-  sessionId: {
-    type: String,
-    required: true
-  }
+  context: { type: Object, default: null },
+  frameworkInfo: { type: Object, default: null },
+  sessionId: { type: String, required: true }
 })
-
-// 定义事件
-const emit = defineEmits(['refresh'])
-
-// 响应式数据
+const emit = defineEmits(['refresh', 'view-bytecode', 'view-detail'])
+const searchKeyword = ref('')
 const activeTab = ref('servlet')
-
-const tabDefinitions = computed(() => {
-  return [
-    {
-      key: 'servlet',
-      label: 'Servlet',
-      icon: iconMap.code,
-      count: props.context.allServlet?.length || 0,
-      visible: props.context.capabilities?.servlet?.inspect === true
-    },
-    {
-      key: 'filter',
-      label: 'Filter',
-      icon: iconMap.filter,
-      count: props.context.allFilter?.length || 0,
-      visible: props.context.capabilities?.filter?.inspect === true
-    },
-    {
-      key: 'controller',
-      label: '控制器',
-      icon: iconMap.code,
-      count: props.frameworkInfo?.allController?.length || 0,
-      visible: props.context.capabilities?.controller?.inspect === true && Boolean(props.frameworkInfo)
-    },
-    {
-      key: 'interceptor',
-      label: '拦截器',
-      icon: iconMap.shield,
-      count: props.frameworkInfo?.allMappedInterceptor?.length || 0,
-      visible: props.context.capabilities?.interceptor?.inspect === true && Boolean(props.frameworkInfo)
-    },
-    {
-      key: 'valve',
-      label: 'Valve',
-      icon: iconMap.shield,
-      count: props.context.allValve?.length || 0,
-      visible: props.context.capabilities?.valve?.inspect === true
-    },
-    {
-      key: 'listener',
-      label: 'Listener',
-      icon: iconMap.shield,
-      count: props.context.allListener?.length || 0,
-      visible: props.context.capabilities?.listener?.inspect === true
-    }
-  ].filter((item) => item.visible !== false)
+const assetTypes = [
+  { key: 'servlet', label: 'Servlet', icon: iconMap.code, component: ServletList, field: 'allServlet', prop: 'servlets' },
+  { key: 'filter', label: 'Filter', icon: iconMap.filter, component: FilterList, field: 'allFilter', prop: 'filters' },
+  { key: 'controller', label: '控制器', icon: iconMap.code, component: ControllerList, field: 'allController', prop: 'controllers', framework: true },
+  { key: 'interceptor', label: '拦截器', icon: iconMap.shield, component: InterceptorList, field: 'allMappedInterceptor', prop: 'interceptors', framework: true },
+  { key: 'valve', label: 'Valve', icon: iconMap.shield, component: ValveList, field: 'allValve', prop: 'valves' },
+  { key: 'listener', label: 'Listener', icon: iconMap.shield, component: ListenerList, field: 'allListener', prop: 'listeners' },
+  { key: 'runtime', label: '运行时组件', icon: iconMap.package, field: 'runtimeComponents', framework: true }
+]
+const tabDefinitions = computed(() => assetTypes.flatMap(tab => {
+  const source = tab.framework ? props.frameworkInfo : props.context
+  if (!source) return []
+  const capability = source.capabilities?.[tab.key]
+  if (tab.key === 'runtime' ? !source.runtimeComponents?.length : capability?.inspect !== true) return []
+  const items = source[tab.field] || []
+  return [{ ...tab, items, count: items.length, removable: Boolean(props.context?.contextId) && capability?.remove === true }]
+}))
+const selectedTab = computed(() => tabDefinitions.value.find(tab => tab.key === activeTab.value))
+const runtimeItems = computed(() => {
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  return (selectedTab.value?.items || []).filter(item =>
+    !keyword || [item.role, item.className].some(value => String(value || '').toLowerCase().includes(keyword)))
 })
-
-const activeComponent = computed(() => {
-  switch (activeTab.value) {
-    case 'servlet':
-      return ServletList
-    case 'filter':
-      return FilterList
-    case 'controller':
-      return ControllerList
-    case 'interceptor':
-      return InterceptorList
-    case 'valve':
-      return ValveList
-    case 'listener':
-      return ListenerList
-    default:
-      return null
-  }
-})
-
-const activeComponentProps = computed(() => {
-  switch (activeTab.value) {
-    case 'servlet':
-      return {
-        servlets: props.context.allServlet || [],
-        contextName: props.context.name,
-        removable: props.context.capabilities?.servlet?.remove === true,
-        sessionId: props.sessionId
-      }
-    case 'filter':
-      return {
-        filters: props.context.allFilter || [],
-        contextName: props.context.name,
-        removable: props.context.capabilities?.filter?.remove === true,
-        sessionId: props.sessionId
-      }
-    case 'controller':
-      return {
-        controllers: props.frameworkInfo?.allController || [],
-        contextName: props.context.name,
-        removable: props.context.capabilities?.controller?.remove === true,
-        sessionId: props.sessionId
-      }
-    case 'interceptor':
-      return {
-        interceptors: props.frameworkInfo?.allMappedInterceptor || [],
-        contextName: props.context.name,
-        removable: props.context.capabilities?.interceptor?.remove === true,
-        sessionId: props.sessionId
-      }
-    case 'valve':
-      return {
-        valves: props.context.allValve || [],
-        contextName: props.context.name,
-        removable: props.context.capabilities?.valve?.remove === true,
-        sessionId: props.sessionId
-      }
-    case 'listener':
-      return {
-        listeners: props.context.allListener || [],
-        contextName: props.context.name,
-        removable: props.context.capabilities?.listener?.remove === true,
-        sessionId: props.sessionId
-      }
-    default:
-      return {}
-  }
-})
-
-watch(
-  tabDefinitions,
-  (tabs) => {
-    if (!tabs.some((tab) => tab.key === activeTab.value)) {
-      activeTab.value = tabs[0]?.key || 'servlet'
-    }
-  },
-  { immediate: true }
-)
+const activeComponentProps = computed(() => ({
+  searchKeyword: searchKeyword.value,
+  [selectedTab.value?.prop]: selectedTab.value?.items || [],
+  contextId: props.context?.contextId || '',
+  contextName: props.context ? `${props.context.host || ''} · ${props.context.name || 'ROOT'}` : '',
+  removable: selectedTab.value?.removable === true,
+  sessionId: props.sessionId
+}))
+watch(activeTab, () => { searchKeyword.value = '' })
+watch(tabDefinitions, tabs => {
+  if (!tabs.some(tab => tab.key === activeTab.value)) activeTab.value = tabs[0]?.key || ''
+}, { immediate: true })
 </script>
 
 <style scoped>
-@import '@/styles/container-shell-shared.css';
-
-.context-detail-container {
+.context-detail-container,
+.asset-workbench {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
-
-.asset-workbench {
-  flex: 1;
-  min-height: 0;
+.asset-toolbar {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding-bottom: 12px;
 }
-
 .asset-switcher {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
 }
-
 .asset-switch {
-  min-width: 106px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--container-soft-border);
-  background: var(--container-strong-surface);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  flex-shrink: 0;
+  gap: 5px;
+  padding: 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--el-text-color-secondary);
   cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
 }
-
-.asset-switch .el-icon {
-  color: var(--el-text-color-secondary);
-}
-
-.asset-switch:hover,
+.asset-switch:hover { color: var(--el-color-primary); }
 .asset-switch.active {
-  transform: none;
-  border-color: var(--container-soft-border);
-  background: var(--container-muted-surface);
-  box-shadow: none;
+  border-bottom-color: var(--el-color-primary);
+  color: var(--el-color-primary);
 }
-
-.asset-switch-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.asset-switch-count {
-  margin-left: auto;
-  min-width: 24px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--container-muted-surface);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--el-text-color-secondary);
-}
-
-.asset-panel-shell {
-  flex: 1;
-  min-height: 0;
-  background: var(--container-strong-surface, var(--app-card-background));
-  border: 1px solid var(--container-soft-border);
-  border-radius: 14px;
-  padding: 10px;
-  box-shadow: none;
-}
-
-@media (max-width: 768px) {
-  .asset-panel-shell {
-    padding: 12px;
-  }
-}
+.asset-switch:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: -2px; }
+.asset-switch-name { font-size: 13px; font-weight: 600; }
+.asset-switch-count { font-size: 11px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+.asset-search { flex: 0 1 180px; min-width: 140px; margin-left: auto; }
+.asset-panel-shell { flex: 1; min-height: 0; overflow: hidden; }
 </style>

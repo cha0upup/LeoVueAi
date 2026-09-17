@@ -21,7 +21,8 @@
           <el-progress
             :percentage="normalizedProgress"
             :status="getProgressStatus(task.status)"
-            :stroke-width="8"
+            :stroke-width="5"
+            :show-text="false"
           />
           <span class="detail-progress-value">{{ normalizedProgress.toFixed(2) }}%</span>
         </div>
@@ -36,18 +37,30 @@
             <el-icon><Icon :icon="primaryAction.icon" /></el-icon>
             {{ primaryAction.label }}
           </el-button>
-          <el-button
-            v-for="action in secondaryActions"
-            :key="action.key"
-            size="small"
-            :type="action.type || 'default'"
-            :plain="action.type !== 'primary'"
-            :disabled="action.disabled"
-            @click="$emit('action', action.key)"
+          <el-dropdown
+            trigger="click"
+            @command="$emit('action', $event)"
           >
-            <el-icon><Icon :icon="action.icon" /></el-icon>
-            {{ action.label }}
-          </el-button>
+            <el-button
+              size="small"
+              aria-label="更多任务操作"
+            >
+              更多
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item
+                  v-for="action in secondaryActions"
+                  :key="action.key"
+                  :command="action.key"
+                  :disabled="action.disabled"
+                  :class="{ 'remove-action': action.key === 'remove' }"
+                >
+                  {{ action.label }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </div>
 
@@ -56,18 +69,14 @@
           关键指标
         </div>
         <div class="metric-grid">
-          <div class="metric-item">
-            <span>来源</span>
-            <strong>{{ task.isManagedLocally ? '当前会话可控' : '服务端快照' }}</strong>
-          </div>
-          <div class="metric-item">
-            <span>大小</span>
-            <strong>{{ formatFileSize(task.fileSize) }}</strong>
-          </div>
-          <div class="metric-item">
-            <span>速度</span>
-            <strong>{{ formatSpeed(task.speed) }}</strong>
-          </div>
+          <template v-if="task.type !== TaskType.SCAN">
+            <div class="metric-item">
+              <span>大小</span><strong>{{ formatFileSize(task.fileSize) }}</strong>
+            </div>
+            <div class="metric-item">
+              <span>速度</span><strong>{{ formatSpeed(task.speed) }}</strong>
+            </div>
+          </template>
           <div class="metric-item">
             <span>任务编号</span>
             <strong>{{ task.serverTaskId || task.taskId || '-' }}</strong>
@@ -122,7 +131,11 @@
               class="detail-info-item"
             >
               <label>指纹</label>
-              <span>{{ task.fingerprintIds?.length > 1 ? `${task.fingerprintIds.length} 条` : (task.fingerprintIds?.[0] || task.fingerprintId) }}</span>
+              <span>{{
+                task.fingerprintIds?.length > 1
+                  ? `${task.fingerprintIds.length} 条`
+                  : task.fingerprintIds?.[0] || task.fingerprintId
+              }}</span>
             </div>
             <div
               v-if="task.totalCount"
@@ -184,33 +197,23 @@
               <span>{{ task.currentTable }}</span>
             </div>
             <div
-              v-if="getDownloadRelativePath(task.downloadPath)"
+              v-if="task.filePath"
+              class="detail-info-item detail-info-item--full"
+            >
+              <label>目标路径</label><span>{{ task.filePath }}</span>
+            </div>
+            <div
+              v-if="task.downloadPath"
               class="detail-info-item detail-info-item--full"
             >
               <label>落盘路径</label>
-              <span>{{ getDownloadRelativePath(task.downloadPath) }}</span>
+              <span>{{ task.downloadPath }}</span>
             </div>
             <TaskError :task="task" />
-            <div
-              v-if="task.type === TaskType.DOWNLOAD && !task.isManagedLocally"
-              class="detail-note"
-            >
-              当前下载任务来自服务端快照，暂停、继续、重试及清理操作会直接作用于服务端任务。
-            </div>
           </template>
         </div>
       </div>
     </template>
-
-    <div
-      v-else
-      class="detail-placeholder"
-    >
-      <el-empty
-        description="选择左侧任务查看详情"
-        :image-size="110"
-      />
-    </div>
   </aside>
 </template>
 
@@ -222,7 +225,6 @@ import { TaskType } from '@/constants/task.js'
 import { formatFileSize, formatDate as formatDateTime } from '@/utils/format.js'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import {
-  getDownloadRelativePath,
   getIndicatorStatus,
   getProgressStatus,
   getScanKindLabel,
@@ -245,12 +247,12 @@ const normalizedProgress = computed(() => {
   return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0
 })
 
-const formatSpeed = bytes => {
+const formatSpeed = (bytes) => {
   const value = Number(bytes || 0)
   return value > 0 ? `${formatFileSize(value)}/s` : '-'
 }
 
-const formatTransferStage = stage =>
+const formatTransferStage = (stage) =>
   ({
     CREATED: '已创建',
     PREPARING: '准备中',
@@ -284,148 +286,103 @@ const TaskError = defineComponent({
 
 <style scoped>
 .task-detail-panel {
-  min-height: 0;
-  padding: var(--space-3);
-  overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  border: 1px solid var(--task-border);
-  border-radius: var(--radius-container);
-  background: var(--task-surface);
+  flex: 1;
+  gap: 18px;
+  min-height: 0;
+  min-width: 0;
+  padding: 12px;
+  overflow: auto;
 }
-
 .detail-card {
-  border: 1px solid color-mix(in srgb, var(--task-border) 85%, white);
-  border-radius: var(--radius-container);
-  background: var(--task-surface-strong);
-  padding: 16px;
+  flex-shrink: 0;
 }
-
-.detail-hero-top {
+.detail-card + .detail-card {
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding-top: 14px;
+}
+.detail-hero-top,
+.detail-type-chip,
+.detail-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.detail-type-chip {
-  display: inline-flex;
-  align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  border-radius: var(--radius-tag);
-  background: var(--task-surface-muted);
+}
+.detail-hero-top {
+  justify-content: space-between;
   font-size: 12px;
-  font-weight: 600;
 }
-
+.detail-type-chip {
+  color: var(--el-text-color-secondary);
+}
 .detail-title {
-  margin: 0 0 14px;
-  font-size: var(--font-size-section-title);
-  line-height: 1.35;
-  word-break: break-word;
+  margin: 12px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
-
 .detail-progress-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
-
+.detail-progress-row > .el-progress {
+  flex: 1;
+  min-width: 0;
+}
 .detail-progress-value {
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  font-weight: 700;
 }
-
 .detail-actions {
-  display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
+  margin-top: 12px;
 }
-
 .panel-title {
-  margin-bottom: 12px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--el-text-color-secondary);
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
-
 .metric-grid,
 .detail-info-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
-
 .metric-item,
 .detail-info-item {
-  min-width: 0;
-  padding: 12px 13px;
-  border-radius: var(--radius-control);
-  background: var(--task-surface-muted);
-  border: 1px solid color-mix(in srgb, var(--task-border) 70%, transparent);
-}
-
-.metric-item span,
-.detail-info-item label {
-  display: block;
-  margin-bottom: 6px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
   font-size: 12px;
+  line-height: 1.6;
+}
+.metric-item > span,
+.detail-info-item > label {
   color: var(--el-text-color-secondary);
-  font-weight: 600;
 }
-
 .metric-item strong,
-.detail-info-item span {
-  display: block;
-  font-size: 13px;
-  line-height: 1.55;
-  word-break: break-word;
+.detail-info-item > span {
+  min-width: 0;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
-
-.detail-info-item--full,
-.detail-note {
-  grid-column: 1 / -1;
-}
-
 .detail-info-item.is-danger {
-  background: color-mix(in srgb, var(--el-color-danger-light-9) 82%, white);
-  border-color: color-mix(in srgb, var(--el-color-danger) 26%, transparent);
-}
-
-.is-danger-text {
+  display: block;
+  padding: 10px;
+  border-radius: 4px;
   color: var(--el-color-danger);
-  font-weight: 600;
+  background: color-mix(in srgb, var(--el-color-danger) 8%, var(--el-bg-color));
 }
-
-.detail-note {
-  padding: 12px 13px;
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--el-color-info-light-9) 78%, white);
-  border: 1px solid color-mix(in srgb, var(--el-color-info) 22%, transparent);
-  color: var(--el-text-color-regular);
-  font-size: 12px;
-  line-height: 1.65;
+.detail-info-item.is-danger label,
+.detail-info-item.is-danger span {
+  display: block;
+  color: inherit;
 }
-
-.detail-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 280px;
-  padding: 18px;
-}
-
-@media (max-width: 768px) {
-  .metric-grid,
-  .detail-info-list,
-  .detail-progress-row {
-    grid-template-columns: 1fr;
-  }
+.remove-action:not(.is-disabled) {
+  color: var(--el-color-danger);
 }
 </style>

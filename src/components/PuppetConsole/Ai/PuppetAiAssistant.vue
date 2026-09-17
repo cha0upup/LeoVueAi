@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="puppet-ai-assistant"
-    :class="{ 'is-dock-mode': dockMode }"
-  >
+  <div class="puppet-ai-assistant">
     <header class="assistant-header">
       <div class="assistant-identity">
         <span
@@ -13,12 +10,8 @@
         </span>
         <div class="assistant-heading">
           <strong>节点 AI</strong>
-          <span>当前会话执行与分析</span>
+          <span>{{ activeModule?.title || '当前节点' }} · 执行与分析</span>
         </div>
-        <span
-          class="assistant-model"
-          :title="selectedConfigModel"
-        >{{ selectedConfigModel || '模型连接中' }}</span>
       </div>
       <div class="assistant-actions">
         <el-tooltip
@@ -47,7 +40,7 @@
             type="button"
             class="header-action is-primary"
             aria-label="新建对话"
-            :disabled="creatingThread"
+            :disabled="creatingThread || historyLoading || threadsLoading"
             @click="onCreateThread"
           >
             <el-icon><Icon :icon="icons.plus" /></el-icon>
@@ -56,10 +49,11 @@
       </div>
     </header>
 
-    <PuppetAiThreadTabs
+    <AiThreadSwitcher
       :model-value="activeThreadId"
       :threads="threads"
       :conversation-status="conversationStatus"
+      :loading="threadsLoading"
       @activate="onActivateThread"
       @delete="onDeleteThread"
     />
@@ -82,7 +76,8 @@
               v-if="!messages.length && !historyLoading"
               :recon-summary-exists="reconSummaryExists"
               :basic-info="basicInfo"
-              @pick-prompt="applyPrompt"
+              :active-module="activeModule"
+              @pick-prompt="onPickPrompt"
             />
 
             <div
@@ -127,6 +122,7 @@
         </el-scrollbar>
 
         <PuppetAiAssistantComposer
+          ref="composerRef"
           v-model="draft"
           :sending="composerSending"
           :session-id="sessionId"
@@ -166,10 +162,10 @@ import { useAiChat } from '@/composables/useAiChat.js'
 import { useAiThreads } from '@/composables/useAiThreads.js'
 import { useAiChannelSelector } from '@/composables/useAiChannelSelector.js'
 import { useAppEvent, emitAppEvent } from '@/composables/useAppEvent.js'
-import { ACTIVE_AI_STATUSES, normalizeAiStatus } from '@/utils/aiRuntime.js'
+import { ACTIVE_AI_STATUSES, normalizeAiStatus, getThreadStatus, isDefaultThreadTitle } from '@/utils/aiRuntime.js'
 import { icons } from '@/utils/icons.js'
 import PuppetAiAssistantWelcome from './PuppetAiAssistantWelcome.vue'
-import PuppetAiThreadTabs from './PuppetAiThreadTabs.vue'
+import AiThreadSwitcher from '@/components/Ai/AiThreadSwitcher.vue'
 import AiAssistantTurnUser from '@/components/AiAssistant/AiAssistantTurnUser.vue'
 import AiAssistantTurnAssistant from '@/components/AiAssistant/AiAssistantTurnAssistant.vue'
 import PuppetAiAssistantComposer from './PuppetAiAssistantComposer.vue'
@@ -202,10 +198,9 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  /** dock 模式：隐藏侧边线程栏，改用紧凑弹出层 */
-  dockMode: {
-    type: Boolean,
-    default: false
+  activeModule: {
+    type: Object,
+    default: null
   }
 })
 
@@ -218,16 +213,18 @@ const {
   threads,
   activeThreadId,
   activeThread,
+  loading: threadsLoading,
   fetchThreads,
   refreshThreadStatuses,
   createThread,
   deleteThread,
+  renameThread,
   switchThread,
   loadMessages,
   loadEvents
 } = useAiThreads({ sessionId: sessionIdRef })
 
-/** 正在执行中的线程 ID 集合（用于 tabs 状态指示灯）。 */
+/** 正在执行中的线程 ID 集合（用于执行状态同步）。 */
 const busyThreadIds   = ref([])
 /** 当前正在发送的线程 ID（用于 onComplete 回调中精确清除 busy 状态）。 */
 const creatingThread  = ref(false)
@@ -244,6 +241,7 @@ const { selectedConfigId, configs, fetchConfigs } = useAiChannelSelector({
 })
 const reasoningEffort = ref('medium')
 const attachments = ref([])
+const composerRef = ref(null)
 const selectedConfigModel = computed(() => configs.value.find(c => c.id === selectedConfigId.value)?.model || '')
 const requestedModelSwitchId = ref(null)
 const revertingConfigSelection = ref(false)
@@ -345,6 +343,11 @@ const {
   errorLabel: 'AI 对话请求失败'
 })
 
+const onPickPrompt = (value) => {
+  applyPrompt(value)
+  nextTick(() => composerRef.value?.focus())
+}
+
 const activeConversationStatus = computed(() =>
   activeThreadId.value ? (conversationStatus.value?.[activeThreadId.value] || {}) : {}
 )
@@ -354,11 +357,7 @@ const waitingForUserInput = computed(() => Boolean(activeConversationStatus.valu
 const latestPlan = computed(() => findLatestAssistantPlan(messages.value))
 
 const activeThreadBusy = computed(() => {
-  const status = normalizeAiStatus(
-    activeConversationStatus.value?.status ||
-    activeThread.value?.runStatus ||
-    'idle'
-  )
+  const status = getThreadStatus(activeThread.value, conversationStatus.value)
   return (
     sending.value ||
     ACTIVE_AI_STATUSES.includes(status) ||
@@ -414,7 +413,7 @@ const ensureActiveThread = async () => {
   if (creatingThread.value) return null
   creatingThread.value = true
   try {
-    const info = await createThread({ configId: selectedConfigId.value ?? undefined })
+    const info = await createThread({ title: '新对话', configId: selectedConfigId.value ?? undefined })
     if (!info?.threadId) return null
     setMessages([], info.threadId)
     return info.threadId
@@ -428,7 +427,7 @@ const onSend = async () => {
   const sessionId = props.sessionId
   const inputText = draft.value?.trim() || ''
   const text = inputText || (attachments.value.length ? '请阅读并分析附件。' : '')
-  if (!text || composerSending.value) return
+  if (!text || composerSending.value || historyLoading.value || threadsLoading.value || creatingThread.value) return
   draft.value = ''
 
   const threadId = await ensureActiveThread()
@@ -454,12 +453,23 @@ const onSend = async () => {
   const displayText = inputText
   const displayAttachments = requestAttachments.map(({ name, mimeType, size }) => ({ name, mimeType, size }))
   attachments.value = []
-  send({
+  const shouldNameThread = isDefaultThreadTitle(activeThread.value?.title) &&
+    !activeThread.value?.messageCount && !messages.value.some(message => message.role === 'user')
+  const submission = send({
     text,
     displayText,
     attachments: displayAttachments,
     requestParams: { reasoningEffort: reasoningEffort.value, attachments: requestAttachments }
   })
+  if (shouldNameThread) {
+    submission.then(turn => {
+      const thread = threads.value.find(item => item.threadId === threadId)
+      if (turn && sessionId === props.sessionId && thread && isDefaultThreadTitle(thread.title)) {
+        const title = Array.from(text.replace(/\s+/g, ' ')).slice(0, 40).join('')
+        renameThread(threadId, title)
+      }
+    })
+  }
 }
 
 const answerUserInput = ({ questionId, answer }) => {
@@ -551,10 +561,15 @@ const onActivateThread = async (threadId) => {
 }
 
 const onCreateThread = async () => {
-  if (creatingThread.value) return
+  if (creatingThread.value || historyLoading.value || threadsLoading.value) return
+  if (activeThread.value && !activeThreadBusy.value && !waitingForUserInput.value &&
+      !activeThread.value.messageCount && !messages.value.length) {
+    composerRef.value?.focus()
+    return
+  }
   creatingThread.value = true
   try {
-    const info = await createThread({ configId: selectedConfigId.value ?? undefined })
+    const info = await createThread({ title: '新对话', configId: selectedConfigId.value ?? undefined })
     if (info) {
       setMessages([], info.threadId)
     }
@@ -762,8 +777,6 @@ onUnmounted(() => {
   --thread-max: min(76rem, 100%);
   --ai-panel-surface: var(--ai-dock-background, var(--app-surface-background));
   --ai-muted-surface: var(--ai-panel-surface);
-  --surface-border: color-mix(in srgb, var(--el-border-color) 20%, transparent);
-  --composer-shadow: 0 0 0 1px color-mix(in srgb, var(--el-border-color) 42%, transparent);
   --accent-soft: var(--el-color-primary);
 
   display: flex;
@@ -831,20 +844,10 @@ onUnmounted(() => {
 
 .assistant-heading span {
   color: var(--el-text-color-secondary);
-  font-size: 10.5px;
+  font-size: 11px;
   white-space: nowrap;
-}
-
-.assistant-model {
-  max-width: 150px;
   overflow: hidden;
-  padding: 4px 8px;
-  border-radius: 10px;
-  color: var(--el-text-color-secondary);
-  background: color-mix(in srgb, var(--el-text-color-primary) 4%, transparent);
-  font-size: 10px;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .assistant-actions {
@@ -873,6 +876,11 @@ onUnmounted(() => {
   background: var(--el-color-primary);
 }
 
+.header-action:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
+}
+
 .header-action:disabled {
   opacity: .4;
   cursor: not-allowed;
@@ -895,23 +903,6 @@ onUnmounted(() => {
   position: relative;
   border-radius: 0;
   background: transparent;
-}
-
-.chat-area::before {
-  display: none;
-}
-
-.channel-opt-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.channel-opt-model {
-  float: right;
-  font-size: 11px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: var(--el-text-color-secondary);
 }
 
 .chat-body {

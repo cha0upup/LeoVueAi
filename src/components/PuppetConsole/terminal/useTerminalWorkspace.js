@@ -39,7 +39,6 @@ export function useTerminalWorkspace({
       { value: 'python-pty', label: 'Python PTY', disabled: !knownModes?.includes('python-pty') }
     ]
   })
-  const activeSessionLabel = computed(() => activeSession.value?.id?.slice(0, 8) || '--')
   const activeSessionTimeLabel = computed(() =>
     formatTerminalRelativeTime(activeSession.value?.lastActivityTime, clockNow.value)
   )
@@ -116,7 +115,6 @@ export function useTerminalWorkspace({
 
     if (!sessions.value.length) {
       activeSessionId.value = ''
-      createSession()
       return
     }
     if (activeSessionId.value === sessionId) {
@@ -155,7 +153,8 @@ export function useTerminalWorkspace({
 
   const handleSearchKeywordChange = (keyword) => {
     searchKeyword.value = keyword
-    if (keyword) searchInActiveSession('next', { incremental: true })
+    if (keyword.trim()) searchInActiveSession('next', { incremental: true })
+    else getViewport(activeSessionId.value)?.clearSearch?.()
   }
 
   const searchInActiveSession = (direction, options = {}) => {
@@ -178,12 +177,14 @@ export function useTerminalWorkspace({
   }
 
   const refreshActiveSession = () => controllers.get(activeSessionId.value)?.refresh()
-  watch(activeSessionId, () =>
+  watch(activeSessionId, (_, previousId) => {
+    searchKeyword.value = ''
+    getViewport(previousId)?.clearSearch?.()
     nextTick(() => {
       focusActiveViewport()
       refreshActiveSession()
     })
-  )
+  })
   watch(
     hostSessionId,
     (nextHostSessionId, previousHostSessionId) => {
@@ -202,12 +203,12 @@ export function useTerminalWorkspace({
     sessions,
     activeSessionId,
     activeSession,
-    activeSessionLabel,
     activeSessionTimeLabel,
     terminalModeOptions,
     clockNow,
     searchKeyword,
     setViewportRef,
+    focusActiveViewport,
     createSession,
     activateSession,
     removeSession,

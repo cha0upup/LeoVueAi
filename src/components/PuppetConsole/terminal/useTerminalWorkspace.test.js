@@ -199,7 +199,7 @@ describe('useTerminalWorkspace', () => {
     scope.stop()
   })
 
-  it('drops queued writes after their terminal session is removed', async () => {
+  it('drops queued writes and stays empty after the last session is closed', async () => {
     const firstWrite = deferred()
     const executeCommand = vi.fn((params) => {
       if (params.type === 'write' && params.cmd === 'first') return firstWrite.promise
@@ -217,7 +217,9 @@ describe('useTerminalWorkspace', () => {
     await flushRequests()
 
     expect(executeCommand.mock.calls.some(([params]) => params.cmd === 'second')).toBe(false)
-    expect(workspace.sessions.value[0].id).toBe('process-b')
+    expect(workspace.sessions.value).toHaveLength(0)
+    expect(workspace.activeSessionId.value).toBe('')
+    expect((await workspace.createSession()).id).toBe('process-b')
     scope.stop()
   })
 

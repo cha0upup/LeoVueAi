@@ -140,6 +140,7 @@
         v-if="sessionId && isInitialized"
         :session-id="sessionId"
         :initial-prompt="initialPrompt"
+        :active-module="moduleMap[activeKey]"
         :visible="aiDockVisible"
         @toggle="toggleAiDock"
       />
@@ -795,13 +796,8 @@ watch(
 }
 
 @media (max-width: 900px) {
-  .main-content {
-    flex-direction: column;
-    padding: 0;
-  }
-
-  .module-container {
-    padding: 10px 0 0;
+  .main-content > .ai-dock {
+    max-width: 50%;
   }
 }
 </style>

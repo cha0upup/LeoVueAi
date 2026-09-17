@@ -86,7 +86,7 @@ export const DATABASE_DIALOG_CONFIG = {
 // 标签页相关常量
 export const DATABASE_TAB_CONSTANTS = {
   HOME_TAB_ID: '首页',
-  HOME_TAB_TITLE: '首页',
+  HOME_TAB_TITLE: '连接管理',
   UNCONFIGURED_CONNECTION: '未配置连接',
   URL_MAX_LENGTH: 36,
   URL_PREFIX_LENGTH: 18,

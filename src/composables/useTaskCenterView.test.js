@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { TaskStatus, TaskType } from '@/constants/task.js'
 import { useTaskCenterView } from './useTaskCenterView.js'
 
-const createView = initialTasks => {
+const createView = (initialTasks) => {
   const tasks = ref(initialTasks)
   const activeTaskType = ref(TaskType.DOWNLOAD)
   const statusFilter = ref('all')
@@ -17,7 +17,7 @@ const createView = initialTasks => {
     searchKeyword,
     sortOption,
     selectedTaskId,
-    activeStatuses: [TaskStatus.PENDING, TaskStatus.DOWNLOADING]
+    activeStatuses: [TaskStatus.PENDING, TaskStatus.DOWNLOADING, TaskStatus.UPLOADING]
   })
   return {
     ...view,
@@ -48,12 +48,13 @@ describe('useTaskCenterView', () => {
       endTime: '2026-07-15T08:00:00Z'
     }
     const view = createView([older, newer])
-    expect(view.filteredTasks.value.map(task => task.viewId)).toEqual(['new', 'old'])
+    expect(view.filteredTasks.value.map((task) => task.viewId)).toEqual(['new', 'old'])
 
     view.searchKeyword.value = 'match'
     await nextTick()
     expect(view.filteredTasks.value).toEqual([newer])
-    expect(view.selectedTaskId.value).toBe('new')
+    expect(view.selectedTaskId.value).toBe('')
+    view.selectTask('new')
 
     view.statusFilter.value = 'completed'
     await nextTick()
@@ -61,14 +62,29 @@ describe('useTaskCenterView', () => {
     expect(view.selectedTaskId.value).toBe('')
   })
 
-  it('keeps selection valid when type or task data changes', async () => {
+  it('shows all types, separates running from waiting and only keeps an explicit visible selection', async () => {
     const view = createView([
       { viewId: 'd1', type: TaskType.DOWNLOAD, status: TaskStatus.PENDING },
       { viewId: 'u1', type: TaskType.UPLOAD, status: TaskStatus.UPLOADING }
     ])
-    expect(view.selectedTaskId.value).toBe('d1')
+    expect(view.selectedTaskId.value).toBe('')
+    view.setActiveTaskType('all')
+    await nextTick()
+    expect(view.filteredTasks.value).toHaveLength(2)
+    view.selectTask('d1')
+    view.setStatusFilter('active')
+    await nextTick()
+    expect(view.filteredTasks.value.map((task) => task.viewId)).toEqual(['u1'])
+    expect(view.selectedTaskId.value).toBe('')
+    view.setStatusFilter(TaskStatus.PENDING)
+    await nextTick()
+    expect(view.filteredTasks.value.map((task) => task.viewId)).toEqual(['d1'])
+    view.setStatusFilter('all')
 
     view.setActiveTaskType(TaskType.UPLOAD)
+    await nextTick()
+    view.selectTask('u1')
+    view.setSortOption('name')
     await nextTick()
     expect(view.selectedTaskId.value).toBe('u1')
 

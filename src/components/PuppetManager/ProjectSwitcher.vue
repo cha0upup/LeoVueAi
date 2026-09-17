@@ -1,15 +1,5 @@
 <template>
   <section class="project-workspace">
-    <div class="project-workspace__eyebrow">
-      <span>项目工作区</span>
-      <span
-        v-if="projects.length"
-        class="project-workspace__count"
-      >
-        {{ activeProjects.length }} 进行中 · {{ archivedProjects.length }} 已归档
-      </span>
-    </div>
-
     <div class="project-workspace__row">
       <el-popover
         v-model:visible="pickerVisible"
@@ -34,8 +24,11 @@
               </el-icon>
             </span>
             <span class="project-trigger__body">
-              <strong>{{ currentTitle }}</strong>
-              <small>{{ currentSubtitle }}</small>
+              <strong :title="currentTitle">{{ currentTitle }}</strong>
+              <small
+                v-if="currentSubtitle"
+                :title="currentSubtitle"
+              >{{ currentSubtitle }}</small>
             </span>
             <el-icon class="project-trigger__chevron">
               <Icon :icon="pickerVisible ? iconMap.arrowUp : iconMap.arrowDown" />
@@ -219,31 +212,21 @@
       </el-tooltip>
     </div>
 
-    <div class="project-workspace__meta">
-      <template v-if="activeProject">
-        <span
-          class="workspace-state"
-          :class="activeProject.status"
-        >
-          <i />{{ activeProject.status === 'archived' ? '只读归档' : '进行中' }}
-        </span>
-        <span><strong>{{ activeProject.hostCount }}</strong> 入口主机</span>
-        <span><strong>{{ activeProject.activeSessionCount }}</strong> 活动会话</span>
-        <span
-          v-if="!activeProject.contentEditable"
-          class="workspace-readonly"
-        >归属只读</span>
-      </template>
-      <template v-else>
-        <template v-if="modelValue === ALL_PROJECTS_ID">
-          <span class="workspace-state all"><i />全局视图</span>
-          <span>跨项目管理全部主机和活动会话</span>
-        </template>
-        <template v-else>
-          <span class="workspace-state unassigned"><i />待整理</span>
-          <span>为主机选择项目后会从这里移出</span>
-        </template>
-      </template>
+    <div
+      v-if="activeProject"
+      class="project-workspace__meta"
+    >
+      <span
+        class="workspace-state"
+        :class="activeProject.status"
+      >
+        <i />{{ activeProject.status === 'archived' ? '只读归档' : '进行中' }}
+      </span>
+      <span>{{ activeProject.hostCount || 0 }} 主机 · {{ activeProject.activeSessionCount || 0 }} 会话</span>
+      <span
+        v-if="!activeProject.contentEditable"
+        class="workspace-readonly"
+      >归属只读</span>
     </div>
   </section>
 </template>
@@ -301,9 +284,9 @@ const currentTitle = computed(() => {
 })
 const currentSubtitle = computed(() => {
   if (!props.activeProject) {
-    return props.modelValue === ALL_PROJECTS_ID ? '跨项目主机与活动会话' : '未归属项目'
+    return ''
   }
-  return props.activeProject.projectCode || props.activeProject.description || '项目主机与活动会话'
+  return props.activeProject.projectCode || props.activeProject.description || ''
 })
 const currentIcon = computed(() => {
   if (props.activeProject) return iconMap.folderOpened
@@ -332,15 +315,12 @@ watch(pickerVisible, async (visible) => {
 <style scoped>
 .project-workspace {
   margin: 0 8px 8px;
-  padding: 10px;
-  border: 1px solid var(--app-divider-color);
+  padding: 0;
+  border: 0;
   border-radius: 10px;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--el-color-primary) 6%, transparent), transparent 58%),
-    var(--app-surface-background-soft);
+  flex-shrink: 0;
 }
 
-.project-workspace__eyebrow,
 .project-workspace__meta,
 .project-workspace__row,
 .project-trigger,
@@ -349,22 +329,6 @@ watch(pickerVisible, async (visible) => {
 .project-option-group__title {
   display: flex;
   align-items: center;
-}
-
-.project-workspace__eyebrow {
-  justify-content: space-between;
-  margin-bottom: 7px;
-  color: var(--el-text-color-placeholder);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.project-workspace__count {
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
 }
 
 .project-workspace__row {
@@ -406,10 +370,10 @@ watch(pickerVisible, async (visible) => {
 }
 
 .project-trigger__icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  font-size: 17px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 15px;
 }
 
 .project-trigger__icon.unassigned {
@@ -469,15 +433,12 @@ watch(pickerVisible, async (visible) => {
 
 .project-workspace__meta {
   min-height: 19px;
-  margin-top: 8px;
-  gap: 9px;
+  margin-top: 6px;
+  padding: 0 8px;
+  flex-wrap: wrap;
+  gap: 8px;
   color: var(--el-text-color-placeholder);
   font-size: 10px;
-}
-
-.project-workspace__meta strong {
-  color: var(--el-text-color-regular);
-  font-weight: 700;
 }
 
 .workspace-state {
@@ -496,13 +457,8 @@ watch(pickerVisible, async (visible) => {
 }
 
 .workspace-state.archived,
-.workspace-state.unassigned,
 .workspace-readonly {
   color: var(--el-text-color-secondary);
-}
-
-.workspace-state.all {
-  color: var(--el-color-primary);
 }
 
 .workspace-readonly {

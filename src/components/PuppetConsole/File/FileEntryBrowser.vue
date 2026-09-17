@@ -1,362 +1,220 @@
 <template>
-  <div class="browser-content">
+  <div
+    ref="browserRef"
+    class="browser-content"
+    :aria-busy="loading"
+  >
     <div class="browser-toolbar">
-      <div class="browser-stats">
-        <span class="stat-pill">全部 {{ totalCount }}</span>
-        <span class="stat-pill">文件夹 {{ directoryCount }}</span>
-        <span class="stat-pill">文件 {{ fileCount }}</span>
-      </div>
-      <div class="browser-filters">
+      <div
+        class="browser-filters"
+        aria-label="文件类型筛选"
+      >
         <button
+          v-for="filter in filters"
+          :key="filter.value"
           type="button"
           class="filter-chip"
-          :class="{ active: entryFilter === 'all' }"
-          @click="entryFilter = 'all'"
+          :class="{ active: entryFilter === filter.value }"
+          :aria-pressed="entryFilter === filter.value"
+          @click="entryFilter = filter.value"
         >
-          全部
-        </button>
-        <button
-          type="button"
-          class="filter-chip"
-          :class="{ active: entryFilter === 'dir' }"
-          @click="entryFilter = 'dir'"
-        >
-          文件夹
-        </button>
-        <button
-          type="button"
-          class="filter-chip"
-          :class="{ active: entryFilter === 'file' }"
-          @click="entryFilter = 'file'"
-        >
-          文件
+          {{ filter.label }} <span>{{ filter.count }}</span>
         </button>
       </div>
+      <span
+        v-if="!loading && searchActive"
+        class="match-count"
+        role="status"
+      >匹配 {{ visibleFiles.length }} /
+        {{ filters.find((filter) => filter.value === entryFilter)?.count || 0 }} 项</span>
     </div>
-
-    <!-- 列表视图 -->
     <div
-      v-if="viewMode === 'list'"
-      class="table-container"
+      v-if="loading"
+      class="loading-state"
+      role="status"
+      aria-label="正在加载文件"
     >
-      <div class="table-card-body">
-        <!-- 批量操作栏 -->
-        <div
-          v-if="selectedFiles.length > 0"
-          class="batch-toolbar"
-        >
-          <span class="batch-count">已选 {{ selectedFiles.length }} 项</span>
-          <el-button
-            size="small"
-            type="danger"
-            text
-            @click="emit('batch-delete')"
-          >
-            <el-icon><Icon :icon="ICON_MAP.delete" /></el-icon>
-            批量删除
-          </el-button>
-          <el-button
-            size="small"
-            text
-            @click="selectedFiles = []"
-          >
-            取消选择
-          </el-button>
-        </div>
-
-        <el-table
-          v-if="!isLoading && visibleFiles.length > 0"
-          :data="visibleFiles"
-          :row-key="getFileEntryKey"
-          stripe
-          header-row-class-name="file-table-header"
-          class="file-table"
-          highlight-current-row
+      <el-skeleton
+        :rows="8"
+        animated
+      />
+    </div>
+    <el-empty
+      v-else-if="!visibleFiles.length"
+      :description="emptyDescription"
+      :image-size="80"
+      class="empty-state"
+    >
+      <el-button
+        size="small"
+        @click="emit('refresh')"
+      >
+        刷新
+      </el-button>
+    </el-empty>
+    <template v-else-if="viewMode === 'list'">
+      <div
+        v-if="selectedFiles.length"
+        class="batch-toolbar"
+      >
+        <span>已选 {{ selectedFiles.length }} 项</span>
+        <el-button
+          text
           size="small"
-          @row-click="(row, col) => col?.type !== 'selection' && emit('file-click', row)"
-          @selection-change="(val) => selectedFiles = val"
+          type="danger"
+          @click="emit('batch-delete')"
         >
-          <el-table-column
-            type="selection"
-            width="40"
-          />
-
-          <el-table-column
-            prop="name"
-            label="名称"
-            sortable
-            min-width="300"
-          >
-            <template #default="scope">
-              <div class="file-item">
-                <span class="file-icon-shell">
-                  <el-icon :class="getIconClass(scope.row)">
-                    <Icon :icon="getIcon(scope.row)" />
-                  </el-icon>
-                </span>
-                <span
+          删除所选
+        </el-button>
+        <el-button
+          text
+          size="small"
+          @click="clearSelection"
+        >
+          取消选择
+        </el-button>
+      </div>
+      <el-table
+        ref="tableRef"
+        :data="visibleFiles"
+        :row-key="getFileEntryKey"
+        height="100%"
+        size="small"
+        class="file-table"
+        @selection-change="selectedFiles = $event"
+      >
+        <el-table-column
+          type="selection"
+          width="36"
+        />
+        <el-table-column
+          prop="name"
+          :label="compact ? '名称 / 修改时间' : '名称'"
+          sortable
+          min-width="160"
+        >
+          <template #default="{ row }">
+            <div class="file-item">
+              <Icon
+                class="file-icon"
+                :class="getIconClass(row)"
+                :icon="getIcon(row)"
+              />
+              <div class="file-identity">
+                <button
+                  type="button"
                   class="file-name"
-                  :title="scope.row.name"
-                >{{ scope.row.name }}</span>
-                <div class="file-tags">
-                  <el-tag
-                    v-if="scope.row.isSymlink"
-                    type="info"
-                    size="small"
-                    class="symlink-tag"
-                    :title="scope.row.symlinkTarget ? `-> ${scope.row.symlinkTarget}` : '符号链接'"
-                  >
-                    <el-icon style="font-size:10px">
-                      <Icon :icon="ICON_MAP.symlink" />
-                    </el-icon>
-                    链接
-                  </el-tag>
-                  <el-tag
-                    v-else-if="scope.row.isDirectory"
-                    type="info"
-                    size="small"
-                  >
-                    文件夹
-                  </el-tag>
-                  <el-tag
-                    v-else-if="scope.row.extension"
-                    :type="getExtensionTagType(scope.row.extension)"
-                    size="small"
-                  >
-                    {{ scope.row.extension.toUpperCase() }}
-                  </el-tag>
+                  :title="row.name"
+                  @click="emit('file-click', row)"
+                >
+                  {{ row.name }}
+                </button>
+                <div
+                  v-if="compact"
+                  class="file-secondary"
+                >
+                  <time :title="formatFileModifiedDate(row.modified)">{{
+                    shortDate(row.modified)
+                  }}</time><span :title="permissionLabel(row)">{{ permissionText(row) }}</span>
                 </div>
               </div>
-            </template>
-          </el-table-column>
-
-          <el-table-column
-            prop="size"
-            label="大小"
-            sortable
-            width="120"
-          >
-            <template #default="scope">
-              <span v-if="!scope.row.isDirectory && scope.row.size !== undefined">{{
-                formatFileSize(scope.row.size)
-              }}</span>
               <span
-                v-else
-                class="text-muted"
-              >-</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column
-            prop="permissions"
-            label="权限"
-            sortable
-            width="120"
-          >
-            <template #default="scope">
-              <div class="permission-details">
-                <span
-                  v-if="scope.row.canRead"
-                  class="permission-badge read"
-                >R</span>
-                <span
-                  v-if="scope.row.canWrite"
-                  class="permission-badge write"
-                >W</span>
-                <span
-                  v-if="scope.row.canExecute"
-                  class="permission-badge execute"
-                >X</span>
-                <span
-                  v-if="!scope.row.canRead && !scope.row.canWrite && !scope.row.canExecute"
-                  class="text-muted"
-                >-</span>
-              </div>
-            </template>
-          </el-table-column>
-
-          <el-table-column
-            prop="modified"
-            label="修改时间"
-            sortable
-            width="180"
-          >
-            <template #default="scope">
-              <span class="time-text">{{ formatModifiedDate(scope.row.modified) }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column
-            label="操作"
-            width="72"
-            fixed="right"
-            align="center"
-            class-name="operation-column-cell"
-            label-class-name="operation-column-header"
-            :resizable="false"
-          >
-            <template #default="scope">
-              <div
-                class="action-buttons"
-                @click.stop
-              >
-                <ActionButton
-                  :file="scope.row"
-                  :type="scope.row.isDirectory ? 'dir' : 'file'"
-                  @copy="handleCopy"
-                  @move="handleMove"
-                  @compress="handleCompress"
-                  @decompress="handleDecompress"
-                  @download="handleDownload"
-                  @touch="handleTouch"
-                  @delete="handleDelete"
-                  @rename="handleRename"
-                  @chmod="handleChmod"
-                  @copy-path="handleCopyPath"
-                />
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <!-- 空状态 -->
-        <div
-          v-else-if="!isLoading && visibleFiles.length === 0"
-          class="empty-state"
+                v-if="row.isSymlink"
+                class="symlink-tag"
+                :title="row.symlinkTarget ? `符号链接 → ${row.symlinkTarget}` : '符号链接'"
+              ><Icon :icon="icons.symlink" /> 链接</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column
+          prop="size"
+          label="大小"
+          sortable
+          width="84"
         >
-          <el-empty
-            :description="emptyDescription"
-            :image-size="120"
-          >
-            <template #image>
-              <el-icon class="empty-icon">
-                <Icon :icon="ICON_MAP.folder" />
-              </el-icon>
-            </template>
-            <el-button
-              type="primary"
-              @click="emit('refresh')"
-            >
-              <el-icon><Refresh /></el-icon>
-              刷新
-            </el-button>
-          </el-empty>
-        </div>
-
-        <!-- 加载状态 -->
-        <div
-          v-else-if="isLoading"
-          class="loading-state"
+          <template #default="{ row }">
+            <span class="file-size">{{
+              row.isDirectory ? '—' : formatFileSize(row.size)
+            }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-if="!compact"
+          label="访问"
+          width="76"
         >
-          <el-skeleton
-            :rows="8"
-            animated
-          />
-        </div>
-      </div>
-    </div>
-
-    <!-- 网格视图 -->
+          <template #default="{ row }">
+            <span
+              class="permission-text"
+              :title="permissionLabel(row)"
+              :aria-label="permissionLabel(row)"
+            >{{ permissionText(row) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-if="!compact"
+          prop="modified"
+          label="修改时间"
+          sortable
+          width="150"
+        >
+          <template #default="{ row }">
+            <time
+              class="time-text"
+              :title="formatFileModifiedDate(row.modified)"
+            >{{
+              shortDate(row.modified)
+            }}</time>
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="操作"
+          width="80"
+          align="center"
+        >
+          <template #default="{ row }">
+            <ActionButton
+              :file="row"
+              :type="row.isDirectory ? 'dir' : 'file'"
+              @action="forwardAction"
+            />
+          </template>
+        </el-table-column>
+      </el-table>
+    </template>
     <div
-      v-if="viewMode === 'grid'"
+      v-else
       class="grid-container"
     >
-      <div class="grid-card-body">
+      <div class="file-grid">
         <div
-          v-if="!isLoading && visibleFiles.length > 0"
-          class="file-grid"
+          v-for="file in visibleFiles"
+          :key="getFileEntryKey(file)"
+          class="file-card"
         >
-          <div
-            v-for="file in visibleFiles"
-            :key="getFileEntryKey(file)"
-            class="file-card"
+          <button
+            type="button"
+            class="card-open"
+            :title="file.name"
             @click="emit('file-click', file)"
           >
-            <div class="card-icon-wrapper">
-              <el-icon
-                class="card-icon"
-                :class="getIconClass(file)"
-              >
-                <Icon :icon="getIcon(file)" />
-              </el-icon>
-            </div>
-            <div class="card-info">
-              <div
-                class="card-name"
-                :title="file.name"
-              >
-                {{ file.name }}
-              </div>
-              <div class="card-meta">
-                <span
-                  v-if="file.isSymlink"
-                  class="card-symlink-badge"
-                >
-                  <el-icon style="font-size:10px"><Icon :icon="ICON_MAP.symlink" /></el-icon>
-                  链接
-                </span>
-                <span v-else-if="!file.isDirectory">{{ formatFileSize(file.size) }}</span>
-                <span
-                  v-else
-                  class="text-muted"
-                >文件夹</span>
-              </div>
-            </div>
-            <div
-              class="card-actions"
-              @click.stop
-            >
-              <ActionButton
-                :file="file"
-                :type="file.isDirectory ? 'dir' : 'file'"
-                @copy="handleCopy"
-                @move="handleMove"
-                @compress="handleCompress"
-                @decompress="handleDecompress"
-                @download="handleDownload"
-                @touch="handleTouch"
-                @delete="handleDelete"
-                @rename="handleRename"
-                @chmod="handleChmod"
-                @copy-path="handleCopyPath"
-              />
-            </div>
+            <Icon
+              class="card-icon"
+              :class="getIconClass(file)"
+              :icon="getIcon(file)"
+            />
+            <span class="card-name">{{ file.name }}</span>
+            <span class="card-meta">{{
+              file.isSymlink ? '符号链接' : file.isDirectory ? '' : formatFileSize(file.size)
+            }}</span>
+          </button>
+          <div class="card-actions">
+            <ActionButton
+              :file="file"
+              :type="file.isDirectory ? 'dir' : 'file'"
+              @action="forwardAction"
+            />
           </div>
-        </div>
-
-        <!-- 网格视图空状态 -->
-        <div
-          v-else-if="!isLoading && visibleFiles.length === 0"
-          class="empty-state"
-        >
-          <el-empty
-            :description="emptyDescription"
-            :image-size="120"
-          >
-            <template #image>
-              <el-icon class="empty-icon">
-                <Icon :icon="ICON_MAP.folder" />
-              </el-icon>
-            </template>
-            <el-button
-              type="primary"
-              @click="emit('refresh')"
-            >
-              <el-icon><Refresh /></el-icon>
-              刷新
-            </el-button>
-          </el-empty>
-        </div>
-
-        <!-- 网格视图加载状态 -->
-        <div
-          v-else-if="isLoading"
-          class="loading-state"
-        >
-          <el-skeleton
-            :rows="8"
-            animated
-          />
         </div>
       </div>
     </div>
@@ -364,21 +222,18 @@
 </template>
 
 <script setup>
-import { Refresh } from '@element-plus/icons-vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
 import { getFileIconMeta } from '@/utils/fileIcons.js'
 import { formatFileSize } from '@/utils/format.js'
 import ActionButton from './ActionButton.vue'
-import {
-  formatFileModifiedDate,
-  getFileEntryKey,
-  resolveFileExtensionTagType
-} from './fileTableModel.js'
+import { formatFileModifiedDate, getFileEntryKey } from './fileTableModel.js'
 
-defineProps({
+const props = defineProps({
   visibleFiles: { type: Array, default: () => [] },
   loading: Boolean,
+  searchActive: Boolean,
   viewMode: { type: String, default: 'list' },
   totalCount: { type: Number, default: 0 },
   directoryCount: { type: Number, default: 0 },
@@ -388,602 +243,265 @@ defineProps({
 const emit = defineEmits(['file-click', 'refresh', 'batch-delete', 'action'])
 const entryFilter = defineModel('entryFilter', { type: String, default: 'all' })
 const selectedFiles = defineModel('selectedFiles', { type: Array, default: () => [] })
-const ICON_MAP = icons
-const getIcon = file => getFileIconMeta(file).icon
-const getIconClass = file => getFileIconMeta(file).className
-const getExtensionTagType = resolveFileExtensionTagType
-const formatModifiedDate = formatFileModifiedDate
-const emitAction = action => file => emit('action', action, file)
-const handleCopy = emitAction('copy')
-const handleMove = emitAction('move')
-const handleCompress = emitAction('compress')
-const handleDecompress = emitAction('decompress')
-const handleDownload = emitAction('download')
-const handleTouch = emitAction('touch')
-const handleDelete = emitAction('delete')
-const handleRename = emitAction('rename')
-const handleChmod = emitAction('chmod')
-const handleCopyPath = emitAction('copy-path')
+const tableRef = ref(null)
+const browserRef = ref(null)
+const compact = ref(false)
+let resizeObserver
+const filters = computed(() => [
+  { value: 'all', label: '全部', count: props.totalCount },
+  { value: 'dir', label: '文件夹', count: props.directoryCount },
+  { value: 'file', label: '文件', count: props.fileCount }
+])
+const getIcon = (file) => getFileIconMeta(file).icon
+const getIconClass = (file) => getFileIconMeta(file).className
+const shortDate = (value) => formatFileModifiedDate(value).slice(0, 16)
+const permissionText = (file) =>
+  `${file.canRead ? 'r' : '-'}${file.canWrite ? 'w' : '-'}${file.canExecute ? 'x' : '-'}`
+const permissionLabel = (file) =>
+  `当前进程：${file.canRead ? '可读' : '不可读'}、${file.canWrite ? '可写' : '不可写'}、${file.canExecute ? '可执行' : '不可执行'}`
+const forwardAction = (action, file) => emit('action', action, file)
+const clearSelection = () => {
+  tableRef.value?.clearSelection()
+  selectedFiles.value = []
+}
+watch(selectedFiles, (files) => {
+  if (!files.length) tableRef.value?.clearSelection()
+})
+onMounted(() => {
+  resizeObserver = new ResizeObserver(([entry]) => {
+    compact.value = entry.contentRect.width < 610
+  })
+  resizeObserver.observe(browserRef.value)
+})
+onBeforeUnmount(() => resizeObserver?.disconnect())
 </script>
 
 <style scoped>
 .browser-content {
-  display: contents;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 .browser-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 38px;
-  padding: 5px 10px;
-  border-bottom: 1px solid var(--file-table-soft-border);
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 10px 8px;
   flex-shrink: 0;
 }
-
-.batch-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  margin-bottom: 8px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--el-color-primary) 6%, var(--file-table-muted-surface));
-  border: 1px solid color-mix(in srgb, var(--el-color-primary) 18%, transparent);
-  flex-shrink: 0;
-}
-
-.batch-count {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-color-primary);
-  flex: 1;
-}
-
-.browser-stats,
 .browser-filters {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 4px;
 }
-
-.stat-pill,
 .filter-chip {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-height: 26px;
-  padding: 0 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.stat-pill {
-  padding: 0;
-  background: transparent;
+  gap: 6px;
+  padding: 5px 8px;
   border: 0;
-  color: var(--el-text-color-secondary);
-}
-
-.stat-pill + .stat-pill::before {
-  content: '';
-  width: 1px;
-  height: 12px;
-  margin-right: 8px;
-  background: var(--file-table-soft-border);
-}
-
-.filter-chip {
-  border: 1px solid transparent;
+  border-radius: 4px;
   background: transparent;
   color: var(--el-text-color-secondary);
   cursor: pointer;
-  transition: all 0.2s;
+  font-size: 12px;
 }
-
+.filter-chip span {
+  font-variant-numeric: tabular-nums;
+}
 .filter-chip:hover,
 .filter-chip.active {
   color: var(--el-color-primary);
-  border-color: color-mix(in srgb, var(--el-color-primary) 18%, transparent);
-  background: color-mix(in srgb, var(--el-color-primary) 7%, transparent);
+  background: var(--el-color-primary-light-9);
 }
-
-.table-container {
-  flex: 1;
+.filter-chip:focus-visible,
+.file-name:focus-visible,
+.card-open:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: -2px;
+}
+.match-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.batch-toolbar {
   display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.table-card-body {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.file-table {
-  width: 100%;
-  border: none;
-  flex: 1;
-  min-height: 0;
-}
-
-:deep(.el-table) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  max-height: 100%;
-}
-
-:deep(.el-table__header-wrapper) {
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--el-color-primary-light-9);
 }
-
-:deep(.el-table__body-wrapper) {
+.batch-toolbar span {
+  margin-right: auto;
+}
+.batch-toolbar :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+.file-table {
   flex: 1;
   min-height: 0;
-  overflow-y: auto !important;
-  overflow-x: hidden;
+  width: 100%;
+  --el-table-header-bg-color: var(--app-control-background-soft);
 }
-
+.file-table :deep(td.el-table__cell) {
+  padding: 5px 0;
+}
+.file-table :deep(.cell) {
+  padding: 0 8px;
+}
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.file-icon {
+  flex-shrink: 0;
+  font-size: 18px;
+}
+.file-identity {
+  flex: 1;
+  min-width: 0;
+}
+.file-name {
+  display: block;
+  max-width: 100%;
+  border: 0;
+  padding: 3px 0;
+  background: transparent;
+  color: var(--el-text-color-primary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-size: 13px;
+}
+.file-name:hover {
+  color: var(--el-color-primary);
+}
+.file-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+}
+.symlink-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  color: var(--el-text-color-secondary);
+  font-size: 11px;
+}
+.permission-text {
+  font-family: var(--app-font-mono, monospace);
+  color: var(--el-text-color-secondary);
+}
+.time-text,
+.file-size {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
+.loading-state {
+  padding: 16px;
+}
+.empty-state {
+  flex: 1;
+  min-height: 0;
+}
 .grid-container {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
+  padding: 4px 10px 10px;
 }
-
-.grid-card-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px;
-}
-
 .file-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 10px;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
+  grid-template-columns: repeat(auto-fill, minmax(125px, 1fr));
+  gap: 8px;
 }
-
 .file-card {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+}
+.file-card:hover {
+  background: var(--app-control-background-soft);
+}
+.card-open {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 10px 10px;
-  position: relative;
-  overflow: hidden;
-  background: var(--app-card-background);
-  border: 1px solid color-mix(in srgb, var(--file-table-soft-border) 90%, transparent);
-  border-radius: var(--radius-container);
-  box-shadow: none;
-  cursor: pointer;
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s,
-    transform 0.2s,
-    background-color 0.2s;
-}
-
-.file-card:hover {
-  border-color: color-mix(in srgb, var(--el-border-color) 28%, transparent);
-  box-shadow: none;
-  transform: none;
-}
-
-.file-card:active {
-  transform: none;
-  box-shadow: none;
-}
-
-.card-icon-wrapper {
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 10px;
-  border-radius: var(--radius-container);
-  background: var(--file-table-raised-surface);
-  border: 1px solid color-mix(in srgb, var(--file-table-soft-border) 88%, transparent);
-  transition:
-    background-color 0.2s,
-    transform 0.2s;
-}
-
-.file-card:hover .card-icon-wrapper {
-  background: var(--file-table-selected-surface);
-  transform: scale(1.04);
-}
-
-.card-icon {
-  font-size: 36px;
-  transition: transform 0.2s;
-}
-
-.file-card:hover .card-icon {
-  transform: scale(1.05);
-}
-
-.card-info {
   width: 100%;
-  text-align: center;
-  min-height: 0;
+  height: 100%;
+  gap: 8px;
+  padding: 18px 12px 12px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+  color: var(--el-text-color-primary);
 }
-
+.card-icon {
+  font-size: 32px;
+}
 .card-name {
   font-size: 12px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  margin-bottom: 3px;
-  overflow: hidden;
-  word-break: break-all;
+  overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
-  line-height: 1.4;
-  max-height: 2.8em;
+  overflow: hidden;
+  line-height: 1.5;
 }
-
 .card-meta {
+  min-height: 15px;
   font-size: 11px;
   color: var(--el-text-color-secondary);
-  margin-top: 2px;
 }
-
-.card-symlink-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: var(--el-color-primary);
-  font-weight: 600;
-}
-
 .card-actions {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 4px;
+  right: 4px;
   opacity: 0;
-  transition: opacity 0.2s;
 }
-
-.file-card:hover .card-actions {
+.file-card:hover .card-actions,
+.file-card:focus-within .card-actions {
   opacity: 1;
 }
-
-.empty-state {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 18px;
-  background: var(--file-table-panel-surface);
-  border: 0;
-  border-radius: 0;
-}
-
-.empty-icon {
-  font-size: clamp(4rem, 5vw, 5rem);
-  color: var(--el-text-color-placeholder);
-  opacity: 0.6;
-  transition: all var(--el-transition-duration) var(--el-transition-function);
-}
-
-.empty-state:hover .empty-icon {
-  opacity: 1;
-  transform: scale(1.05);
-}
-
-.loading-state {
-  flex: 1;
-  padding: 12px;
-  background: var(--file-table-muted-surface);
-  border-radius: 0;
-}
-
-.file-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  padding: 3px 6px;
-  border-radius: 4px;
-  transition: all var(--el-transition-duration) var(--el-transition-function);
-  margin: 0 -4px;
-}
-
-.file-item:hover {
-  background: color-mix(in srgb, var(--file-table-selected-surface) 84%, transparent);
-  transform: none;
-}
-
-.file-icon-shell {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border-radius: 4px;
-  background: var(--file-table-raised-surface);
-  border: 1px solid color-mix(in srgb, var(--file-table-soft-border) 88%, transparent);
-}
-
-.file-icon {
-  color: var(--el-text-color-regular);
-  font-size: 15px;
-}
-
-.folder-icon {
-  color: var(--el-color-primary);
-  font-size: 15px;
-}
-
-.image-icon,
-.excel-icon {
-  color: var(--el-color-success);
-  font-size: 15px;
-}
-
-.video-icon,
-.audio-icon,
-.archive-icon {
-  color: var(--el-color-warning-dark-2);
-  font-size: 15px;
-}
-
-.pdf-icon,
-.executable-icon {
-  color: var(--el-color-danger);
-  font-size: 15px;
-}
-
+.folder-icon,
+.code-icon,
 .json-icon,
-.code-icon {
-  color: var(--el-color-primary);
-  font-size: 15px;
-}
-
 .word-icon,
 .ppt-icon {
   color: var(--el-color-primary);
-  font-size: 15px;
 }
-
-.markdown-icon {
-  color: var(--el-text-color-regular);
-  font-size: 15px;
+.image-icon,
+.excel-icon {
+  color: var(--el-color-success);
 }
-
-.text-icon {
-  color: var(--el-text-color-secondary);
-  font-size: 15px;
+.video-icon,
+.audio-icon,
+.archive-icon {
+  color: var(--el-color-warning);
 }
-
-.font-icon,
-.book-icon {
-  color: var(--el-text-color-secondary);
-  font-size: 15px;
+.pdf-icon,
+.executable-icon {
+  color: var(--el-color-danger);
 }
-
-.file-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--el-text-color-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-tags {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.symlink-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.time-text {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.text-muted {
-  color: var(--el-text-color-placeholder);
-}
-
-.action-buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.permission-details {
-  display: flex;
-  gap: 4px;
-}
-
-.permission-badge {
-  width: 16px;
-  height: 16px;
-  border-radius: 5px;
-  font-size: 9px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--el-text-color-secondary);
-  background: var(--file-table-muted-surface);
-  border: 1px solid color-mix(in srgb, var(--file-table-soft-border) 88%, transparent);
-  box-shadow: none;
-  transition:
-    background-color 0.18s ease,
-    color 0.18s ease;
-}
-
-.permission-badge:hover {
-  color: var(--el-text-color-primary);
-  background: var(--file-table-selected-surface);
-}
-
-.permission-badge.read {
-  color: var(--el-color-primary);
-  background-color: color-mix(in srgb, var(--el-color-primary) 9%, var(--file-table-muted-surface));
-  border-color: color-mix(in srgb, var(--el-color-primary) 20%, transparent);
-}
-
-.permission-badge.write {
-  color: var(--el-color-warning-dark-2);
-  background-color: color-mix(in srgb, var(--el-color-warning) 11%, var(--file-table-muted-surface));
-  border-color: color-mix(in srgb, var(--el-color-warning) 24%, transparent);
-}
-
-.permission-badge.execute {
-  color: var(--el-color-success-dark-2);
-  background-color: color-mix(in srgb, var(--el-color-success) 11%, var(--file-table-muted-surface));
-  border-color: color-mix(in srgb, var(--el-color-success) 24%, transparent);
-}
-
-:deep(.file-table-header),
-:deep(.el-table__header th) {
-  background: var(--file-table-muted-surface) !important;
-  border-bottom: 1px solid color-mix(in srgb, var(--file-table-soft-border) 88%, transparent) !important;
-}
-
-:deep(.el-table__header th) {
-  color: var(--el-text-color-regular) !important;
-  font-weight: 600 !important;
-  font-size: 12px !important;
-  letter-spacing: 0.2px;
-}
-
-:deep(.el-table__body tr) {
-  transition: all var(--el-transition-duration) var(--el-transition-function);
-}
-
-:deep(.el-table__body tr:hover) {
-  background-color: color-mix(
-    in srgb,
-    var(--file-table-selected-surface) 72%,
-    transparent
-  ) !important;
-}
-
-:deep(.el-table__body tr.current-row) {
-  background-color: var(--file-table-selected-surface) !important;
-}
-
-:deep(.el-table__body td) {
-  padding: 10px 0 !important;
-  font-size: 12px !important;
-  color: var(--el-text-color-primary) !important;
-  border-bottom: 1px solid color-mix(in srgb, var(--file-table-soft-border) 58%, transparent) !important;
-}
-
-:deep(.operation-column-header),
-:deep(.operation-column-cell) {
-  background: var(--app-card-background) !important;
-  border-left: 1px solid color-mix(in srgb, var(--file-table-soft-border) 76%, transparent) !important;
-  box-shadow: -8px 0 16px color-mix(in srgb, var(--el-text-color-primary) 3%, transparent);
-}
-
-:deep(.operation-column-header) {
-  color: var(--el-text-color-secondary) !important;
-  font-weight: 600 !important;
-}
-
-:deep(.el-table__body tr:hover .operation-column-cell),
-:deep(.el-table__body tr.current-row .operation-column-cell) {
-  background: color-mix(in srgb, var(--file-table-selected-surface) 72%, var(--app-card-background)) !important;
-}
-
-:deep(.el-table--striped .el-table__body tr.el-table__row--striped td) {
-  background-color: color-mix(in srgb, var(--file-table-muted-surface) 64%, transparent) !important;
-}
-
-:deep(.el-table__inner-wrapper::before) {
-  display: none;
-}
-
-:deep(.el-tag) {
-  --el-tag-bg-color: var(--file-table-muted-surface);
-  --el-tag-border-color: transparent;
-  --el-tag-text-color: var(--el-text-color-regular);
-  border-radius: 999px;
-  border-color: transparent;
-  font-size: 10px;
-  font-weight: 600;
-  height: 20px;
-  line-height: 18px;
-}
-
-:deep(.el-tag--primary) {
-  --el-tag-bg-color: color-mix(in srgb, var(--el-color-primary) 9%, var(--file-table-muted-surface));
-  --el-tag-border-color: color-mix(in srgb, var(--el-color-primary) 20%, transparent);
-  --el-tag-text-color: var(--el-color-primary);
-}
-
-:deep(.el-tag--success) {
-  --el-tag-bg-color: color-mix(in srgb, var(--el-color-success) 10%, var(--file-table-muted-surface));
-  --el-tag-border-color: color-mix(in srgb, var(--el-color-success) 22%, transparent);
-  --el-tag-text-color: var(--el-color-success-dark-2);
-}
-
-:deep(.el-tag--warning) {
-  --el-tag-bg-color: color-mix(in srgb, var(--el-color-warning) 11%, var(--file-table-muted-surface));
-  --el-tag-border-color: color-mix(in srgb, var(--el-color-warning) 24%, transparent);
-  --el-tag-text-color: var(--el-color-warning-dark-2);
-}
-
-:deep(.el-tag--danger) {
-  --el-tag-bg-color: color-mix(in srgb, var(--el-color-danger) 9%, var(--file-table-muted-surface));
-  --el-tag-border-color: color-mix(in srgb, var(--el-color-danger) 22%, transparent);
-  --el-tag-text-color: var(--el-color-danger);
-}
-
-:deep(.el-tag--info) {
-  --el-tag-bg-color: color-mix(in srgb, var(--el-color-info) 9%, var(--file-table-muted-surface));
-  --el-tag-border-color: color-mix(in srgb, var(--el-color-info) 18%, transparent);
-  --el-tag-text-color: var(--el-text-color-regular);
-}
-
-@media (max-width: 768px) {
-  .browser-toolbar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .file-name {
-    font-size: 13px;
-  }
-
-  .time-text {
-    font-size: 12px;
-  }
-
-  .file-tags {
-    flex-direction: column;
-    gap: 2px;
+@media (hover: none) {
+  .card-actions {
+    opacity: 1;
   }
 }
 </style>

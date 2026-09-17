@@ -1,251 +1,244 @@
 <template>
-  <div class="file-workspace">
-    <div class="workspace-shell">
-      <header class="workspace-toolbar">
-        <div class="toolbar-primary">
-          <el-button-group class="nav-group">
-            <el-button
-              :disabled="!canGoBack"
-              size="small"
-              title="上一级"
-              @click="goToParentDirectory"
-            >
-              <el-icon><Icon :icon="ICON_MAP.arrowLeft" /></el-icon>
-            </el-button>
-            <el-button
-              size="small"
-              title="根目录"
-              @click="goToRoot"
-            >
-              <el-icon><Icon :icon="ICON_MAP.homeFilled" /></el-icon>
-            </el-button>
-          </el-button-group>
-
-          <div
-            v-if="!isPathEditing"
-            class="path-surface"
-            @click="startPathEditing"
+  <div
+    ref="workspaceRef"
+    class="file-workspace"
+    :class="{ 'is-sidebar-open': sidebarOpen }"
+    @keydown.esc="sidebarOpen = false"
+  >
+    <header class="workspace-toolbar">
+      <el-button
+        text
+        :aria-expanded="sidebarOpen"
+        :aria-label="sidebarOpen ? '收起目录栏' : '展开目录栏'"
+        :title="sidebarOpen ? '收起目录栏' : '展开目录栏'"
+        @click="sidebarOpen = !sidebarOpen"
+      >
+        <Icon :icon="ICON_MAP.menu" />
+      </el-button>
+      <el-button
+        text
+        :disabled="!canGoBack"
+        aria-label="上一级目录"
+        title="上一级目录"
+        @click="goToParentDirectory"
+      >
+        <Icon :icon="ICON_MAP.arrowUp" />
+      </el-button>
+      <el-button
+        text
+        aria-label="根目录"
+        title="根目录"
+        @click="goToRoot"
+      >
+        <Icon :icon="ICON_MAP.homeFilled" />
+      </el-button>
+      <el-select
+        v-if="isWindows && diskList.length"
+        v-model="selectedDisk"
+        size="small"
+        class="disk-select"
+        aria-label="选择盘符"
+        @change="handleDiskChange"
+      >
+        <el-option
+          v-for="item in diskList"
+          :key="item.value"
+          :label="item.label"
+          :value="item.value"
+        />
+      </el-select>
+      <nav
+        v-if="!isPathEditing"
+        class="path-surface"
+        aria-label="当前目录路径"
+        :title="currentFullPath"
+        @dblclick="startPathEditing"
+      >
+        <template
+          v-for="(crumb, index) in displayBreadcrumbs"
+          :key="crumb.link"
+        >
+          <Icon
+            v-if="index"
+            class="path-separator"
+            :icon="ICON_MAP.arrowRight"
+          />
+          <button
+            type="button"
+            class="path-segment"
+            :aria-current="index === displayBreadcrumbs.length - 1 ? 'location' : undefined"
+            @click="goToPath(crumb.link)"
           >
-            <div
-              v-for="(crumb, index) in displayBreadcrumbs"
-              :key="index"
-              class="path-segment"
-            >
-              <button
-                type="button"
-                class="path-segment-text"
-                :class="{ 'path-segment-active': index === displayBreadcrumbs.length - 1 }"
-                @click.stop="goToPath(crumb.link)"
-              >
-                {{ crumb.text }}
-              </button>
-              <el-icon
-                v-if="index < displayBreadcrumbs.length - 1"
-                class="path-separator"
-              >
-                <Icon :icon="ICON_MAP.arrowRight" />
-              </el-icon>
-            </div>
-            <el-icon class="path-edit-icon">
-              <Icon :icon="ICON_MAP.edit" />
-            </el-icon>
-          </div>
-
-          <div
-            v-else
-            class="path-input-wrap"
+            {{ crumb.text }}
+          </button>
+        </template>
+        <el-button
+          text
+          aria-label="编辑路径"
+          title="编辑路径"
+          @click="startPathEditing"
+        >
+          <Icon :icon="ICON_MAP.edit" />
+        </el-button>
+      </nav>
+      <el-input
+        v-else
+        ref="pathInputRef"
+        v-model="pathInput"
+        size="small"
+        class="path-input"
+        aria-label="目录路径"
+        @keyup.enter="handlePathInput"
+        @keyup.esc.stop="cancelPathEditing"
+        @blur="cancelPathEditing"
+      />
+      <el-button
+        size="small"
+        :loading="isLoading"
+        @click="refreshFiles"
+      >
+        <Icon :icon="ICON_MAP.refresh" /> 刷新
+      </el-button>
+    </header>
+    <div class="workspace-body">
+      <button
+        v-if="sidebarOpen"
+        type="button"
+        class="sidebar-backdrop"
+        aria-label="关闭目录导航"
+        @click="sidebarOpen = false"
+      />
+      <aside
+        v-show="sidebarOpen"
+        class="workspace-sidebar"
+        aria-label="目录导航"
+      >
+        <div class="sidebar-heading">
+          <strong>目录</strong><el-button
+            text
+            aria-label="收起目录栏"
+            @click="sidebarOpen = false"
           >
-            <el-input
-              v-model="pathInput"
-              size="small"
-              class="path-input"
-              autofocus
-              @keyup.enter="handlePathInput"
-              @keyup.esc="cancelPathEditing"
-              @blur="cancelPathEditing"
-            >
-              <template #prefix>
-                <el-icon><Icon :icon="ICON_MAP.folder" /></el-icon>
-              </template>
-              <template #suffix>
-                <el-icon
-                  class="path-input-icon"
-                  @click="handlePathInput"
-                >
-                  <Icon :icon="ICON_MAP.check" />
-                </el-icon>
-                <el-icon
-                  class="path-input-icon"
-                  @click="cancelPathEditing"
-                >
-                  <Icon :icon="ICON_MAP.close" />
-                </el-icon>
-              </template>
-            </el-input>
-          </div>
-        </div>
-
-        <div class="toolbar-secondary">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索名称或扩展名"
-            class="search-input"
-            clearable
-            size="small"
-          >
-            <template #prefix>
-              <el-icon><Icon :icon="ICON_MAP.search" /></el-icon>
-            </template>
-          </el-input>
-
-          <el-radio-group
-            v-model="viewMode"
-            size="small"
-            class="view-mode-group"
-          >
-            <el-radio-button
-              value="list"
-              title="列表"
-            >
-              <el-icon><Icon :icon="ICON_MAP.list" /></el-icon>
-            </el-radio-button>
-            <el-radio-button
-              value="grid"
-              title="网格"
-            >
-              <el-icon><Icon :icon="ICON_MAP.grid" /></el-icon>
-            </el-radio-button>
-          </el-radio-group>
-
-          <el-button
-            :loading="isLoading"
-            size="small"
-            class="refresh-button"
-            @click="refreshFiles"
-          >
-            <el-icon><Icon :icon="ICON_MAP.refresh" /></el-icon>
-            刷新
+            <Icon :icon="ICON_MAP.close" />
           </el-button>
         </div>
-      </header>
-
-      <div class="workspace-body">
-        <aside class="workspace-sidebar">
-          <div class="sidebar-top">
-            <el-select
-              v-if="isWindows && diskList.length > 0"
-              v-model="selectedDisk"
+        <FileTree
+          v-if="fileSystemProfile"
+          ref="fileTreeRef"
+          :session-id="sessionId"
+          :current-path="currentFullPath"
+          :current-disk="disk"
+          :is-windows="isWindows"
+          :roots="fileSystemProfile.roots || []"
+          @select-path="goToPath"
+        />
+      </aside>
+      <main class="workspace-main">
+        <div class="main-actions">
+          <div class="action-group">
+            <el-dropdown
+              trigger="click"
+              @command="createEntry"
+            >
+              <el-button
+                size="small"
+                aria-label="新建文件或文件夹"
+              >
+                <Icon :icon="ICON_MAP.plus" /> 新建 <Icon :icon="ICON_MAP.arrowDown" />
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="file">
+                    新建文件
+                  </el-dropdown-item><el-dropdown-item command="folder">
+                    新建文件夹
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button
               size="small"
-              class="disk-select"
-              placeholder="选择盘符"
-              @change="handleDiskChange"
+              @click="uploadFile"
             >
-              <el-option
-                v-for="item in diskList"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              >
-                <div class="disk-option">
-                  <el-icon class="disk-icon">
-                    <Icon :icon="ICON_MAP.hardDrive" />
-                  </el-icon>
-                  <span>{{ item.label }}</span>
-                </div>
-              </el-option>
-            </el-select>
-
-            <div
-              v-else
-              class="sidebar-root"
+              <Icon :icon="ICON_MAP.upload" /> 上传
+            </el-button>
+            <el-button
+              v-if="fileCapabilities.grep"
+              size="small"
+              title="递归搜索当前目录及子目录的文件内容"
+              @click="openGrep"
             >
-              <el-icon><Icon :icon="ICON_MAP.folder" /></el-icon>
-              <span>目录</span>
-              <code>/</code>
-            </div>
+              <Icon :icon="ICON_MAP.search" /> 搜索内容
+            </el-button>
+            <el-dropdown
+              v-if="fileCapabilities.pack"
+              trigger="click"
+              @command="openPack"
+            >
+              <el-button
+                text
+                aria-label="更多目录操作"
+                title="更多目录操作"
+              >
+                <Icon :icon="ICON_MAP.more" />
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="pack">
+                    打包当前目录
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
-
-          <div class="sidebar-tree">
-            <FileTree
-              v-if="fileSystemProfile"
-              :session-id="sessionId"
-              :current-path="currentFullPath"
-              :current-disk="disk"
-              :is-windows="isWindows"
-              :roots="fileSystemProfile.roots || []"
-              @select-path="goToPath"
-            />
+          <div class="filter-group">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="筛选当前目录"
+              aria-label="筛选当前目录的名称或扩展名"
+              title="按名称或扩展名筛选，不搜索子目录"
+              clearable
+              size="small"
+              class="search-input"
+            >
+              <template #prefix>
+                <Icon :icon="ICON_MAP.search" />
+              </template>
+            </el-input>
+            <el-radio-group
+              v-model="viewMode"
+              size="small"
+              aria-label="文件视图"
+            >
+              <el-radio-button
+                value="list"
+                aria-label="列表视图"
+                title="列表视图"
+              >
+                <Icon :icon="ICON_MAP.list" />
+              </el-radio-button>
+              <el-radio-button
+                value="grid"
+                aria-label="网格视图"
+                title="网格视图"
+              >
+                <Icon :icon="ICON_MAP.grid" />
+              </el-radio-button>
+            </el-radio-group>
           </div>
-        </aside>
-
-        <main class="workspace-main">
-          <div class="main-actions">
-            <div class="main-actions__group">
-              <el-button
-                size="small"
-                type="primary"
-                @click="createFile"
-              >
-                <el-icon><Icon :icon="ICON_MAP.documentAdd" /></el-icon>
-                新建文件
-              </el-button>
-              <el-button
-                class="semantic-button is-folder"
-                size="small"
-                @click="createFolder"
-              >
-                <el-icon><Icon :icon="ICON_MAP.folderAdd" /></el-icon>
-                新建文件夹
-              </el-button>
-              <el-button
-                class="semantic-button is-upload"
-                size="small"
-                @click="uploadFile"
-              >
-                <el-icon><Icon :icon="ICON_MAP.upload" /></el-icon>
-                上传
-              </el-button>
-            </div>
-            <div class="main-actions__group is-utility">
-              <el-button
-                v-if="fileCapabilities.grep"
-                class="semantic-button is-search"
-                size="small"
-                title="递归搜索文件内容"
-                @click="openGrep"
-              >
-                <el-icon><Icon :icon="ICON_MAP.search" /></el-icon>
-                内容搜索
-              </el-button>
-              <el-button
-                v-if="fileCapabilities.pack"
-                class="semantic-button is-archive"
-                size="small"
-                title="打包当前目录为 tar.gz"
-                @click="openPack"
-              >
-                <el-icon><Icon :icon="ICON_MAP.compress" /></el-icon>
-                打包目录
-              </el-button>
-            </div>
-          </div>
-
-          <div class="main-content">
-            <FileTable
-              ref="fileTableRef"
-              :session-id="sessionId"
-              :search-keyword="searchKeyword"
-              :view-mode="viewMode"
-              @change-disk="handleDiskChangeFromTable"
-              @change-current-path="handlePathChange"
-              @loading="handleLoadingChange"
-            />
-          </div>
-        </main>
-      </div>
+        </div>
+        <FileTable
+          ref="fileTableRef"
+          :session-id="sessionId"
+          :search-keyword="searchKeyword"
+          :view-mode="viewMode"
+          @change-disk="handleDiskChangeFromTable"
+          @change-current-path="handlePathChange"
+          @loading="handleLoadingChange"
+        />
+      </main>
     </div>
   </div>
-
   <FileCreate
     ref="fileCreateRef"
     @refresh="refreshFiles"
@@ -280,8 +273,8 @@ import FileTree from '@/components/PuppetConsole/File/FileTree.vue'
 import FileTable from '@/components/PuppetConsole/File/FileTable.vue'
 import FileCreate from '@/components/PuppetConsole/File/FileCreate.vue'
 import FileUpload from '@/components/PuppetConsole/File/FileUpload.vue'
-import FileGrep   from '@/components/PuppetConsole/File/FileGrep.vue'
-import FilePack   from '@/components/PuppetConsole/File/FilePack.vue'
+import FileGrep from '@/components/PuppetConsole/File/FileGrep.vue'
+import FilePack from '@/components/PuppetConsole/File/FilePack.vue'
 
 /**
  * 文件管理组件 - macOS Finder 风格
@@ -307,23 +300,21 @@ const searchKeyword = ref('')
 const viewMode = ref(DEFAULT_VIEW_MODE)
 const isPathEditing = ref(false)
 const pathInput = ref('')
+const pathInputRef = ref(null)
+const sidebarOpen = ref(false)
+const workspaceRef = ref(null)
+const fileTreeRef = ref(null)
 
 // 组件引用
 const fileTableRef = ref(null)
 const fileCreateRef = ref(null)
 const fileUploadRef = ref(null)
-const fileGrepRef   = ref(null)
-const filePackRef   = ref(null)
+const fileGrepRef = ref(null)
+const filePackRef = ref(null)
 
 // 使用 composables
-const {
-  diskList,
-  selectedDisk,
-  isWindows,
-  fileSystemProfile,
-  isLoading,
-  loadDisks
-} = useFileSystem({ sessionId: props.sessionId })
+const { diskList, selectedDisk, isWindows, fileSystemProfile, isLoading, loadDisks } =
+  useFileSystem({ sessionId: props.sessionId })
 
 const fileCapabilities = computed(() => fileSystemProfile.value?.capabilities || {})
 provide(FILE_CAPABILITIES_KEY, fileCapabilities)
@@ -360,6 +351,7 @@ const handleDiskChangeFromTable = (newDisk) => {
  * 从 FileTable 接收路径变化
  */
 const handlePathChange = (path) => {
+  if (currentPath.value !== path) searchKeyword.value = ''
   currentPath.value = path
 }
 
@@ -368,9 +360,9 @@ const handlePathChange = (path) => {
  */
 const refreshFiles = async () => {
   await loadDisks()
-  const targetPath = buildPath(disk.value,currentPath.value)
+  const targetPath = buildPath(disk.value, currentPath.value)
   if (targetPath) {
-    fileTableRef.value?.getList(targetPath)
+    await Promise.all([fileTableRef.value?.getList(targetPath), fileTreeRef.value?.refresh()])
   }
 }
 
@@ -388,15 +380,8 @@ const handleCreatedEntry = async (entry) => {
 /**
  * 创建文件
  */
-const createFile = () => {
-  fileCreateRef.value?.openDialog(props.sessionId, currentFullPath.value, 'file')
-}
-
-/**
- * 创建文件夹
- */
-const createFolder = () => {
-  fileCreateRef.value?.openDialog(props.sessionId, currentFullPath.value, 'folder')
+const createEntry = (type) => {
+  fileCreateRef.value?.openDialog(props.sessionId, currentFullPath.value, type)
 }
 
 /**
@@ -410,7 +395,7 @@ const handleLoadingChange = (val) => {
  * 上传文件
  */
 const uploadFile = () => {
-  fileUploadRef.value?.openDialog(props.sessionId, buildPath(disk.value,currentPath.value))
+  fileUploadRef.value?.openDialog(props.sessionId, buildPath(disk.value, currentPath.value))
 }
 
 const openGrep = () => {
@@ -426,10 +411,11 @@ const openPack = () => {
  */
 const goToParentDirectory = () => {
   if (!canGoBack.value) return
+  searchKeyword.value = ''
 
   const lastSlashIndex = currentPath.value.lastIndexOf('/')
   const parentPath = lastSlashIndex > 0 ? currentPath.value.substring(0, lastSlashIndex) : ''
-  fileTableRef.value?.getList(buildPath(disk.value,parentPath))
+  fileTableRef.value?.getList(buildPath(disk.value, parentPath))
 }
 
 /**
@@ -437,6 +423,8 @@ const goToParentDirectory = () => {
  */
 const goToPath = (path) => {
   if (!path) return
+  searchKeyword.value = ''
+  if (workspaceRef.value?.clientWidth <= 760) sidebarOpen.value = false
 
   const normalizedPath = formatFilePath(path)
 
@@ -457,9 +445,12 @@ const goToPath = (path) => {
 /**
  * 开始路径编辑
  */
-const startPathEditing = () => {
+const startPathEditing = async () => {
   isPathEditing.value = true
   pathInput.value = currentFullPath.value
+  await nextTick()
+  pathInputRef.value?.focus()
+  pathInputRef.value?.select()
 }
 
 /**
@@ -501,11 +492,12 @@ const handlePathInput = () => {
  * 跳转到根目录
  */
 const goToRoot = () => {
-  const rootPath = isWindows.value && disk.value.startsWith('//')
-    ? formatFilePath(`${disk.value}/`)
-    : isWindows.value && selectedDisk.value
-      ? formatFilePath(`${selectedDisk.value}/`)
-      : '/'
+  const rootPath =
+    isWindows.value && disk.value.startsWith('//')
+      ? formatFilePath(`${disk.value}/`)
+      : isWindows.value && selectedDisk.value
+        ? formatFilePath(`${selectedDisk.value}/`)
+        : '/'
   goToPath(rootPath)
 }
 
@@ -538,349 +530,172 @@ onMounted(async () => {
 
 <style scoped>
 .file-workspace {
-  --workspace-surface: var(--app-card-background);
-  --workspace-muted-surface: var(--app-control-background-soft);
-  --workspace-control-surface: var(--app-control-background);
-  --workspace-soft-border: color-mix(in srgb, var(--el-border-color) 16%, transparent);
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-:global(html:not(.dark) .file-workspace),
-:global(html[data-theme='light'] .file-workspace) {
-  --workspace-muted-surface: var(--app-control-background-soft);
-}
-
-.workspace-shell {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 0;
-  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  container-type: inline-size;
+  background: var(--app-card-background);
 }
-
 .workspace-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 44px;
-  padding: 6px 10px;
-  border-radius: 0;
-  background: color-mix(in srgb, var(--workspace-muted-surface) 90%, transparent);
-  border: 0;
-  border-bottom: 1px solid var(--workspace-soft-border);
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
-
-.toolbar-primary,
-.toolbar-secondary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
+.file-workspace :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
-
-.toolbar-primary {
-  flex: 1;
+.file-workspace :deep(.el-button.is-text) {
+  height: 28px;
+  padding: 6px;
 }
-
-.toolbar-secondary {
-  flex-shrink: 0;
+.file-workspace :deep(.el-button .iconify) {
+  font-size: 15px;
 }
-
 .path-surface,
-.path-input-wrap {
+.path-input {
   flex: 1;
   min-width: 0;
 }
-
 .path-surface {
   display: flex;
   align-items: center;
-  gap: 4px;
-  min-height: 30px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: var(--workspace-control-surface);
-  border: 1px solid color-mix(in srgb, var(--workspace-soft-border) 92%, transparent);
+  gap: 2px;
   overflow-x: auto;
-  cursor: text;
+  scrollbar-width: thin;
 }
-
-.path-surface::-webkit-scrollbar {
-  height: 4px;
-}
-
 .path-segment {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   flex-shrink: 0;
-}
-
-.path-segment-text {
-  border: none;
+  border: 0;
   background: transparent;
-  padding: 2px 6px;
-  border-radius: 4px;
   color: var(--el-text-color-regular);
-  font-size: 12px;
+  font-size: 13px;
+  padding: 4px;
+  border-radius: 4px;
   cursor: pointer;
+  white-space: nowrap;
 }
-
-.path-segment-text:hover {
+.path-segment:hover {
   background: var(--app-control-background-hover);
-  color: var(--el-text-color-primary);
 }
-
-.path-segment-text.path-segment-active {
+.path-segment[aria-current] {
   color: var(--el-color-primary);
   font-weight: 600;
 }
-
-.path-separator,
-.path-edit-icon {
-  color: var(--el-text-color-placeholder);
-  font-size: 13px;
+.path-segment:focus-visible {
+  outline: 2px solid var(--el-color-primary);
 }
-
-.path-input :deep(.el-input__wrapper),
-.search-input :deep(.el-input__wrapper),
-.disk-select :deep(.el-input__wrapper) {
-  border-radius: var(--radius-control);
-  background: var(--workspace-control-surface);
-  border: 1px solid color-mix(in srgb, var(--workspace-soft-border) 92%, transparent);
-  box-shadow: none;
-}
-
-.path-input-icon {
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.search-input {
-  width: clamp(180px, 16vw, 250px);
-}
-
-.view-mode-group {
+.path-separator {
   flex-shrink: 0;
-  padding: 2px;
-  border-radius: 6px;
-  background: var(--workspace-control-surface);
-  border: 1px solid color-mix(in srgb, var(--workspace-soft-border) 92%, transparent);
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
-
-.workspace-toolbar :deep(.el-radio-button__inner) {
-  border: none !important;
-  background: transparent;
-  box-shadow: none !important;
-  border-radius: 4px !important;
+.disk-select {
+  width: 76px;
+  flex-shrink: 0;
 }
-
-.workspace-toolbar :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  background: var(--workspace-surface);
-  color: var(--el-text-color-primary);
-}
-
-.workspace-toolbar :deep(.el-button),
-.main-actions :deep(.el-button) {
-  border-radius: 6px;
-  font-weight: 600;
-  box-shadow: none;
-}
-
 .workspace-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(196px, 220px) minmax(0, 1fr);
-  gap: 0;
+  grid-template-columns: minmax(0, 1fr);
 }
-
-.workspace-sidebar,
-.workspace-main {
+.is-sidebar-open .workspace-body {
+  grid-template-columns: 180px minmax(0, 1fr);
+}
+.workspace-sidebar {
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  border-radius: 0;
-  background: var(--workspace-surface);
-  border: 0;
-  overflow: hidden;
+  padding: 8px;
+  background: var(--app-card-background);
+  border-right: 1px solid var(--el-border-color-lighter);
 }
-
-.workspace-sidebar {
-  padding: 7px;
-  gap: 5px;
-  border-right: 1px solid var(--workspace-soft-border);
-}
-
-.sidebar-top {
-  flex-shrink: 0;
-}
-
-.sidebar-root {
+.sidebar-heading {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  height: 32px;
-  padding: 0 9px;
-  border-radius: 5px;
-  background: var(--workspace-muted-surface);
-  border: 0;
-  color: var(--el-text-color-primary);
-  font-weight: 600;
+  justify-content: space-between;
+  padding: 0 4px 8px;
+  font-size: 12px;
 }
-
-.sidebar-root code {
-  margin-left: auto;
-  color: var(--el-text-color-placeholder);
-  font-family: var(--app-font-mono, monospace);
-  font-size: 11px;
-}
-
-.sidebar-root .el-icon,
-.path-input :deep(.el-input__prefix .el-icon) {
-  color: var(--el-color-primary);
-}
-
-.sidebar-tree {
+.workspace-sidebar :deep(.file-tree) {
   flex: 1;
   min-height: 0;
 }
-
-.disk-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.disk-icon {
-  color: var(--el-color-primary);
-}
-
 .workspace-main {
-  padding: 0;
-  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
-
+.workspace-main :deep(.file-table-container) {
+  flex: 1;
+  height: auto;
+}
 .main-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
   flex-wrap: wrap;
   justify-content: space-between;
-  min-height: 42px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--workspace-soft-border);
+  gap: 8px 12px;
+  padding: 8px 10px 4px;
 }
-
-.main-actions__group {
+.action-group,
+.filter-group {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
-
-.main-actions__group.is-utility {
-  padding-left: 10px;
-  border-left: 1px solid var(--workspace-soft-border);
+.filter-group {
+  margin-left: auto;
+  flex: 0 1 auto;
 }
-
-.main-actions .semantic-button {
-  --el-button-text-color: var(--el-text-color-regular);
-  --el-button-border-color: color-mix(in srgb, var(--el-border-color) 56%, transparent);
-  --el-button-bg-color: var(--workspace-control-surface);
-  --el-button-hover-text-color: var(--el-color-primary);
-  --el-button-hover-border-color: color-mix(in srgb, var(--el-color-primary) 32%, transparent);
-  --el-button-hover-bg-color: color-mix(in srgb, var(--el-color-primary) 6%, var(--workspace-control-surface));
+.search-input {
+  width: 180px;
+  min-width: 120px;
 }
-
-.semantic-button.is-folder {
-  --el-button-text-color: var(--el-color-success);
-  --el-button-border-color: color-mix(in srgb, var(--el-color-success) 24%, transparent);
-  --el-button-bg-color: color-mix(in srgb, var(--el-color-success) 7%, var(--workspace-control-surface));
-  --el-button-hover-text-color: var(--el-color-success);
-  --el-button-hover-border-color: color-mix(in srgb, var(--el-color-success) 36%, transparent);
-  --el-button-hover-bg-color: color-mix(in srgb, var(--el-color-success) 11%, var(--workspace-control-surface));
+.filter-group .el-radio-group {
+  flex-wrap: nowrap;
 }
-
-.semantic-button.is-upload,
-.semantic-button.is-search {
-  --el-button-text-color: var(--el-color-primary);
-  --el-button-border-color: color-mix(in srgb, var(--el-color-primary) 24%, transparent);
-  --el-button-bg-color: color-mix(in srgb, var(--el-color-primary) 7%, var(--workspace-control-surface));
-  --el-button-hover-text-color: var(--el-color-primary);
-  --el-button-hover-border-color: color-mix(in srgb, var(--el-color-primary) 36%, transparent);
-  --el-button-hover-bg-color: color-mix(in srgb, var(--el-color-primary) 11%, var(--workspace-control-surface));
+.sidebar-backdrop {
+  display: none;
 }
-
-.semantic-button.is-archive {
-  --el-button-text-color: var(--el-color-warning-dark-2);
-  --el-button-border-color: color-mix(in srgb, var(--el-color-warning) 28%, transparent);
-  --el-button-bg-color: color-mix(in srgb, var(--el-color-warning) 9%, var(--workspace-control-surface));
-  --el-button-hover-text-color: var(--el-color-warning-dark-2);
-  --el-button-hover-border-color: color-mix(in srgb, var(--el-color-warning) 40%, transparent);
-  --el-button-hover-bg-color: color-mix(in srgb, var(--el-color-warning) 13%, var(--workspace-control-surface));
-}
-
-.main-actions .semantic-button.is-folder,
-.main-actions .semantic-button.is-upload,
-.main-actions .semantic-button.is-search,
-.main-actions .semantic-button.is-archive {
-  --el-button-text-color: var(--el-text-color-regular);
-  --el-button-border-color: color-mix(in srgb, var(--el-border-color) 56%, transparent);
-  --el-button-bg-color: var(--workspace-control-surface);
-  --el-button-hover-text-color: var(--el-color-primary);
-  --el-button-hover-border-color: color-mix(in srgb, var(--el-color-primary) 32%, transparent);
-  --el-button-hover-bg-color: color-mix(in srgb, var(--el-color-primary) 6%, var(--workspace-control-surface));
-}
-
-.main-content {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-@media (max-width: 1100px) {
-  .workspace-body {
-    grid-template-columns: 220px minmax(0, 1fr);
+@container (max-width: 760px) {
+  .is-sidebar-open .workspace-body {
+    grid-template-columns: minmax(0, 1fr);
   }
-}
-
-@media (max-width: 768px) {
-  .workspace-shell {
-    padding: 6px;
-  }
-
-  .workspace-toolbar {
-    flex-direction: column;
-  }
-
-  .toolbar-primary,
-  .toolbar-secondary {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .search-input {
-    width: 100%;
-  }
-
-  .workspace-body {
-    grid-template-columns: 1fr;
-  }
-
   .workspace-sidebar {
-    max-height: 220px;
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(240px, 80%);
+    z-index: 12;
+    box-shadow: var(--el-box-shadow-light);
   }
-
-  .main-actions {
-    flex-direction: column;
+  .sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0 0 0 min(240px, 80%);
+    z-index: 11;
+    border: 0;
+    background: rgb(0 0 0 / 15%);
+  }
+}
+@container (max-width: 520px) {
+  .filter-group {
+    flex: 1 1 100%;
+  }
+  .search-input {
+    flex: 1;
+    width: auto;
   }
 }
 </style>

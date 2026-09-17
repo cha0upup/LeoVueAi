@@ -1,28 +1,9 @@
 import { buildFullPath } from '@/composables/useFilePath.js'
 import { formatFilePath } from '@/utils/format.js'
-import { getFileTypeNameByExtension } from '@/utils/fileIcons.js'
-
-const EXTENSION_TAG_TYPES = Object.freeze({
-  image: 'success',
-  video: 'warning',
-  audio: 'info',
-  pdf: 'primary',
-  word: 'primary',
-  excel: 'primary',
-  ppt: 'primary',
-  markdown: 'primary',
-  text: 'primary',
-  json: 'danger',
-  code: 'danger',
-  executable: 'danger',
-  font: 'info',
-  book: 'info',
-  archive: 'warning'
-})
 
 export function normalizeFileEntries(entries) {
   if (!Array.isArray(entries)) return []
-  return entries.map(file => ({
+  return entries.map((file) => ({
     ...file,
     name: String(file?.name || file?.path || ''),
     path: String(file?.path || ''),
@@ -48,32 +29,35 @@ export function sortFileEntries(entries) {
 }
 
 export function filterFileEntries(entries, { keyword = '', type = 'all' } = {}) {
-  const normalizedKeyword = String(keyword || '').trim().toLocaleLowerCase()
-  return (Array.isArray(entries) ? entries : []).filter(file => {
+  const normalizedKeyword = String(keyword || '')
+    .trim()
+    .toLocaleLowerCase()
+  return (Array.isArray(entries) ? entries : []).filter((file) => {
     if (type === 'dir' && !file.isDirectory) return false
     if (type === 'file' && file.isDirectory) return false
     if (!normalizedKeyword) return true
-    return String(file.name || '').toLocaleLowerCase().includes(normalizedKeyword) ||
-      String(file.extension || '').toLocaleLowerCase().includes(normalizedKeyword)
+    return (
+      String(file.name || '')
+        .toLocaleLowerCase()
+        .includes(normalizedKeyword) ||
+      String(file.extension || '')
+        .toLocaleLowerCase()
+        .includes(normalizedKeyword)
+    )
   })
 }
 
 export function summarizeFileEntries(entries) {
   const files = Array.isArray(entries) ? entries : []
-  const directories = files.filter(file => file.isDirectory).length
+  const directories = files.filter((file) => file.isDirectory).length
   return { total: files.length, directories, files: files.length - directories }
-}
-
-export function resolveFileExtensionTagType(extension) {
-  if (!extension) return 'info'
-  return EXTENSION_TAG_TYPES[getFileTypeNameByExtension(String(extension).toLowerCase())] || 'info'
 }
 
 export function formatFileModifiedDate(timestamp) {
   if (!timestamp) return '-'
   const date = new Date(timestamp)
   if (Number.isNaN(date.getTime())) return '-'
-  const pad = value => String(value).padStart(2, '0')
+  const pad = (value) => String(value).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
@@ -81,7 +65,10 @@ export function resolveCurrentFileDirectory(disk, currentPath) {
   return buildFullPath(disk, currentPath)
 }
 
-export function resolveFileEntryPath(file, { absolutePath = '', disk = '/', currentPath = '' } = {}) {
+export function resolveFileEntryPath(
+  file,
+  { absolutePath = '', disk = '/', currentPath = '' } = {}
+) {
   const entryPath = String(file?.path || '')
   if (entryPath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(entryPath)) {
     return formatFilePath(entryPath)

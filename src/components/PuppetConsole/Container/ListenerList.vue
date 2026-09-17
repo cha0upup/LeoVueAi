@@ -1,163 +1,91 @@
 <template>
-  <div class="listener-list-container">
+  <div class="container-asset-list">
     <ContainerAssetPanel
-      title="Listener 监听器"
-      :icon="iconMap.shield"
+      title="Listener 列表"
       :total="listeners.length"
       :filtered="filteredListeners.length"
     >
-      <template #toolbar>
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索类名、ClassLoader、ID"
-          clearable
-          class="search-input"
+      <el-table
+        :data="pagedListeners"
+        height="100%"
+        class="asset-table"
+        :empty-text="listeners.length ? '未找到匹配的组件' : '暂无组件'"
+      >
+        <el-table-column
+          label="类型"
+          width="115"
         >
-          <template #prefix>
-            <el-icon>
-              <Icon :icon="iconMap.search" />
-            </el-icon>
+          <template #default="{ row }">
+            {{ categoryLabel(row.category) }}
           </template>
-        </el-input>
-      </template>
-
-      <el-card class="container-table-card">
-        <div class="asset-table-shell">
-          <el-table
-            :data="pagedListeners"
-            stripe
-            style="width: 100%"
-            height="100%"
-            class="asset-table"
-            :empty-text="listeners.length === 0 ? '该Context暂无Listener' : '未找到匹配的Listener'"
-          >
-            <el-table-column
-              label="类型"
-              width="110"
+        </el-table-column>
+        <el-table-column
+          label="Listener 类名"
+          min-width="230"
+        >
+          <template #default="{ row }">
+            <button
+              type="button"
+              class="asset-name-button mono-text"
+              :title="row.className"
+              @click="viewDetail(row)"
             >
-              <template #default="{ row }">
-                <el-tag
-                  :type="categoryTagType(row.category)"
-                  size="small"
-                  effect="plain"
-                >
-                  {{ categoryLabel(row.category) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-
-            <el-table-column
-              prop="className"
-              label="Listener类名"
-              min-width="260"
-            >
-              <template #default="{ row }">
-                <div
-                  v-if="row.className"
-                  class="listener-class-cell"
-                >
-                  <el-tooltip
-                    :content="row.className"
-                    placement="top"
-                  >
-                    <span class="mono-text listener-class">{{ row.className }}</span>
-                  </el-tooltip>
-                  <el-button
-                    type="primary"
-                    link
-                    size="small"
-                    style="margin-left: 8px"
-                    @click="handleViewBytecode(row.className)"
-                  >
-                    <el-icon>
-                      <Icon :icon="iconMap.code" />
-                    </el-icon>
-                    查看字节码
-                  </el-button>
-                </div>
-                <span
-                  v-else
-                  class="mono-text"
-                >-</span>
-              </template>
-            </el-table-column>
-
-            <el-table-column
-              prop="classLoader"
-              label="ClassLoader"
-              min-width="260"
-            >
-              <template #default="{ row }">
-                <span class="mono-text">
-                  {{ row.classLoader || '-' }}
-                </span>
-              </template>
-            </el-table-column>
-
-            <el-table-column
-              label="操作"
-              width="120"
-              fixed="right"
-            >
-              <template #default="{ row }">
-                <el-button
-                  type="danger"
-                  size="small"
-                  :loading="removingIds.has(row.listenerId)"
-                  :disabled="!props.removable || removingIds.has(row.listenerId) || !row.listenerId"
-                  @click="handleRemove(row)"
-                >
-                  <el-icon>
-                    <Icon :icon="iconMap.delete" />
-                  </el-icon>
-                  移除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <div
-            v-if="filteredListeners.length > pageSize"
-            class="pagination-wrapper"
-          >
-            <el-pagination
-              v-model:current-page="currentPage"
-              :page-size="pageSize"
-              layout="prev, pager, next, jumper"
-              :total="filteredListeners.length"
-              background
-              small
+              {{ row.className || '-' }}
+            </button>
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="操作"
+          width="60"
+          align="center"
+          fixed="right"
+        >
+          <template #default="{ row }">
+            <ContainerAssetActions
+              :class-name="row.className || ''"
+              :loading="removingIds.has(row.listenerId)"
+              :removable="props.removable && Boolean(row.listenerId)"
+              @view="viewDetail(row)"
+              @bytecode="emit('view-bytecode', row.className)"
+              @remove="handleRemove(row)"
             />
-          </div>
-        </div>
-      </el-card>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div
+        v-if="filteredListeners.length > pageSize"
+        class="pagination-wrapper"
+      >
+        <el-pagination
+          v-model:current-page="currentPage"
+          :page-size="pageSize"
+          layout="prev, pager, next"
+          :total="filteredListeners.length"
+          small
+        />
+      </div>
     </ContainerAssetPanel>
-
-    <ClassBytecodeDialog
-      v-model="bytecodeDialogVisible"
-      :session-id="sessionId"
-      :class-name="selectedClassName"
-      @close="selectedClassName = ''"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, inject, watch } from 'vue'
-import { confirmAction } from '@/utils/confirmUtils.js'
-import { icons } from '@/utils/icons.js'
-import ClassBytecodeDialog from './ClassBytecodeDialog.vue'
+import { toRef } from 'vue'
+import { useContainerAssetList } from './useContainerAssetList.js'
 import ContainerAssetPanel from './ContainerAssetPanel.vue'
+import ContainerAssetActions from './ContainerAssetActions.vue'
 import { useWebRuntimeComponentRemoval } from './useWebRuntimeComponentRemoval.js'
 import { showWarning } from '@/utils/messageUtils.js'
 
-const iconMap = icons
-
 // Props
 const props = defineProps({
+  searchKeyword: { type: String, default: '' },
   listeners: {
     type: Array,
     default: () => []
+  },
+  contextId: {
+    type: String,
+    default: ''
   },
   contextName: {
     type: String,
@@ -173,43 +101,18 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['refresh'])
+const emit = defineEmits(['refresh', 'view-bytecode', 'view-detail'])
 
 // 响应式数据
-const searchKeyword = ref('')
-const currentPage = ref(1)
-const injectedPageSize = inject('puppetListPageSize', ref(50))
-const pageSize = injectedPageSize
 const { removingIds, removeComponent } = useWebRuntimeComponentRemoval({
   props,
   emit,
   componentType: 'listener',
   label: 'Listener'
 })
-const bytecodeDialogVisible = ref(false)
-const selectedClassName = ref('')
 
-// 计算属性 - 过滤后的 Listener 列表
-const filteredListeners = computed(() => {
-  if (!searchKeyword.value.trim()) {
-    return props.listeners
-  }
-
-  const keyword = searchKeyword.value.toLowerCase().trim()
-  return props.listeners.filter((listener) => {
-    const className = (listener.className || '').toLowerCase()
-    const classLoader = (listener.classLoader || '').toLowerCase()
-    const listenerId = (listener.listenerId || '').toLowerCase()
-    const category = (listener.category || '').toLowerCase()
-
-    return (
-      className.includes(keyword) ||
-      classLoader.includes(keyword) ||
-      listenerId.includes(keyword) ||
-      category.includes(keyword)
-    )
-  })
-})
+const { currentPage, pageSize, filteredItems: filteredListeners, pagedItems: pagedListeners } =
+  useContainerAssetList(() => props.listeners, item => [item.className, item.classLoader, item.listenerId, item.category], toRef(props, 'searchKeyword'))
 
 const categoryLabel = (category) => {
   switch (category) {
@@ -220,38 +123,6 @@ const categoryLabel = (category) => {
     default:
       return category || '未知'
   }
-}
-
-const categoryTagType = (category) => {
-  switch (category) {
-    case 'event':
-      return 'info'
-    case 'lifecycle':
-      return 'success'
-    default:
-      return ''
-  }
-}
-
-// 当前页数据
-const pagedListeners = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return filteredListeners.value.slice(start, start + pageSize.value)
-})
-
-watch(searchKeyword, () => {
-  currentPage.value = 1
-})
-
-/**
- * 查看类字节码
- */
-const handleViewBytecode = (className) => {
-  if (!className) {
-    return
-  }
-  selectedClassName.value = className
-  bytecodeDialogVisible.value = true
 }
 
 /**
@@ -265,39 +136,26 @@ const handleRemove = async (listener) => {
 
   const displayClassName = listener.className || '未知 Listener'
 
-  const confirmed = await confirmAction({
+  await removeComponent(listener.listenerId, listener.listenerId, {
     title: '确认移除 Listener',
     message: `确定要移除以下 Listener 吗？\n\nListener 类名: ${displayClassName}\n\n此操作会立即从当前版本适配器管理的 Context 监听器列表中移除该 Listener，请谨慎操作！`,
     confirmButtonText: '确定移除'
   })
-  if (!confirmed) return
-
-  await removeComponent(listener.listenerId, listener.listenerId)
 }
+
+const viewDetail = row => emit('view-detail', {
+  title: 'Listener 详情',
+  className: row.className,
+  fields: [
+    ['Context', props.contextName],
+    ['类型', categoryLabel(row.category)],
+    ['类名', row.className],
+    ['ClassLoader', row.classLoader],
+    ['Listener ID', row.listenerId]
+  ]
+})
 </script>
 
 <style scoped>
 @import '@/styles/container-list-shared.css';
-
-.listener-list-container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--el-spacing-base);
-  height: 100%;
-}
-
-.listener-class-cell {
-  display: flex;
-  align-items: center;
-}
-
-.listener-class {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-}
 </style>

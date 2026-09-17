@@ -12,9 +12,7 @@ describe('terminalWorkspaceModel', () => {
     ).toMatchObject({
       mode: 'PTY',
       resizeMode: 'RESIZE',
-      streamMode: 'POLL',
-      shellLabel: 'PTY SHELL',
-      degraded: false
+      streamMode: 'POLL'
     })
     expect(
       describeTerminalCapability({
@@ -27,24 +25,19 @@ describe('terminalWorkspaceModel', () => {
       mode: 'PIPE',
       resizeMode: 'FIXED',
       streamMode: 'POLL',
-      shellLabel: 'PIPE SHELL',
-      degraded: false,
       details: expect.stringContaining('python3-pty: startup failed')
     })
     expect(describeTerminalCapability(null)).toMatchObject({
       mode: 'DETECTING',
       resizeMode: 'WAIT',
-      streamMode: 'WAIT',
-      degraded: false
+      streamMode: 'WAIT'
     })
     expect(
       describeTerminalCapability({ ended: true, endReason: '退出码 0', backend: 'python3-pty' })
     ).toMatchObject({
       mode: 'ENDED',
       resizeMode: 'N/A',
-      streamMode: 'STOPPED',
-      shellLabel: 'SHELL ENDED',
-      degraded: true
+      streamMode: 'STOPPED'
     })
   })
 })

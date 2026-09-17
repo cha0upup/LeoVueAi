@@ -1,0 +1,136 @@
+.composer-dock {
+  flex-shrink: 0;
+  container-type: inline-size;
+  container-name: ai-composer;
+  padding: 12px 10px 16px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--ai-panel-surface, var(--app-surface-background)) 96%, transparent) 18px
+  );
+}
+
+.composer-inner {
+  max-width: var(--thread-max, 48rem);
+  margin: 0 auto;
+}
+
+.composer-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 12px 11px 10px 15px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 16px;
+  background: var(--el-bg-color-overlay, #fff);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--el-text-color-primary) 5%, transparent);
+  backdrop-filter: none;
+}
+
+.composer-box:focus-within {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 0 0 2px var(--el-color-primary-light-9);
+}
+
+.composer-shell {
+  flex: 1;
+  min-width: 0;
+}
+
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.composer-attachments { margin-bottom: 10px; }
+
+.composer-input {
+  display: block;
+}
+
+.composer-input :deep(.el-textarea__inner) {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  color: var(--el-text-color-primary);
+  padding: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.55;
+  min-height: 52px !important;
+  resize: none;
+}
+
+.composer-input :deep(.el-textarea__inner:focus) {
+  box-shadow: none;
+}
+
+.composer-input :deep(.el-input__count) {
+  background: transparent;
+  bottom: 2px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.send-fab {
+  flex-shrink: 0;
+  width: 38px !important;
+  height: 38px !important;
+  padding: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--el-color-primary) 18%, transparent);
+}
+
+.send-fab-icon {
+  font-size: 16px;
+}
+
+.send-fab.is-disabled {
+  color: var(--el-text-color-placeholder);
+  background: var(--el-fill-color);
+  border-color: var(--el-border-color-lighter);
+  box-shadow: none;
+}
+
+@container ai-composer (max-width: 560px) {
+  .composer-box {
+    gap: 8px;
+    padding: 10px 9px 9px 11px;
+  }
+
+  .composer-input :deep(.el-textarea__inner) {
+    min-height: 46px !important;
+  }
+
+  .send-fab {
+    width: 36px !important;
+    height: 36px !important;
+  }
+}
+
+@container ai-composer (max-width: 420px) {
+  .composer-box {
+    gap: 6px;
+    padding-right: 7px;
+  }
+
+  .send-fab {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 10px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .composer-dock {
+    padding: 8px 10px 10px;
+  }
+
+  .composer-box {
+    padding: 9px 9px 9px 10px;
+    border-radius: 12px;
+  }
+
+}

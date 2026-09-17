@@ -5,6 +5,7 @@
       v-model:selected-files="selectedFiles"
       :visible-files="visibleFiles"
       :loading="isLoading"
+      :search-active="Boolean(searchKeyword.trim())"
       :view-mode="viewMode"
       :total-count="sortedFiles.length"
       :directory-count="directoryCount"

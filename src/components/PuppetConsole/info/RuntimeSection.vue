@@ -69,6 +69,7 @@
             堆内存使用
           </div>
           <el-progress
+            v-if="javaHeapUsagePercentage != null"
             :percentage="javaHeapUsagePercentage"
             :color="getUsageColor(javaHeapUsagePercentage)"
             :stroke-width="10"
@@ -83,6 +84,7 @@
             总内存使用
           </div>
           <el-progress
+            v-if="javaMemoryUsagePercentage != null"
             :percentage="javaMemoryUsagePercentage"
             :color="getUsageColor(javaMemoryUsagePercentage)"
             :stroke-width="10"
@@ -309,7 +311,7 @@ const phpFacts = computed(() => [
   padding: 12px 12px 0;
 }
 
-@media (max-width: 980px) {
+@container basic-info (max-width: 650px) {
   .usage-dual-grid {
     grid-template-columns: 1fr;
   }

@@ -1,29 +1,79 @@
 <template>
-  <div class="task-manager-page">
-    <div class="task-workspace">
-      <section class="task-main-panel">
-        <TaskManagerFilters
-          :type-options="typeOptions"
-          :status-options="statusOptions"
-          :active-task-type="activeTaskType"
-          :status-filter="statusFilter"
-          :search-keyword="searchKeyword"
-          :sort-option="sortOption"
-          :result-count="filteredTasks.length"
-          @update:type="setActiveTaskType"
-          @update:status="setStatusFilter"
-          @update:search="setSearchKeyword"
-          @update:sort="setSortOption"
-        />
-
-        <div
-          v-if="filteredTasks.length === 0"
-          class="task-empty-state"
+  <div
+    ref="workspaceRef"
+    class="task-manager-page"
+  >
+    <TaskManagerFilters
+      :type-options="typeOptions"
+      :status-options="statusOptions"
+      :active-task-type="activeTaskType"
+      :status-filter="statusFilter"
+      :search-keyword="searchKeyword"
+      :sort-option="sortOption"
+      :result-count="filteredTasks.length"
+      @update:type="setActiveTaskType"
+      @update:status="setStatusFilter"
+      @update:search="setSearchKeyword"
+      @update:sort="setSortOption"
+    >
+      <template #sync>
+        <span
+          v-if="lastSyncedAt"
+          class="sync-time"
+          :title="`上次完整同步：${new Date(lastSyncedAt).toLocaleString()}`"
         >
-          <el-empty
-            description="没有匹配的任务，换个筛选条件试试"
-            :image-size="120"
+          更新于 {{ new Date(lastSyncedAt).toLocaleTimeString('zh-CN', { hour12: false }) }}
+        </span>
+        <el-button
+          text
+          size="small"
+          :loading="isSyncing"
+          :disabled="isSyncing"
+          @click="refreshAll"
+        >
+          刷新
+        </el-button>
+      </template>
+    </TaskManagerFilters>
+    <div
+      v-if="syncError"
+      class="sync-error"
+      role="alert"
+    >
+      {{ syncError }}任务同步失败，已有记录已保留。可点击刷新重试。
+    </div>
+    <div
+      class="task-workspace"
+      :class="{ 'has-detail': selectedTask && !isCompact }"
+    >
+      <section
+        class="task-main-panel"
+        aria-label="任务列表"
+        :aria-busy="isSyncing && !initialSyncDone"
+      >
+        <div
+          v-if="!filteredTasks.length"
+          class="task-empty-state"
+          role="status"
+        >
+          <Icon
+            :icon="
+              !initialSyncDone
+                ? 'mdi:progress-clock'
+                : syncError
+                  ? 'mdi:cloud-alert-outline'
+                  : 'mdi:clipboard-text-outline'
+            "
           />
+          <strong>{{ emptyState.title }}</strong>
+          <p>{{ emptyState.hint }}</p>
+          <el-button
+            v-if="initialSyncDone && !syncError && tasks.length && hasFilters"
+            size="small"
+            @click="resetFilters"
+          >
+            {{ activeTypeTasks.length ? '清除筛选' : '查看全部任务' }}
+          </el-button>
         </div>
         <div
           v-else
@@ -41,24 +91,60 @@
             :progress-status="getProgressStatus(task.status)"
             :primary-action="getPrimaryTaskAction(task, iconMap)"
             :secondary-actions="getSecondaryTaskActions(task, iconMap)"
-            @select="selectTask(task.viewId)"
+            @select="openDetail(task.viewId, $event)"
             @action="handleTaskAction($event, task)"
           />
         </div>
       </section>
-
+      <section
+        v-if="selectedTask && !isCompact"
+        class="task-detail-shell"
+        aria-label="任务详情"
+      >
+        <div class="detail-heading">
+          <strong>任务详情</strong>
+          <el-button
+            text
+            size="small"
+            aria-label="关闭任务详情"
+            @click="closeDetail"
+          >
+            <Icon icon="mdi:close" />
+          </el-button>
+        </div>
+        <TaskManagerDetail
+          :task="selectedTask"
+          :primary-action="selectedPrimaryAction"
+          :secondary-actions="selectedSecondaryActions"
+          @action="handleTaskAction($event, selectedTask)"
+        />
+      </section>
+    </div>
+    <el-drawer
+      v-if="isCompact"
+      :model-value="Boolean(selectedTask)"
+      title="任务详情"
+      size="min(420px, 100%)"
+      :append-to-body="false"
+      :modal-append-to-body="false"
+      :lock-scroll="false"
+      @close="closeDetail"
+      @closed="restoreDetailFocus"
+    >
       <TaskManagerDetail
+        v-if="selectedTask"
         :task="selectedTask"
         :primary-action="selectedPrimaryAction"
         :secondary-actions="selectedSecondaryActions"
         @action="handleTaskAction($event, selectedTask)"
       />
-    </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Icon } from '@iconify/vue'
 import { confirmDelete } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
 import { taskEngine } from '../File/TaskEngine.js'
@@ -106,7 +192,7 @@ const props = defineProps({
 })
 
 const iconMap = icons
-const activeTaskType = ref(TaskType.DOWNLOAD)
+const activeTaskType = ref('all')
 const statusFilter = ref('all')
 const searchKeyword = ref('')
 const sortOption = ref('latest')
@@ -115,9 +201,22 @@ const tasks = ref([])
 const serverDownloadTasks = ref([])
 const serverUploadTasks = ref([])
 const serverSqlExportTasks = ref([])
-const requestGuard = createLatestRequestGuard(['remote'])
+const requestGuard = createLatestRequestGuard(['remote', 'refresh'])
 const remoteSyncRequests = new Map()
 let syncTimer = null
+const workspaceRef = ref(null)
+const isCompact = ref(false)
+let resizeObserver = null
+let detailTrigger = null
+let refreshRequest = null
+const isSyncing = ref(false)
+const initialSyncDone = ref(false)
+const lastSyncedAt = ref(0)
+const remoteErrors = ref([])
+const scanSyncFailed = ref(false)
+const syncError = computed(() =>
+  [...remoteErrors.value, ...(scanSyncFailed.value ? ['扫描'] : [])].join('、')
+)
 
 const {
   activeTypeTasks,
@@ -141,6 +240,7 @@ const {
 })
 
 const typeOptions = computed(() => [
+  { value: 'all', label: '全部类型', count: tasks.value.length },
   { value: TaskType.DOWNLOAD, label: '下载', count: countTasksByType(TaskType.DOWNLOAD) },
   { value: TaskType.UPLOAD, label: '上传', count: countTasksByType(TaskType.UPLOAD) },
   { value: TaskType.DB_EXPORT, label: '数据库导出', count: countTasksByType(TaskType.DB_EXPORT) },
@@ -148,7 +248,7 @@ const typeOptions = computed(() => [
 ])
 
 const statusOptions = computed(() => [
-  { value: 'all', label: '全部', count: activeTypeTasks.value.length },
+  { value: 'all', label: '全部状态', count: activeTypeTasks.value.length },
   { value: 'active', label: '进行中', count: activeTypeTasks.value.filter(isActiveStatus).length },
   ...[
     [TaskStatus.PENDING, '等待'],
@@ -159,7 +259,7 @@ const statusOptions = computed(() => [
   ].map(([value, label]) => ({
     value,
     label,
-    count: activeTypeTasks.value.filter(task => task.status === value).length
+    count: activeTypeTasks.value.filter((task) => task.status === value).length
   }))
 ])
 
@@ -168,7 +268,43 @@ const selectedSecondaryActions = computed(() =>
   getSecondaryTaskActions(selectedTask.value, iconMap)
 )
 
-const isCurrentSession = sessionId => sessionId === props.sessionId
+const hasFilters = computed(
+  () =>
+    activeTaskType.value !== 'all' ||
+    statusFilter.value !== 'all' ||
+    Boolean(searchKeyword.value.trim())
+)
+const emptyState = computed(() => {
+  if (!initialSyncDone.value) return { title: '正在加载任务', hint: '正在同步当前节点的任务记录…' }
+  if (syncError.value)
+    return { title: '暂时没有可展示的任务', hint: '部分任务未能获取，请刷新后重试。' }
+  if (!tasks.value.length)
+    return { title: '暂无任务', hint: '下载、上传、数据库导出和扫描任务会显示在这里。' }
+  if (!activeTypeTasks.value.length) {
+    const label =
+      typeOptions.value.find((option) => option.value === activeTaskType.value)?.label || ''
+    return { title: `暂无${label}任务`, hint: '可以切换到全部类型查看其他任务。' }
+  }
+  return { title: '没有匹配的任务', hint: '请调整状态或关键词，也可以清除筛选。' }
+})
+function resetFilters() {
+  activeTaskType.value = 'all'
+  statusFilter.value = 'all'
+  searchKeyword.value = ''
+}
+function openDetail(viewId, event) {
+  detailTrigger = event?.currentTarget
+  selectTask(viewId)
+}
+function closeDetail() {
+  selectTask('')
+  if (!isCompact.value) restoreDetailFocus()
+}
+function restoreDetailFocus() {
+  nextTick(() => detailTrigger?.isConnected && detailTrigger.focus())
+}
+
+const isCurrentSession = (sessionId) => sessionId === props.sessionId
 
 const rebuildTaskList = (sessionId = props.sessionId) => {
   if (!sessionId || !isCurrentSession(sessionId)) return
@@ -192,30 +328,33 @@ const syncRemoteTasks = (force = false) => {
       getSqlExportTasksApi({ sessionId })
     ])
     if (!requestGuard.isCurrent('remote', sequence) || !isCurrentSession(sessionId)) return
+    remoteErrors.value = ['下载', '上传', '数据库导出'].filter(
+      (_, index) => [downloadResult, uploadResult, sqlResult][index].status === 'rejected'
+    )
 
     if (downloadResult.status === 'fulfilled') {
       const snapshots = Array.isArray(downloadResult.value?.data?.tasks)
         ? downloadResult.value.data.tasks
         : []
       serverDownloadTasks.value = snapshots
-        .map(task => normalizeServerDownloadTask(task, sessionId))
-        .filter(task => task.serverTaskId)
+        .map((task) => normalizeServerDownloadTask(task, sessionId))
+        .filter((task) => task.serverTaskId)
     }
     if (uploadResult.status === 'fulfilled') {
       const snapshots = Array.isArray(uploadResult.value?.data?.tasks)
         ? uploadResult.value.data.tasks
         : []
       serverUploadTasks.value = snapshots
-        .map(task => normalizeServerUploadTask(task, sessionId))
-        .filter(task => task.serverTaskId)
+        .map((task) => normalizeServerUploadTask(task, sessionId))
+        .filter((task) => task.serverTaskId)
     }
     if (sqlResult.status === 'fulfilled') {
       const snapshots = Array.isArray(sqlResult.value?.data?.tasks)
         ? sqlResult.value.data.tasks
         : []
       serverSqlExportTasks.value = snapshots
-        .map(task => normalizeServerSqlExportTask(task, sessionId))
-        .filter(task => task.serverTaskId)
+        .map((task) => normalizeServerSqlExportTask(task, sessionId))
+        .filter((task) => task.serverTaskId)
     }
     rebuildTaskList(sessionId)
   })()
@@ -227,19 +366,40 @@ const syncRemoteTasks = (force = false) => {
 }
 
 const refreshAll = () => {
+  if (refreshRequest) return refreshRequest
   const sessionId = props.sessionId
   if (!sessionId) return
-  void Promise.allSettled([
+  const sequence = requestGuard.next('refresh')
+  isSyncing.value = true
+  const request = Promise.allSettled([
     syncRemoteTasks(),
     taskEngine.syncNetworkWorkflowTasks(sessionId)
-  ]).then(() => {
-    if (isCurrentSession(sessionId)) rebuildTaskList(sessionId)
-  })
+  ])
+    .then(([remote, scan]) => {
+      if (!requestGuard.isCurrent('refresh', sequence) || !isCurrentSession(sessionId)) return
+      if (remote.status === 'rejected') remoteErrors.value = ['下载', '上传', '数据库导出']
+      scanSyncFailed.value = scan.status === 'rejected'
+      initialSyncDone.value = true
+      isSyncing.value = false
+      if (!syncError.value) lastSyncedAt.value = Date.now()
+      rebuildTaskList(sessionId)
+    })
+    .finally(() => {
+      if (refreshRequest === request) refreshRequest = null
+    })
+  refreshRequest = request
+  return request
 }
 
 const resetSessionState = () => {
   requestGuard.invalidate()
   remoteSyncRequests.clear()
+  refreshRequest = null
+  isSyncing.value = false
+  initialSyncDone.value = false
+  lastSyncedAt.value = 0
+  remoteErrors.value = []
+  scanSyncFailed.value = false
   selectedTaskId.value = ''
   tasks.value = []
   serverDownloadTasks.value = []
@@ -249,7 +409,7 @@ const resetSessionState = () => {
 
 watch(
   () => props.sessionId,
-  sessionId => {
+  (sessionId) => {
     resetSessionState()
     if (!sessionId) return
     rebuildTaskList(sessionId)
@@ -258,7 +418,7 @@ watch(
   { immediate: true }
 )
 
-const removeTask = async task => {
+const removeTask = async (task) => {
   const isNetworkWorkflow =
     task?.type === TaskType.SCAN &&
     task?.scanKind === 'network_workflow' &&
@@ -295,7 +455,7 @@ const removeTask = async task => {
   showSuccess('任务已删除')
 }
 
-const downloadToLocal = async task => {
+const downloadToLocal = async (task) => {
   const relativePath = getDownloadRelativePath(task?.downloadPath)
   if (!relativePath) {
     showError('服务端未返回可下载的相对路径')
@@ -387,13 +547,15 @@ const handleTaskAction = async (action, task) => {
     if (!operation) return
     await operation()
     if (!isCurrentSession(sessionId)) return
-    showSuccess({
-      start: '任务已开始',
-      retry: '任务已重新开始',
-      pause: '任务已暂停',
-      resume: '任务已继续',
-      stop: '任务已停止'
-    }[action])
+    showSuccess(
+      {
+        start: '任务已开始',
+        retry: '任务已重新开始',
+        pause: '任务已暂停',
+        resume: '任务已继续',
+        stop: '任务已停止'
+      }[action]
+    )
     rebuildTaskList(sessionId)
   } catch (error) {
     if (isCurrentSession(sessionId)) showError(error?.message || '任务操作失败')
@@ -415,13 +577,18 @@ const taskEvents = [
 const handleTaskEngineChange = () => rebuildTaskList()
 
 onMounted(() => {
-  taskEvents.forEach(event => taskEngine.on(event, handleTaskEngineChange))
+  resizeObserver = new ResizeObserver(([entry]) => {
+    isCompact.value = entry.contentRect.width < 820
+  })
+  resizeObserver.observe(workspaceRef.value)
+  taskEvents.forEach((event) => taskEngine.on(event, handleTaskEngineChange))
   syncTimer = window.setInterval(refreshAll, 3000)
 })
 
 onUnmounted(() => {
+  resizeObserver?.disconnect()
   requestGuard.invalidate()
-  taskEvents.forEach(event => taskEngine.off(event, handleTaskEngineChange))
+  taskEvents.forEach((event) => taskEngine.off(event, handleTaskEngineChange))
   if (syncTimer !== null) window.clearInterval(syncTimer)
   syncTimer = null
 })
@@ -430,55 +597,104 @@ onUnmounted(() => {
 <style scoped>
 .task-manager-page {
   display: flex;
+  position: relative;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   height: 100%;
+  overflow: hidden;
   color: var(--el-text-color-primary);
-  --task-border: color-mix(in srgb, var(--el-border-color) 34%, transparent);
-  --task-surface: color-mix(in srgb, var(--app-surface-background) 94%, var(--el-bg-color-overlay));
-  --task-surface-strong: color-mix(in srgb, var(--app-card-background) 92%, var(--el-bg-color-overlay));
-  --task-surface-muted: color-mix(in srgb, var(--app-control-background-soft) 92%, var(--el-bg-color-overlay));
+  background: var(--el-bg-color);
+  container-type: inline-size;
 }
-
 .task-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.96fr);
-  gap: var(--space-3);
-  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
   flex: 1;
+  min-height: 0;
 }
-
+.task-workspace.has-detail {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 38%);
+}
 .task-main-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--task-border);
-  border-radius: var(--radius-container);
-  background: var(--task-surface);
 }
-
 .task-list {
   flex: 1;
   min-height: 0;
-  padding: 0 var(--space-3) var(--space-3);
   overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
-
 .task-empty-state {
   display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   align-items: center;
   justify-content: center;
-  min-height: 280px;
-  padding: 18px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--el-text-color-secondary);
 }
-
-@media (max-width: 1200px) {
-  .task-workspace {
-    grid-template-columns: 1fr;
+.task-empty-state > svg {
+  font-size: 32px;
+  color: var(--el-text-color-placeholder);
+}
+.task-empty-state strong {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--el-text-color-regular);
+}
+.task-empty-state p {
+  margin: 0;
+  line-height: 1.7;
+}
+.sync-error {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  color: var(--el-color-danger);
+  background: color-mix(in srgb, var(--el-color-danger) 8%, var(--el-bg-color));
+  font-size: 12px;
+  line-height: 1.6;
+}
+.task-detail-shell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--el-border-color-lighter);
+}
+.detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  font-size: 12px;
+}
+.task-manager-page :deep(.el-overlay) {
+  position: absolute;
+}
+.task-manager-page :deep(.el-drawer__header) {
+  margin: 0;
+  padding: 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.task-manager-page :deep(.el-drawer__body) {
+  display: flex;
+  min-height: 0;
+  padding: 0;
+}
+@container (max-width: 520px) {
+  .sync-time {
+    display: none;
   }
 }
 </style>

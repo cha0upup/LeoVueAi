@@ -1,4 +1,5 @@
 import { computed, watch } from 'vue'
+import { TaskStatus } from '@/constants/task.js'
 
 const clampTaskProgress = (progress) => {
   const value = Number(progress || 0)
@@ -68,10 +69,13 @@ export function useTaskCenterView({
   const activeStatusSet = computed(() => new Set(activeStatuses?.value || activeStatuses || []))
 
   const activeTypeTasks = computed(() => {
-    return (tasks.value || []).filter((task) => task.type === activeTaskType.value)
+    return (tasks.value || []).filter(
+      (task) => activeTaskType.value === 'all' || task.type === activeTaskType.value
+    )
   })
 
-  const isActiveStatus = (task) => activeStatusSet.value.has(task?.status)
+  const isActiveStatus = (task) =>
+    task?.status !== TaskStatus.PENDING && activeStatusSet.value.has(task?.status)
 
   const matchesStatus = (task, filter) => {
     if (filter === 'all') return true
@@ -95,14 +99,8 @@ export function useTaskCenterView({
   watch(
     filteredTasks,
     (nextTasks) => {
-      if (!nextTasks.length) {
+      if (!nextTasks.some((task) => task.viewId === selectedTaskId.value)) {
         selectedTaskId.value = ''
-        return
-      }
-
-      const exists = nextTasks.some((task) => task.viewId === selectedTaskId.value)
-      if (!exists) {
-        selectedTaskId.value = nextTasks[0].viewId
       }
     },
     { immediate: true }

@@ -17,13 +17,6 @@
         label-position="top"
         class="script-form"
       >
-        <DisguiseTransportPanel
-          v-model:form="form"
-          :disguises="disguises"
-          :show-header-gate="showHeaderGate"
-          @generate-random-header="emit('generate-random-header')"
-        />
-
         <JavaRuntimeConfig
           v-if="form.runtime === 'java'"
           v-model:form="form"
@@ -38,6 +31,14 @@
           :transport-protocols="transportProtocols"
           @server-type-change="emit('server-type-change')"
         >
+          <template #transport>
+            <DisguiseTransportPanel
+              v-model:form="form"
+              :disguises="disguises"
+              :show-header-gate="showHeaderGate"
+              @generate-random-header="emit('generate-random-header')"
+            />
+          </template>
           <ObfuscationEditor
             v-if="showObfuscationSection"
             v-model="form.jspObfuscationSteps"
@@ -50,11 +51,18 @@
           />
         </JavaRuntimeConfig>
 
-        <PhpRuntimeConfig
-          v-else
-          v-model:form="form"
-          :metadata="runtimeGenerators.php"
-        />
+        <template v-else>
+          <PhpRuntimeConfig
+            v-model:form="form"
+            :metadata="runtimeGenerators.php"
+          />
+          <DisguiseTransportPanel
+            v-model:form="form"
+            :disguises="disguises"
+            :show-header-gate="showHeaderGate"
+            @generate-random-header="emit('generate-random-header')"
+          />
+        </template>
       </el-form>
     </div>
   </section>
@@ -211,12 +219,13 @@ const showObfuscationSection = computed(() => {
   gap: 0;
 }
 
-.form-group {
+.script-form :deep(.form-group) {
   padding: 8px 0 10px;
   border-top: 1px solid color-mix(in srgb, var(--el-border-color) 18%, transparent);
 }
 
-.form-group:first-child {
+.script-form > :first-child,
+.script-form :deep(.java-runtime-config > .form-group:first-child) {
   border-top: 0;
   padding-top: 6px;
 }
@@ -239,9 +248,7 @@ const showObfuscationSection = computed(() => {
 }
 
 .script-form :deep(.el-input__wrapper),
-.script-form :deep(.el-select__wrapper),
-.script-form :deep(.el-input-number__decrease),
-.script-form :deep(.el-input-number__increase) {
+.script-form :deep(.el-select__wrapper) {
   min-height: 32px;
   border-radius: var(--radius-control);
   background: var(--sg-panel-strong);

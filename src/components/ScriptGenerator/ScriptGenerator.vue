@@ -26,6 +26,8 @@
 
         <ScriptGeneratorPreviewPanel
           :output-result="outputResult"
+          :build-overview="buildOverview"
+          :is-generating="isGenerating"
           :is-form-valid="isFormValid"
           :result-meta="resultMeta"
           :config-summary="configSummary"
@@ -136,6 +138,7 @@ const supportedTypes = ref({
   runtimeGenerators: {}
 })
 const outputResult = ref('')
+const isGenerating = ref(false)
 const memoryMetadata = ref(null)
 const webMetadata = ref(null)
 const obfuscationSteps = ref([])
@@ -220,6 +223,11 @@ const isJspGroupPacker = (packerType) => {
 const currentModeLabel = computed(() => isPhpRuntime.value
   ? 'PHP WebShell'
   : (form.generateType === 'webshell' ? 'Java WebShell' : 'Java 内存构建'))
+
+const buildOverview = computed(() => isPhpRuntime.value
+  ? `PHP · HTTP · ${PHP_OUTPUT_MODES[form.phpOutputMode]?.label || form.phpOutputMode}`
+  : ['Java', form.generateType === 'memoryshell' ? form.serverType : '', form.shellType, form.protocol?.toUpperCase()]
+    .filter(Boolean).join(' · '))
 
 const memoryPayloadText = computed(() => {
   if (form.generateType !== 'memoryshell') return ''
@@ -338,7 +346,7 @@ const configSummary = computed(() => {
         : [{ label: '静态初始化', value: form.staticInitialize ? '开启' : '关闭' }]),
       { label: 'Class 瘦身', value: form.shrink ? '开启' : '关闭' },
       {
-        label: 'Header 门禁',
+        label: 'Header 校验',
         value: form.headerName ? `${form.headerName}: ${form.headerValue || '-'}` : '-'
       },
       ...base.slice(1)
@@ -347,7 +355,7 @@ const configSummary = computed(() => {
 
   return [
     ...base,
-    { label: 'Header 门禁', value: form.headerName ? `${form.headerName}: ${form.headerValue || '-'}` : '-' }
+    { label: 'Header 校验', value: form.headerName ? `${form.headerName}: ${form.headerValue || '-'}` : '-' }
   ]
 })
 
@@ -381,7 +389,7 @@ const resultMeta = computed(() => {
       },
       { label: '类型', value: webMetadata.value?.type || form.shellType || '-' },
       { label: '目标 JDK', value: webMetadata.value?.targetJavaVersion || form.targetJavaVersion || 'auto' },
-      { label: 'Header 门禁', value: webMetadata.value?.headerConfig || `${form.headerName}: ${form.headerValue}` },
+      { label: 'Header 校验', value: webMetadata.value?.headerConfig || `${form.headerName}: ${form.headerValue}` },
       { label: '字符编码', value: 'UTF-8' }
     ]
     if (generatedClassArtifacts.value.length) {
@@ -632,12 +640,12 @@ const reconcileInjectorCapability = () => {
   }
 }
 
-const getEditorLanguage = () => {
-  if (isPhpRuntime.value) return 'php'
+const getEditorLanguage = (buildForm = form) => {
+  if (buildForm.runtime === 'php') return 'php'
   // 输出区以“展示”为主，不需要类型校验，统一使用更稳的语言模式
-  if (form.generateType === 'webshell') {
+  if (buildForm.generateType === 'webshell') {
     // JSP/JSPX 用 html 更接近模板语法；其他情况退化为纯文本
-    return form.shellType === 'JSP' || form.shellType === 'JSPX' ? 'html' : 'plaintext'
+    return buildForm.shellType === 'JSP' || buildForm.shellType === 'JSPX' ? 'html' : 'plaintext'
   }
   // 内存马返回 Packer 输出的 payload 字符串，纯文本展示
   return 'plaintext'
@@ -689,8 +697,11 @@ const handleEditorContainerReady = (container) => {
 }
 
 const GenShell = async () => {
+  if (!isFormValid.value || isGenerating.value) return
+  const buildForm = snapshotBuildForm(form)
+  isGenerating.value = true
   try {
-    const buildRequest = createBuildRequest(form, { isJspGroupPacker })
+    const buildRequest = createBuildRequest(buildForm, { isJspGroupPacker })
     const generators = {
       [BUILD_CHANNEL.RUNTIME]: generateRuntimeScriptApi,
       [BUILD_CHANNEL.WEB]: generateWebShellApi,
@@ -710,12 +721,12 @@ const GenShell = async () => {
     outputResult.value = result
     await nextTick()
 
-    // 快照当前配置，用于检测后续变更
-    lastGeneratedForm.value = snapshotBuildForm(form)
+    // 结果对应请求发出时的配置，生成过程中修改表单也应标记为过期。
+    lastGeneratedForm.value = buildForm
 
     if (monacoEditor.value) {
       // 更新编辑器语言
-      const language = getEditorLanguage()
+      const language = getEditorLanguage(buildForm)
       const model = toRaw(monacoEditor.value).getModel()
       if (model) {
         monaco.editor.setModelLanguage(model, language)
@@ -734,6 +745,8 @@ const GenShell = async () => {
   } catch (error) {
     await getSupportedTypes()
     showError('生成脚本失败: ' + (error.message || '未知错误'))
+  } finally {
+    isGenerating.value = false
   }
 }
 

@@ -115,7 +115,7 @@ import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
 
 import { icons } from '@/utils/icons.js'
 import { getClassBytecodeApi } from '@/services/api.js'
-import { executeRequest } from '@/utils/apiUtils.js'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
@@ -149,6 +149,7 @@ const dialogVisible = computed({
   set: (val) => emit('update:modelValue', val)
 })
 
+const requestGuard = createLatestRequestGuard(['bytecode'])
 const loading = ref(false)
 const bytecodeData = ref(null)
 const monacoEditor = ref(null)
@@ -174,10 +175,8 @@ const formatByteSize = (bytes) => {
 /**
  * 初始化Monaco编辑器
  */
-const initMonacoEditor = async () => {
+const initMonacoEditor = () => {
   if (!monacoEditorContainer.value || !bytecodeData.value?.javaCode) return
-
-  await nextTick()
 
   try {
     recreateEditorInstance(
@@ -264,85 +263,51 @@ const downloadClassFile = () => {
   }
 }
 
-/**
- * 获取类字节码
- */
-const fetchBytecode = async () => {
-  if (!props.sessionId || !props.className) {
-    showError('会话ID或类名不能为空')
-    return
-  }
-
-  loading.value = true
-  bytecodeData.value = null
-
-  // 销毁现有编辑器
-  disposeEditorInstance(monacoEditor, { disposeModel: true })
-
-  await executeRequest(
-    async () => {
-      const response = await getClassBytecodeApi({
-        sessionId: props.sessionId,
-        className: props.className
-      })
-
-      // http拦截器已经处理了响应格式，response.data 就是实际数据
-      if (response.data) {
-        bytecodeData.value = response.data
-
-        // 如果有Java代码，初始化编辑器
-        if (bytecodeData.value.javaCode) {
-          await nextTick()
-          await initMonacoEditor()
-        }
-      } else {
-        showError('获取类字节码失败：响应数据为空')
-      }
-
-      return response
-    },
-    {
-      loadingRef: null,
-      successMessage: null,
-      errorMessage: '获取类字节码失败'
-    }
-  )
-
-  loading.value = false
-}
-
-/**
- * 清理资源
- */
 const cleanup = () => {
-  // 销毁编辑器
-  disposeEditorInstance(monacoEditor, { disposeModel: true })
+  requestGuard.invalidate()
+  loading.value = false
   bytecodeData.value = null
+  disposeEditorInstance(monacoEditor, { disposeModel: true })
 }
 
-/**
- * 关闭对话框
- */
+const fetchBytecode = async () => {
+  cleanup()
+  const { sessionId, className } = props
+  if (!sessionId || !className) return
+  const sequence = requestGuard.next('bytecode')
+  const isCurrent = () => requestGuard.isCurrent('bytecode', sequence) && props.modelValue &&
+    props.sessionId === sessionId && props.className === className
+  loading.value = true
+  try {
+    const response = await getClassBytecodeApi({ sessionId, className })
+    if (!isCurrent()) return
+    if (!response.data) throw new Error('响应数据为空')
+    bytecodeData.value = response.data
+    await nextTick()
+    if (isCurrent()) initMonacoEditor()
+  } catch (error) {
+    if (isCurrent()) showError(`获取类字节码失败：${error?.message || '未知错误'}`)
+  } finally {
+    if (requestGuard.isCurrent('bytecode', sequence)) loading.value = false
+  }
+}
+
 const handleClose = () => {
   cleanup()
   emit('close')
 }
 
-// 监听对话框显示状态
-watch(dialogVisible, (visible) => {
-  if (visible) {
-    fetchBytecode()
-  } else {
-    cleanup()
-  }
-})
+watch(() => [props.modelValue, props.sessionId, props.className], ([visible]) => {
+  if (visible) fetchBytecode()
+  else cleanup()
+}, { immediate: true })
 
 const stopMonacoThemeWatch = watchMonacoTheme(() => monacoEditor.value)
 
 // 生命周期
 onUnmounted(() => {
   stopMonacoThemeWatch()
-  disposeEditorInstance(monacoEditor, { disposeModel: true })
+  cleanup()
 })
 </script>
 

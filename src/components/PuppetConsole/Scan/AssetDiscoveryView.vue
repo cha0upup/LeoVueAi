@@ -1,12 +1,19 @@
 <template>
   <div class="asset-discovery-view">
-    <header class="page-head">
+    <header
+      class="page-head"
+      :class="{ 'has-tasks': tasks.length }"
+    >
       <div class="task-selector">
         <div class="selector-label">
-          <span class="selector-caption">当前扫描</span>
-          <span class="selector-count">{{ tasks.length }} 个任务</span>
+          <span class="selector-caption">{{ tasks.length ? '当前扫描' : '网络资产发现' }}</span>
+          <span
+            v-if="tasks.length"
+            class="selector-count"
+          >{{ tasks.length }} 个任务</span>
         </div>
         <el-select
+          v-if="tasks.length"
           v-model="selectedTaskId"
           class="task-select"
           filterable
@@ -48,6 +55,7 @@
           刷新
         </el-button>
         <el-button
+          v-if="tasks.length || loadError"
           type="primary"
           :icon="Plus"
           @click="showComposer = true"
@@ -56,6 +64,22 @@
         </el-button>
       </div>
     </header>
+
+    <div
+      v-if="loadError && activeTask"
+      class="load-error"
+      role="alert"
+    >
+      <span>同步失败，当前显示已有数据：{{ loadError }}</span>
+      <el-button
+        text
+        type="primary"
+        :loading="historyLoading"
+        @click="syncTasks"
+      >
+        重试
+      </el-button>
+    </div>
 
     <main
       v-if="activeTask"
@@ -139,7 +163,10 @@
         </div>
       </section>
 
-      <section class="hosts-strip">
+      <section
+        v-if="hasReachability"
+        class="hosts-strip"
+      >
         <div class="hosts-heading">
           <strong>存活主机</strong><b>{{ formatCount(metrics.reachableHostCount) }}</b>
         </div>
@@ -163,6 +190,13 @@
         >{{ isRunning(activeTask) || isPaused(activeTask) ? '发现存活主机后将在这里显示' : '未发现存活主机' }}</span>
       </section>
 
+      <p
+        v-else
+        class="stage-output-empty"
+      >
+        未执行主机探活，直接扫描输入目标。
+      </p>
+
       <AssetResultTable
         v-if="stageDefinitions.some(stage => stage.name === 'PORT_SCAN')"
         :task-id="activeBackendTaskId"
@@ -172,6 +206,33 @@
     </main>
 
     <section
+      v-else-if="!hasLoaded"
+      class="page-empty"
+      role="status"
+      aria-label="正在加载扫描任务"
+    >
+      <el-skeleton
+        :rows="3"
+        animated
+      />
+      <p>正在加载扫描任务…</p>
+    </section>
+    <section
+      v-else-if="loadError"
+      class="page-empty"
+      role="alert"
+    >
+      <h2>扫描任务加载失败</h2>
+      <p>{{ loadError }}</p>
+      <el-button
+        :loading="historyLoading"
+        :icon="Refresh"
+        @click="syncTasks"
+      >
+        重新加载
+      </el-button>
+    </section>
+    <section
       v-else
       class="page-empty"
     >
@@ -179,7 +240,7 @@
         <DataAnalysis />
       </div>
       <h2>开始发现网络资产</h2>
-      <p>选择扫描阶段、目标和端口策略，按需执行主机探活、端口扫描和服务识别。</p>
+      <p>添加目标，按需执行主机探活、端口扫描和服务识别。开始前可预览扫描范围。</p>
       <el-button
         type="primary"
         :icon="Plus"
@@ -187,16 +248,13 @@
       >
         新建扫描
       </el-button>
-      <div class="empty-notes">
-        <span><el-icon><Check /></el-icon>主机是否可达</span><span><el-icon><Check /></el-icon>开放端口和服务</span>
-      </div>
     </section>
 
     <el-dialog
       v-model="showComposer"
       title="新建扫描"
       width="min(840px, calc(100vw - 32px))"
-      top="8vh"
+      top="4vh"
       class="scan-composer-dialog"
       destroy-on-close
     >
@@ -236,14 +294,15 @@ const {
   selectedTaskId,
   activeTask,
   loading: historyLoading,
+  hasLoaded,
+  loadError,
   resultRefreshToken,
   selectTask,
   syncTasks,
   refreshTaskList
 } = useAssetDiscoveryTasks({
   sessionId: toRef(props, 'sessionId'),
-  taskEngine,
-  onError: (error) => ElMessage.error(`加载扫描任务失败: ${error?.message || '未知错误'}`)
+  taskEngine
 })
 watch(
   () => props.sessionId,
@@ -255,6 +314,8 @@ const stageDefinitions = computed(() => {
   const stages = activeTask.value?.stages
   return selectScanStages(stages?.length ? stages.map(stage => stage.name) : undefined)
 })
+
+const hasReachability = computed(() => stageDefinitions.value.some(stage => stage.name === 'REACHABILITY'))
 
 const activeBackendTaskId = computed(() => {
   const task = activeTask.value
@@ -523,538 +584,78 @@ function stageStatusText(name) {
 
 <style scoped lang="scss">
 .asset-discovery-view {
-  --ink: #1f2937;
-  --muted: #6b7280;
-  --subtle: #9ca3af;
-  --line: #e5e7eb;
-  --canvas: #f6f7f9;
-  --surface: #ffffff;
-  --blue: #2563eb;
+  container: discovery / inline-size;
   height: 100%;
   min-height: 0;
   padding: 16px 20px 24px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  box-sizing: border-box;
-  color: var(--ink);
-  background: var(--canvas);
-}
-
-.page-head,
-.task-selector,
-.progress-card,
-.hosts-strip,
-:deep(.asset-result-table) {
-  border: 1px solid var(--line);
-  background: var(--surface);
-}
-
-.page-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 0 8px;
-  border-width: 0 0 1px;
-  background: transparent;
-}
-
-.page-head .task-selector {
-  flex: 1 1 auto;
-  min-height: 0;
-  margin-top: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-h2,
-p {
-  margin: 0;
-}
-
-.head-actions,
-.progress-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.task-selector {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  min-height: 54px;
-  margin-top: 10px;
-  padding: 8px 14px;
-  border-radius: 6px;
-}
-
-.selector-label {
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 auto;
-  gap: 3px;
-}
-
-.selector-caption {
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.selector-count,
-.selector-hint,
-.selector-task-meta,
-.task-option-meta {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.task-select {
-  width: min(360px, 38vw);
-}
-
-.task-option {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-}
-
-.task-option-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.task-option-meta {
-  flex: 0 0 auto;
-  font-size: 11px;
-}
-
-.selector-task-meta {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.status-mark {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #9ca3af;
-}
-
-.status-mark.status-running,
-.status-mark.status-scanning {
-  background: var(--blue);
-}
-
-.status-mark.status-paused {
-  background: #d97706;
-}
-
-.status-mark.status-completed {
-  background: #059669;
-}
-
-.status-mark.status-failed {
-  background: #dc2626;
-}
-
-.meta-divider {
-  width: 1px;
-  height: 14px;
-  margin: 0 4px;
-  background: var(--line);
-}
-
-.discovery-content {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.progress-card {
-  padding: 10px 14px;
-  border-radius: 6px;
-}
-
-.progress-card-head {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px 16px;
-}
-
-.progress-card-info {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  min-width: 0;
-  gap: 6px 12px;
-}
-
-.progress-actions {
-  flex: 0 0 auto;
-}
-
-.task-subtitle {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.progress-card-body {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 24px;
-  margin-top: 8px;
-}
-
-.stage-track {
-  display: flex;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-}
-
-.stage-node {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-
-.stage-node-marker {
-  display: grid;
-  flex: 0 0 18px;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  border: 1px solid #d8dde3;
-  border-radius: 50%;
-  color: #9ca3af;
-  background: #fff;
-  font-size: 10px;
-}
-
-.stage-node.current .stage-node-marker {
-  border-color: var(--blue);
-  color: #fff;
-  background: var(--blue);
-  box-shadow: 0 0 0 4px #eaf1ff;
-}
-
-.stage-node.complete .stage-node-marker {
-  border-color: #54b8a7;
-  color: #fff;
-  background: #15947f;
-}
-
-.stage-node.failed .stage-node-marker {
-  border-color: #f3a7a7;
-  color: #b91c1c;
-  background: #fff1f1;
-}
-
-.stage-node-copy {
-  display: flex;
-  align-items: baseline;
-  min-width: 0;
-  gap: 6px;
-}
-
-.stage-node-copy strong,
-.stage-node-copy span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.stage-node-copy strong {
-  color: #374151;
-  font-size: 12px;
-}
-
-.stage-node-copy span {
-  color: var(--subtle);
-  font-size: 11px;
-}
-
-.progress-line {
-  display: flex;
-  flex: 1 1 200px;
-  max-width: 280px;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.progress-line-label {
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.progress-line strong {
-  color: var(--blue);
-  font-size: 12px;
-}
-
-.progress-line :deep(.el-progress) {
-  flex: 1;
-  min-width: 0;
-}
-
-.throughput {
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.hosts-strip {
-  padding: 10px 14px;
-  border-radius: 6px;
-}
-
-.hosts-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.hosts-heading > div {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.hosts-heading strong {
-  font-size: 13px;
-}
-
-.hosts-heading span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.hosts-heading b {
-  color: #374151;
-  font-size: 16px;
-  font-weight: 650;
-}
-
-.host-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  max-height: 66px;
-  margin-top: 7px;
   overflow: auto;
-}
-
-.host-chip,
-.host-more {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 2px 7px;
-  border: 1px solid #d8e5f8;
-  border-radius: 4px;
-  color: #315d9c;
-  background: #f5f8fe;
-  font-family: monospace;
-  font-size: 10px;
-}
-
-.host-more {
-  border-color: var(--line);
-  color: var(--muted);
-  background: #fafafa;
-}
-
-.stage-output-empty {
-  display: block;
-  margin-top: 9px;
-  color: var(--subtle);
-  font-size: 11px;
-}
-
-.page-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-height: 430px;
-  margin-top: 14px;
-  padding: 72px 24px 54px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  text-align: center;
-}
-
-.empty-icon {
-  display: grid;
-  place-items: center;
-  width: 54px;
-  height: 54px;
-  border: 1px solid #c9d9f4;
-  border-radius: 50%;
-  color: var(--blue);
-  background: #f1f6ff;
-}
-
-.empty-icon svg {
-  width: 25px;
-  height: 25px;
-}
-
-.page-empty h2 {
-  margin-top: 18px;
-  font-size: 18px;
-  font-weight: 650;
-}
-
-.page-empty p {
-  max-width: 430px;
-  margin: 9px 0 20px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.empty-notes {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 18px;
-  margin-top: 28px;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.empty-notes span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.empty-notes .el-icon {
-  color: #059669;
-}
-
-:deep(.asset-result-table) {
-  height: auto;
-  min-height: 410px;
-  overflow: visible;
-  border-radius: 6px;
-}
-
-:deep(.asset-result-table .table-wrap) {
-  flex: none;
-  min-height: 0;
-  overflow: visible;
-}
-
-:deep(.scan-composer-dialog.el-dialog) {
-  width: min(840px, calc(100vw - 32px));
-  margin: 8vh auto 0;
-  padding: 0;
-  overflow: hidden;
-  border-radius: 10px;
-}
-
-:deep(.scan-composer-dialog .el-dialog__header) {
-  margin: 0;
-  padding: 17px 20px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
-
-:deep(.scan-composer-dialog .el-dialog__title) {
+  box-sizing: border-box;
   color: var(--el-text-color-primary);
-  font-size: 16px;
-  font-weight: 600;
+  background: var(--el-bg-color-page);
 }
-
-:deep(.scan-composer-dialog .el-dialog__headerbtn) {
-  top: 8px;
-  right: 8px;
-  width: 40px;
-  height: 40px;
+.page-head, .task-selector, .head-actions, .progress-actions, .progress-card-head,
+.progress-card-info, .progress-card-body, .stage-track, .stage-node, .stage-node-copy,
+.progress-line, .hosts-heading, .selector-task-meta, .task-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
-
-:deep(.scan-composer-dialog .el-dialog__body) {
-  padding: 0;
-  overflow: hidden;
-}
-
-@media (max-width: 900px) {
-  .asset-discovery-view {
-    padding: 20px 18px 28px;
-  }
-
-}
-
-@media (max-width: 680px) {
-  .asset-discovery-view {
-    padding: 16px 12px 22px;
-  }
-
-  .page-head,
-  .progress-card-head,
-  .task-selector {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .page-head {
-    gap: 16px;
-  }
-
-  .head-actions {
-    width: 100%;
-  }
-
-  .head-actions .el-button {
-    flex: 1;
-  }
-
-  .task-selector {
-    gap: 9px;
-  }
-
-  .task-select {
-    width: 100%;
-  }
-
-  .selector-task-meta {
-    padding-top: 3px;
-  }
-
-  .progress-card {
-    padding: 10px 12px;
-  }
-
-  .progress-line {
-    flex-basis: 100%;
-    max-width: none;
-  }
-
-  .empty-notes {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 9px;
-  }
-
-  :deep(.scan-composer-dialog.el-dialog) {
-    width: calc(100vw - 20px);
-    margin-top: 2vh;
-  }
-
+.page-head { justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--el-border-color-lighter); gap: 16px; }
+.task-selector { flex: 1; flex-wrap: wrap; gap: 10px 16px; }
+.selector-label { display: grid; gap: 3px; flex-shrink: 0; }
+.selector-caption { font-size: 13px; font-weight: 600; }
+.selector-count, .selector-task-meta, .task-option-meta, .task-subtitle, .throughput { color: var(--el-text-color-secondary); font-size: 12px; }
+.task-select { width: 280px; max-width: 100%; }
+.task-option { justify-content: space-between; }
+.task-option-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-option-meta { flex-shrink: 0; font-size: 11px; }
+.head-actions, .progress-actions { flex-shrink: 0; }
+.head-actions :deep(.el-button + .el-button), .progress-actions :deep(.el-button + .el-button) { margin-left: 0; }
+.status-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--el-text-color-placeholder); }
+.status-mark.status-running, .status-mark.status-scanning { background: var(--el-color-primary); }
+.status-mark.status-paused { background: var(--el-color-warning); }
+.status-mark.status-completed { background: var(--el-color-success); }
+.status-mark.status-failed { background: var(--el-color-danger); }
+.meta-divider { width: 1px; height: 14px; margin: 0 4px; background: var(--el-border-color); }
+.discovery-content { display: grid; gap: 12px; margin-top: 12px; }
+.progress-card, .hosts-strip { padding: 12px 14px; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; background: var(--el-bg-color); }
+.progress-card-head { justify-content: space-between; flex-wrap: wrap; }
+.progress-card-info { flex-wrap: wrap; gap: 6px 12px; }
+.task-subtitle { margin: 0; }
+.progress-card-body { flex-wrap: wrap; gap: 12px 24px; margin-top: 12px; }
+.stage-track { flex: 1; flex-wrap: wrap; gap: 8px 20px; }
+.stage-node-marker { display: grid; flex: 0 0 18px; place-items: center; width: 18px; height: 18px; border: 1px solid var(--el-border-color); border-radius: 50%; color: var(--el-text-color-secondary); font-size: 10px; }
+.stage-node.current .stage-node-marker { border-color: var(--el-color-primary); color: var(--el-color-white); background: var(--el-color-primary); }
+.stage-node.complete .stage-node-marker { border-color: var(--el-color-success); color: var(--el-color-white); background: var(--el-color-success); }
+.stage-node.failed .stage-node-marker { border-color: var(--el-color-danger-light-5); color: var(--el-color-danger); background: var(--el-color-danger-light-9); }
+.stage-node-copy { align-items: baseline; gap: 6px; }
+.stage-node-copy strong { font-size: 12px; }
+.stage-node-copy span { color: var(--el-text-color-secondary); font-size: 11px; }
+.progress-line { flex: 1 1 180px; max-width: 260px; margin-left: auto; }
+.progress-line-label { color: var(--el-text-color-secondary); font-size: 11px; white-space: nowrap; }
+.progress-line strong { color: var(--el-color-primary); font-size: 12px; }
+.progress-line :deep(.el-progress) { flex: 1; min-width: 0; }
+.hosts-heading { justify-content: space-between; font-size: 13px; }
+.host-list { display: flex; flex-wrap: wrap; gap: 5px; max-height: 66px; margin-top: 8px; overflow: auto; }
+.host-chip, .host-more { padding: 3px 7px; border-radius: 4px; color: var(--el-text-color-regular); background: var(--el-fill-color-light); font-family: monospace; font-size: 11px; }
+.stage-output-empty { display: block; margin: 8px 0 0; color: var(--el-text-color-secondary); font-size: 12px; }
+.page-empty { display: flex; flex-direction: column; align-items: center; margin: 24px auto 0; padding: 32px 16px; max-width: 520px; text-align: center; }
+.empty-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; color: var(--el-color-primary); background: var(--app-brand-background); }
+.empty-icon svg { width: 24px; height: 24px; }
+.page-empty h2 { margin: 16px 0 0; font-size: 18px; font-weight: 600; }
+.page-empty p { margin: 10px 0 20px; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.load-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 8px 12px; color: var(--el-color-danger); background: var(--el-color-danger-light-9); border-radius: 4px; font-size: 12px; overflow-wrap: anywhere; }
+:deep(.scan-composer-dialog.el-dialog) { padding: 0; overflow: hidden; border-radius: 10px; }
+:deep(.scan-composer-dialog .el-dialog__header) { margin: 0; padding: 17px 20px; border-bottom: 1px solid var(--el-border-color-lighter); }
+:deep(.scan-composer-dialog .el-dialog__title) { font-size: 16px; font-weight: 600; }
+:deep(.scan-composer-dialog .el-dialog__headerbtn) { top: 8px; right: 8px; width: 40px; height: 40px; }
+:deep(.scan-composer-dialog .el-dialog__body) { padding: 0; overflow: hidden; }
+@container discovery (max-width: 700px) {
+  .page-head { flex-wrap: wrap; }
+  .has-tasks .task-selector { flex-basis: 100%; }
+  .task-select { flex: 1; min-width: 180px; }
+  .selector-task-meta { flex-basis: 100%; }
+  .progress-line { flex-basis: 100%; max-width: none; }
 }
 </style>

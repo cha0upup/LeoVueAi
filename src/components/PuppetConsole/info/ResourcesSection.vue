@@ -1,6 +1,6 @@
 <template>
   <section class="info-section">
-    <article class="content-card">
+    <article class="content-card content-card-wide">
       <div class="card-header">
         <div>
           <div class="section-eyebrow">
@@ -15,12 +15,13 @@
             物理内存
           </div>
           <el-progress
+            v-if="resources.memory != null"
             :percentage="resources.memory"
             :color="getUsageColor(resources.memory)"
             :stroke-width="10"
           />
           <div class="usage-meta">
-            <span>可用 {{ formatMBValue(basicInfo.HardwareInfo?.FreePhysicalMemoryMB) }}</span>
+            <span>空闲 {{ formatMBValue(basicInfo.HardwareInfo?.FreePhysicalMemoryMB) }}</span>
             <span>总计 {{ formatMBValue(basicInfo.HardwareInfo?.TotalPhysicalMemoryMB) }}</span>
           </div>
         </div>
@@ -29,12 +30,13 @@
             交换空间
           </div>
           <el-progress
+            v-if="resources.swap != null"
             :percentage="resources.swap"
             :color="getUsageColor(resources.swap)"
             :stroke-width="10"
           />
           <div class="usage-meta">
-            <span>可用 {{ formatMBValue(basicInfo.HardwareInfo?.FreeSwapSpaceMB) }}</span>
+            <span>空闲 {{ formatMBValue(basicInfo.HardwareInfo?.FreeSwapSpaceMB) }}</span>
             <span>总计 {{ formatMBValue(basicInfo.HardwareInfo?.TotalSwapSpaceMB) }}</span>
           </div>
         </div>
@@ -108,7 +110,10 @@
             width="140"
           >
             <template #default="{ row }">
-              <div class="usage-inline">
+              <div
+                v-if="isCapacityFileSystem(row) && row.UsagePercent != null"
+                class="usage-inline"
+              >
                 <el-progress
                   :percentage="Math.round(row.UsagePercent || 0)"
                   :color="getUsageColor(row.UsagePercent)"
@@ -117,6 +122,10 @@
                 />
                 <span>{{ formatPercent(row.UsagePercent) }}</span>
               </div>
+              <span
+                v-else
+                class="text-muted"
+              >{{ isCapacityFileSystem(row) ? '—' : '不参与容量统计' }}</span>
             </template>
           </el-table-column>
         </el-table>
@@ -175,7 +184,7 @@
                 round
                 size="small"
               >
-                {{ row.IsUp ? '在线' : '离线' }}
+                {{ row.IsUp ? '已启用' : '未启用' }}
               </el-tag>
             </template>
           </el-table-column>
@@ -213,7 +222,8 @@ import {
   formatPercent,
   getUsageColor,
   getIPType,
-  getResourceUsage
+  getResourceUsage,
+  isCapacityFileSystem
 } from './infoModel.js'
 
 const props = defineProps({
@@ -236,12 +246,13 @@ const hardwareFacts = computed(() => [
 <style scoped>
 .usage-stack {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 12px;
 }
 
 .usage-panel {
+  flex: 1 1 240px;
   border-radius: 0;
   border: 0;
   border-bottom: 1px solid var(--info-border);

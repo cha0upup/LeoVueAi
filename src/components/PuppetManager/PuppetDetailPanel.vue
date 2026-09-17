@@ -184,9 +184,4 @@ const emit = defineEmits([
   box-shadow: none;
 }
 
-@media (max-width: 1320px) {
-  .detail-card {
-    min-height: 720px;
-  }
-}
 </style>

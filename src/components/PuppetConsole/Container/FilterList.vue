@@ -1,210 +1,92 @@
 <template>
-  <div class="filter-list-container">
+  <div class="container-asset-list">
     <ContainerAssetPanel
-      title="Filter 链路"
-      :icon="iconMap.filter"
+      title="Filter 列表"
       :total="filters.length"
       :filtered="filteredFilters.length"
     >
-      <template #toolbar>
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索名称、类名、URL模式"
-          clearable
-          class="search-input"
+      <el-table
+        :data="pagedFilters"
+        height="100%"
+        class="asset-table"
+        :empty-text="filters.length ? '未找到匹配的组件' : '暂无组件'"
+      >
+        <el-table-column
+          label="匹配路径"
+          min-width="150"
         >
-          <template #prefix>
-            <el-icon>
-              <Icon :icon="iconMap.search" />
-            </el-icon>
+          <template #default="{ row }">
+            <span class="mono-text asset-paths">{{ row.urlPatterns?.join('\n') || row.servletNames?.join('\n') || '-' }}</span>
           </template>
-        </el-input>
-      </template>
-
-      <el-card class="container-table-card">
-        <div class="asset-table-shell">
-          <el-table
-            :data="pagedFilters"
-            stripe
-            style="width: 100%"
-            height="100%"
-            class="asset-table"
-            :empty-text="filters.length === 0 ? '该Context暂无Filter' : '未找到匹配的Filter'"
-          >
-            <el-table-column
-              prop="filterName"
-              label="Filter名称"
-              min-width="180"
+        </el-table-column>
+        <el-table-column
+          label="Filter 名称 / 类名"
+          min-width="230"
+        >
+          <template #default="{ row }">
+            <button
+              type="button"
+              class="asset-name-button mono-text"
+              :title="row.filterClassName"
+              @click="viewDetail(row)"
             >
-              <template #default="{ row }">
-                <el-tag
-                  type="warning"
-                  size="small"
-                >
-                  {{ row.filterName || '-' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="filterClassName"
-              label="Filter类名"
-              min-width="260"
-            >
-              <template #default="{ row }">
-                <div
-                  v-if="row.filterClassName"
-                  class="filter-class-cell"
-                >
-                  <el-tooltip
-                    :content="row.filterClassName"
-                    placement="top"
-                  >
-                    <span class="mono-text filter-class">{{ row.filterClassName }}</span>
-                  </el-tooltip>
-                  <el-button
-                    type="primary"
-                    link
-                    size="small"
-                    style="margin-left: 8px"
-                    @click="handleViewBytecode(row.filterClassName)"
-                  >
-                    <el-icon>
-                      <Icon :icon="iconMap.code" />
-                    </el-icon>
-                    查看字节码
-                  </el-button>
-                </div>
-                <span
-                  v-else
-                  class="text-muted"
-                >-</span>
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="urlPatterns"
-              label="URL模式"
-              min-width="200"
-            >
-              <template #default="{ row }">
-                <div class="url-patterns">
-                  <el-tag
-                    v-for="(pattern, index) in row.urlPatterns"
-                    :key="index"
-                    type="primary"
-                    size="small"
-                    style="margin: 2px"
-                  >
-                    {{ pattern }}
-                  </el-tag>
-                  <span
-                    v-if="!row.urlPatterns || row.urlPatterns.length === 0"
-                    class="text-muted"
-                  >
-                    -
-                  </span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="servletNames"
-              label="关联Servlet"
-              min-width="180"
-            >
-              <template #default="{ row }">
-                <div class="servlet-names">
-                  <el-tag
-                    v-for="(name, index) in row.servletNames"
-                    :key="index"
-                    type="success"
-                    size="small"
-                    style="margin: 2px"
-                  >
-                    {{ name }}
-                  </el-tag>
-                  <span
-                    v-if="!row.servletNames || row.servletNames.length === 0"
-                    class="text-muted"
-                  >
-                    无
-                  </span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="filterClassLoaderName"
-              label="ClassLoader"
-              min-width="260"
-            >
-              <template #default="{ row }">
-                <span class="mono-text">
-                  {{ row.filterClassLoaderName || '-' }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column
-              label="操作"
-              width="120"
-              fixed="right"
-            >
-              <template #default="{ row }">
-                <el-button
-                  type="danger"
-                  size="small"
-                  :loading="removingIds.has(row.filterName)"
-                  :disabled="!props.removable || removingIds.has(row.filterName)"
-                  @click="handleRemove(row)"
-                >
-                  <el-icon>
-                    <Icon :icon="iconMap.delete" />
-                  </el-icon>
-                  移除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <div
-            v-if="filteredFilters.length > pageSize"
-            class="pagination-wrapper"
-          >
-            <el-pagination
-              v-model:current-page="currentPage"
-              :page-size="pageSize"
-              layout="prev, pager, next, jumper"
-              :total="filteredFilters.length"
-              background
-              small
+              {{ row.filterClassName || '-' }}
+            </button>
+            <span class="asset-secondary">{{ row.filterName }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="操作"
+          width="60"
+          align="center"
+          fixed="right"
+        >
+          <template #default="{ row }">
+            <ContainerAssetActions
+              :class-name="row.filterClassName || ''"
+              :loading="removingIds.has(row.filterName)"
+              :removable="props.removable && Boolean(row.filterName)"
+              @view="viewDetail(row)"
+              @bytecode="emit('view-bytecode', row.filterClassName)"
+              @remove="handleRemove(row)"
             />
-          </div>
-        </div>
-      </el-card>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div
+        v-if="filteredFilters.length > pageSize"
+        class="pagination-wrapper"
+      >
+        <el-pagination
+          v-model:current-page="currentPage"
+          :page-size="pageSize"
+          layout="prev, pager, next"
+          :total="filteredFilters.length"
+          small
+        />
+      </div>
     </ContainerAssetPanel>
-
-    <ClassBytecodeDialog
-      v-model="bytecodeDialogVisible"
-      :session-id="sessionId"
-      :class-name="selectedClassName"
-      @close="selectedClassName = ''"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, inject, watch } from 'vue'
-import { confirmAction } from '@/utils/confirmUtils.js'
-import { icons } from '@/utils/icons.js'
-import ClassBytecodeDialog from './ClassBytecodeDialog.vue'
+import { toRef } from 'vue'
+import { useContainerAssetList } from './useContainerAssetList.js'
 import ContainerAssetPanel from './ContainerAssetPanel.vue'
+import ContainerAssetActions from './ContainerAssetActions.vue'
 import { useWebRuntimeComponentRemoval } from './useWebRuntimeComponentRemoval.js'
 import { showWarning } from '@/utils/messageUtils.js'
 
-const iconMap = icons
-
 // Props
 const props = defineProps({
+  searchKeyword: { type: String, default: '' },
   filters: {
     type: Array,
     default: () => []
+  },
+  contextId: {
+    type: String,
+    default: ''
   },
   contextName: {
     type: String,
@@ -221,53 +103,18 @@ const props = defineProps({
 })
 
 // 定义事件
-const emit = defineEmits(['refresh'])
+const emit = defineEmits(['refresh', 'view-bytecode', 'view-detail'])
 
 // 响应式数据
-const searchKeyword = ref('')
-const currentPage = ref(1)
-const injectedPageSize = inject('puppetListPageSize', ref(50))
-const pageSize = injectedPageSize
 const { removingIds, removeComponent } = useWebRuntimeComponentRemoval({
   props,
   emit,
   componentType: 'filter',
   label: 'Filter'
 })
-const bytecodeDialogVisible = ref(false)
-const selectedClassName = ref('')
 
-// 计算属性 - 过滤后的Filter列表
-const filteredFilters = computed(() => {
-  if (!searchKeyword.value.trim()) {
-    return props.filters
-  }
-
-  const keyword = searchKeyword.value.toLowerCase().trim()
-  return props.filters.filter((filter) => {
-    const filterName = (filter.filterName || '').toLowerCase()
-    const filterClassName = (filter.filterClassName || '').toLowerCase()
-    const urlPatterns = (filter.urlPatterns || []).join(' ').toLowerCase()
-    const servletNames = (filter.servletNames || []).join(' ').toLowerCase()
-
-    return (
-      filterName.includes(keyword) ||
-      filterClassName.includes(keyword) ||
-      urlPatterns.includes(keyword) ||
-      servletNames.includes(keyword)
-    )
-  })
-})
-
-// 当前页数据
-const pagedFilters = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return filteredFilters.value.slice(start, start + pageSize.value)
-})
-
-watch(searchKeyword, () => {
-  currentPage.value = 1
-})
+const { currentPage, pageSize, filteredItems: filteredFilters, pagedItems: pagedFilters } =
+  useContainerAssetList(() => props.filters, item => [item.filterName, item.filterClassName, item.urlPatterns, item.servletNames], toRef(props, 'searchKeyword'))
 
 /**
  * 移除Filter
@@ -278,60 +125,27 @@ const handleRemove = async (filter) => {
     return
   }
 
-  const displayContextName = props.contextName || 'ROOT'
-  const confirmed = await confirmAction({
+  await removeComponent(filter.filterName, filter.filterName, {
     title: '确认移除Filter',
-    message: `确定要移除以下Filter吗？\n\nContext: ${displayContextName}\nFilter名称: ${filter.filterName}\n类名: ${filter.filterClassName}\n\n此操作会立即生效，请谨慎操作！`,
+    message: `确定要移除以下Filter吗？\n\nFilter名称: ${filter.filterName}\n类名: ${filter.filterClassName}\n\n此操作会立即生效，请谨慎操作！`,
     confirmButtonText: '确定移除'
   })
-  if (!confirmed) return
-
-  await removeComponent(filter.filterName, filter.filterName)
 }
 
-/**
- * 查看类字节码
- */
-const handleViewBytecode = (className) => {
-  if (!className) {
-    return
-  }
-  selectedClassName.value = className
-  bytecodeDialogVisible.value = true
-}
+const viewDetail = row => emit('view-detail', {
+  title: 'Filter 详情',
+  className: row.filterClassName,
+  fields: [
+    ['Context', props.contextName],
+    ['名称', row.filterName],
+    ['类名', row.filterClassName],
+    ['URL 模式', row.urlPatterns],
+    ['关联 Servlet', row.servletNames],
+    ['ClassLoader', row.filterClassLoaderName]
+  ]
+})
 </script>
 
 <style scoped>
 @import '@/styles/container-list-shared.css';
-
-.filter-list-container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--el-spacing-base);
-  height: 100%;
-}
-
-/* URL模式和Servlet名称容器 */
-.url-patterns,
-.servlet-names {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-}
-
-.filter-class-cell {
-  display: flex;
-  align-items: center;
-}
-
-.filter-class {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-}
 </style>

@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     :model-value="visible"
-    title="新增数据库配置"
+    title="新增连接"
     width="min(680px, calc(100vw - 32px))"
     :close-on-click-modal="false"
     destroy-on-close

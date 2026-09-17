@@ -1,0 +1,15 @@
+.welcome { width: 100%; max-width: 680px; margin: 0 auto; padding: 22px 16px 16px; }
+.welcome h2 { margin: 0; color: var(--el-text-color-primary); font-size: 18px; font-weight: 600; line-height: 1.4; }
+.welcome-description { margin: 8px 0 18px; color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.6; }
+.prompt-list { display: grid; gap: 8px; }
+.prompt-item { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--el-border-color-lighter); border-radius: 10px; color: var(--el-text-color-primary); background: var(--el-bg-color); text-align: left; cursor: pointer; }
+.prompt-item:hover:not(:disabled) { border-color: var(--el-color-primary-light-5); background: var(--el-color-primary-light-9); }
+.prompt-icon { flex-shrink: 0; color: var(--el-color-primary); font-size: 19px; }
+.prompt-copy { display: grid; gap: 4px; min-width: 0; }
+.prompt-copy strong { font-size: 13px; font-weight: 500; }
+.prompt-copy > span { color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.5; }
+.prompt-arrow { margin-left: auto; flex-shrink: 0; color: var(--el-text-color-placeholder); font-size: 14px; }
+.more-prompts { display: flex; align-items: center; gap: 5px; margin: 12px 0 0; padding: 4px 0; border: 0; color: var(--el-text-color-secondary); background: transparent; font-size: 12px; cursor: pointer; }
+.more-prompts:hover { color: var(--el-color-primary); }
+.prompt-item:focus-visible, .more-prompts:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 2px; }
+.prompt-item:disabled { opacity: .5; cursor: not-allowed; }

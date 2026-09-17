@@ -39,6 +39,7 @@
           v-if="aiAvailable"
           :session-id="sessionId"
           :initial-prompt="initialPrompt"
+          :active-module="activeModule"
         />
         <AiNotConfiguredEmpty
           v-else
@@ -64,6 +65,7 @@ const PuppetAiAssistant = defineAsyncComponent(
 defineProps({
   sessionId: { type: String, required: true },
   initialPrompt: { type: String, default: '' },
+  activeModule: { type: Object, default: null },
   visible: { type: Boolean, default: false }
 })
 

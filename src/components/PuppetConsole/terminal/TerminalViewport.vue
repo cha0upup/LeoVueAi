@@ -1,50 +1,25 @@
 <template>
-  <div class="terminal-viewport">
-    <div class="terminal-viewport__chrome">
-      <span
-        :class="['terminal-viewport__mode', { 'is-degraded': capability.degraded }]"
-        :title="capability.details"
-      >
-        <span
-          class="terminal-viewport__mode-mark"
-          aria-hidden="true"
-        />
-        {{ capability.shellLabel }}
-      </span>
-      <span
-        class="terminal-viewport__hint"
-        :title="capability.details"
-      >{{ capability.hint }}</span>
-    </div>
-    <div
-      ref="containerRef"
-      class="terminal-viewport__canvas"
-    />
-  </div>
+  <div
+    ref="containerRef"
+    class="terminal-viewport"
+  />
 </template>
-
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
-import { describeTerminalCapability } from './terminalWorkspaceModel.js'
 
 const props = defineProps({
   active: {
     type: Boolean,
     default: false
-  },
-  terminalSession: {
-    type: Object,
-    default: null
   }
 })
 
-const emit = defineEmits(['ready', 'input', 'activity', 'resize'])
-const capability = computed(() => describeTerminalCapability(props.terminalSession))
+const emit = defineEmits(['ready', 'input', 'activity', 'resize', 'search-results'])
 
 const containerRef = ref(null)
 let terminal = null
@@ -69,6 +44,8 @@ const initializeTerminal = async () => {
   if (!containerRef.value || terminal) return
 
   terminal = new Terminal({
+    // Search result decorations use xterm's proposed decoration API.
+    allowProposedApi: true,
     allowTransparency: true,
     convertEol: true,
     cursorBlink: true,
@@ -109,6 +86,7 @@ const initializeTerminal = async () => {
   terminal.loadAddon(fitAddon)
   terminal.loadAddon(searchAddon)
   terminal.loadAddon(webLinksAddon)
+  searchAddon.onDidChangeResults((result) => emit('search-results', result))
   terminal.open(containerRef.value)
   terminal.onData((data) => emit('input', data))
   terminal.onSelectionChange(() => emit('activity'))
@@ -153,8 +131,21 @@ const search = (direction, term, options = {}) => {
     incremental: false,
     regex: false,
     wholeWord: false,
+    decorations: {
+      matchBackground: '#375168',
+      matchOverviewRuler: '#7dd3fc',
+      activeMatchBackground: '#806200',
+      activeMatchBorder: '#e3b341',
+      activeMatchColorOverviewRuler: '#e3b341'
+    },
     ...options
   })
+}
+
+const clearSearch = () => {
+  searchAddon?.clearDecorations()
+  terminal?.clearSelection()
+  emit('search-results', { resultIndex: -1, resultCount: 0 })
 }
 
 const dispose = () => {
@@ -177,6 +168,7 @@ const dispose = () => {
 defineExpose({
   isVisible: () => Boolean(containerRef.value?.getClientRects().length),
   clear,
+  clearSearch,
   fit,
   focus,
   searchNext: (term, options) => search('findNext', term, options),
@@ -208,73 +200,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .terminal-viewport {
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  overflow: hidden;
-  border-radius: 0;
-  border: 0;
-  background: var(--app-code-background);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 5%, transparent);
-}
-
-.terminal-viewport__chrome {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 28px;
-  padding: 4px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--app-code-border) 50%, transparent);
-  background: color-mix(
-    in srgb,
-    var(--app-code-background) 84%,
-    var(--app-control-background-soft)
-  );
-}
-
-.terminal-viewport__mode {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: color-mix(in srgb, var(--app-code-foreground, #e6edf3) 74%, transparent);
-  font-family: 'SFMono-Regular', Consolas, monospace;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-}
-
-.terminal-viewport__mode-mark {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: 1px;
-  background: #7dd3fc;
-  box-shadow: 0 0 0 2px color-mix(in srgb, #7dd3fc 13%, transparent);
-}
-
-.terminal-viewport__mode.is-degraded {
-  color: color-mix(in srgb, var(--el-color-warning) 82%, #ffffff);
-}
-
-.terminal-viewport__mode.is-degraded .terminal-viewport__mode-mark {
-  background: var(--el-color-warning);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-warning) 16%, transparent);
-}
-
-.terminal-viewport__hint {
-  color: color-mix(in srgb, var(--app-code-foreground, #e6edf3) 46%, transparent);
-  font-size: 10px;
-}
-
-.terminal-viewport__canvas {
+  flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding: 0;
+  background: #07111b;
 }
-
-.terminal-viewport__canvas :deep(.xterm) {
+.terminal-viewport :deep(.xterm) {
   box-sizing: border-box;
   height: 100%;
   padding: 10px 12px 12px;

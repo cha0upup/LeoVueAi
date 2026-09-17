@@ -2,24 +2,29 @@
 .info-page .info-section {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
+  align-items: start;
 }
 .info-page :where(.info-section) .card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .info-page :where(.info-section) .card-header h3 {
   margin: 2px 0 0;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.3;
   color: var(--el-text-color-primary);
 }
 .info-page :where(.info-section) .section-eyebrow {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--el-color-primary);
@@ -34,18 +39,18 @@
   flex-direction: column;
   min-width: 0;
   gap: 6px;
-  padding: 12px 13px;
+  padding: 10px;
 }
 .info-page :where(.info-section) .kv-label {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.04em;
   color: var(--el-text-color-secondary);
   text-transform: uppercase;
 }
 .info-page :where(.info-section) .kv-value {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--el-text-color-primary);
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -75,7 +80,7 @@
 }
 .info-page :where(.info-section) .usage-title {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.04em;
   color: var(--el-text-color-secondary);
   text-transform: uppercase;
@@ -147,15 +152,13 @@
   padding-top: 7px;
   padding-bottom: 7px;
 }
-@media (max-width: 980px) {
+@container basic-info (max-width: 720px) {
   .info-page .info-section {
     grid-template-columns: 1fr;
   }
-  .info-page :where(.info-section) .kv-grid {
-    grid-template-columns: 1fr;
-  }
 }
-@media (max-width: 640px) {
+@container basic-info (max-width: 440px) {
+  .info-page :where(.info-section) .kv-grid { grid-template-columns: 1fr; }
   .info-page :where(.info-section) .usage-meta {
     flex-direction: column;
   }

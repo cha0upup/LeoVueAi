@@ -145,7 +145,7 @@ const userFacts = computed(() => [
   background: transparent;
 }
 
-@media (max-width: 640px) {
+@container basic-info (max-width: 440px) {
   .content-card {
     padding-left: 12px;
     padding-right: 12px;

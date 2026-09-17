@@ -10,6 +10,7 @@ const rows = value => Array.isArray(value) ? value : []
 const buildOverviewRows = (context, frameworkInfo) => [
   ['字段', '值'],
   ['Context 名称', getContextDisplayName(context)],
+  ['Host', context?.host || ''],
   ['基础路径', context?.basePath || '/'],
   ['工作目录', context?.workDir || ''],
   ['Servlet 数量', rows(context?.allServlet).length],
@@ -66,6 +67,11 @@ const buildControllerRows = frameworkInfo => [
   ])
 ]
 
+const buildRuntimeRows = frameworkInfo => [
+  ['类型', '类名'],
+  ...rows(frameworkInfo?.runtimeComponents).map(item => [item.role || '-', item.className || '-'])
+]
+
 const buildInterceptorRows = frameworkInfo => [
   ['路径', '拦截器类名'],
   ...rows(frameworkInfo?.allMappedInterceptor).map(item => [
@@ -74,16 +80,17 @@ const buildInterceptorRows = frameworkInfo => [
   ])
 ]
 
-export const buildContextExportSpec = (context, frameworkInfo) => ({
+export const buildContextExportSpec = context => ({
   fileName: `${safeFileSegment(getContextDisplayName(context))}_container_info.xlsx`,
   sheets: [
-    { name: 'Context概览', rows: buildOverviewRows(context, frameworkInfo) },
+    { name: 'Context概览', rows: buildOverviewRows(context, context.frameworkInfo) },
     { name: 'Servlets', rows: buildServletRows(context) },
     { name: 'Filters', rows: buildFilterRows(context) },
     { name: 'Valves', rows: buildValveRows(context) },
     { name: 'Listeners', rows: buildListenerRows(context) },
-    { name: 'Controllers', rows: buildControllerRows(frameworkInfo) },
-    { name: 'Interceptors', rows: buildInterceptorRows(frameworkInfo) }
+    { name: 'Controllers', rows: buildControllerRows(context.frameworkInfo) },
+    { name: 'Interceptors', rows: buildInterceptorRows(context.frameworkInfo) },
+    { name: 'FrameworkRuntime', rows: buildRuntimeRows(context.frameworkInfo) }
   ]
 })
 
@@ -124,17 +131,27 @@ const buildAggregateAssetRows = contexts => [
   })
 ]
 
-export const buildAllContextsExportSpec = (contexts, frameworkInfo) => {
+export const buildAllContextsExportSpec = (contexts, frameworks = []) => {
   const contextList = rows(contexts)
+  const contextNames = new Map(contextList.map(context => [context.contextId, getContextDisplayName(context)]))
+  const frameworkRows = buildRows => [
+    ['框架', 'Context', ...buildRows(null)[0]],
+    ...rows(frameworks).flatMap(framework => buildRows(framework).slice(1).map(row => [
+      framework.family || '',
+      contextNames.get(framework.contextId) || '归属未确定',
+      ...row
+    ]))
+  ]
   return {
     fileName: 'container_all_info.xlsx',
     sheets: [
       {
         name: 'Contexts',
         rows: [
-          ['Context 名称', '基础路径', '工作目录', 'Servlet', 'Filter', 'Valve', 'Listener'],
+          ['Context 名称', 'Host', '基础路径', '工作目录', 'Servlet', 'Filter', 'Valve', 'Listener'],
           ...contextList.map(context => [
             getContextDisplayName(context),
+            context.host || '',
             context.basePath || '/',
             context.workDir || '',
             rows(context.allServlet).length,
@@ -145,8 +162,9 @@ export const buildAllContextsExportSpec = (contexts, frameworkInfo) => {
         ]
       },
       { name: 'ContextAssets', rows: buildAggregateAssetRows(contextList) },
-      { name: 'Controllers', rows: buildControllerRows(frameworkInfo) },
-      { name: 'Interceptors', rows: buildInterceptorRows(frameworkInfo) }
+      { name: 'Controllers', rows: frameworkRows(buildControllerRows) },
+      { name: 'Interceptors', rows: frameworkRows(buildInterceptorRows) },
+      { name: 'FrameworkRuntime', rows: frameworkRows(buildRuntimeRows) }
     ]
   }
 }

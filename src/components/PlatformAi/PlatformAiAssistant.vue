@@ -10,16 +10,8 @@
         </span>
         <div class="assistant-heading">
           <strong>平台 AI</strong>
-          <span>跨主机与平台资源分析</span>
+          <span>{{ agentReady ? '全平台 · 资源管理与分析' : '全平台 · 初始化中…' }}</span>
         </div>
-        <span
-          class="assistant-status"
-          :class="{ 'is-ready': agentReady }"
-          role="status"
-        >
-          <span class="assistant-status__dot" />
-          {{ agentReady ? '服务可用' : '初始化中' }}
-        </span>
       </div>
       <div class="assistant-actions">
         <el-tooltip
@@ -29,20 +21,22 @@
         >
           <button
             type="button"
-            class="header-action"
+            class="header-action is-icon"
+            aria-label="归档当前分析报告"
             :disabled="!canArchiveReport || archivingReport"
             @click="archiveCurrentReport"
           >
             <el-icon :class="{ 'u-spin': archivingReport }">
               <Icon :icon="icons.save" />
             </el-icon>
-            <span>归档</span>
           </button>
         </el-tooltip>
         <button
           type="button"
           class="header-action is-primary"
-          :disabled="creatingThread"
+          aria-label="新建对话"
+          title="新建对话"
+          :disabled="!agentReady || creatingThread || historyLoading"
           @click="onCreateThread"
         >
           <el-icon><Icon :icon="icons.plus" /></el-icon>
@@ -65,10 +59,12 @@
       </div>
     </header>
 
-    <PlatformAiThreadTabs
+    <AiThreadSwitcher
       :model-value="activeThreadId"
       :threads="threads"
       :conversation-status="conversationStatus"
+      :loading="!agentReady"
+      renameable
       @activate="onActivateThread"
       @delete="onDeleteThread"
       @rename="commitRename"
@@ -90,7 +86,7 @@
           <PlatformAiWelcome
             v-if="!messages.length && !historyLoading"
             :ready="agentReady"
-            @pick-prompt="applyPrompt"
+            @pick-prompt="onPickPrompt"
           />
 
           <div
@@ -132,9 +128,10 @@
       </el-scrollbar>
 
       <PlatformAiComposer
+        ref="composerRef"
         :model-value="draft"
         :sending="composerSending"
-        :ready="agentReady"
+        :ready="agentReady && !historyLoading && !creatingThread"
         :composing="composerComposing"
         :config-id="selectedConfigId"
         :reasoning-effort="reasoningEffort"
@@ -174,10 +171,10 @@ import {
 } from '@/services/api/platform-ai.js'
 import { useAiChat } from '@/composables/useAiChat.js'
 import { useAiChannelSelector } from '@/composables/useAiChannelSelector.js'
-import { ACTIVE_AI_STATUSES, normalizeAiStatus } from '@/utils/aiRuntime.js'
+import { ACTIVE_AI_STATUSES, normalizeAiStatus, getThreadStatus, isDefaultThreadTitle } from '@/utils/aiRuntime.js'
 import PlatformAiWelcome from './PlatformAiWelcome.vue'
 import PlatformAiComposer from './PlatformAiComposer.vue'
-import PlatformAiThreadTabs from './PlatformAiThreadTabs.vue'
+import AiThreadSwitcher from '@/components/Ai/AiThreadSwitcher.vue'
 import AiAssistantTurnUser from '@/components/AiAssistant/AiAssistantTurnUser.vue'
 import AiAssistantTurnAssistant from '@/components/AiAssistant/AiAssistantTurnAssistant.vue'
 import PlanPopover from '@/components/AiAssistant/PlanPopover.vue'
@@ -186,7 +183,6 @@ import { useAuth } from '@/composables/useAuth.js'
 import {
   buildRequestAttachments,
   findLatestAssistantPlan,
-  getPlatformThreadStatus,
   mapPlatformPersistedMessages
 } from './platformAiAssistantModel.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
@@ -208,6 +204,7 @@ let statusSyncPromise = null
 const { selectedConfigId, configs, fetchConfigs } = useAiChannelSelector()
 const reasoningEffort = ref('medium')
 const attachments = ref([])
+const composerRef = ref(null)
 const selectedConfigModel = computed(() => configs.value.find(c => c.id === selectedConfigId.value)?.model || '')
 const requestedModelSwitchId = ref(null)
 const revertingConfigSelection = ref(false)
@@ -271,8 +268,6 @@ const commitRename = async ({ threadId, title }) => {
   }
 }
 
-const getTabStatus = thread => getPlatformThreadStatus(thread, conversationStatus.value)
-
 // ── AI chat ───────────────────────────────────────────────────────────────────
 const {
   messages,
@@ -309,6 +304,11 @@ const {
   errorLabel: '平台 AI 请求失败'
 })
 
+const onPickPrompt = value => {
+  applyPrompt(value)
+  nextTick(() => composerRef.value?.focus())
+}
+
 const composerSending = computed(() => {
   const localStatus = normalizeAiStatus(
     conversationStatus.value?.[activeThreadId.value]?.status || 'idle'
@@ -316,7 +316,7 @@ const composerSending = computed(() => {
   // 中断请求已被服务端接收后立即重新开放输入；下一条消息进入串行队列。
   if (localStatus === 'cancelling') return false
   if (sending.value || sendPreparing.value) return true
-  const status = getTabStatus(activeThread.value)
+  const status = getThreadStatus(activeThread.value, conversationStatus.value)
   return ACTIVE_AI_STATUSES.includes(status)
 })
 
@@ -492,10 +492,15 @@ const onActivateThread = async threadId => {
 }
 
 const onCreateThread = async () => {
-  if (creatingThread.value) return null
+  if (!agentReady.value || creatingThread.value || historyLoading.value) return null
+  if (activeThread.value && !composerSending.value && !waitingForUserInput.value &&
+      !activeThread.value.messageCount && !messages.value.length) {
+    composerRef.value?.focus()
+    return activeThreadId.value
+  }
   creatingThread.value = true
   try {
-    const response = await platformAiThreadCreateApi({ configId: selectedConfigId.value ?? undefined })
+    const response = await platformAiThreadCreateApi({ title: '新对话', configId: selectedConfigId.value ?? undefined })
     if (!mounted) return null
     const info = response.data
     if (!info?.threadId) return null
@@ -555,7 +560,7 @@ const onSend = async () => {
   if (waitingForUserInput.value) return
   const inputText = draft.value?.trim() || ''
   const text = inputText || (attachments.value.length ? '请阅读并分析附件。' : '')
-  if (!text || composerSending.value || sendPreparing.value) return
+  if (!text || !agentReady.value || composerSending.value || sendPreparing.value || historyLoading.value || creatingThread.value) return
   sendPreparing.value = true
   try {
     const threadId = activeThreadId.value || await onCreateThread()
@@ -574,12 +579,22 @@ const onSend = async () => {
     const requestAttachments = buildRequestAttachments(attachments.value)
     const displayAttachments = requestAttachments.map(({ name, mimeType, size }) => ({ name, mimeType, size }))
     attachments.value = []
-    send({
+    const shouldNameThread = isDefaultThreadTitle(activeThread.value?.title) &&
+      !activeThread.value?.messageCount && !messages.value.some(message => message.role === 'user')
+    const submission = send({
       text,
       displayText: inputText,
       attachments: displayAttachments,
       requestParams: { reasoningEffort: reasoningEffort.value, attachments: requestAttachments }
     })
+    if (shouldNameThread) {
+      submission.then(turn => {
+        const thread = threads.value.find(item => item.threadId === threadId)
+        if (turn && mounted && thread && isDefaultThreadTitle(thread.title)) {
+          commitRename({ threadId, title: Array.from(text.replace(/\s+/g, ' ')).slice(0, 40).join('') })
+        }
+      })
+    }
   } finally {
     sendPreparing.value = false
   }
@@ -713,31 +728,28 @@ onUnmounted(() => {
 <style scoped>
 .platform-ai-assistant {
   --thread-max: 46rem;
-  --accent: var(--el-color-primary);
   --accent-soft: var(--el-color-primary);
-  --surface-border: var(--app-surface-border-strong);
   --ai-muted-surface: var(--app-surface-background);
+  --ai-panel-surface: var(--app-surface-background);
+  container: platform-assistant / inline-size;
 
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 82% 0%, color-mix(in srgb, var(--el-color-primary) 5%, transparent), transparent 30%),
-    var(--app-container-background);
+  background: var(--ai-panel-surface);
 }
 
 .assistant-header {
-  min-height: 60px;
+  min-height: 58px;
   padding: 0 14px 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-shrink: 0;
-  background: var(--app-container-background);
-  border-bottom: 1px solid var(--app-divider-color);
+  background: var(--ai-muted-surface);
 }
 
 .assistant-identity,
@@ -783,34 +795,8 @@ onUnmounted(() => {
   font-size: 11px;
   line-height: 1.25;
   white-space: nowrap;
-}
-
-.assistant-status {
-  height: 22px;
-  padding: 0 7px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-  border-radius: var(--radius-tag);
-  color: var(--el-text-color-secondary);
-  background: var(--app-control-background-soft);
-  font-size: 11px;
-}
-
-.assistant-status__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--el-text-color-placeholder);
-}
-
-.assistant-status.is-ready {
-  color: var(--el-color-success-dark-2);
-}
-
-.assistant-status.is-ready .assistant-status__dot {
-  background: var(--el-color-success);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .assistant-actions {
@@ -889,7 +875,7 @@ onUnmounted(() => {
   width: 100%;
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 10px 16px 0;
+  padding: 8px 0 18px;
   display: flex;
   flex-direction: column;
 }
@@ -929,21 +915,8 @@ onUnmounted(() => {
   text-align: center;
 }
 
-@media (max-width: 768px) {
-  .assistant-heading span,
-  .assistant-status,
-  .header-action span {
-    display: none;
-  }
-
-  .header-action {
-    width: 28px;
-    padding: 0;
-  }
-
-  .thread {
-    padding: 0 8px;
-    max-width: 100%;
-  }
+@container platform-assistant (max-width: 460px) {
+  .header-action span { display: none; }
+  .header-action { width: 30px; padding: 0; }
 }
 </style>

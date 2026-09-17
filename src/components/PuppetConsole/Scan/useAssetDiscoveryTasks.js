@@ -20,6 +20,8 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
   const tasks = shallowRef([])
   const selectedTaskId = ref(null)
   const loading = ref(false)
+  const hasLoaded = ref(false)
+  const loadError = ref('')
   const resultRefreshToken = ref(0)
   const activeTask = computed(
     () => tasks.value.find((task) => task.id === selectedTaskId.value) || null
@@ -74,7 +76,8 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
         if (discover) await taskEngine.syncNetworkWorkflowTasks(currentSession)
         if (!isCurrent(token)) return
         refreshTaskList()
-        const activeTasks = tasks.value.filter(isActive)
+        const activeTasks = tasks.value.filter(task => isActive(task) ||
+          (task.id === selectedTaskId.value && !task.reachabilityLoaded))
         const results = await Promise.allSettled(
           activeTasks.map((task) => taskEngine.queryScanTask(task))
         )
@@ -83,13 +86,22 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
         if (activeTasks.some((task) => task.id === selectedTaskId.value))
           resultRefreshToken.value += 1
         const failed = results.find((result) => result.status === 'rejected')
-        if (discover && failed) onError?.(failed.reason)
+        if (failed) {
+          loadError.value = failed.reason?.message || '部分任务状态同步失败'
+          if (discover) onError?.(failed.reason)
+        } else if (discover || !loadError.value) {
+          loadError.value = ''
+        }
       } catch (error) {
-        if (isCurrent(token) && (discover || !tasks.value.length)) onError?.(error)
+        if (isCurrent(token)) {
+          loadError.value = error?.message || '任务同步失败，请重试'
+          if (discover || !tasks.value.length) onError?.(error)
+        }
       } finally {
         if (isCurrent(token) && inFlight === request) {
           inFlight = null
           loading.value = false
+          hasLoaded.value = true
           scheduleRefresh()
         }
       }
@@ -110,7 +122,10 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
       await taskEngine.queryScanTask(task)
       if (isCurrent(token) && selectedTaskId.value === taskId) resultRefreshToken.value += 1
     } catch (error) {
-      if (isCurrent(token) && selectedTaskId.value === taskId) onError?.(error)
+      if (isCurrent(token) && selectedTaskId.value === taskId) {
+        loadError.value = error?.message || '任务详情加载失败'
+        onError?.(error)
+      }
     }
   })
 
@@ -126,6 +141,8 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
       generation += 1
       inFlight = null
       loading.value = false
+      hasLoaded.value = false
+      loadError.value = ''
       selectedTaskId.value = null
       resultRefreshToken.value = 0
       clearTimer()
@@ -147,6 +164,8 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
     selectedTaskId,
     activeTask,
     loading,
+    hasLoaded,
+    loadError,
     resultRefreshToken,
     selectTask,
     syncTasks,

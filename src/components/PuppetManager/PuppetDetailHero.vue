@@ -4,10 +4,10 @@
       <PuppetHeroIdentity
         :puppet="puppet"
         :live-session-count="liveSessionCount"
-        :can-create-session="canCreateSession"
       />
 
       <PuppetHeroActions
+        :can-create-session="canCreateSession"
         :puppet="puppet"
         :test-conn-loading="testConnLoading"
         :is-current-puppet-testing="isCurrentPuppetTesting"
@@ -25,11 +25,12 @@
 
     <div class="cache-availability-row">
       <div class="cache-availability-main">
-        <StatusIndicator
-          :status="cacheAvailabilityLoading ? 'running' : cacheAvailability.hasCache ? 'success' : 'unconfigured'"
-          :label="cacheAvailabilityLoading ? '正在检查缓存' : cacheAvailability.hasCache ? '缓存可用' : '暂无可用缓存'"
-          compact
-        />
+        <span class="cache-status">
+          <el-icon :class="{ 'u-spin': cacheAvailabilityLoading }">
+            <Icon :icon="cacheAvailabilityLoading ? iconMap.loading : iconMap.database" />
+          </el-icon>
+          {{ cacheAvailabilityLoading ? '正在检查缓存' : cacheAvailability.hasCache ? '缓存可用' : '暂无可用缓存' }}
+        </span>
         <span
           v-if="cacheAvailability.hasCache && cacheAvailability.saveTime"
           class="cache-availability-time"
@@ -90,7 +91,6 @@ import PuppetCacheModeBanner from './PuppetCacheModeBanner.vue'
 import PuppetConnectionResultBanner from './PuppetConnectionResultBanner.vue'
 import PuppetHeroActions from './PuppetHeroActions.vue'
 import PuppetHeroIdentity from './PuppetHeroIdentity.vue'
-import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import { icons } from '@/utils/icons.js'
 import { formatDate } from '@/utils/format.js'
 
@@ -183,7 +183,8 @@ const emit = defineEmits([
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px 12px;
+  flex-wrap: wrap;
   border-top: 1px solid var(--app-divider-color);
 }
 
@@ -191,16 +192,23 @@ const emit = defineEmits([
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+}
+
+.cache-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--pm-muted);
+  font-size: 11px;
 }
 
 .cache-availability-time,
 .cache-availability-hint {
-  overflow: hidden;
   color: var(--el-text-color-secondary);
   font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .cache-availability-actions {
@@ -261,11 +269,6 @@ const emit = defineEmits([
   .hero-card {
     padding-left: 14px;
     padding-right: 14px;
-  }
-
-  .cache-availability-time,
-  .cache-availability-hint {
-    display: none;
   }
 }
 </style>

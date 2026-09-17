@@ -2,17 +2,15 @@
   <section class="asset-result-table">
     <div class="result-toolbar">
       <div class="result-heading">
-        <div>
-          <h3>发现结果</h3>
-        </div>
-        <span class="result-count">{{ displayedTotal.toLocaleString('zh-CN') }} 条</span>
+        <h3>发现结果</h3><span>{{ hasActiveFilters ? '符合条件 ' : '' }}{{ total.toLocaleString('zh-CN') }} 条</span>
       </div>
       <div class="result-actions">
         <el-input
-          v-model="filters.keyword"
+          v-model="searchText"
           class="search-input"
           placeholder="搜索主机或服务"
           clearable
+          aria-label="搜索主机或服务"
           @input="handleSearch"
         >
           <template #prefix>
@@ -23,7 +21,7 @@
           :type="hasActiveFilters ? 'primary' : 'default'"
           plain
           :icon="Filter"
-          @click="showFilterDrawer = true"
+          @click="openFilters"
         >
           筛选
         </el-button>
@@ -36,27 +34,13 @@
         </el-button>
         <el-button
           :icon="Download"
+          :disabled="!tableData.length || loading || Boolean(loadError)"
           @click="handleExport"
         >
-          导出
+          {{ selectedRows.length ? `导出已选 ${selectedRows.length} 项` : '导出本页' }}
         </el-button>
       </div>
     </div>
-
-    <div class="result-nav">
-      <button
-        v-for="tab in resultTabs"
-        :key="tab.value"
-        type="button"
-        class="result-tab"
-        :class="{ active: resultView === tab.value }"
-        :aria-selected="resultView === tab.value"
-        @click="changeResultView(tab.value)"
-      >
-        {{ tab.label }}<span v-if="tab.value === 'all'">{{ total.toLocaleString('zh-CN') }}</span>
-      </button>
-    </div>
-
     <div
       v-if="hasActiveFilters"
       class="active-filters"
@@ -79,38 +63,75 @@
         清空条件
       </el-button>
     </div>
-
+    <div
+      v-if="loadError"
+      class="result-error"
+      role="alert"
+    >
+      <span>{{ tableData.length ? '更新失败，保留上次结果：' : '结果加载失败：' }}{{ loadError }}</span>
+      <el-button
+        text
+        type="primary"
+        :loading="loading"
+        @click="loadData"
+      >
+        重试
+      </el-button>
+    </div>
     <div class="table-wrap">
       <el-table
+        ref="resultTable"
         v-loading="showTableLoading"
-        :data="displayedTableData"
+        :data="tableData"
+        :row-key="endpointKey"
         stripe
         @sort-change="handleSortChange"
-        @selection-change="handleSelectionChange"
+        @selection-change="selectedRows = $event"
       >
+        <template #empty>
+          <div
+            class="result-empty"
+            role="status"
+          >
+            <template v-if="loading">
+              正在加载结果…
+            </template>
+            <template v-else-if="loadError">
+              请重试加载结果
+            </template>
+            <template v-else-if="hasActiveFilters">
+              没有符合条件的结果 <el-button
+                text
+                type="primary"
+                @click="clearAllFilters"
+              >
+                清空条件
+              </el-button>
+            </template>
+            <template v-else>
+              暂无端口结果，扫描发现的开放端口将在这里显示。
+            </template>
+          </div>
+        </template>
         <el-table-column
           type="selection"
-          width="42"
+          width="40"
         />
         <el-table-column
           label="目标"
           prop="target"
-          min-width="160"
+          min-width="180"
           sortable="custom"
+          show-overflow-tooltip
         >
           <template #default="{ row }">
-            <div class="target-cell">
-              <span class="target-host">{{ row.host }}</span><span
-                v-if="row.port"
-                class="target-port"
-              >:{{ row.port }}</span>
-            </div>
+            <span class="target-cell">{{ endpointAddress(row) }}</span>
           </template>
         </el-table-column>
         <el-table-column
           label="状态"
           prop="state"
-          width="90"
+          width="82"
           sortable="custom"
         >
           <template #default="{ row }">
@@ -125,253 +146,198 @@
         <el-table-column
           label="服务"
           prop="service"
-          min-width="130"
+          min-width="110"
           sortable="custom"
-        >
-          <template #default="{ row }">
-            <span
-              v-if="row.service"
-              class="service-name"
-            >{{ row.service }}</span><span
-              v-else
-              class="empty-text"
-            >未识别</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="Banner"
-          prop="banner"
-          min-width="220"
           show-overflow-tooltip
         >
           <template #default="{ row }">
-            <span
-              v-if="row.banner"
-              class="banner-text"
-            >{{ row.banner }}</span><span
-              v-else
-              class="empty-text"
-            >-</span>
+            <span :class="{ 'muted': !row.service }">{{ row.service || '未识别' }}</span>
           </template>
         </el-table-column>
         <el-table-column
-          label="HTTP 状态"
-          prop="statusCode"
-          width="100"
-          sortable="custom"
+          label="摘要"
+          min-width="200"
         >
           <template #default="{ row }">
-            <el-tag
-              v-if="row.statusCode != null"
-              :type="getStatusCodeType(row.statusCode)"
-              size="small"
+            <div
+              class="summary-title"
+              :title="row.title || row.banner"
             >
-              {{ row.statusCode }}
-            </el-tag>
-            <span
-              v-else
-              class="empty-text"
-            >-</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="响应大小"
-          prop="responseSize"
-          width="105"
-          sortable="custom"
-        >
-          <template #default="{ row }">
-            <span
-              v-if="row.responseSize != null"
-              class="response-size"
-            >{{ formatBytes(row.responseSize) }}</span><span
-              v-else
-              class="empty-text"
-            >-</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="页面标题"
-          prop="title"
-          min-width="160"
-          show-overflow-tooltip
-        >
-          <template #default="{ row }">
-            <span v-if="row.title">{{ row.title }}</span><span
-              v-else
-              class="empty-text"
-            >-</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="响应"
-          prop="responseTime"
-          width="90"
-          sortable="custom"
-        >
-          <template #default="{ row }">
-            <span
-              v-if="row.responseTime != null"
-              class="response-time"
-            >{{ row.responseTime }}ms</span><span
-              v-else
-              class="empty-text"
-            >-</span>
+              {{ row.title || row.banner || '—' }}
+            </div>
+            <div class="summary-meta">
+              <span v-if="row.statusCode != null">HTTP {{ row.statusCode }}</span>
+              <span v-if="row.responseSize != null">{{ formatBytes(row.responseSize) }}</span>
+              <span v-if="row.responseTime != null">{{ row.responseTime }} ms</span>
+            </div>
           </template>
         </el-table-column>
         <el-table-column
           label="操作"
-          width="84"
+          width="64"
           fixed="right"
         >
           <template #default="{ row }">
-            <el-dropdown @command="command => handleAction(command, row)">
-              <el-button
-                size="small"
-                text
-              >
-                更多<el-icon class="el-icon--right">
-                  <ArrowDown />
-                </el-icon>
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="copy">
-                    复制地址
-                  </el-dropdown-item>
-                  <el-dropdown-item
-                    command="browser"
-                    :disabled="!row.service?.startsWith('http')"
-                  >
-                    浏览器打开
-                  </el-dropdown-item>
-                  <el-dropdown-item command="export">
-                    导出证据
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+            <el-button
+              text
+              type="primary"
+              size="small"
+              :aria-label="`查看 ${endpointAddress(row)} 详情`"
+              @click="detailRow = row"
+            >
+              详情
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
     </div>
-
-    <div class="table-pagination">
+    <div
+      v-if="total"
+      class="table-pagination"
+    >
       <el-pagination
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.pageSize"
-        :total="displayedTotal"
+        :total="total"
         :page-sizes="[20, 50, 100, 200]"
-        layout="total, sizes, prev, pager, next, jumper"
+        :pager-count="5"
+        layout="sizes, prev, pager, next"
         @current-change="loadData"
-        @size-change="loadData"
+        @size-change="reloadFirstPage"
       />
     </div>
-
     <el-drawer
       v-model="showFilterDrawer"
       title="筛选结果"
-      size="400px"
+      size="min(400px, 100vw)"
+      append-to-body
     >
-      <div class="filter-form">
-        <el-form label-position="top">
-          <el-form-item label="服务类型">
-            <el-select
-              v-model="filters.services"
-              multiple
-              placeholder="选择服务类型"
-              clearable
-            >
-              <el-option
-                label="HTTP"
-                value="http"
-              /><el-option
-                label="HTTPS"
-                value="https"
-              /><el-option
-                label="SSH"
-                value="ssh"
-              /><el-option
-                label="FTP"
-                value="ftp"
-              /><el-option
-                label="MySQL"
-                value="mysql"
-              /><el-option
-                label="Redis"
-                value="redis"
-              /><el-option
-                label="MongoDB"
-                value="mongodb"
-              /><el-option
-                label="PostgreSQL"
-                value="postgresql"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="端口范围">
-            <el-row :gutter="12">
-              <el-col :span="11">
-                <el-input-number
-                  v-model="filters.portMin"
-                  :min="1"
-                  :max="65535"
-                  placeholder="最小"
-                  controls-position="right"
-                />
-              </el-col><el-col
-                :span="2"
-                class="range-separator"
-              >
-                -
-              </el-col><el-col :span="11">
-                <el-input-number
-                  v-model="filters.portMax"
-                  :min="1"
-                  :max="65535"
-                  placeholder="最大"
-                  controls-position="right"
-                />
-              </el-col>
-            </el-row>
-          </el-form-item>
-          <el-form-item label="响应时间">
-            <el-slider
-              v-model="filters.responseTimeRange"
-              range
+      <el-form
+        class="filter-form"
+        label-position="top"
+      >
+        <el-form-item label="服务类型">
+          <el-select
+            v-model="filterDraft.services"
+            multiple
+            placeholder="选择服务类型"
+            clearable
+          >
+            <el-option
+              v-for="service in serviceOptions"
+              :key="service"
+              :label="service.toUpperCase()"
+              :value="service"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="端口范围">
+          <div class="range-fields">
+            <el-input-number
+              v-model="filterDraft.portMin"
+              aria-label="最小端口"
+              :min="1"
+              :max="65535"
+              :precision="0"
+              placeholder="最小"
+              controls-position="right"
+            />
+            <span>至</span>
+            <el-input-number
+              v-model="filterDraft.portMax"
+              aria-label="最大端口"
+              :min="1"
+              :max="65535"
+              :precision="0"
+              placeholder="最大"
+              controls-position="right"
+            />
+          </div>
+        </el-form-item>
+        <el-form-item label="响应时间（毫秒）">
+          <div class="range-fields">
+            <el-input-number
+              v-model="filterDraft.responseTimeRange[0]"
+              aria-label="最短响应时间"
               :min="0"
               :max="300000"
-              :step="1000"
-              :marks="{ 0: '0ms', 5000: '5s', 300000: '不限' }"
+              :precision="0"
+              controls-position="right"
             />
-          </el-form-item>
-          <el-form-item label="结果条件">
-            <el-checkbox v-model="filters.hasService">
-              仅显示已识别服务
-            </el-checkbox>
-            <el-checkbox v-model="filters.hasTitle">
-              仅显示有页面标题
-            </el-checkbox>
-          </el-form-item>
-        </el-form>
-        <div class="filter-actions">
-          <el-button @click="resetFilters">
-            重置
-          </el-button><el-button
-            type="primary"
-            @click="applyFilters"
+            <span>至</span>
+            <el-input-number
+              v-model="filterDraft.responseTimeRange[1]"
+              aria-label="最长响应时间"
+              :min="0"
+              :max="300000"
+              :precision="0"
+              controls-position="right"
+            />
+          </div>
+          <span class="filter-hint">最大值 300000 表示不限</span>
+        </el-form-item>
+        <el-form-item label="结果条件">
+          <el-checkbox v-model="filterDraft.hasService">
+            仅显示已识别服务
+          </el-checkbox>
+          <el-checkbox v-model="filterDraft.hasTitle">
+            仅显示有页面标题
+          </el-checkbox>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="filterDraft = defaultFilters()">
+          重置
+        </el-button>
+        <el-button @click="showFilterDrawer = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          @click="applyFilters"
+        >
+          应用筛选
+        </el-button>
+      </template>
+    </el-drawer>
+    <el-drawer
+      :model-value="Boolean(detailRow)"
+      title="资产详情"
+      size="min(520px, 100vw)"
+      append-to-body
+      @close="detailRow = null"
+    >
+      <template v-if="detailRow">
+        <div class="detail-actions">
+          <el-button @click="copyToClipboard(endpointAddress(detailRow))">
+            复制地址
+          </el-button>
+          <el-button
+            v-if="detailRow.service?.startsWith('http')"
+            @click="openInBrowser(detailRow)"
           >
-            应用筛选
+            浏览器打开
+          </el-button>
+          <el-button @click="exportEvidence(detailRow)">
+            导出证据
           </el-button>
         </div>
-      </div>
+        <dl class="endpoint-detail">
+          <template
+            v-for="column in endpointColumns"
+            :key="column.label"
+          >
+            <dt>{{ column.label }}</dt><dd>{{ column.key(detailRow) === '' ? '—' : column.key(detailRow) }}</dd>
+          </template>
+        </dl>
+      </template>
     </el-drawer>
   </section>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onUnmounted, watch } from 'vue'
-import { Search, Filter, Download, ArrowDown, Refresh } from '@element-plus/icons-vue'
+import { ref, reactive, computed, nextTick, onUnmounted, watch } from 'vue'
+import { Search, Filter, Download, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { queryNetworkProbeWorkflowResultsApi } from '@/services/api.js'
 import { exportTsv } from '@/utils/exportUtils.js'
@@ -393,23 +359,23 @@ const props = defineProps({
 
 // 状态
 const loading = ref(false)
-const hasLoadedOnce = ref(false)
+const showTableLoading = ref(false)
+const loadError = ref('')
+const resultTable = ref(null)
+const detailRow = ref(null)
+const searchText = ref('')
 const tableData = ref([])
 const total = ref(0)
 const selectedRows = ref([])
 const showFilterDrawer = ref(false)
-const resultView = ref('all')
-const resultTabs = [
-  { value: 'all', label: '全部' },
-  { value: 'services', label: '服务识别' }
-]
+const serviceOptions = ['http', 'https', 'ssh', 'ftp', 'mysql', 'redis', 'mongodb', 'postgresql']
 
 const pagination = reactive({
   page: 1,
   pageSize: 20
 })
 
-const filters = reactive({
+const defaultFilters = () => ({
   keyword: '',
   services: [],
   portMin: null,
@@ -419,21 +385,12 @@ const filters = reactive({
   hasTitle: false
 })
 
+const filters = reactive(defaultFilters())
+const filterDraft = ref(defaultFilters())
+
 const sortBy = ref({
   field: 'discoveredAt',
   order: 'desc'
-})
-
-// 计算属性
-const hasActiveFilters = computed(() => {
-  return (
-    filters.keyword ||
-    filters.services.length > 0 ||
-    filters.portMin ||
-    filters.portMax ||
-    filters.hasService ||
-    filters.hasTitle
-  )
 })
 
 const activeFilterTags = computed(() => {
@@ -442,22 +399,27 @@ const activeFilterTags = computed(() => {
   if (filters.services.length) tags.services = `服务: ${filters.services.join(', ')}`
   if (filters.portMin) tags.portMin = `端口≥${filters.portMin}`
   if (filters.portMax) tags.portMax = `端口≤${filters.portMax}`
+  if (filters.hasService) tags.hasService = '已识别服务'
+  if (filters.hasTitle) tags.hasTitle = '有页面标题'
+  const [min, max] = filters.responseTimeRange
+  if (min > 0 || max < 300000) tags.responseTimeRange = `响应: ${min}–${max >= 300000 ? '不限' : max + ' ms'}`
   return tags
 })
 
-const displayedTableData = computed(() => tableData.value)
-const displayedTotal = computed(() => total.value)
-const showTableLoading = computed(() => loading.value && !hasLoadedOnce.value)
+const hasActiveFilters = computed(() => Object.keys(activeFilterTags.value).length > 0)
 
 // 方法
-async function loadData() {
+async function loadData({ silent = false } = {}) {
   if (!props.taskId || !props.sessionId) return
   if (searchTimer) window.clearTimeout(searchTimer)
   searchTimer = null
   refreshPending = false
+  filters.keyword = searchText.value
 
   const sequence = ++requestSequence
   loading.value = true
+  showTableLoading.value = !silent
+  if (!silent) resultTable.value?.clearSelection()
   try {
     const { field, order } = sortBy.value
     const response = await queryNetworkProbeWorkflowResultsApi({
@@ -471,7 +433,7 @@ async function loadData() {
         services: filters.services.map((service) => service.toLowerCase()),
         portMin: filters.portMin,
         portMax: filters.portMax,
-        hasService: filters.hasService || resultView.value === 'services',
+        hasService: filters.hasService,
         hasTitle: filters.hasTitle,
         responseTimeMin: filters.responseTimeRange[0],
         responseTimeMax:
@@ -480,22 +442,29 @@ async function loadData() {
     })
     const payload = response?.data || {}
     if (sequence !== requestSequence) return
+    const selectedKeys = new Set(selectedRows.value.map(endpointKey))
+    loadError.value = ''
     total.value = Number(payload.total || 0)
     tableData.value = Array.isArray(payload.endpoints) ? payload.endpoints : []
+    await nextTick()
+    if (sequence !== requestSequence) return
+    resultTable.value?.clearSelection()
+    for (const row of tableData.value) {
+      if (selectedKeys.has(endpointKey(row))) resultTable.value?.toggleRowSelection(row, true)
+    }
   } catch (error) {
     if (sequence === requestSequence)
-      ElMessage.error('加载数据失败: ' + (error.message || '未知错误'))
+      loadError.value = error?.message || '未知错误'
   } finally {
     if (sequence === requestSequence) {
       loading.value = false
-      hasLoadedOnce.value = true
-      if (refreshPending) void loadData()
+      showTableLoading.value = false
+      if (refreshPending) void loadData({ silent: true })
     }
   }
 }
 
-function changeResultView(view) {
-  resultView.value = view
+function reloadFirstPage() {
   pagination.page = 1
   loadData()
 }
@@ -505,76 +474,60 @@ function refreshResults() {
     refreshPending = true
     return
   }
-  loadData()
+  loadData({ silent: true })
 }
 
 function handleSearch() {
   requestSequence += 1
   pagination.page = 1
   if (searchTimer) window.clearTimeout(searchTimer)
-  searchTimer = window.setTimeout(loadData, 250)
+  searchTimer = window.setTimeout(() => {
+    filters.keyword = searchText.value
+    loadData()
+  }, 250)
 }
 
 function handleSortChange({ prop, order }) {
-  if (!order) {
-    sortBy.value = { field: 'discoveredAt', order: 'desc' }
-  } else {
-    sortBy.value = {
-      field: prop,
-      order: order === 'ascending' ? 'asc' : 'desc'
-    }
-  }
-  loadData()
+  sortBy.value = order ? { field: prop, order: order === 'ascending' ? 'asc' : 'desc' } : { field: 'discoveredAt', order: 'desc' }
+  reloadFirstPage()
 }
 
-function handleSelectionChange(selection) {
-  selectedRows.value = selection
+function openFilters() {
+  filterDraft.value = { ...filters, services: [...filters.services], responseTimeRange: [...filters.responseTimeRange] }
+  showFilterDrawer.value = true
 }
 
 function applyFilters() {
-  pagination.page = 1
+  const draft = filterDraft.value
+  const min = draft.responseTimeRange[0] ?? 0
+  const max = draft.responseTimeRange[1] ?? 300000
+  if ((draft.portMin && draft.portMax && draft.portMin > draft.portMax) || min > max) {
+    ElMessage.warning('范围起始值不能大于结束值')
+    return
+  }
+  Object.assign(filters, draft, { keyword: searchText.value, responseTimeRange: [min, max] })
   showFilterDrawer.value = false
-  loadData()
-}
-
-function resetFilters() {
-  Object.assign(filters, {
-    keyword: '',
-    services: [],
-    portMin: null,
-    portMax: null,
-    responseTimeRange: [0, 300000],
-    hasService: false,
-    hasTitle: false
-  })
+  reloadFirstPage()
 }
 
 function clearFilter(key) {
-  if (key === 'keyword') filters.keyword = ''
-  else if (key === 'services') filters.services = []
-  else if (key === 'portMin') filters.portMin = null
-  else if (key === 'portMax') filters.portMax = null
-  loadData()
+  filters[key] = defaultFilters()[key]
+  if (key === 'keyword') searchText.value = ''
+  reloadFirstPage()
 }
 
 function clearAllFilters() {
-  resetFilters()
-  loadData()
+  Object.assign(filters, defaultFilters())
+  searchText.value = ''
+  reloadFirstPage()
 }
 
-function handleAction(command, row) {
-  switch (command) {
-    case 'copy':
-      copyToClipboard(`${row.host}:${row.port}`)
-      break
-    case 'browser':
-      openInBrowser(row)
-      break
-    case 'export':
-      exportEvidence(row)
-      break
-  }
+function endpointAddress(row) {
+  const host = String(row.host || '')
+  const formattedHost = host.includes(':') && !host.startsWith('[') ? `[${host}]` : host
+  return row.port != null ? `${formattedHost}:${row.port}` : formattedHost
 }
+const endpointKey = (row) => `${row.protocol || 'tcp'}://${endpointAddress(row)}`
 
 function copyToClipboard(text) {
   navigator.clipboard
@@ -585,12 +538,7 @@ function copyToClipboard(text) {
 
 function openInBrowser(row) {
   const protocol = row.service === 'https' ? 'https' : 'http'
-  const host =
-    String(row.host || '').includes(':') && !String(row.host).startsWith('[')
-      ? `[${row.host}]`
-      : row.host
-  const url = `${protocol}://${host}:${row.port}`
-  window.open(url, '_blank')
+  window.open(`${protocol}://${endpointAddress(row)}`, '_blank', 'noopener,noreferrer')
 }
 
 function exportEvidence(row) {
@@ -632,14 +580,6 @@ function getStateTagType(state) {
   return normalized === 'OPEN' ? 'success' : 'info'
 }
 
-function getStatusCodeType(statusCode) {
-  const code = Number(statusCode)
-  if (code >= 200 && code < 300) return 'success'
-  if (code >= 300 && code < 400) return 'warning'
-  if (code >= 400) return 'danger'
-  return 'info'
-}
-
 function formatBytes(value) {
   const bytes = Number(value)
   if (!Number.isFinite(bytes) || bytes < 0) return '-'
@@ -671,7 +611,9 @@ watch(
     tableData.value = []
     total.value = 0
     selectedRows.value = []
-    hasLoadedOnce.value = false
+    loadError.value = ''
+    detailRow.value = null
+    showFilterDrawer.value = false
     loadData()
   },
   { immediate: true, flush: 'sync' }
@@ -681,262 +623,42 @@ watch(() => props.refreshToken, refreshResults)
 </script>
 
 <style scoped lang="scss">
-.asset-result-table {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  background: #fff;
+.asset-result-table { container: results / inline-size; min-width: 0; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; background: var(--el-bg-color); color: var(--el-text-color-primary); }
+.result-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; }
+.result-heading, .result-actions, .active-filters, .detail-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.result-heading h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.result-heading > span, .muted, .summary-meta, .filter-hint { color: var(--el-text-color-secondary); font-size: 12px; }
+.result-actions :deep(.el-button + .el-button), .detail-actions :deep(.el-button + .el-button) { margin-left: 0; }
+.search-input { width: 190px; }
+.active-filters { padding: 0 14px 10px; }
+.active-filters :deep(.el-tag) { max-width: 100%; }
+.active-filters :deep(.el-tag__content) { overflow: hidden; text-overflow: ellipsis; }
+.table-wrap { min-width: 0; padding: 0 14px; }
+.target-cell { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.summary-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.summary-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; }
+.table-pagination { display: flex; justify-content: flex-end; padding: 12px 14px; }
+:deep(.el-table .cell) { padding: 0 8px; font-size: 12px; }
+:deep(.el-table th.el-table__cell) { background: var(--el-fill-color-light); }
+:deep(.el-table td.el-table__cell) { padding: 6px 0; }
+.result-empty { padding: 28px 16px; line-height: 1.6; white-space: normal; }
+.result-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 14px 10px; padding: 8px 12px; color: var(--el-color-danger); background: var(--el-color-danger-light-9); border-radius: 4px; font-size: 12px; overflow-wrap: anywhere; }
+.range-fields { display: flex; align-items: center; gap: 8px; width: 100%; }
+.range-fields :deep(.el-input-number) { flex: 1; width: 0; min-width: 0; }
+.filter-hint { margin-top: 6px; }
+.endpoint-detail { display: grid; grid-template-columns: 110px minmax(0, 1fr); margin: 20px 0 0; font-size: 13px; }
+.endpoint-detail dt, .endpoint-detail dd { margin: 0; padding: 12px 0; border-bottom: 1px solid var(--el-border-color-lighter); overflow-wrap: anywhere; white-space: pre-wrap; }
+.endpoint-detail dt { padding-right: 12px; color: var(--el-text-color-secondary); }
+.endpoint-detail dd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+@container results (max-width: 760px) {
+  .result-actions { width: 100%; }
+  .search-input { flex: 1 1 160px; width: auto; }
 }
-
-.result-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 15px 18px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.result-heading,
-.result-heading > div,
-.result-actions {
-  display: flex;
-  align-items: center;
-}
-
-.result-heading {
-  min-width: 0;
-  gap: 10px;
-}
-
-.result-heading > div {
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.result-heading h3 {
-  margin: 0;
-  color: #1f2937;
-  font-size: 14px;
-  font-weight: 650;
-}
-
-.result-caption,
-.result-nav-hint {
-  color: #9ca3af;
-  font-size: 11px;
-}
-
-.result-count {
-  padding: 3px 7px;
-  border-radius: 4px;
-  color: #2563eb;
-  background: #eff6ff;
-  font-size: 11px;
-}
-
-.result-actions {
-  flex: 0 0 auto;
-  gap: 7px;
-}
-
-.search-input {
-  width: 210px;
-}
-
-.result-nav {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  min-height: 42px;
-  padding: 0 18px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.result-tab {
-  position: relative;
-  height: 42px;
-  padding: 0 1px;
-  border: 0;
-  color: #6b7280;
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.result-tab::after {
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  left: 0;
-  height: 2px;
-  background: transparent;
-  content: '';
-}
-
-.result-tab.active {
-  color: #2563eb;
-  font-weight: 650;
-}
-
-.result-tab.active::after {
-  background: #2563eb;
-}
-
-.result-tab span {
-  margin-left: 5px;
-  color: #9ca3af;
-  font-size: 10px;
-}
-
-.result-nav-hint {
-  margin-left: auto;
-}
-
-.active-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  border-bottom: 1px solid #eef0f2;
-  background: #fafbfc;
-}
-
-.table-wrap {
-  flex: 1;
-  min-height: 260px;
-  overflow: auto;
-  padding: 0 18px;
-}
-
-.target-cell {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 7px;
-}
-
-.target-cell {
-  color: #1f2937;
-  font-family: monospace;
-}
-
-.target-host {
-  overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.target-port {
-  color: #2563eb;
-}
-
-.service-name {
-  color: #374151;
-  font-weight: 550;
-}
-
-.banner-text {
-  display: block;
-  overflow: hidden;
-  color: #4b5563;
-  font-family: monospace;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.response-time {
-  color: #059669;
-  font-family: monospace;
-  font-size: 12px;
-}
-
-.empty-text {
-  color: #c4c9d0;
-}
-
-.table-pagination {
-  display: flex;
-  justify-content: flex-end;
-  padding: 12px 18px;
-  border-top: 1px solid #e5e7eb;
-}
-
-:deep(.el-table) {
-  width: 100%;
-}
-
-:deep(.el-table .cell) {
-  padding: 0 8px;
-  font-size: 12px;
-}
-
-:deep(.el-table th.el-table__cell) {
-  padding: 9px 0;
-  color: #6b7280;
-  background: #fafbfc;
-}
-
-:deep(.el-table td.el-table__cell) {
-  padding: 9px 0;
-}
-
-:deep(.el-pagination) {
-  --el-pagination-button-width: 26px;
-  --el-pagination-button-height: 26px;
-}
-
-.filter-form {
-  padding: 0 4px;
-}
-
-.range-separator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #9ca3af;
-}
-
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-}
-
-@media (max-width: 760px) {
-  .result-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .result-actions {
-    flex-wrap: wrap;
-  }
-
-  .search-input {
-    flex: 1 1 180px;
-    width: auto;
-  }
-
-  .result-nav-hint {
-    display: none;
-  }
-
-  .table-wrap {
-    padding: 0 10px;
-  }
-
-  .table-pagination {
-    padding: 10px;
-  }
+@container results (max-width: 480px) {
+  .search-input { flex-basis: 100%; }
+  .table-wrap { padding: 0 8px; }
+  .table-pagination { justify-content: center; padding: 10px 4px; }
+  :deep(.el-pagination) { gap: 4px; --el-pagination-button-width: 24px; }
+  :deep(.el-pagination__sizes .el-select) { width: 94px; }
 }
 </style>

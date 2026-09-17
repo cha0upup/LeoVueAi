@@ -33,9 +33,14 @@ export const filterRuntimeContexts = (contexts, keyword) => {
   ].some(value => String(value).toLocaleLowerCase().includes(query)))
 }
 
+const normalizeFramework = (framework, runtime) => ({
+  ...framework,
+  capabilities: asObject(framework?.capabilities || runtime.capabilities)
+})
+
 const normalizeContext = (context, runtime) => {
   const components = asObject(context?.components)
-  const frameworks = asArray(context?.frameworks)
+  const frameworks = asArray(context?.frameworks).map(framework => normalizeFramework(framework, runtime))
   return {
     ...context,
     contextId: String(context?.contextId || `${runtime.runtimeId}:${context?.host || 'default'}:${context?.path || '/'}`),
@@ -65,7 +70,7 @@ export const normalizeWebRuntimePayload = data => {
       ...runtime,
       capabilities: asObject(runtime.capabilities),
       contexts: asArray(runtime.contexts).map(context => normalizeContext(context, runtime)),
-      frameworks: asArray(runtime.frameworks)
+      frameworks: asArray(runtime.frameworks).map(framework => normalizeFramework(framework, runtime))
     }))
   return {
     ok: true,
@@ -99,6 +104,6 @@ export const getControllerClassName = description => {
 }
 
 export const getControllerMethodName = description => {
-  const match = String(description || '').match(/[.#]([a-zA-Z0-9_$]+)(?:\(|$)/)
-  return match?.[1] || ''
+  const match = String(description || '').match(/[.#]([a-zA-Z0-9_$]+)(\(.*\))?(?:\s+throws\s+.*)?$/)
+  return match ? match[1] + (match[2] || '') : ''
 }

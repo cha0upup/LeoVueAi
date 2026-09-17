@@ -1,11 +1,15 @@
 <template>
   <div class="database-home">
     <section class="configs-workbench">
-      <div class="workbench-toolbar">
+      <div
+        v-if="hasConfigs"
+        class="workbench-toolbar"
+      >
         <div class="toolbar-search">
           <el-input
             v-model="searchText"
             clearable
+            aria-label="搜索数据库连接"
             placeholder="搜索连接名称、URL、用户名"
             size="default"
           >
@@ -15,25 +19,10 @@
           </el-input>
         </div>
         <div class="toolbar-filters">
-          <el-button
-            type="primary"
-            size="small"
-            @click="openAddDialog"
-          >
-            <el-icon><Icon :icon="iconMap.plus" /></el-icon>
-            新增配置
-          </el-button>
-          <el-button
-            size="small"
-            :loading="savedLoading"
-            @click="loadSavedConfigs"
-          >
-            <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
-            刷新列表
-          </el-button>
           <el-radio-group
             v-model="statusFilter"
             size="small"
+            aria-label="连接状态"
           >
             <el-radio-button value="all">
               全部
@@ -46,193 +35,225 @@
             </el-radio-button>
           </el-radio-group>
         </div>
-      </div>
-
-      <div
-        v-if="filteredConfigs.length === 0 && !savedLoading"
-        class="empty-state"
-      >
-        <div class="empty-copy">
-          <div class="empty-icon-shell">
-            <el-icon>
-              <Icon :icon="savedConfigs.length === 0 ? iconMap.database : iconMap.search" />
-            </el-icon>
-          </div>
-          <strong>{{
-            savedConfigs.length === 0 ? '还没有数据库配置' : '没有匹配的连接配置'
-          }}</strong>
-          <span>{{
-            savedConfigs.length === 0
-              ? '先添加一个连接，直接进入工作台开始操作。'
-              : '调整关键词或筛选条件后重试。'
-          }}</span>
+        <div class="toolbar-actions">
+          <el-button
+            size="small"
+            :loading="savedLoading"
+            @click="loadSavedConfigs"
+          >
+            <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
+            刷新列表
+          </el-button>
           <el-button
             type="primary"
+            size="small"
             @click="openAddDialog"
           >
-            {{ savedConfigs.length === 0 ? '立即添加' : '新增配置' }}
+            <el-icon><Icon :icon="iconMap.plus" /></el-icon>
+            新增连接
           </el-button>
         </div>
       </div>
 
       <div
-        v-else
-        v-loading="savedLoading"
-        class="configs-list"
+        v-if="loadFailed && hasConfigs"
+        class="load-error"
+        role="alert"
       >
-        <article
-          v-for="row in filteredConfigs"
-          :key="row.connectionId || getDatabaseConnectionName(row)"
-          class="config-card"
-        >
-          <button
-            type="button"
-            class="config-main"
-            :class="{ 'is-disabled': !isStatusEnabled(row.status) }"
-            :disabled="!isStatusEnabled(row.status)"
-            @click="connectToDatabase(row)"
-          >
-            <span class="config-icon-shell">
-              <el-icon class="conn-icon">
-                <Icon :icon="iconMap.database" />
-              </el-icon>
-            </span>
-            <div class="conn-main">
-              <div class="config-title-row">
-                <span class="conn-title">{{ getDatabaseConnectionName(row) }}</span>
-                <div class="config-tags">
-                  <el-tag
-                    :type="getDialectTagType(getDatabaseDialect(row))"
-                    size="small"
-                  >
-                    {{ sqlEngine.getDialectName(getDatabaseDialect(row)) }}
-                  </el-tag>
-                  <el-tag
-                    :type="isStatusEnabled(row.status) ? 'success' : 'info'"
-                    size="small"
-                  >
-                    {{ isStatusEnabled(row.status) ? '启用' : '禁用' }}
-                  </el-tag>
-                  <el-tooltip
-                    :content="getTestStatusTooltip(row)"
-                    placement="top"
-                  >
-                    <el-tag
-                      :type="getDatabaseTestStatus(row.testStatus).type"
-                      size="small"
-                    >
-                      {{ getDatabaseTestStatus(row.testStatus).label }}
-                    </el-tag>
-                  </el-tooltip>
-                </div>
-              </div>
-              <span class="url-text">{{ getDatabaseConnectionTarget(row) }}</span>
-              <div class="config-meta">
-                <span class="config-meta-item">
-                  <el-icon><Icon :icon="iconMap.user" /></el-icon>
-                  {{ getUsername(row) || '-' }}
-                </span>
-                <span class="config-meta-item">
-                  <el-icon><Icon :icon="iconMap.connection" /></el-icon>
-                  {{ getDriverClass(row) || '默认驱动' }}
-                </span>
-                <span
-                  v-if="row.lastTestTime"
-                  class="config-meta-item"
-                >
-                  <el-icon><Icon icon="mdi:clock-check-outline" /></el-icon>
-                  {{ formatDate(row.lastTestTime) }}
-                </span>
-              </div>
-            </div>
-          </button>
+        刷新失败，当前显示上次加载的连接。请稍后刷新列表。
+      </div>
 
-          <div class="config-actions">
+      <div
+        v-loading="savedLoading"
+        class="configs-content"
+        :aria-busy="savedLoading"
+        element-loading-text="正在加载连接…"
+      >
+        <div
+          v-if="!filteredConfigs.length && !savedLoading"
+          class="empty-state"
+          role="status"
+        >
+          <div class="empty-copy">
+            <div class="empty-icon-shell">
+              <el-icon><Icon :icon="emptyState.icon" /></el-icon>
+            </div>
+            <h2>{{ emptyState.title }}</h2>
+            <p>{{ emptyState.description }}</p>
             <el-button
               type="primary"
+              @click="emptyState.action"
+            >
+              {{ emptyState.actionLabel }}
+            </el-button>
+            <el-button
+              v-if="!hasConfigs && !loadFailed"
+              link
               size="small"
-              class="enter-workbench-btn"
+              @click="loadSavedConfigs"
+            >
+              刷新列表
+            </el-button>
+          </div>
+        </div>
+        <div
+          v-else
+          class="configs-list"
+        >
+          <article
+            v-for="row in filteredConfigs"
+            :key="row.connectionId || getDatabaseConnectionName(row)"
+            class="config-card"
+          >
+            <button
+              type="button"
+              class="config-main"
+              :class="{ 'is-disabled': !isStatusEnabled(row.status) }"
               :disabled="!isStatusEnabled(row.status)"
               @click="connectToDatabase(row)"
             >
-              <el-icon><Icon :icon="iconMap.connection" /></el-icon>
-              进入工作台
-            </el-button>
-            <div class="config-action-cluster">
-              <el-tooltip
-                :content="isStatusEnabled(row.status) ? '停用连接' : '启用连接'"
-                placement="top"
+              <span class="config-icon-shell">
+                <el-icon class="conn-icon">
+                  <Icon :icon="iconMap.database" />
+                </el-icon>
+              </span>
+              <div class="conn-main">
+                <div class="config-title-row">
+                  <span class="conn-title">{{ getDatabaseConnectionName(row) }}</span>
+                  <div class="config-tags">
+                    <el-tag
+                      :type="getDialectTagType(getDatabaseDialect(row))"
+                      size="small"
+                    >
+                      {{ sqlEngine.getDialectName(getDatabaseDialect(row)) }}
+                    </el-tag>
+                    <el-tag
+                      :type="isStatusEnabled(row.status) ? 'success' : 'info'"
+                      size="small"
+                    >
+                      {{ isStatusEnabled(row.status) ? '启用' : '禁用' }}
+                    </el-tag>
+                    <el-tooltip
+                      :content="getTestStatusTooltip(row)"
+                      placement="top"
+                    >
+                      <el-tag
+                        :type="getDatabaseTestStatus(row.testStatus).type"
+                        size="small"
+                      >
+                        {{ getDatabaseTestStatus(row.testStatus).label }}
+                      </el-tag>
+                    </el-tooltip>
+                  </div>
+                </div>
+                <span class="url-text">{{ getDatabaseConnectionTarget(row) }}</span>
+                <div class="config-meta">
+                  <span class="config-meta-item">
+                    <el-icon><Icon :icon="iconMap.user" /></el-icon>
+                    {{ getUsername(row) || '-' }}
+                  </span>
+                  <span class="config-meta-item">
+                    <el-icon><Icon :icon="iconMap.connection" /></el-icon>
+                    {{ getDriverClass(row) || '默认驱动' }}
+                  </span>
+                  <span
+                    v-if="row.lastTestTime"
+                    class="config-meta-item"
+                  >
+                    <el-icon><Icon icon="mdi:clock-check-outline" /></el-icon>
+                    {{ formatDate(row.lastTestTime) }}
+                  </span>
+                </div>
+              </div>
+            </button>
+
+            <div class="config-actions">
+              <el-button
+                type="primary"
+                size="small"
+                class="enter-workbench-btn"
+                :disabled="!isStatusEnabled(row.status)"
+                @click="connectToDatabase(row)"
               >
-                <el-button
-                  circle
-                  size="small"
-                  :type="isStatusEnabled(row.status) ? 'warning' : 'success'"
-                  plain
-                  :loading="updatingStatusId === row.connectionId"
-                  :aria-label="`${isStatusEnabled(row.status) ? '停用' : '启用'}连接 ${row.connectionName || row.connectionId}`"
-                  @click="toggleConnectionStatus(row)"
+                <el-icon><Icon :icon="iconMap.connection" /></el-icon>
+                进入工作台
+              </el-button>
+              <div class="config-action-cluster">
+                <el-tooltip
+                  :content="isStatusEnabled(row.status) ? '停用连接' : '启用连接'"
+                  placement="top"
                 >
-                  <el-icon>
-                    <Icon
-                      :icon="
-                        isStatusEnabled(row.status)
-                          ? 'mdi:pause-circle-outline'
-                          : 'mdi:play-circle-outline'
-                      "
-                    />
-                  </el-icon>
-                </el-button>
-              </el-tooltip>
-              <el-tooltip
-                content="测试连接"
-                placement="top"
-              >
-                <el-button
-                  circle
-                  size="small"
-                  type="success"
-                  plain
-                  :disabled="!isStatusEnabled(row.status)"
-                  :loading="testingConnectionId === row.connectionId"
-                  :aria-label="`测试连接 ${row.connectionName || row.connectionId}`"
-                  @click="testSavedConnection(row)"
+                  <el-button
+                    circle
+                    size="small"
+                    :type="isStatusEnabled(row.status) ? 'warning' : 'success'"
+                    plain
+                    :loading="updatingStatusId === row.connectionId"
+                    :aria-label="`${isStatusEnabled(row.status) ? '停用' : '启用'}连接 ${row.connectionName || row.connectionId}`"
+                    @click="toggleConnectionStatus(row)"
+                  >
+                    <el-icon>
+                      <Icon
+                        :icon="
+                          isStatusEnabled(row.status)
+                            ? 'mdi:pause-circle-outline'
+                            : 'mdi:play-circle-outline'
+                        "
+                      />
+                    </el-icon>
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip
+                  content="测试连接"
+                  placement="top"
                 >
-                  <el-icon><Icon icon="mdi:database-check-outline" /></el-icon>
-                </el-button>
-              </el-tooltip>
-              <el-tooltip
-                content="编辑配置"
-                placement="top"
-              >
-                <el-button
-                  circle
-                  size="small"
-                  type="primary"
-                  plain
-                  :aria-label="`编辑连接 ${row.connectionName || row.connectionId}`"
-                  @click="editConfig(row)"
+                  <el-button
+                    circle
+                    size="small"
+                    type="success"
+                    plain
+                    :disabled="!isStatusEnabled(row.status)"
+                    :loading="testingConnectionId === row.connectionId"
+                    :aria-label="`测试连接 ${row.connectionName || row.connectionId}`"
+                    @click="testSavedConnection(row)"
+                  >
+                    <el-icon><Icon icon="mdi:database-check-outline" /></el-icon>
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip
+                  content="编辑配置"
+                  placement="top"
                 >
-                  <el-icon><Icon :icon="iconMap.edit" /></el-icon>
-                </el-button>
-              </el-tooltip>
-              <el-tooltip
-                content="删除配置"
-                placement="top"
-              >
-                <el-button
-                  circle
-                  size="small"
-                  type="danger"
-                  plain
-                  :aria-label="`删除连接 ${row.connectionName || row.connectionId}`"
-                  @click="deleteConfig(row)"
+                  <el-button
+                    circle
+                    size="small"
+                    type="primary"
+                    plain
+                    :aria-label="`编辑连接 ${row.connectionName || row.connectionId}`"
+                    @click="editConfig(row)"
+                  >
+                    <el-icon><Icon :icon="iconMap.edit" /></el-icon>
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip
+                  content="删除配置"
+                  placement="top"
                 >
-                  <el-icon><Icon :icon="iconMap.delete" /></el-icon>
-                </el-button>
-              </el-tooltip>
+                  <el-button
+                    circle
+                    size="small"
+                    type="danger"
+                    plain
+                    :aria-label="`删除连接 ${row.connectionName || row.connectionId}`"
+                    @click="deleteConfig(row)"
+                  >
+                    <el-icon><Icon :icon="iconMap.delete" /></el-icon>
+                  </el-button>
+                </el-tooltip>
+              </div>
             </div>
-          </div>
-        </article>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -295,7 +316,9 @@ const props = defineProps({
 const emit = defineEmits(['addDataTab'])
 
 const savedConfigs = ref([])
-const savedLoading = ref(false)
+const savedLoading = ref(true)
+const loadFailed = ref(false)
+const hasConfigs = computed(() => savedConfigs.value.length > 0)
 const testingConnectionId = ref('')
 const updatingStatusId = ref('')
 const addDialogVisible = ref(false)
@@ -337,11 +360,13 @@ const filteredConfigs = computed(() => {
 
 const loadSavedConfigs = async () => {
   if (!props.sessionId) {
-    showWarning('缺少会话ID，无法加载配置')
+    loadFailed.value = true
+    savedLoading.value = false
     return
   }
 
   savedLoading.value = true
+  loadFailed.value = false
   try {
     const resp = await getDatabaseConnectionsApi({
       sessionId: props.sessionId
@@ -349,8 +374,7 @@ const loadSavedConfigs = async () => {
 
     savedConfigs.value = resp.data || []
   } catch {
-    showError('加载配置列表失败')
-    savedConfigs.value = []
+    loadFailed.value = true
   } finally {
     savedLoading.value = false
   }
@@ -359,6 +383,39 @@ const loadSavedConfigs = async () => {
 const openAddDialog = () => {
   addDialogVisible.value = true
 }
+
+const clearFilters = () => {
+  searchText.value = ''
+  statusFilter.value = 'all'
+}
+
+const emptyState = computed(() => {
+  if (loadFailed.value && !hasConfigs.value) {
+    return {
+      icon: 'mdi:database-alert-outline',
+      title: '连接列表加载失败',
+      description: '暂时无法读取已保存的连接，请检查会话状态后重试。',
+      actionLabel: '重新加载',
+      action: loadSavedConfigs
+    }
+  }
+  if (hasConfigs.value) {
+    return {
+      icon: iconMap.search,
+      title: '没有匹配的连接',
+      description: '试试其他关键词，或清除筛选查看全部连接。',
+      actionLabel: '清除筛选',
+      action: clearFilters
+    }
+  }
+  return {
+    icon: iconMap.database,
+    title: '添加第一个数据库连接',
+    description: '连接由当前节点发起，请填写该节点可访问的数据库地址。',
+    actionLabel: '新增连接',
+    action: openAddDialog
+  }
+})
 
 const handleConfigSuccess = async () => {
   await loadSavedConfigs()
@@ -487,28 +544,17 @@ onMounted(async () => {
 
 <style scoped>
 .database-home {
+  container: database-home / inline-size;
   --database-home-panel-surface: var(--app-card-background);
-  --database-home-muted-surface: color-mix(
-    in srgb,
-    var(--app-control-background-soft) 64%,
-    transparent
-  );
-  --database-home-soft-border: color-mix(in srgb, var(--el-border-color) 18%, transparent);
+  --database-home-muted-surface: var(--app-control-background-soft);
+  --database-home-soft-border: var(--el-border-color-lighter);
   display: flex;
   flex-direction: column;
   flex: 1;
   height: 100%;
   min-height: 0;
-  padding: 8px 10px 10px;
   background: transparent;
   overflow: hidden;
-}
-
-:global(html:not(.dark) .database-home),
-:global(html[data-theme='light'] .database-home) {
-  --database-home-panel-surface: var(--app-card-background);
-  --database-home-muted-surface: var(--app-control-background-soft);
-  --database-home-soft-border: color-mix(in srgb, var(--el-border-color) 16%, transparent);
 }
 
 .configs-workbench {
@@ -516,9 +562,7 @@ onMounted(async () => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  border-radius: 0;
-  border: 1px solid var(--database-home-soft-border);
-  background: color-mix(in srgb, var(--database-home-panel-surface) 82%, transparent);
+  background: var(--database-home-panel-surface);
   overflow: hidden;
 }
 
@@ -527,56 +571,74 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 12px;
-  background: var(--app-control-background-soft);
-  border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 30%, transparent);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--database-home-soft-border);
   flex-wrap: wrap;
   flex-shrink: 0;
 }
 
 .toolbar-search {
   flex: 1;
-  min-width: 16rem;
+  min-width: min(240px, 100%);
 }
 
-.toolbar-filters {
+.toolbar-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.toolbar-actions :deep(.el-button) {
+  margin-left: 0;
+}
+
+.load-error {
+  padding: 10px 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-color-danger);
+  background: var(--el-color-danger-light-9);
+}
+
+.configs-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .configs-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
-  min-height: 0;
-  overflow-y: auto;
+  padding: 12px 16px;
 }
 
 .empty-state {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: min(14rem, 34vh);
-  margin: 10px;
-  background: transparent;
-  border-radius: 12px;
-  border: 1px dashed color-mix(in srgb, var(--el-border-color) 34%, transparent);
+  display: grid;
+  grid-template-rows: minmax(40px, 1fr) auto minmax(40px, 2fr);
+  justify-items: center;
+  padding: 0 24px;
 }
 
 .empty-copy {
+  grid-row: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  max-width: 360px;
   text-align: center;
 }
 
-.empty-copy strong {
-  font-size: 16px;
+.empty-copy h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
@@ -590,15 +652,18 @@ onMounted(async () => {
   font-size: 24px;
   background: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
   color: var(--el-color-primary);
-  border: 1px solid color-mix(in srgb, var(--el-color-primary) 20%, transparent);
   margin-bottom: 4px;
 }
 
-.empty-copy span {
-  max-width: 320px;
+.empty-copy p {
+  margin: 0 0 8px;
   font-size: 13px;
   color: var(--el-text-color-secondary);
   line-height: 1.6;
+}
+
+.empty-copy :deep(.el-button) {
+  margin-left: 0;
 }
 
 .config-card {
@@ -698,6 +763,7 @@ onMounted(async () => {
 
 .conn-title {
   min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: 700;
   font-size: 13px;
   color: var(--el-text-color-primary);
@@ -725,6 +791,7 @@ onMounted(async () => {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 12px;
   font-weight: 600;
   color: var(--el-text-color-secondary);
@@ -775,7 +842,7 @@ onMounted(async () => {
   background: var(--database-home-muted-surface);
 }
 
-@media (max-width: 960px) {
+@container database-home (max-width: 760px) {
   .config-card {
     grid-template-columns: 1fr;
   }
@@ -786,27 +853,15 @@ onMounted(async () => {
   }
 }
 
-@media (max-width: 640px) {
-  .database-home {
-    padding: 0 10px 10px;
-  }
+@container database-home (max-width: 560px) {
+  .toolbar-search { flex-basis: 100%; }
 
-  .workbench-toolbar {
-    padding: 10px;
-  }
+  .workbench-toolbar, .configs-list { padding: 12px; }
 
-  .configs-list {
-    padding: 10px;
-  }
-
-  .config-title-row,
-  .config-actions {
+  .config-title-row {
     flex-direction: column;
     align-items: flex-start;
   }
-
-  .enter-workbench-btn {
-    width: 100%;
-  }
+  .config-actions { flex-wrap: wrap; }
 }
 </style>

@@ -1,75 +1,69 @@
 <template>
   <div class="container-manage-page">
-    <div class="container-panel">
-      <div class="container-toolbar">
+    <div
+      class="container-panel"
+      :class="{ 'is-sidebar-collapsed': sidebarCollapsed }"
+    >
+      <header class="container-toolbar">
         <div class="toolbar-title">
-          <el-icon>
-            <Icon :icon="iconMap.server" />
-          </el-icon>
-          <span>容器管理</span>
-          <el-tag
-            v-if="contexts.length"
-            size="small"
-            effect="plain"
-            round
+          <el-button
+            text
+            class="sidebar-toggle"
+            :aria-label="sidebarCollapsed ? '展开 Context 列表' : '收起 Context 列表'"
+            :title="sidebarCollapsed ? '展开 Context 列表' : '收起 Context 列表'"
+            :aria-expanded="!sidebarCollapsed"
+            @click="sidebarCollapsed = !sidebarCollapsed"
           >
-            {{ contexts.length }} 个 Context
-          </el-tag>
-          <el-tag
+            <Icon :icon="iconMap.menu" />
+          </el-button>
+          <strong>容器管理</strong>
+          <el-tooltip
             v-if="selectedRuntime"
-            size="small"
-            type="info"
-            effect="plain"
+            :content="runtimeDescription"
+            placement="bottom"
           >
-            {{ selectedRuntime.family }} {{ selectedRuntime.productVersion }}
-          </el-tag>
-          <el-tag
-            v-if="selectedRuntime?.profileId"
-            size="small"
-            effect="plain"
-          >
-            {{ selectedRuntime.profileId }} · {{ selectedRuntime.namespace }}
-          </el-tag>
+            <span
+              class="runtime-label"
+              tabindex="0"
+            >{{ selectedRuntime.family }} {{ selectedRuntime.productVersion }}</span>
+          </el-tooltip>
         </div>
-
         <div class="toolbar-actions">
           <el-button
-            type="success"
             size="small"
             :loading="exporting"
-            :disabled="!contexts.length || exporting"
+            :disabled="!runtimes.length || exporting"
             @click="exportContainerInfo"
           >
-            <el-icon>
-              <Icon :icon="iconMap.download" />
-            </el-icon>
-            导出全部信息
+            <Icon :icon="iconMap.download" /> 导出全部
           </el-button>
           <el-button
-            type="primary"
             size="small"
             :loading="loading"
-            @click="refreshRuntimeInfo"
+            @click="fetchRuntimeInfo"
           >
-            <el-icon>
-              <Icon :icon="iconMap.refresh" />
-            </el-icon>
-            刷新信息
+            <Icon :icon="iconMap.refresh" /> 刷新
           </el-button>
         </div>
-      </div>
-
+      </header>
       <el-alert
-        v-if="error && contexts.length"
-        class="refresh-alert"
+        v-if="error && runtimes.length"
         :title="error"
         type="warning"
         :closable="false"
         show-icon
       />
+      <el-alert
+        v-for="diagnostic in diagnostics"
+        :key="diagnostic"
+        :title="diagnostic"
+        type="info"
+        :closable="false"
+        show-icon
+      />
 
       <div
-        v-if="loading && contexts.length === 0"
+        v-if="loading && !runtimes.length"
         class="loading-container"
       >
         <el-skeleton
@@ -77,10 +71,9 @@
           animated
         />
       </div>
-
       <div
-        v-else-if="error && !contexts.length"
-        class="error-container"
+        v-else-if="error && !runtimes.length"
+        class="empty-container"
       >
         <el-result
           icon="error"
@@ -88,153 +81,156 @@
           sub-title="请检查网络连接或重试"
         >
           <template #extra>
-            <el-button
-              type="primary"
-              @click="fetchRuntimeInfo"
-            >
-              <el-icon>
-                <Icon :icon="iconMap.refresh" />
-              </el-icon>
+            <el-button @click="fetchRuntimeInfo">
               重试
             </el-button>
           </template>
         </el-result>
       </div>
-
       <div
-        v-else-if="contexts.length > 0"
+        v-else-if="contexts.length || unboundFrameworks.length"
         class="workspace-shell"
       >
-        <aside class="context-sidebar">
-          <div class="context-list-panel">
-            <div class="context-list-head">
-              <strong>Context</strong>
-              <span>{{ filteredContexts.length }} / {{ contexts.length }}</span>
-            </div>
-
-            <el-input
-              v-model="contextSearchKeyword"
-              clearable
-              placeholder="搜索 Context / 路径 / 工作目录"
-              class="context-search-input"
-            >
-              <template #prefix>
-                <el-icon>
-                  <Icon :icon="iconMap.search" />
-                </el-icon>
-              </template>
-            </el-input>
-
-            <el-scrollbar class="context-scrollbar">
-              <div class="context-items">
-                <button
-                  v-for="(context, index) in filteredContexts"
-                  :key="context.name || `context-${index}`"
-                  type="button"
-                  class="context-item"
-                  :class="{ active: getContextKey(selectedContext) === getContextKey(context) }"
-                  @click="selectContext(context)"
-                >
-                  <div class="context-main">
-                    <el-icon class="context-icon">
-                      <Icon :icon="iconMap.server" />
-                    </el-icon>
-                    <div class="context-copy">
-                      <div class="context-title-row">
-                        <span class="context-name">{{ getContextDisplayName(context) }}</span>
-                        <code>{{ context.basePath || '/' }}</code>
-                      </div>
-                      <span class="context-subtitle">{{ context.workDir || '未提供工作目录' }}</span>
-                    </div>
-                  </div>
-                  <div
-                    class="context-metrics"
-                    aria-label="入口组件统计"
-                  >
-                    <span>S {{ context.allServlet?.length || 0 }}</span>
-                    <span>F {{ context.allFilter?.length || 0 }}</span>
-                    <span>V {{ context.allValve?.length || 0 }}</span>
-                    <span>L {{ context.allListener?.length || 0 }}</span>
-                  </div>
-                  <div class="context-actions">
-                    <button
-                      type="button"
-                      class="icon-action"
-                      title="导出 Context"
-                      aria-label="导出 Context"
-                      :disabled="exporting"
-                      @click.stop="exportContextExcel(context)"
-                    >
-                      <Icon :icon="iconMap.download" />
-                    </button>
-                  </div>
-                </button>
-
-                <el-empty
-                  v-if="filteredContexts.length === 0"
-                  description="没有匹配的 Context"
-                  :image-size="96"
-                />
-              </div>
-            </el-scrollbar>
+        <aside
+          class="context-sidebar"
+          aria-label="Context 与框架导航"
+        >
+          <div class="context-list-head">
+            <strong>Context</strong><span>{{ contexts.length }}</span>
           </div>
-        </aside>
-
-        <main class="context-detail">
-          <div
-            v-if="selectedContext"
-            class="context-overview-strip"
+          <el-input
+            v-model="contextSearchKeyword"
+            clearable
+            placeholder="搜索 Context"
+            aria-label="搜索 Context"
           >
-            <div class="overview-main">
-              <el-icon>
-                <Icon :icon="iconMap.package" />
-              </el-icon>
-              <div>
-                <strong>{{ getContextDisplayName(selectedContext) }}</strong>
-                <span>{{ selectedContext.workDir || '未提供工作目录' }}</span>
-              </div>
-            </div>
-            <div class="overview-fields">
-              <span>
-                <small>访问路径</small>
-                <code>{{ selectedContext.basePath || '/' }}</code>
-              </span>
-              <span>
-                <small>组件</small>
-                <code>{{ getContextAssetScore(selectedContext) }}</code>
-              </span>
-              <span v-if="detectedFramework?.family">
-                <small>框架</small>
-                <code>{{ detectedFramework.family }}</code>
-              </span>
+            <template #prefix>
+              <Icon :icon="iconMap.search" />
+            </template>
+          </el-input>
+          <el-scrollbar class="context-scrollbar">
+            <div class="context-items">
               <button
+                v-for="context in filteredContexts"
+                :key="getContextKey(context)"
                 type="button"
-                class="icon-action is-large"
-                title="导出 Context"
-                aria-label="导出 Context"
-                :disabled="exporting"
-                @click="exportContextExcel(selectedContext)"
+                class="context-item"
+                :class="{ active: selectedKey === getContextKey(context) }"
+                :aria-current="selectedKey === getContextKey(context) ? 'true' : undefined"
+                @click="selectedKey = getContextKey(context)"
               >
-                <Icon :icon="iconMap.download" />
+                <span class="context-name">{{ getContextDisplayName(context) }}</span>
+                <span class="context-asset-count">{{ getContextAssetScore(context) }} 项</span>
+                <span class="context-subtitle">{{ context.host || context.basePath || '/' }}</span>
+              </button>
+              <p
+                v-if="!filteredContexts.length"
+                class="sidebar-empty"
+              >
+                没有匹配的 Context
+              </p>
+            </div>
+            <div
+              v-if="unboundFrameworks.length"
+              class="framework-group"
+            >
+              <div class="context-list-head">
+                <strong>框架视图</strong><span>只读</span>
+              </div>
+              <button
+                v-for="framework in unboundFrameworks"
+                :key="framework.key"
+                type="button"
+                class="context-item"
+                :class="{ active: selectedKey === framework.key }"
+                :aria-current="selectedKey === framework.key ? 'true' : undefined"
+                @click="selectedKey = framework.key"
+              >
+                <span class="context-name">{{ framework.family }}</span>
+                <span class="context-subtitle">归属未确定</span>
               </button>
             </div>
+          </el-scrollbar>
+        </aside>
+        <main class="context-detail">
+          <el-select
+            v-model="selectedKey"
+            class="compact-context-picker"
+            aria-label="选择 Context 或框架"
+            placeholder="选择 Context 或框架"
+            filterable
+            @change="contextSearchKeyword = ''"
+          >
+            <el-option-group label="Context">
+              <el-option
+                v-for="context in contexts"
+                :key="getContextKey(context)"
+                :value="getContextKey(context)"
+                :label="`${getContextDisplayName(context)} · ${context.host || '/'}`"
+              />
+            </el-option-group>
+            <el-option-group
+              v-if="unboundFrameworks.length"
+              label="框架视图 · 只读"
+            >
+              <el-option
+                v-for="framework in unboundFrameworks"
+                :key="framework.key"
+                :value="framework.key"
+                :label="framework.family"
+              />
+            </el-option-group>
+          </el-select>
+          <div
+            v-if="selectedContext || selectedFramework"
+            class="context-overview"
+          >
+            <div class="context-heading">
+              <h3>{{ selectedContext ? getContextDisplayName(selectedContext) : selectedFramework.family }}</h3>
+              <span
+                v-if="selectedContext"
+                class="context-location"
+              >{{ selectedContext.host }}<template v-if="selectedContext.workDir"> · {{ selectedContext.workDir }}</template></span>
+              <span
+                v-else
+                class="readonly-label"
+              >只读</span>
+            </div>
+            <el-button
+              v-if="selectedContext"
+              text
+              size="small"
+              title="导出当前 Context"
+              aria-label="导出当前 Context"
+              :disabled="exporting"
+              @click="exportContextExcel(selectedContext)"
+            >
+              <Icon :icon="iconMap.download" />
+            </el-button>
           </div>
-
+          <p
+            v-if="selectedFramework"
+            class="framework-note"
+          >
+            尚未确定所属 Context，此视图仅供查看。
+          </p>
           <ContextDetail
-            v-if="selectedContext"
+            v-if="selectedContext || selectedFramework"
+            :key="`${sessionId}:${selectedKey}`"
             :context="selectedContext"
             :framework-info="frameworkInfo"
             :session-id="sessionId"
             @refresh="fetchRuntimeInfo"
+            @view-bytecode="viewBytecode"
+            @view-detail="viewAssetDetail"
           />
           <el-empty
             v-else
-            description="请选择一个 Context 查看资产明细"
-            :image-size="120"
+            description="请选择一个 Context 查看组件"
+            :image-size="96"
           />
         </main>
       </div>
-
       <div
         v-else
         class="empty-container"
@@ -245,6 +241,45 @@
         />
       </div>
     </div>
+    <el-drawer
+      v-model="assetDetailVisible"
+      :title="selectedAsset?.title || '组件详情'"
+      size="min(560px, 92vw)"
+      append-to-body
+    >
+      <template v-if="selectedAsset">
+        <div class="asset-detail-actions">
+          <el-button
+            size="small"
+            @click="copyAssetDetails"
+          >
+            <Icon :icon="iconMap.copy" /> 复制详情
+          </el-button>
+          <el-button
+            v-if="selectedAsset.className"
+            size="small"
+            type="primary"
+            @click="viewBytecode(selectedAsset.className)"
+          >
+            <Icon :icon="iconMap.code" /> 查看字节码
+          </el-button>
+        </div>
+        <dl class="asset-detail-fields">
+          <div
+            v-for="[label, value] in selectedAsset.fields"
+            :key="label"
+          >
+            <dt>{{ label }}</dt><dd>{{ detailValue(value) }}</dd>
+          </div>
+        </dl>
+      </template>
+    </el-drawer>
+    <ClassBytecodeDialog
+      v-model="bytecodeDialogVisible"
+      :session-id="sessionId"
+      :class-name="selectedClassName"
+      @close="selectedClassName = ''"
+    />
   </div>
 </template>
 
@@ -256,13 +291,13 @@ import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { icons } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import ContextDetail from './ContextDetail.vue'
+import ClassBytecodeDialog from './ClassBytecodeDialog.vue'
 import {
   filterRuntimeContexts,
   getContextAssetScore,
   getContextDisplayName,
   getContextKey,
-  normalizeWebRuntimePayload,
-  sortRuntimeContexts
+  normalizeWebRuntimePayload
 } from './containerManageModel.js'
 import {
   buildAllContextsExportSpec,
@@ -280,7 +315,13 @@ const props = defineProps({
 
 const runtimes = ref([])
 const contexts = ref([])
-const selectedContext = ref(null)
+const selectedKey = ref(null)
+const diagnostics = ref([])
+const sidebarCollapsed = ref(false)
+const selectedAsset = ref(null)
+const assetDetailVisible = ref(false)
+const bytecodeDialogVisible = ref(false)
+const selectedClassName = ref('')
 const loading = ref(false)
 const exporting = ref(false)
 const error = ref(null)
@@ -291,25 +332,48 @@ let mounted = true
 const filteredContexts = computed(() =>
   filterRuntimeContexts(contexts.value, contextSearchKeyword.value)
 )
+const unboundFrameworks = computed(() => runtimes.value.flatMap(runtime =>
+  runtime.frameworks.filter(framework => !framework.contextId).map(framework => ({
+    ...framework,
+    runtimeId: runtime.runtimeId,
+    key: `framework:${runtime.runtimeId}:${framework.frameworkId}`
+  }))
+))
+const selectedContext = computed(() => filteredContexts.value.find(context => getContextKey(context) === selectedKey.value) || null)
+const selectedFramework = computed(() => unboundFrameworks.value.find(framework => framework.key === selectedKey.value) || null)
 const selectedRuntime = computed(() =>
-  runtimes.value.find(runtime => runtime.runtimeId === selectedContext.value?.runtimeId) || runtimes.value[0] || null
+  runtimes.value.find(runtime => runtime.runtimeId === (selectedContext.value?.runtimeId || selectedFramework.value?.runtimeId)) || runtimes.value[0] || null
 )
-const frameworkInfo = computed(() => selectedContext.value?.frameworkInfo || null)
-const detectedFramework = computed(() =>
-  frameworkInfo.value || selectedRuntime.value?.frameworks?.[0] || null
-)
+const frameworkInfo = computed(() => selectedContext.value?.frameworkInfo || selectedFramework.value)
+const runtimeDescription = computed(() => selectedRuntime.value
+  ? `版本适配：${selectedRuntime.value.profileId} · ${selectedRuntime.value.namespace}` : '')
+const detailValue = value => Array.isArray(value) ? value.join('\n') || '—' : String(value ?? '') || '—'
+const viewAssetDetail = asset => {
+  selectedAsset.value = asset
+  assetDetailVisible.value = true
+}
+const copyAssetDetails = async () => {
+  if (!selectedAsset.value) return
+  try {
+    await navigator.clipboard.writeText(selectedAsset.value.fields.map(([label, value]) => `${label}: ${detailValue(value)}`).join('\n'))
+    showSuccess('组件详情已复制')
+  } catch {
+    showError('复制失败，请手动选择内容复制')
+  }
+}
 
+const viewBytecode = className => {
+  if (!className) return
+  selectedClassName.value = className
+  bytecodeDialogVisible.value = true
+}
 const clearContainerState = () => {
   contexts.value = []
   runtimes.value = []
-  selectedContext.value = null
+  selectedKey.value = null
+  diagnostics.value = []
   contextSearchKeyword.value = ''
   error.value = null
-}
-
-const reconcileSelectedContext = contexts => {
-  const currentKey = getContextKey(selectedContext.value)
-  selectedContext.value = contexts.find(context => getContextKey(context) === currentKey) || contexts[0] || null
 }
 
 const fetchRuntimeInfo = async () => {
@@ -334,7 +398,10 @@ const fetchRuntimeInfo = async () => {
 
     runtimes.value = normalized.runtimes
     contexts.value = normalized.contexts
-    reconcileSelectedContext(sortRuntimeContexts(normalized.contexts))
+    const diagnosticLabels = {
+      RUNTIME_VERSION_UNKNOWN: '容器版本未识别，容器组件仅供查看'
+    }
+    diagnostics.value = normalized.diagnostics.filter(value => value !== 'FRAMEWORK_CONTEXT_UNRESOLVED').map(value => diagnosticLabels[value] || String(value))
     return normalized
   } catch (requestError) {
     if (!mounted || !requestGuard.isCurrent('info', sequence) || sessionId !== props.sessionId) return null
@@ -345,9 +412,6 @@ const fetchRuntimeInfo = async () => {
     if (requestGuard.isCurrent('info', sequence)) loading.value = false
   }
 }
-
-const refreshRuntimeInfo = () => fetchRuntimeInfo()
-const selectContext = context => { selectedContext.value = context }
 
 const runExport = async spec => {
   if (exporting.value) return false
@@ -370,12 +434,12 @@ const runExport = async spec => {
 
 const exportContextExcel = context => {
   if (!context) return Promise.resolve(false)
-  return runExport(buildContextExportSpec(context, frameworkInfo.value))
+  return runExport(buildContextExportSpec(context))
 }
 
 const exportContainerInfo = () => {
-  if (!contexts.value.length) return Promise.resolve(false)
-  return runExport(buildAllContextsExportSpec(contexts.value, frameworkInfo.value))
+  if (!runtimes.value.length) return Promise.resolve(false)
+  return runExport(buildAllContextsExportSpec(contexts.value, runtimes.value.flatMap(runtime => runtime.frameworks)))
 }
 
 watch(
@@ -389,13 +453,17 @@ watch(
   { immediate: true }
 )
 
-watch(filteredContexts, contexts => {
-  if (!contexts.length) {
-    selectedContext.value = null
-    return
+watch([filteredContexts, unboundFrameworks], ([contextList, frameworks]) => {
+  if (!contextList.some(context => getContextKey(context) === selectedKey.value) &&
+      !frameworks.some(framework => framework.key === selectedKey.value)) {
+    selectedKey.value = getContextKey(contextList[0]) || frameworks[0]?.key || null
   }
-  const currentKey = getContextKey(selectedContext.value)
-  selectedContext.value = contexts.find(context => getContextKey(context) === currentKey) || contexts[0]
+})
+watch(() => [props.sessionId, selectedKey.value], () => {
+  bytecodeDialogVisible.value = false
+  selectedClassName.value = ''
+  assetDetailVisible.value = false
+  selectedAsset.value = null
 })
 
 onUnmounted(() => {
@@ -405,494 +473,67 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-@import '@/styles/container-shell-shared.css';
-
 .container-manage-page {
   height: 100%;
   min-height: 0;
-  padding: 0;
-  background: transparent;
-  --container-muted-surface: var(--app-control-background-soft);
-  --container-strong-surface: var(--app-card-background);
-  --container-soft-border: color-mix(in srgb, var(--el-border-color) 20%, transparent);
-  --container-primary: var(--el-color-primary);
-  --container-primary-soft: color-mix(in srgb, var(--el-color-primary) 14%, var(--app-card-background));
-  --container-primary-border: color-mix(in srgb, var(--el-color-primary) 36%, var(--el-border-color));
+  container-type: inline-size;
+  --container-muted-surface: var(--app-control-background-soft, var(--el-fill-color-light));
+  --container-strong-surface: var(--app-card-background, var(--el-bg-color));
+  --container-soft-border: var(--el-border-color-lighter);
 }
-
-:global(html:not(.dark) .container-manage-page),
-:global(html[data-theme='light'] .container-manage-page) {
-  --container-muted-surface: var(--app-control-background-soft);
-  --container-strong-surface: var(--app-card-background);
-  --container-soft-border: color-mix(in srgb, var(--el-border-color) 18%, transparent);
-  --container-primary-soft: color-mix(in srgb, var(--el-color-primary) 14%, var(--app-card-background));
-  --container-primary-border: color-mix(in srgb, var(--el-color-primary) 38%, var(--el-border-color));
+.container-panel { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 6px; overflow: hidden; }
+.container-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 6px; flex-wrap: wrap; }
+.toolbar-title, .toolbar-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.toolbar-title { font-size: 14px; flex-wrap: wrap; }
+.toolbar-title strong { white-space: nowrap; }
+.runtime-label { color: var(--el-text-color-secondary); font-size: 12px; cursor: help; }
+.toolbar-actions { margin-left: auto; }
+.toolbar-actions :deep(.el-button + .el-button) { margin-left: 0; }
+.toolbar-actions :deep(.iconify), .asset-detail-actions :deep(.iconify) { margin-right: 4px; }
+.workspace-shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 200px minmax(0, 1fr); border: 1px solid var(--container-soft-border); border-radius: 10px; overflow: hidden; background: var(--container-strong-surface); }
+.context-sidebar { display: flex; flex-direction: column; min-height: 0; min-width: 0; gap: 12px; padding: 14px 10px; border-right: 1px solid var(--container-soft-border); }
+.context-list-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 0 4px; }
+.context-list-head span { color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
+.context-scrollbar { flex: 1; min-height: 0; }
+.context-items { display: flex; flex-direction: column; gap: 4px; }
+.context-item { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 6px; padding: 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--el-text-color-primary); text-align: left; cursor: pointer; }
+.context-item:hover { background: var(--container-muted-surface); }
+.context-item.active { background: color-mix(in srgb, var(--el-color-primary) 9%, var(--container-strong-surface)); border-color: color-mix(in srgb, var(--el-color-primary) 25%, transparent); }
+.context-item.active .context-name { color: var(--el-color-primary); }
+.context-item:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: -2px; }
+.context-name { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.context-asset-count { font-size: 11px; color: var(--el-text-color-secondary); align-self: center; }
+.context-subtitle { grid-column: 1 / -1; font-size: 12px; color: var(--el-text-color-secondary); overflow-wrap: anywhere; }
+.framework-group { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--container-soft-border); }
+.framework-group .context-list-head { margin-bottom: 8px; }
+.sidebar-empty { margin: 10px 4px; font-size: 12px; color: var(--el-text-color-secondary); }
+.context-detail { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; padding: 16px; }
+.context-overview { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.context-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; min-width: 0; }
+.context-heading h3 { font-size: 16px; margin: 0; overflow-wrap: anywhere; }
+.context-location { font-size: 12px; color: var(--el-text-color-secondary); overflow-wrap: anywhere; }
+.readonly-label { color: var(--el-text-color-secondary); background: var(--container-muted-surface); border-radius: 4px; padding: 2px 6px; font-size: 11px; }
+.framework-note { margin: 0; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
+.compact-context-picker { display: none; width: 100%; }
+.is-sidebar-collapsed .workspace-shell { grid-template-columns: minmax(0, 1fr); }
+.is-sidebar-collapsed .context-sidebar { display: none; }
+.is-sidebar-collapsed .compact-context-picker { display: block; }
+.loading-container, .empty-container { flex: 1; min-height: 0; display: grid; place-items: center; }
+.loading-container { padding: 20px; }
+.asset-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.asset-detail-actions :deep(.el-button + .el-button) { margin-left: 0; }
+.asset-detail-fields { margin: 0; }
+.asset-detail-fields > div { padding: 14px 0; border-bottom: 1px solid var(--el-border-color-lighter); }
+.asset-detail-fields dt { color: var(--el-text-color-secondary); font-size: 12px; margin-bottom: 6px; }
+.asset-detail-fields dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; font-family: monospace; font-size: 13px; }
+@container (max-width: 900px) {
+  .workspace-shell { grid-template-columns: 172px minmax(0, 1fr); }
+  .context-detail { padding: 12px; }
 }
-
-:global(html.dark .container-manage-page),
-:global(html[data-theme='dark'] .container-manage-page) {
-  --container-muted-surface: color-mix(
-    in srgb,
-    var(--app-control-background-soft) 84%,
-    var(--el-bg-color-overlay)
-  );
-  --container-strong-surface: color-mix(
-    in srgb,
-    var(--app-card-background) 90%,
-    var(--el-bg-color-overlay)
-  );
-  --container-soft-border: color-mix(in srgb, var(--el-border-color) 18%, transparent);
-  --container-primary-soft: color-mix(in srgb, var(--el-color-primary) 24%, var(--app-card-background));
-  --container-primary-border: color-mix(in srgb, var(--el-color-primary) 48%, var(--el-border-color));
-}
-
-.container-panel {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: 0;
-  background: transparent;
-  padding: 6px;
-  gap: 10px;
-}
-
-.container-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: var(--radius-container);
-  background: color-mix(in srgb, var(--container-muted-surface) 90%, transparent);
-  border: 0;
-  flex-shrink: 0;
-  gap: 12px;
-}
-
-.toolbar-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-}
-
-.toolbar-title .el-icon {
-  color: var(--container-primary);
-}
-
-.toolbar-title :deep(.el-tag) {
-  --el-tag-bg-color: var(--container-primary-soft);
-  --el-tag-border-color: var(--container-primary-border);
-  --el-tag-text-color: var(--container-primary);
-}
-
-.toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.refresh-alert {
-  flex-shrink: 0;
-}
-
-.loading-container,
-.error-container,
-.empty-container {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.loading-container {
-  padding: 20px;
-  align-items: flex-start;
-}
-
-.workspace-shell {
-  display: flex;
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.context-sidebar {
-  width: 312px;
-  flex-shrink: 0;
-  min-height: 0;
-}
-
-.context-list-panel {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  overflow: hidden;
-  border: 1px solid var(--container-soft-border);
-  border-radius: var(--radius-container);
-  background: var(--container-strong-surface);
-}
-
-.context-list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 28px;
-}
-
-.context-list-head strong {
-  color: var(--el-text-color-primary);
-  font-size: 13px;
-  line-height: 1.2;
-}
-
-.context-list-head span {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.context-scrollbar {
-  flex: 1;
-  min-height: 0;
-}
-
-.context-items {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-right: 2px;
-  min-height: 100%;
-}
-
-.context-item {
-  position: relative;
-  width: 100%;
-  min-width: 0;
-  padding: 9px 8px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 28px;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  border: 1px solid var(--container-soft-border);
-  border-radius: var(--radius-control);
-  color: var(--el-text-color-primary);
-  text-align: left;
-  cursor: pointer;
-  overflow: hidden;
-  transition: border-color 0.18s ease, background 0.18s ease;
-}
-
-.context-item::before {
-  content: '';
-  position: absolute;
-  inset: 8px auto 8px 0;
-  width: 3px;
-  border-radius: 999px;
-  background: transparent;
-}
-
-.context-item:hover,
-.context-item.active {
-  background: var(--container-primary-soft);
-}
-
-.context-item.active {
-  border-color: var(--container-primary-border);
-}
-
-.context-item.active::before {
-  background: var(--el-color-primary);
-}
-
-.context-item:focus-visible,
-.icon-action:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--el-color-primary) 36%, transparent);
-  outline-offset: 2px;
-}
-
-.context-main {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-}
-
-.context-icon {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: var(--container-primary-soft);
-  color: var(--container-primary);
-  font-size: 14px;
-}
-
-.context-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.context-title-row {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.context-title-row code,
-.overview-fields code {
-  padding: 2px 6px;
-  border-radius: 6px;
-  background: var(--container-muted-surface);
-  color: var(--el-text-color-regular);
-  font-size: 12px;
-  font-family: inherit;
-}
-
-.context-name {
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--el-text-color-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.context-subtitle {
-  font-size: 12px;
-  line-height: 1.25;
-  color: var(--el-text-color-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.context-metrics {
-  display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 4px 6px;
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.context-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.icon-action {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid var(--container-primary-border);
-  border-radius: 8px;
-  background: var(--container-primary-soft);
-  color: var(--container-primary);
-  cursor: pointer;
-}
-
-.icon-action:hover {
-  background: color-mix(in srgb, var(--el-color-primary) 22%, var(--app-card-background));
-  color: var(--container-primary);
-}
-
-.icon-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.context-detail {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow: hidden;
-}
-
-.context-overview-strip {
-  min-height: 58px;
-  flex: 0 0 auto;
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px solid var(--container-soft-border);
-  border-radius: var(--radius-container);
-  background: var(--container-strong-surface);
-}
-
-.overview-main {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.overview-main .el-icon {
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  color: var(--container-primary);
-  background: var(--container-primary-soft);
-}
-
-.overview-main div {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.overview-main strong {
-  color: var(--el-text-color-primary);
-  font-size: 18px;
-  line-height: 1.15;
-}
-
-.overview-main span {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.overview-fields {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.overview-fields span {
-  min-height: 34px;
-  padding: 5px 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--container-primary-soft) 72%, var(--app-card-background));
-  border: 1px solid color-mix(in srgb, var(--container-primary-border) 72%, transparent);
-}
-
-.overview-fields small {
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-}
-
-.icon-action.is-large {
-  width: 34px;
-  height: 34px;
-}
-
-.toolbar-actions :deep(.el-button) {
-  border-radius: var(--radius-control);
-  font-weight: 600;
-}
-
-.toolbar-actions :deep(.el-button--primary),
-.toolbar-actions :deep(.el-button--success) {
-  box-shadow: none;
-  background: var(--el-button-bg-color) !important;
-  border-color: var(--el-button-border-color) !important;
-  color: var(--el-button-text-color) !important;
-}
-
-.toolbar-actions :deep(.el-button--primary) {
-  --el-button-bg-color: var(--el-color-primary);
-  --el-button-border-color: var(--el-color-primary);
-  --el-button-text-color: #fff;
-  --el-button-hover-bg-color: var(--el-color-primary-light-3);
-  --el-button-hover-border-color: var(--el-color-primary-light-3);
-  --el-button-hover-text-color: #fff;
-}
-
-.toolbar-actions :deep(.el-button--success) {
-  --el-button-bg-color: var(--el-color-success);
-  --el-button-border-color: var(--el-color-success);
-  --el-button-text-color: #fff;
-  --el-button-hover-bg-color: var(--el-color-success-light-3);
-  --el-button-hover-border-color: var(--el-color-success-light-3);
-  --el-button-hover-text-color: #fff;
-}
-
-@media (max-width: 768px) {
-  .container-manage-page {
-    padding: 0;
-    background: transparent;
-  }
-
-  .container-panel {
-    border-radius: 20px;
-    padding: 12px;
-  }
-
-  .container-toolbar {
-    padding: 12px;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .toolbar-actions {
-    width: 100%;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-  }
-
-  .workspace-shell {
-    flex-direction: column;
-  }
-
-  .context-sidebar {
-    width: 100%;
-  }
-
-  .context-item {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .context-actions {
-    display: none;
-  }
-
-  .context-overview-strip {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .overview-fields {
-    justify-content: flex-start;
-  }
+@container (max-width: 640px) {
+  .workspace-shell { grid-template-columns: minmax(0, 1fr); }
+  .context-sidebar, .sidebar-toggle { display: none; }
+  .compact-context-picker { display: block; }
+  .runtime-label { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 </style>
