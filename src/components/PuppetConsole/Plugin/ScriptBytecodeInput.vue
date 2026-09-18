@@ -1,18 +1,5 @@
 <template>
-  <el-card
-    class="io-card input-card class-input-card"
-    shadow="never"
-  >
-    <template #header>
-      <div class="card-header-title">
-        <el-icon class="header-icon input-icon">
-          <Icon :icon="icons.coffeeCup" />
-        </el-icon>
-        <span>字节码输入</span>
-        <span class="header-hint">PluginComponent.pluginBytecode</span>
-      </div>
-    </template>
-
+  <div class="bytecode-input">
     <el-tabs
       v-model="inputMode"
       class="bytecode-tabs"
@@ -45,6 +32,7 @@
         <el-input
           v-model="base64Input"
           type="textarea"
+          aria-label="Base64 字节码"
           :rows="6"
           :disabled="disabled"
           placeholder="直接粘贴 base64 字节码（首字符应为 yv66… 对应 magic cafebabe）"
@@ -107,6 +95,7 @@
       <el-input
         :model-value="pluginParam"
         type="textarea"
+        aria-label="入参 JSON"
         :rows="4"
         :disabled="disabled"
         placeholder="{&quot;cmd&quot;:&quot;whoami&quot;}"
@@ -115,7 +104,7 @@
         @update:model-value="$emit('update:plugin-param', $event)"
       />
     </div>
-  </el-card>
+  </div>
 </template>
 
 <script setup>
@@ -198,52 +187,11 @@ const applyBase64 = () => {
 </script>
 
 <style scoped>
-.io-card {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--el-border-color);
-  border-radius: var(--radius-container);
-}
-
-.io-card :deep(.el-card__header) {
-  flex-shrink: 0;
-}
-
-.io-card :deep(.el-card__body) {
+.bytecode-input {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
-}
-
-.input-card {
-  border-left: 3px solid color-mix(in srgb, var(--el-color-primary) 72%, transparent);
-}
-
-.card-header-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--el-text-color-primary);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.header-icon {
-  font-size: 16px;
-}
-
-.input-icon {
-  color: var(--el-color-primary);
-}
-
-.header-hint {
-  margin-left: 6px;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-  font-weight: 500;
+  padding: 0 14px 14px;
+  overflow: auto;
 }
 
 .code-input {
@@ -255,20 +203,12 @@ const applyBase64 = () => {
   font-size: 13px;
 }
 
-.code-input :deep(.el-textarea) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
 .code-input :deep(.el-textarea__inner) {
   flex: 1;
   min-height: 0;
   height: 100% !important;
   padding: 12px;
   resize: none;
-  border: 1px solid var(--el-border-color);
   border-radius: var(--radius-control);
   background: var(--app-control-background);
   line-height: 1.6;
@@ -310,12 +250,6 @@ const applyBase64 = () => {
   margin-left: 6px;
 }
 
-.class-input-card :deep(.el-card__body) {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .bytecode-tabs :deep(.el-tabs__header) {
   margin: 0 0 8px;
 }
@@ -338,6 +272,7 @@ const applyBase64 = () => {
 }
 
 .param-block {
+  margin-top: 14px;
   padding-top: 10px;
   display: flex;
   flex-direction: column;

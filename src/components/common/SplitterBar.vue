@@ -13,7 +13,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onUnmounted, ref } from 'vue'
 
 /**
  * 通用可拖拽分栏。
@@ -82,6 +82,8 @@ const handleKey = (e) => {
     e.preventDefault()
   }
 }
+
+onUnmounted(stopDrag)
 </script>
 
 <style scoped>

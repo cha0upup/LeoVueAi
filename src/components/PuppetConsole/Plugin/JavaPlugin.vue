@@ -1,94 +1,62 @@
 <template>
-  <div>
+  <div
+    v-loading="isLoading"
+    class="plugin-library"
+  >
+    <el-empty
+      v-if="!isLoading && plugins.length === 0"
+      description="暂无可用插件"
+    />
     <div
-      v-if="plugins.length === 0"
-      class="empty-state"
-    >
-      <el-empty description="暂无可用插件" />
-    </div>
-    <el-row
       v-else
-      :gutter="16"
-      class="card-grid"
+      class="plugin-grid"
     >
-      <el-col
+      <article
         v-for="item in plugins"
         :key="item.pluginId"
-        :lg="8"
-        :md="12"
-        :sm="24"
-        :xl="6"
-        :xs="24"
+        class="plugin-card"
+        :aria-label="item.pluginName || item.pluginId"
       >
-        <el-card
-          class="plugin-card"
-          shadow="hover"
-        >
-          <div class="card-header">
-            <div class="card-title">
-              <span
-                class="plugin-icon-shell"
-                :style="iconStyleFor(item.pluginType)"
-              >
-                <el-icon>
-                  <Icon :icon="iconForType(item.pluginType)" />
-                </el-icon>
-              </span>
-              <div class="plugin-copy">
-                <div class="name">
-                  {{ item.pluginName }}
-                </div>
-                <div class="desc">
-                  {{ item.pluginDescription || '暂无描述' }}
-                </div>
-              </div>
-            </div>
-            <el-tag
-              size="small"
-              :type="tagTypeFor(item.pluginType)"
-              class="version-tag"
-            >
-              {{ typeLabelFor(item.pluginType) }} · v{{ item.version || '1.0' }}
-            </el-tag>
-          </div>
-          <div class="card-body">
-            <div class="meta-grid">
-              <div class="meta-chip">
-                <span class="meta-label">类型</span>
-                <strong>{{ typeLabelFor(item.pluginType) }}</strong>
-              </div>
-              <div class="meta-chip">
-                <span class="meta-label">作者</span>
-                <strong>{{ item.createUserId || '未知' }}</strong>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div class="footer-accent">
-              <el-icon><Icon :icon="iconForType(item.pluginType)" /></el-icon>
-              <span>{{ isScript(item.pluginType) ? '脚本插件' : 'Java 插件' }}</span>
-            </div>
-            <div class="card-actions">
-              <el-button
-                v-if="isScript(item.pluginType)"
-                size="small"
-                @click="emitLoad(item)"
-              >
-                载入编辑器
-              </el-button>
-              <el-button
-                size="small"
-                type="primary"
-                class="invoke-btn"
-                @click="openInvokeDialog(item)"
-              >
-                调用
-              </el-button>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+        <div class="plugin-heading">
+          <span
+            class="plugin-icon-shell"
+            :style="iconStyleFor(item.pluginType)"
+            aria-hidden="true"
+          >
+            <el-icon>
+              <Icon :icon="iconForType(item.pluginType)" />
+            </el-icon>
+          </span>
+          <h3 class="plugin-name">
+            {{ item.pluginName || item.pluginId }}
+          </h3>
+        </div>
+        <p class="plugin-description">
+          {{ item.pluginDescription || '暂无描述' }}
+        </p>
+        <div class="plugin-meta">
+          <span>{{ typeLabelFor(item.pluginType) }}</span>
+          <span>v{{ item.version || '1.0' }}</span>
+          <span>作者：{{ item.createUserId || '未知' }}</span>
+        </div>
+        <div class="plugin-actions">
+          <el-button
+            v-if="isScript(item.pluginType)"
+            size="small"
+            @click="emitLoad(item)"
+          >
+            载入编辑器
+          </el-button>
+          <el-button
+            size="small"
+            type="primary"
+            @click="openInvokeDialog(item)"
+          >
+            配置执行
+          </el-button>
+        </div>
+      </article>
+    </div>
 
     <!-- 调用弹窗 -->
     <el-dialog
@@ -495,189 +463,96 @@ defineExpose({
 </script>
 
 <style scoped>
-.title-text h3 {
-  margin: 0;
-  font-size: clamp(1rem, 1.125vw, 1.125rem);
-  font-weight: 600;
+.plugin-library {
+  min-height: 160px;
 }
 
-.title-text p {
-  margin: 2px 0 0;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
-.card-grid {
-  margin-top: 4px;
+.plugin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+  align-items: stretch;
 }
 
 .plugin-card {
-  height: 280px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  overflow: hidden;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--el-border-color-light);
   border-radius: var(--radius-container);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 22%, transparent);
   background: var(--app-surface-background);
-  box-shadow: none;
-  transition: all 0.2s ease;
-}
-
-.plugin-card:hover {
-  transform: none;
-  box-shadow: none;
+  transition: border-color 0.2s ease;
 }
 
 .plugin-card:focus-within {
-  border-color: color-mix(in srgb, var(--el-color-primary) 36%, var(--el-border-color));
+  border-color: var(--el-color-primary);
 }
 
-.card-header {
+.plugin-heading {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  min-height: 116px;
-  padding: 18px 18px 14px;
-  background: color-mix(in srgb, var(--app-control-background-soft) 68%, white);
-}
-
-.card-title {
-  display: flex;
-  gap: 12px;
-  min-width: 0;
-  flex: 1;
-  height: 100%;
+  align-items: center;
+  gap: 10px;
 }
 
 .plugin-icon-shell {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-container);
+  border-radius: var(--radius-control);
   flex-shrink: 0;
-  box-shadow: none;
+  font-size: 18px;
 }
 
-.plugin-copy {
+.plugin-name {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-}
-
-.card-title .name {
+  margin: 0;
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.5;
   color: var(--el-text-color-primary);
-  line-height: 1.4;
-  word-break: break-word;
-  font-size: 15px;
+  overflow-wrap: anywhere;
 }
 
-.card-title .desc {
-  color: var(--el-text-color-secondary);
+.plugin-description {
+  margin: 0 0 4px;
   font-size: 13px;
-  margin-top: 6px;
   line-height: 1.7;
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: var(--el-text-color-regular);
+  overflow-wrap: anywhere;
 }
 
-.version-tag {
-  flex-shrink: 0;
-}
-
-.card-body {
-  padding: 14px 18px 0;
-  min-height: 78px;
-}
-
-.meta-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.meta-chip {
+.plugin-meta {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  border-radius: var(--radius-control);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 22%, transparent);
-  background: color-mix(in srgb, var(--app-surface-background) 92%, white);
-}
-
-.meta-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--el-text-color-secondary);
-}
-
-.meta-chip strong {
-  font-size: 13px;
-  color: var(--el-text-color-primary);
-  word-break: break-word;
-}
-
-.card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
   flex-wrap: wrap;
-  padding: 14px 18px 18px;
+  gap: 4px 8px;
   margin-top: auto;
-  border-top: 1px solid color-mix(in srgb, var(--el-border-color) 36%, transparent);
-}
-
-.footer-accent {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--el-text-color-secondary);
   font-size: 12px;
-  font-weight: 600;
+  color: var(--el-text-color-secondary);
 }
 
-.card-actions {
-  display: flex;
-  gap: 8px;
+.plugin-meta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.invoke-btn {
-  min-width: 76px;
-  border-radius: var(--radius-control);
-  box-shadow: none;
+.plugin-meta span + span::before {
+  content: '·';
+  margin-right: 8px;
 }
 
+.plugin-actions,
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
 }
 
-.empty-state {
-  margin-top: 24px;
-}
-
-@media (max-width: 768px) {
-  .plugin-card {
-    height: auto;
-    min-height: 280px;
-  }
-
-  .meta-grid {
-    grid-template-columns: 1fr;
-  }
+.plugin-actions .el-button + .el-button {
+  margin-left: 0;
 }
 
 :deep(.invoke-dialog) {

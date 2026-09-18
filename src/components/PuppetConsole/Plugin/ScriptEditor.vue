@@ -1,12 +1,10 @@
 <template>
   <div class="script-editor">
-    <!-- 工具栏 -->
     <div class="editor-toolbar">
       <div class="toolbar-left">
-        <!-- 模式切换：脚本 / Java Class -->
         <el-radio-group
           v-model="mode"
-          size="default"
+          aria-label="执行类型"
           :disabled="isExecuting || isSaving"
         >
           <el-radio-button
@@ -22,77 +20,28 @@
             Java Class
           </el-radio-button>
         </el-radio-group>
-
-        <!-- 脚本模式：语言下拉 -->
-        <template v-if="mode === 'script'">
-          <span class="toolbar-label">语言</span>
-          <el-select
-            v-model="language"
-            size="default"
-            class="lang-select"
-            :disabled="isExecuting || isSaving"
-          >
-            <el-option
-              v-for="opt in languageOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
-          </el-select>
-        </template>
-
-        <!-- Class 模式：仅保留语言/状态指示，上传 + base64 输入移到主区域 -->
-        <template v-else>
-          <span class="toolbar-label class-mode-hint">
-            <el-icon><Icon :icon="iconMap.coffeeCup" /></el-icon>
-            Java 字节码
-          </span>
-          <span
-            v-if="bytecode.fileName"
-            class="class-file-chip"
-          >
-            <el-icon><Icon :icon="iconMap.document" /></el-icon>
-            {{ bytecode.fileName }}
-          </span>
-          <span
-            v-if="bytecode.base64"
-            class="size-chip"
-            :class="{ invalid: !bytecode.magicValid }"
-          >
-            {{ formatByteSize(bytecode.size) }}
-            <span class="magic-hint">{{ bytecode.magicValid ? '✓ cafebabe' : '⚠ magic 不符' }}</span>
-          </span>
-        </template>
-
-        <span
-          v-if="lastDurationMs != null"
-          class="latency-chip"
+        <el-select
+          v-if="mode === 'script'"
+          v-model="language"
+          aria-label="脚本语言"
+          class="lang-select"
+          :disabled="isExecuting || isSaving"
         >
-          <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
-          {{ lastDurationMs }} ms
-        </span>
+          <el-option
+            v-for="opt in languageOptions"
+            :key="opt.value"
+            :label="opt.label"
+            :value="opt.value"
+          />
+        </el-select>
       </div>
-
       <div class="toolbar-actions">
-        <el-button
-          size="default"
-          :disabled="!canClear || isExecuting || isSaving"
-          @click="clearAll"
-        >
-          <el-icon><Icon :icon="iconMap.delete" /></el-icon>
-          清空
-        </el-button>
-        <el-button
-          size="default"
-          :disabled="!canSave || isExecuting || isSaving"
-          @click="openSaveDialog"
-        >
-          <el-icon><Icon :icon="iconMap.documentAdd" /></el-icon>
-          保存为插件
-        </el-button>
+        <span
+          v-if="executionHint"
+          class="execution-hint"
+        >{{ executionHint }}</span>
         <el-button
           type="primary"
-          size="default"
           :loading="isExecuting"
           :disabled="!canExecute || isSaving"
           @click="execute"
@@ -100,44 +49,65 @@
           <el-icon v-if="!isExecuting">
             <Icon :icon="iconMap.play" />
           </el-icon>
-          执行
+          {{ isExecuting ? '执行中' : '执行' }}
         </el-button>
       </div>
     </div>
 
-    <!-- 编辑区 + 结果区 -->
-    <div class="editor-body">
-      <el-row
-        :gutter="16"
-        class="io-row"
+    <div
+      ref="editorBody"
+      class="editor-body"
+    >
+      <div
+        class="editor-layout"
+        :class="{ 'is-stacked': isStacked, 'is-expanded': editorExpanded }"
+        :style="{ '--editor-width': `${editorWidth}px` }"
       >
-        <el-col :span="12">
-          <!-- 脚本模式：脚本内容 -->
-          <el-card
+        <section
+          class="input-pane io-pane"
+          aria-label="编辑区"
+        >
+          <div class="pane-header">
+            <h3>编辑区</h3>
+            <div class="pane-actions">
+              <el-button
+                size="small"
+                text
+                :disabled="!canClearInput || isExecuting || isSaving"
+                @click="clearInput"
+              >
+                {{ mode === 'script' ? '清空脚本' : '清空输入' }}
+              </el-button>
+              <el-button
+                size="small"
+                text
+                :disabled="!canExecute || isExecuting || isSaving"
+                @click="openSaveDialog"
+              >
+                保存为插件
+              </el-button>
+              <el-button
+                size="small"
+                text
+                :aria-label="editorExpanded ? '恢复分栏' : '展开编辑区'"
+                :title="editorExpanded ? '恢复分栏' : '展开编辑区'"
+                :aria-pressed="editorExpanded"
+                @click="editorExpanded = !editorExpanded"
+              >
+                <el-icon><Icon :icon="editorExpanded ? 'mdi:fullscreen-exit' : iconMap.fullScreen" /></el-icon>
+              </el-button>
+            </div>
+          </div>
+          <el-input
             v-if="mode === 'script'"
-            class="io-card input-card"
-            shadow="never"
-          >
-            <template #header>
-              <div class="card-header-title">
-                <el-icon class="header-icon input-icon">
-                  <Icon :icon="iconMap.codeEdit" />
-                </el-icon>
-                <span>脚本</span>
-                <span class="header-hint">{{ languageHint }}</span>
-              </div>
-            </template>
-            <el-input
-              v-model="script"
-              type="textarea"
-              :rows="18"
-              :placeholder="placeholderText"
-              :disabled="isExecuting || isSaving"
-              spellcheck="false"
-              class="code-input"
-            />
-          </el-card>
-
+            v-model="script"
+            type="textarea"
+            aria-label="脚本内容"
+            :placeholder="placeholderText"
+            :disabled="isExecuting || isSaving"
+            spellcheck="false"
+            class="code-input"
+          />
           <ScriptBytecodeInput
             v-else
             v-model="bytecode"
@@ -146,59 +116,82 @@
             :reset-key="sessionId"
             @update:plugin-param="pluginParam = $event"
           />
-        </el-col>
-
-        <el-col :span="12">
-          <el-card
-            class="io-card output-card"
-            shadow="never"
+        </section>
+        <SplitterBar
+          v-show="!editorExpanded && !isStacked"
+          v-model="editorWidth"
+          :min="320"
+          :max="maxEditorWidth"
+          :aria-valuemin="320"
+          :aria-valuemax="maxEditorWidth"
+          :aria-valuenow="Math.round(editorWidth)"
+          aria-label="调整编辑区宽度"
+          title="拖动或使用左右方向键调整宽度"
+          class="editor-splitter"
+        />
+        <section
+          v-show="!editorExpanded"
+          class="output-pane io-pane"
+          aria-label="执行结果"
+          :aria-busy="isExecuting"
+        >
+          <div class="pane-header">
+            <h3>执行结果</h3>
+            <div
+              v-if="resultState !== 'idle'"
+              class="pane-actions"
+            >
+              <el-button
+                v-if="resultText"
+                size="small"
+                text
+                @click="copyResult"
+              >
+                复制结果
+              </el-button>
+              <el-button
+                size="small"
+                text
+                @click="resetOutput"
+              >
+                清空结果
+              </el-button>
+            </div>
+          </div>
+          <div
+            v-if="isExecuting || resultState !== 'idle'"
+            class="result-status"
+            :class="isExecuting ? 'running' : resultState"
+            role="status"
           >
-            <template #header>
-              <div class="card-header-title">
-                <el-icon class="header-icon output-icon">
-                  <Icon :icon="iconMap.document" />
-                </el-icon>
-                <span>执行结果</span>
-                <div class="header-actions">
-                  <el-button
-                    :disabled="!resultText"
-                    size="small"
-                    text
-                    @click="copyResult"
-                  >
-                    <el-icon><Icon :icon="iconMap.copyDocument" /></el-icon>
-                    复制
-                  </el-button>
-                  <el-button
-                    :disabled="!resultText"
-                    size="small"
-                    text
-                    @click="resultText = ''"
-                  >
-                    <el-icon><Icon :icon="iconMap.delete" /></el-icon>
-                    清空
-                  </el-button>
-                </div>
-              </div>
-            </template>
-            <el-input
-              v-model="resultText"
-              type="textarea"
-              :rows="18"
-              readonly
-              placeholder="点击「执行」查看结果"
-              class="code-input result-input"
-            />
-          </el-card>
-        </el-col>
-      </el-row>
+            <span>{{ isExecuting ? '正在执行…' : resultState === 'success' ? '执行成功' : '执行失败' }}</span>
+            <span v-if="lastDurationMs != null">{{ lastDurationMs }} ms</span>
+          </div>
+          <el-input
+            v-if="resultText"
+            :model-value="resultText"
+            type="textarea"
+            aria-label="执行结果内容"
+            readonly
+            spellcheck="false"
+            class="code-input result-input"
+          />
+          <div
+            v-else
+            class="result-empty"
+          >
+            <el-icon><Icon :icon="iconMap.document" /></el-icon>
+            <p>{{ isExecuting ? '等待节点返回结果' : resultState === 'success' ? '执行完成，无输出内容' : '执行后，结果将在这里显示' }}</p>
+          </div>
+        </section>
+      </div>
     </div>
 
     <!-- 保存为插件弹窗 -->
     <el-dialog
       v-model="saveDialogVisible"
       title="保存为插件"
-      width="520px"
+      width="min(520px, calc(100vw - 32px))"
       :close-on-click-modal="false"
       :close-on-press-escape="!isSaving"
       :show-close="!isSaving"
@@ -277,7 +270,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onUnmounted, ref, unref, watch } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, unref, watch } from 'vue'
 
 import { icons } from '@/utils/icons.js'
 import { execClassApi, execScriptApi } from '@/services/api/puppet-tools.js'
@@ -285,11 +278,11 @@ import { addPluginApi } from '@/services/api/plugins.js'
 import { supportsCapabilityRequirements } from '@/composables/usePuppetConsoleModules.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import SplitterBar from '@/components/common/SplitterBar.vue'
 import ScriptBytecodeInput from './ScriptBytecodeInput.vue'
 import {
   buildPluginPayload,
   createEmptyBytecode,
-  formatByteSize,
   formatExecutionResult,
   getScriptLanguageOptions,
   SCRIPT_PLACEHOLDERS
@@ -315,6 +308,7 @@ const script = ref('')
 const bytecode = ref(createEmptyBytecode())
 const pluginParam = ref('')
 const resultText = ref('')
+const resultState = ref('idle')
 const isExecuting = ref(false)
 const lastDurationMs = ref(null)
 const isSaving = ref(false)
@@ -330,23 +324,44 @@ const canUseClassMode = computed(() =>
   supportsCapabilityRequirements(classModeCapability, unref(puppetCapabilities))
 )
 const languageOptions = computed(() => getScriptLanguageOptions(puppetRuntime.value))
-const languageHint = computed(() =>
-  languageOptions.value.find(option => option.value === language.value)?.label || ''
-)
 const placeholderText = computed(() => SCRIPT_PLACEHOLDERS[language.value] || '在此编写脚本…')
 
 const canExecute = computed(() => {
   if (mode.value === 'script') return canUseScriptMode.value && !!script.value.trim()
   return canUseClassMode.value && !!bytecode.value.base64 && bytecode.value.magicValid
 })
-const canSave = computed(() => canExecute.value)
-const canClear = computed(() => mode.value === 'script'
-  ? !!script.value.trim() || !!resultText.value
-  : !!bytecode.value.base64 || !!pluginParam.value || !!resultText.value
+const canClearInput = computed(() => mode.value === 'script'
+  ? !!script.value
+  : !!bytecode.value.base64 || !!pluginParam.value
 )
+const executionHint = computed(() => {
+  if (isSaving.value) return '正在保存插件'
+  if (canExecute.value) return ''
+  if (mode.value === 'script') return canUseScriptMode.value ? '输入脚本后可执行' : '当前节点不支持脚本执行'
+  if (!canUseClassMode.value) return '当前节点不支持 Java Class'
+  return bytecode.value.base64 ? '请提供有效的 Java Class 字节码' : '上传 .class 或粘贴 Base64 后可执行'
+})
+
+const editorBody = ref(null)
+const bodyWidth = ref(0)
+const editorRatio = ref(0.6)
+const editorExpanded = ref(false)
+const isStacked = computed(() => bodyWidth.value < 720)
+const availableWidth = computed(() => Math.max(0, bodyWidth.value - 6))
+const maxEditorWidth = computed(() => Math.max(320, availableWidth.value - 280))
+const editorWidth = computed({
+  get: () => Math.max(320, Math.min(maxEditorWidth.value, availableWidth.value * editorRatio.value)),
+  set: value => { editorRatio.value = value / Math.max(1, availableWidth.value) }
+})
+let resizeObserver
+onMounted(() => {
+  resizeObserver = new ResizeObserver(([entry]) => { bodyWidth.value = entry.contentRect.width })
+  resizeObserver.observe(editorBody.value)
+})
 
 const resetOutput = () => {
   resultText.value = ''
+  resultState.value = 'idle'
   lastDurationMs.value = null
 }
 
@@ -410,8 +425,9 @@ const execute = async () => {
   const sessionId = props.sessionId
   const executionMode = mode.value
   const startedAt = Date.now()
+  resetOutput()
+  editorExpanded.value = false
   isExecuting.value = true
-  resultText.value = ''
   try {
     const response = executionMode === 'script'
       ? await execScriptApi({ sessionId, language: language.value, script: script.value })
@@ -423,25 +439,26 @@ const execute = async () => {
     if (!mounted || !requestGuard.isCurrent('execute', sequence) || sessionId !== props.sessionId) return
     lastDurationMs.value = Date.now() - startedAt
     resultText.value = formatExecutionResult(response.data)
+    resultState.value = 'success'
     showSuccess(executionMode === 'script' ? '脚本执行完成' : '字节码执行完成')
   } catch (error) {
     if (!mounted || !requestGuard.isCurrent('execute', sequence) || sessionId !== props.sessionId) return
     lastDurationMs.value = Date.now() - startedAt
     resultText.value = '执行失败：' + (error?.message || error)
+    resultState.value = 'error'
     showError('执行失败: ' + (error?.message || error))
   } finally {
     if (requestGuard.isCurrent('execute', sequence)) isExecuting.value = false
   }
 }
 
-const clearAll = () => {
+const clearInput = () => {
   if (isExecuting.value || isSaving.value) return
   if (mode.value === 'script') script.value = ''
   else {
     bytecode.value = createEmptyBytecode()
     pluginParam.value = ''
   }
-  resetOutput()
 }
 
 const copyResult = async () => {
@@ -485,7 +502,7 @@ const saveRules = {
 
 const openSaveDialog = () => {
   if (isSaving.value) return
-  if (!canSave.value) {
+  if (!canExecute.value) {
     showWarning(mode.value === 'script' ? '脚本内容为空' : '请先提供有效的 Java Class 字节码')
     return
   }
@@ -535,6 +552,7 @@ const confirmSave = async () => {
 
 onUnmounted(() => {
   mounted = false
+  resizeObserver?.disconnect()
   requestGuard.invalidate()
 })
 
@@ -548,209 +566,196 @@ defineExpose({ loadPlugin })
   gap: 12px;
   height: 100%;
   min-height: 0;
+  min-width: 0;
+}
+
+.editor-toolbar,
+.toolbar-left,
+.toolbar-actions,
+.pane-header,
+.pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .editor-toolbar {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: var(--radius-container);
-  background: var(--app-control-background-soft);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 30%, transparent);
   flex-wrap: wrap;
   flex-shrink: 0;
 }
 
 .toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   flex-wrap: wrap;
-}
-
-.toolbar-label {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-  font-weight: 600;
-}
-
-.lang-select {
-  width: 160px;
-}
-
-.class-file-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--el-color-primary) 30%, transparent);
-}
-
-.latency-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: var(--el-font-family-mono, 'Consolas', monospace);
-  color: var(--el-color-info);
-  background: color-mix(in srgb, var(--el-color-info) 12%, transparent);
+  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .toolbar-actions {
-  display: flex;
-  gap: 8px;
+  margin-left: auto;
+}
+
+.lang-select {
+  width: 140px;
+}
+
+.execution-hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 
 .editor-body {
   flex: 1;
   min-height: 0;
+  overflow: auto;
 }
 
-.io-row {
+.editor-layout {
+  display: flex;
   height: 100%;
-}
-
-.io-row :deep(.el-col) {
-  height: 100%;
-}
-
-.io-card {
-  height: 100%;
+  min-height: 320px;
+  border: 1px solid var(--el-border-color-light);
   border-radius: var(--radius-container);
-  border: 1px solid var(--el-border-color);
+  background: var(--el-bg-color);
+  overflow: hidden;
+}
+
+.io-pane {
   display: flex;
   flex-direction: column;
-}
-
-.io-card :deep(.el-card__header) {
-  flex-shrink: 0;
-}
-
-.io-card :deep(.el-card__body) {
-  flex: 1;
+  min-width: 0;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
 }
 
-.input-card {
-  border-left: 3px solid color-mix(in srgb, var(--el-color-primary) 72%, transparent);
+.input-pane {
+  flex: 0 0 var(--editor-width);
 }
 
-.output-card {
-  border-left: 3px solid color-mix(in srgb, var(--el-color-info) 72%, transparent);
+.output-pane {
+  flex: 1;
 }
 
-.card-header-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.editor-splitter {
+  background: var(--el-fill-color-light);
+}
+
+.editor-splitter :deep(.splitter-handle) {
+  border-inline: 1px solid var(--el-border-color-lighter);
+}
+
+.pane-header {
+  flex-shrink: 0;
+  min-height: 42px;
+  padding: 6px 12px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.pane-header h3 {
+  margin: 0;
+  font-size: 13px;
   font-weight: 600;
-  font-size: 14px;
   color: var(--el-text-color-primary);
 }
 
-.header-icon {
-  font-size: 16px;
-}
-
-.input-icon {
-  color: var(--el-color-primary);
-}
-
-.output-icon {
-  color: var(--el-color-info);
-}
-
-.header-hint {
-  margin-left: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--el-text-color-secondary);
-}
-
-.header-actions {
+.pane-actions {
+  gap: 0;
   margin-left: auto;
-  display: flex;
-  gap: 4px;
+}
+
+.pane-actions .el-button + .el-button {
+  margin-left: 0;
 }
 
 .code-input {
+  display: flex;
+  flex: 1;
+  min-height: 0;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 13px;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.code-input :deep(.el-textarea) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .code-input :deep(.el-textarea__inner) {
   flex: 1;
-  min-height: 0;
+  min-height: 0 !important;
   height: 100% !important;
-  background: var(--app-control-background);
-  border: 1px solid var(--el-border-color);
-  border-radius: var(--radius-control);
-  padding: 12px;
-  line-height: 1.6;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 14px;
+  line-height: 1.7;
   resize: none;
 }
 
-.code-input :deep(.el-textarea__inner):focus {
-  border-color: color-mix(in srgb, var(--el-color-primary) 36%, var(--el-border-color));
-  background: var(--el-bg-color);
+.code-input :deep(.el-textarea__inner:focus-visible) {
+  box-shadow: inset 0 0 0 1px var(--el-color-primary-light-5);
 }
 
 .result-input :deep(.el-textarea__inner) {
-  background: var(--app-control-background-soft);
   color: var(--el-text-color-primary);
 }
 
-.class-mode-hint {
-  display: inline-flex;
+.result-status {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  color: var(--el-color-primary);
-}
-
-.size-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 10px;
-  border-radius: 999px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
   font-size: 12px;
-  font-weight: 600;
+  color: var(--el-color-primary);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.result-status.success {
   color: var(--el-color-success);
-  background: color-mix(in srgb, var(--el-color-success) 12%, transparent);
 }
 
-.size-chip.invalid {
-  color: var(--el-color-warning);
-  background: color-mix(in srgb, var(--el-color-warning) 14%, transparent);
+.result-status.error {
+  color: var(--el-color-danger);
 }
 
-.magic-hint {
-  font-weight: 400;
-  opacity: 0.85;
+.result-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
+.result-empty .el-icon {
+  font-size: 28px;
+  color: var(--el-text-color-placeholder);
+}
+
+.result-empty p {
+  margin: 0;
+}
+
+.is-stacked {
+  flex-direction: column;
+  min-height: 520px;
+}
+
+.is-stacked .input-pane {
+  flex: 3 0 280px;
+}
+
+.is-stacked .output-pane {
+  flex: 2 0 220px;
+  border-top: 1px solid var(--el-border-color-light);
+}
+
+.is-expanded {
+  min-height: 320px;
+}
+
+.is-expanded .input-pane {
+  flex: 1;
+}
 </style>
