@@ -95,12 +95,6 @@
         <span>{{ detail.tags?.length || 0 }} 标签</span>
         <span>{{ requestList.length }} 请求</span>
         <span>版本 {{ detail.info?.version || '-' }}</span>
-        <span
-          class="risk-pill"
-          :class="{ 'has-vulns': vulnerabilityList.length }"
-        >
-          {{ vulnerabilityList.length ? `已知漏洞 ${vulnerabilityList.length}` : '暂无已知漏洞' }}
-        </span>
       </div>
 
       <div class="info-grid">
@@ -160,92 +154,6 @@
             </div>
           </div>
         </article>
-      </div>
-
-      <div
-        v-if="vulnerabilityList.length"
-        class="vulnerability-panel panel"
-      >
-        <div class="panel-header">
-          已知漏洞情报
-          <el-tag
-            type="danger"
-            size="small"
-            effect="plain"
-            class="vuln-count-tag"
-          >
-            {{ vulnerabilityList.length }}
-          </el-tag>
-        </div>
-        <div class="vulnerability-list">
-          <article
-            v-for="(vuln, index) in vulnerabilityList"
-            :key="index"
-            class="vulnerability-card"
-            :class="`severity-${vuln.severity || 'unknown'}`"
-          >
-            <div class="vuln-header">
-              <el-tag
-                :type="severityTagType(vuln.severity)"
-                size="small"
-                effect="dark"
-                class="vuln-severity-tag"
-              >
-                {{ severityLabel(vuln.severity) }}
-              </el-tag>
-              <h4 class="vuln-title">
-                {{ vuln.title || '未命名漏洞' }}
-              </h4>
-              <el-tag
-                v-if="vuln.cve"
-                size="small"
-                type="warning"
-                effect="plain"
-              >
-                {{ vuln.cve }}
-              </el-tag>
-              <el-tag
-                v-if="vuln.exploitSkill"
-                size="small"
-                type="success"
-                effect="plain"
-              >
-                skill: {{ vuln.exploitSkill }}
-              </el-tag>
-            </div>
-            <p
-              v-if="vuln.description"
-              class="vuln-description"
-            >
-              {{ vuln.description }}
-            </p>
-            <div
-              v-if="vuln.references && vuln.references.length"
-              class="vuln-references"
-            >
-              <template
-                v-for="ref in vuln.references"
-                :key="ref"
-              >
-                <a
-                  v-if="isSafeUrl(ref)"
-                  :href="ref"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {{ ref }}
-                </a>
-                <span
-                  v-else
-                  class="vuln-reference-invalid"
-                  :title="'非 http(s) 协议,已禁用跳转'"
-                >
-                  {{ ref }}
-                </span>
-              </template>
-            </div>
-          </article>
-        </div>
       </div>
 
       <div class="request-panel panel">
@@ -381,39 +289,6 @@ function handleActionCommand(command) {
   if (command === 'delete') {
     emit('delete')
   }
-}
-
-const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 }
-const vulnerabilityList = computed(() => {
-  const list = props.detail?.info?.vulnerabilities
-  if (!Array.isArray(list)) return []
-  return [...list].sort((a, b) => {
-    const aw = SEVERITY_ORDER[(a?.severity || '').toLowerCase()] ?? 99
-    const bw = SEVERITY_ORDER[(b?.severity || '').toLowerCase()] ?? 99
-    return aw - bw
-  })
-})
-
-function severityTagType(severity) {
-  const s = (severity || '').toLowerCase()
-  if (s === 'critical') return 'danger'
-  if (s === 'high') return 'warning'
-  if (s === 'medium') return 'primary'
-  if (s === 'low') return 'info'
-  return 'info'
-}
-
-function severityLabel(severity) {
-  const s = (severity || '').toLowerCase()
-  if (s === 'critical') return '严重'
-  if (s === 'high') return '高危'
-  if (s === 'medium') return '中危'
-  if (s === 'low') return '低危'
-  return '未分级'
-}
-
-function isSafeUrl(url) {
-  return /^https?:\/\//i.test(String(url || '').trim())
 }
 
 function formatHeaders(headers) {
@@ -565,23 +440,6 @@ function formatHeaders(headers) {
   background: color-mix(in srgb, var(--el-text-color-secondary) 42%, transparent);
 }
 
-.risk-pill {
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: var(--radius-tag);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 40%, transparent);
-  background: var(--detail-surface-muted);
-  font-weight: 700;
-}
-
-.risk-pill.has-vulns {
-  color: var(--el-color-danger);
-  border-color: color-mix(in srgb, var(--el-color-danger) 30%, transparent);
-  background: color-mix(in srgb, var(--el-color-danger) 8%, var(--detail-surface-muted));
-}
-
 .info-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -647,22 +505,6 @@ function formatHeaders(headers) {
   gap: 6px;
 }
 
-.summary-chip.has-vulns {
-  border-color: color-mix(in srgb, var(--el-color-danger) 36%, transparent);
-  background: color-mix(in srgb, var(--el-color-danger-light-9) 75%, var(--detail-surface-raised));
-}
-
-.summary-chip.has-vulns strong {
-  color: var(--el-color-danger);
-}
-
-.vulnerability-panel .panel-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.vulnerability-panel,
 .request-panel,
 .script-panel {
   margin-left: 18px;
@@ -671,108 +513,6 @@ function formatHeaders(headers) {
 
 .script-panel {
   margin-bottom: 18px;
-}
-
-.vuln-count-tag {
-  margin-left: 4px;
-}
-
-.vulnerability-list {
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.vulnerability-card {
-  padding: 12px 14px;
-  border-radius: var(--radius-control);
-  background: var(--detail-surface-muted);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 30%, transparent);
-  border-left-width: 3px;
-}
-
-.vulnerability-card.severity-critical {
-  border-left-color: var(--el-color-danger);
-}
-
-.vulnerability-card.severity-high {
-  border-left-color: var(--el-color-warning);
-}
-
-.vulnerability-card.severity-medium {
-  border-left-color: var(--el-color-primary);
-}
-
-.vulnerability-card.severity-low {
-  border-left-color: var(--el-color-info);
-}
-
-.vulnerability-card.severity-unknown {
-  border-left-color: color-mix(in srgb, var(--el-border-color) 60%, transparent);
-}
-
-.vuln-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-
-.vuln-title {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.4;
-  font-weight: 600;
-  flex: 1 1 auto;
-  min-width: 0;
-  word-break: break-word;
-}
-
-.vuln-severity-tag {
-  flex-shrink: 0;
-}
-
-.vuln-description {
-  margin: 0 0 8px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--el-text-color-regular);
-  word-break: break-word;
-}
-
-.vuln-description:last-child {
-  margin-bottom: 0;
-}
-
-.vuln-references {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: 6px;
-  border-top: 1px dashed color-mix(in srgb, var(--el-border-color) 40%, transparent);
-}
-
-.vuln-references a {
-  font-size: 12px;
-  font-family: var(--el-font-family-mono);
-  color: var(--el-color-primary);
-  text-decoration: none;
-  word-break: break-all;
-}
-
-.vuln-references a:hover {
-  text-decoration: underline;
-}
-
-.vuln-reference-invalid {
-  font-size: 12px;
-  font-family: var(--el-font-family-mono);
-  color: var(--el-text-color-secondary);
-  text-decoration: line-through;
-  word-break: break-all;
-  cursor: not-allowed;
 }
 
 .request-list {

@@ -1,36 +1,34 @@
+import { deferred } from '@/test-support/deferred.js'
 import { effectScope, nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useTerminalWorkspace } from './useTerminalWorkspace.js'
 import { testTerminalTransport } from './test-support/terminalTransport.js'
 
-afterEach(() => vi.useRealTimers())
+const scopes = []
+afterEach(() => {
+  scopes.splice(0).forEach((scope) => scope.stop())
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 
 async function flushRequests() {
   for (let i = 0; i < 30; i += 1) await Promise.resolve()
 }
 
-function deferred() {
-  let resolve
-  const promise = new Promise((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
-
 function createWorkspace(executeCommand, options = {}) {
   const scope = effectScope()
+  scopes.push(scope)
   const hostSessionId = ref('host-a')
   const ids = ['process-a', 'process-b', 'process-c']
-  let workspace
-  scope.run(() => {
-    workspace = useTerminalWorkspace({
+  const workspace = scope.run(() =>
+    useTerminalWorkspace({
       hostSessionId,
       executeCommand: testTerminalTransport(executeCommand),
       createProcessId: () => ids.shift(),
       pollingConfig: { interval: 60000 },
       ...options
     })
-  })
+  )
   return { scope, hostSessionId, workspace }
 }
 
@@ -39,39 +37,31 @@ describe('useTerminalWorkspace', () => {
     const page = new globalThis.EventTarget()
     page.hidden = false
     vi.stubGlobal('document', page)
-    let scope
-    try {
-      const executeCommand = vi.fn(() =>
-        Promise.resolve({
-          data: { code: 200, alive: true, pty: false, resizable: false }
-        })
-      )
-      const workspaceState = createWorkspace(executeCommand)
-      scope = workspaceState.scope
-      const { workspace } = workspaceState
-      await workspace.handleViewportReady(workspace.sessions.value[0].id)
-      const selected = await workspace.createSession()
-      await workspace.handleViewportReady(selected.id)
-      await flushRequests()
-      executeCommand.mockClear()
-      page.hidden = true
-      page.dispatchEvent(new globalThis.Event('visibilitychange'))
-      await flushRequests()
-      expect(executeCommand).not.toHaveBeenCalled()
-      page.hidden = false
-      page.dispatchEvent(new globalThis.Event('visibilitychange'))
-      await flushRequests()
-      expect(executeCommand.mock.calls.map(([params]) => params.processId)).toEqual([selected.id])
-      scope.stop()
-      await flushRequests()
-      executeCommand.mockClear()
-      page.dispatchEvent(new globalThis.Event('visibilitychange'))
-      await flushRequests()
-      expect(executeCommand).not.toHaveBeenCalled()
-    } finally {
-      scope?.stop()
-      vi.unstubAllGlobals()
-    }
+    const executeCommand = vi.fn(() =>
+      Promise.resolve({
+        data: { code: 200, alive: true, pty: false, resizable: false }
+      })
+    )
+    const { scope, workspace } = createWorkspace(executeCommand)
+    await workspace.handleViewportReady(workspace.sessions.value[0].id)
+    const selected = await workspace.createSession()
+    await workspace.handleViewportReady(selected.id)
+    await flushRequests()
+    executeCommand.mockClear()
+    page.hidden = true
+    page.dispatchEvent(new globalThis.Event('visibilitychange'))
+    await flushRequests()
+    expect(executeCommand).not.toHaveBeenCalled()
+    page.hidden = false
+    page.dispatchEvent(new globalThis.Event('visibilitychange'))
+    await flushRequests()
+    expect(executeCommand.mock.calls.map(([params]) => params.processId)).toEqual([selected.id])
+    scope.stop()
+    await flushRequests()
+    executeCommand.mockClear()
+    page.dispatchEvent(new globalThis.Event('visibilitychange'))
+    await flushRequests()
+    expect(executeCommand).not.toHaveBeenCalled()
   })
 
   it('slows background reads and refreshes immediately when a terminal is selected', async () => {
@@ -89,7 +79,7 @@ describe('useTerminalWorkspace', () => {
         }
       })
     )
-    const { scope, workspace } = createWorkspace(executeCommand, {
+    const { workspace } = createWorkspace(executeCommand, {
       pollingConfig: { interval: 250 }
     })
     const first = workspace.sessions.value[0]
@@ -110,7 +100,6 @@ describe('useTerminalWorkspace', () => {
     expect(executeCommand).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'read', processId: first.id, cmd: '10000' })
     )
-    scope.stop()
   })
 
   it('defaults to a pipe and creates a separate PTY without stopping the first process', async () => {
@@ -123,7 +112,7 @@ describe('useTerminalWorkspace', () => {
         }
       })
     )
-    const { scope, workspace } = createWorkspace(executeCommand)
+    const { workspace } = createWorkspace(executeCommand)
     const pipe = workspace.sessions.value[0]
     await workspace.handleViewportReady(pipe.id)
     expect(executeCommand).toHaveBeenCalledWith(
@@ -155,7 +144,6 @@ describe('useTerminalWorkspace', () => {
       includeOutput: true,
       cmd: 'echo pipe\n'
     })
-    scope.stop()
   })
 
   it('uses the reported modes and keeps Java mode selection out of PHP initialization', async () => {
@@ -167,19 +155,17 @@ describe('useTerminalWorkspace', () => {
     expect(
       java.workspace.terminalModeOptions.value.find((mode) => mode.value === 'python-pty').disabled
     ).toBe(true)
-    java.scope.stop()
     executeCommand.mockClear()
     const php = createWorkspace(executeCommand, { runtime: ref('php') })
     await php.workspace.handleViewportReady(php.workspace.sessions.value[0].id)
     const initialization = executeCommand.mock.calls.find(([p]) => p.type === 'init')[0]
     expect(initialization).not.toHaveProperty('terminalMode')
     expect(php.workspace.terminalModeOptions.value).toEqual([])
-    php.scope.stop()
   })
 
   it('stops old processes with their captured host session when the host changes', async () => {
     const executeCommand = vi.fn(() => Promise.resolve({ data: { data: '' } }))
-    const { scope, hostSessionId, workspace } = createWorkspace(executeCommand)
+    const { hostSessionId, workspace } = createWorkspace(executeCommand)
     await nextTick()
 
     hostSessionId.value = 'host-b'
@@ -196,7 +182,6 @@ describe('useTerminalWorkspace', () => {
       id: 'process-b',
       hostSessionId: 'host-b'
     })
-    scope.stop()
   })
 
   it('drops queued writes and stays empty after the last session is closed', async () => {
@@ -205,7 +190,7 @@ describe('useTerminalWorkspace', () => {
       if (params.type === 'write' && params.cmd === 'first') return firstWrite.promise
       return Promise.resolve({ data: { data: '' } })
     })
-    const { scope, workspace } = createWorkspace(executeCommand)
+    const { workspace } = createWorkspace(executeCommand)
     await nextTick()
     const session = workspace.sessions.value[0]
     session.viewportReady = true
@@ -220,7 +205,6 @@ describe('useTerminalWorkspace', () => {
     expect(workspace.sessions.value).toHaveLength(0)
     expect(workspace.activeSessionId.value).toBe('')
     expect((await workspace.createSession()).id).toBe('process-b')
-    scope.stop()
   })
 
   it('does not render read output after a host session switch', async () => {
@@ -229,7 +213,7 @@ describe('useTerminalWorkspace', () => {
       if (params.type === 'read') return pendingRead.promise
       return Promise.resolve({ data: { data: '' } })
     })
-    const { scope, hostSessionId, workspace } = createWorkspace(executeCommand)
+    const { hostSessionId, workspace } = createWorkspace(executeCommand)
     await nextTick()
     const session = workspace.sessions.value[0]
     const viewport = { write: vi.fn(), fit: vi.fn(), focus: vi.fn() }
@@ -244,7 +228,6 @@ describe('useTerminalWorkspace', () => {
     await write
 
     expect(viewport.write).not.toHaveBeenCalled()
-    scope.stop()
   })
 
   it('deduplicates repeated viewport initialization events', async () => {
@@ -252,7 +235,7 @@ describe('useTerminalWorkspace', () => {
     const executeCommand = vi.fn((params) =>
       params.type === 'init' ? init.promise : Promise.resolve({ data: { data: '' } })
     )
-    const { scope, workspace } = createWorkspace(executeCommand)
+    const { workspace } = createWorkspace(executeCommand)
     await nextTick()
     const session = await workspace.createSession('python-pty')
 
@@ -276,7 +259,6 @@ describe('useTerminalWorkspace', () => {
       backend: 'python3-pty',
       instanceId: 'instance-a'
     })
-    scope.stop()
   })
 
   it('serializes early terminal input behind backend initialization', async () => {
@@ -284,7 +266,7 @@ describe('useTerminalWorkspace', () => {
     const executeCommand = vi.fn((params) =>
       params.type === 'init' ? init.promise : Promise.resolve({ data: { data: '' } })
     )
-    const { scope, workspace } = createWorkspace(executeCommand)
+    const { workspace } = createWorkspace(executeCommand)
     await nextTick()
     const session = workspace.sessions.value[0]
 
@@ -296,7 +278,6 @@ describe('useTerminalWorkspace', () => {
     init.resolve({})
     await Promise.all([initializing, writing])
     expect(executeCommand.mock.calls.some(([params]) => params.cmd === 'whoami\n')).toBe(true)
-    scope.stop()
   })
 
   it('releases queued write state when terminal initialization fails', async () => {
@@ -305,7 +286,7 @@ describe('useTerminalWorkspace', () => {
       params.type === 'init' ? init.promise : Promise.resolve({ data: { data: '' } })
     )
     const onError = vi.fn()
-    const { scope, workspace } = createWorkspace(executeCommand, { onError })
+    const { workspace } = createWorkspace(executeCommand, { onError })
     await nextTick()
     const session = workspace.sessions.value[0]
 
@@ -319,14 +300,13 @@ describe('useTerminalWorkspace', () => {
       endReason: '终端初始化失败: startup failed'
     })
     expect(onError).toHaveBeenCalledWith('终端初始化失败: startup failed')
-    scope.stop()
   })
 
   it('continues low-frequency reads after a session becomes idle', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(100000)
     const executeCommand = vi.fn(() => Promise.resolve({ data: { data: '' } }))
-    const { scope, workspace } = createWorkspace(executeCommand, {
+    const { workspace } = createWorkspace(executeCommand, {
       pollingConfig: { interval: 10, idleIntervals: [20] }
     })
     await nextTick()
@@ -336,8 +316,6 @@ describe('useTerminalWorkspace', () => {
     await vi.advanceTimersByTimeAsync(30)
 
     expect(executeCommand.mock.calls.some(([params]) => params.type === 'read')).toBe(true)
-    scope.stop()
-    vi.useRealTimers()
   })
 
   it('uses bounded long polling after the backend advertises support', async () => {
@@ -348,7 +326,7 @@ describe('useTerminalWorkspace', () => {
       }
       return Promise.resolve({ data: { alive: true, data: '' } })
     })
-    const { scope, workspace } = createWorkspace(executeCommand, {
+    const { workspace } = createWorkspace(executeCommand, {
       pollingConfig: { interval: 250, longPollWait: 750 }
     })
     await nextTick()
@@ -367,7 +345,6 @@ describe('useTerminalWorkspace', () => {
       type: 'read'
     })
     expect(session.longPolling).toBe(true)
-    scope.stop()
   })
 
   it('stops polling and writing after the backend reports an ended terminal', async () => {
@@ -377,7 +354,7 @@ describe('useTerminalWorkspace', () => {
       }
       return Promise.resolve({ data: { alive: true, data: '' } })
     })
-    const { scope, workspace } = createWorkspace(executeCommand)
+    const { workspace } = createWorkspace(executeCommand)
     await nextTick()
     const session = workspace.sessions.value[0]
     const viewport = { write: vi.fn(), fit: vi.fn(), focus: vi.fn() }
@@ -396,7 +373,6 @@ describe('useTerminalWorkspace', () => {
       writeCount
     )
     expect(viewport.write).toHaveBeenCalledWith(expect.stringContaining('创建新终端'))
-    scope.stop()
   })
 
   it('backs off repeated read failures', async () => {
@@ -407,7 +383,7 @@ describe('useTerminalWorkspace', () => {
         ? Promise.reject(new Error('temporary read failure'))
         : Promise.resolve({ data: { alive: true, data: '' } })
     )
-    const { scope, workspace } = createWorkspace(executeCommand, {
+    const { workspace } = createWorkspace(executeCommand, {
       pollingConfig: {
         interval: 10,
         errorBaseInterval: 100,
@@ -421,15 +397,12 @@ describe('useTerminalWorkspace', () => {
     expect(executeCommand.mock.calls.filter(([params]) => params.type === 'read')).toHaveLength(1)
     await vi.advanceTimersByTimeAsync(30)
     expect(executeCommand.mock.calls.filter(([params]) => params.type === 'read')).toHaveLength(2)
-
-    scope.stop()
-    vi.useRealTimers()
   })
 
   it('debounces terminal resize and sends the latest PTY dimensions', async () => {
     vi.useFakeTimers()
     const executeCommand = vi.fn(() => Promise.resolve({ data: { data: '' } }))
-    const { scope, workspace } = createWorkspace(executeCommand)
+    const { workspace } = createWorkspace(executeCommand)
     await nextTick()
     const session = workspace.sessions.value[0]
     session.viewportReady = true
@@ -445,14 +418,12 @@ describe('useTerminalWorkspace', () => {
       type: 'resize'
     })
     expect(executeCommand.mock.calls.filter(([params]) => params.type === 'resize')).toHaveLength(1)
-    scope.stop()
-    vi.useRealTimers()
   })
 
   it('keeps the local viewport fitted without sending resize to fixed backends', async () => {
     vi.useFakeTimers()
     const executeCommand = vi.fn(() => Promise.resolve({ data: { data: '' } }))
-    const { scope, workspace } = createWorkspace(executeCommand)
+    const { workspace } = createWorkspace(executeCommand)
     await nextTick()
     const session = workspace.sessions.value[0]
     session.viewportReady = true
@@ -463,8 +434,6 @@ describe('useTerminalWorkspace', () => {
 
     expect(session).toMatchObject({ cols: 120, rows: 36 })
     expect(executeCommand.mock.calls.some(([params]) => params.type === 'resize')).toBe(false)
-    scope.stop()
-    vi.useRealTimers()
   })
 
   it('detects terminal requests routed to a different service instance', async () => {
@@ -478,7 +447,7 @@ describe('useTerminalWorkspace', () => {
       }
       return Promise.resolve({ data: { data: '' } })
     })
-    const { scope, workspace } = createWorkspace(executeCommand, {
+    const { workspace } = createWorkspace(executeCommand, {
       pollingConfig: { interval: 250 }
     })
     await nextTick()
@@ -494,7 +463,6 @@ describe('useTerminalWorkspace', () => {
     expect(session.routingMismatch).toBe(true)
     expect(session.ended).toBe(false)
     expect(viewport.write).toHaveBeenCalledWith(expect.stringContaining('会话粘性路由'))
-    scope.stop()
   })
 
   it('rejects a component error returned inside a successful HTTP response', async () => {
@@ -504,7 +472,7 @@ describe('useTerminalWorkspace', () => {
       })
     )
     const onError = vi.fn()
-    const { scope, workspace } = createWorkspace(executeCommand, { onError })
+    const { workspace } = createWorkspace(executeCommand, { onError })
     await nextTick()
     const session = workspace.sessions.value[0]
     await workspace.handleViewportReady(session.id)
@@ -512,7 +480,6 @@ describe('useTerminalWorkspace', () => {
     expect(session).toMatchObject({ viewportReady: false, ended: true })
     expect(onError).toHaveBeenCalledWith('终端初始化失败: startup failed')
     expect(executeCommand.mock.calls.some(([p]) => p.cmd === 'whoami\n')).toBe(false)
-    scope.stop()
   })
 
   it('sends subsequent input while a long read is still pending', async () => {
@@ -520,7 +487,7 @@ describe('useTerminalWorkspace', () => {
     const executeCommand = vi.fn((p) =>
       p.type === 'read' ? read.promise : Promise.resolve({ data: { code: 200, alive: true } })
     )
-    const { scope, workspace } = createWorkspace(executeCommand)
+    const { workspace } = createWorkspace(executeCommand)
     await nextTick()
     const session = workspace.sessions.value[0]
     session.viewportReady = true
@@ -534,7 +501,6 @@ describe('useTerminalWorkspace', () => {
     expect(executeCommand.mock.calls.filter(([p]) => p.type === 'read')).toHaveLength(1)
     read.resolve({ data: { alive: true, data: '' } })
     await flushRequests()
-    scope.stop()
   })
 
   it('interrupts a running command without waiting for its write response', async () => {
@@ -544,7 +510,7 @@ describe('useTerminalWorkspace', () => {
         ? running.promise
         : Promise.resolve({ data: { code: 200, alive: true } })
     )
-    const { scope, workspace } = createWorkspace(executeCommand)
+    const { workspace } = createWorkspace(executeCommand)
     await nextTick()
     const session = workspace.sessions.value[0]
     session.viewportReady = true
@@ -557,7 +523,6 @@ describe('useTerminalWorkspace', () => {
     running.resolve({ data: { code: 200, alive: true } })
     await Promise.all([first, queued])
     expect(executeCommand.mock.calls.some(([p]) => p.cmd === 'stale input')).toBe(false)
-    scope.stop()
   })
 
   it('drains output after process exit and preserves UTF-8 across reads', async () => {
@@ -572,7 +537,7 @@ describe('useTerminalWorkspace', () => {
     const executeCommand = vi.fn((p) =>
       Promise.resolve({ data: p.type === 'read' ? chunks.shift() : { code: 200, alive: false } })
     )
-    const { scope, workspace } = createWorkspace(executeCommand, {
+    const { workspace } = createWorkspace(executeCommand, {
       pollingConfig: { interval: 10 }
     })
     await nextTick()
@@ -591,8 +556,6 @@ describe('useTerminalWorkspace', () => {
     const count = executeCommand.mock.calls.length
     await vi.advanceTimersByTimeAsync(40)
     expect(executeCommand.mock.calls).toHaveLength(count)
-    scope.stop()
-    vi.useRealTimers()
   })
 
   it('stops again after a removed session finishes initialization', async () => {
@@ -600,7 +563,7 @@ describe('useTerminalWorkspace', () => {
     const executeCommand = vi.fn((p) =>
       p.type === 'init' ? init.promise : Promise.resolve({ data: { code: 200 } })
     )
-    const { scope, workspace } = createWorkspace(executeCommand)
+    const { workspace } = createWorkspace(executeCommand)
     await nextTick()
     const session = workspace.sessions.value[0]
     const initializing = workspace.handleViewportReady(session.id)
@@ -614,7 +577,6 @@ describe('useTerminalWorkspace', () => {
     expect(
       executeCommand.mock.calls.filter(([p]) => p.type === 'stop' && p.processId === session.id)
     ).toHaveLength(2)
-    scope.stop()
   })
 
   it('retries failed cleanup and reports an exhausted retry budget', async () => {
@@ -630,6 +592,5 @@ describe('useTerminalWorkspace', () => {
     executeCommand.mockImplementation(() => Promise.resolve({ data: { code: 200 } }))
     scope.stop()
     await vi.runOnlyPendingTimersAsync()
-    vi.useRealTimers()
   })
 })

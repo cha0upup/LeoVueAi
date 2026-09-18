@@ -9,15 +9,6 @@ const toTimeout = (value) => {
     : DEFAULT_TIMEOUT
 }
 
-export const createEmptyVulnerability = () => ({
-  title: '',
-  cve: '',
-  severity: '',
-  description: '',
-  exploitSkill: '',
-  references: []
-})
-
 export const createEmptyRequest = () => ({
   method: 'GET',
   path: '/',
@@ -33,7 +24,6 @@ export const createEmptyFingerprintForm = () => ({
   tagsStr: '',
   infoAuthor: '',
   infoRemark: '',
-  vulnerabilityList: [],
   requestList: [createEmptyRequest()],
   versionExtractText: '',
   matchText: JSON.stringify(DEFAULT_MATCH, null, 2)
@@ -68,20 +58,6 @@ export const normalizeRequests = (requests, ensureOne = true) => {
 
 export const loadFingerprintForm = (fingerprint) => {
   if (!fingerprint) return createEmptyFingerprintForm()
-  const vulnerabilities = Array.isArray(fingerprint.info?.vulnerabilities)
-    ? fingerprint.info.vulnerabilities.map((item) => ({
-        title: String(item?.title ?? ''),
-        cve: String(item?.cve ?? ''),
-        severity: String(item?.severity ?? ''),
-        description: String(item?.description ?? ''),
-        exploitSkill: String(item?.exploitSkill ?? ''),
-        references: Array.isArray(item?.references)
-          ? item.references.map((reference) => ({
-              value: String(reference?.value ?? reference ?? '')
-            }))
-          : []
-      }))
-    : []
   return {
     fingerprintId: String(fingerprint.fingerprintId || ''),
     name: String(fingerprint.name || ''),
@@ -91,7 +67,6 @@ export const loadFingerprintForm = (fingerprint) => {
       : String(fingerprint.tags || ''),
     infoAuthor: String(fingerprint.info?.author || ''),
     infoRemark: String(fingerprint.info?.remark || ''),
-    vulnerabilityList: vulnerabilities,
     requestList: normalizeRequests(fingerprint.rule?.requests),
     versionExtractText: fingerprint.rule?.version ? JSON.stringify(fingerprint.rule.version, null, 2) : '',
     matchText: JSON.stringify(fingerprint.rule?.match || DEFAULT_MATCH, null, 2)
@@ -116,34 +91,6 @@ const buildHeaders = (headers) => {
   return result
 }
 
-export const findIncompleteVulnerabilities = (vulnerabilities) =>
-  (Array.isArray(vulnerabilities) ? vulnerabilities : []).filter((item) => {
-    if (String(item?.title || '').trim()) return false
-    return Boolean(
-      String(item?.cve || '').trim() ||
-      String(item?.severity || '').trim() ||
-      String(item?.description || '').trim() ||
-      String(item?.exploitSkill || '').trim() ||
-      item?.references?.some((reference) => String(reference?.value || '').trim())
-    )
-  })
-
-const buildVulnerabilities = (vulnerabilities) =>
-  (Array.isArray(vulnerabilities) ? vulnerabilities : []).flatMap((item) => {
-    const title = String(item?.title || '').trim()
-    if (!title) return []
-    const result = { title }
-    ;['cve', 'severity', 'description', 'exploitSkill'].forEach((key) => {
-      const value = String(item?.[key] || '').trim()
-      if (value) result[key] = value
-    })
-    const references = (Array.isArray(item?.references) ? item.references : [])
-      .map((reference) => String(reference?.value ?? '').trim())
-      .filter(Boolean)
-    if (references.length) result.references = references
-    return [result]
-  })
-
 export const buildFingerprintPayload = (form) => {
   const requests = normalizeRequests(form?.requestList, false).map((request) => {
     const result = { method: request.method, path: request.path, timeout: request.timeout }
@@ -161,8 +108,6 @@ export const buildFingerprintPayload = (form) => {
   const remark = String(form?.infoRemark || '').trim()
   if (author) info.author = author
   if (remark) info.remark = remark
-  const vulnerabilities = buildVulnerabilities(form?.vulnerabilityList)
-  if (vulnerabilities.length) info.vulnerabilities = vulnerabilities
   const payload = {
     name: String(form?.name || '').trim(),
     info,

@@ -28,66 +28,43 @@ afterEach(() => {
 })
 
 describe('SqlEngine runtime-neutral connections', () => {
-  it('passes abort signals as request config instead of serializing them', async () => {
+  it.each([
+    [
+      'queryTable',
+      'querySqlTableApi',
+      { rows: [] },
+      {
+        objectRef: { catalog: 'main', name: 'events', kind: 'table' },
+        queryTimeoutSeconds: 45
+      }
+    ],
+    ['getDatabases', 'getSqlDatabasesApi', { databases: [] }, {}],
+    [
+      'getTables',
+      'getSqlTablesApi',
+      { tables: [] },
+      {
+        objectRef: { catalog: 'main', kind: 'catalog' }
+      }
+    ],
+    ['testConnection', 'testSqlConnectionApi', { success: true }, {}]
+  ])('passes abort signals separately from the %s payload', async (method, api, data, options) => {
     const controller = new AbortController()
-    apiMocks.querySqlTableApi.mockResolvedValueOnce({ data: { rows: [] } })
+    const request = apiMocks[api]
+    request.mockResolvedValueOnce({ data })
 
-    await sqlEngine.queryTable({
+    await sqlEngine[method]({
       sessionId: 'session-1',
       connection: { dialect: 'sqlite', connectionMode: 'standard', file: ':memory:' },
-      objectRef: { catalog: 'main', name: 'events', kind: 'table' },
-      queryTimeoutSeconds: 45,
+      ...options,
       signal: controller.signal
     })
 
-    expect(apiMocks.querySqlTableApi).toHaveBeenCalledWith(
+    expect(request).toHaveBeenCalledWith(
       expect.not.objectContaining({ signal: expect.anything() }),
       { signal: controller.signal }
     )
-    expect(apiMocks.querySqlTableApi.mock.calls[0][0]).toMatchObject({
-      sessionId: 'session-1',
-      queryTimeoutSeconds: 45
-    })
-  })
-
-  it('passes abort signals to metadata requests', async () => {
-    const controller = new AbortController()
-    apiMocks.getSqlDatabasesApi.mockResolvedValueOnce({ data: { databases: [] } })
-    apiMocks.getSqlTablesApi.mockResolvedValueOnce({ data: { tables: [] } })
-
-    const params = {
-      sessionId: 'session-1',
-      connection: { dialect: 'sqlite', file: ':memory:' },
-      signal: controller.signal
-    }
-    await sqlEngine.getDatabases(params)
-    const objectRef = { catalog: 'main', kind: 'catalog' }
-    await sqlEngine.getTables({ ...params, objectRef })
-
-    expect(apiMocks.getSqlDatabasesApi).toHaveBeenCalledWith(
-      expect.not.objectContaining({ signal: expect.anything() }),
-      { signal: controller.signal }
-    )
-    expect(apiMocks.getSqlTablesApi).toHaveBeenCalledWith(
-      expect.objectContaining({ objectRef }),
-      { signal: controller.signal }
-    )
-  })
-
-  it('passes abort signals to connection tests', async () => {
-    const controller = new AbortController()
-    apiMocks.testSqlConnectionApi.mockResolvedValueOnce({ data: { success: true } })
-
-    await sqlEngine.testConnection({
-      sessionId: 'session-1',
-      connection: { dialect: 'sqlite', file: ':memory:' },
-      signal: controller.signal
-    })
-
-    expect(apiMocks.testSqlConnectionApi).toHaveBeenCalledWith(
-      expect.not.objectContaining({ signal: expect.anything() }),
-      { signal: controller.signal }
-    )
+    expect(request.mock.lastCall[0]).toMatchObject({ sessionId: 'session-1', ...options })
   })
 
   it('builds a canonical connection payload without JDBC or PDO fields', () => {

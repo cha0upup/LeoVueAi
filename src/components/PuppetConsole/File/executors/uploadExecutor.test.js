@@ -1,3 +1,4 @@
+import { deferred } from '@/test-support/deferred.js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TaskStatus } from '@/constants/task.js'
 import { applyUploadExecutor } from './uploadExecutor.js'
@@ -10,15 +11,6 @@ vi.mock('@/services/api.js', () => ({
   moveFileApi: vi.fn(),
   newFileApi: vi.fn()
 }))
-function deferred() {
-  let resolve
-  let reject
-  const promise = new Promise((yes, no) => {
-    resolve = yes
-    reject = no
-  })
-  return { promise, resolve, reject }
-}
 function fixture(content = 'abc') {
   class Engine {}
   applyUploadExecutor(Engine)

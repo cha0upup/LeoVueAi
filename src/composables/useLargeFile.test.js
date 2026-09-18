@@ -1,3 +1,4 @@
+import { deferred } from '@/test-support/deferred.js'
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { previewFileChunkApi } from '@/services/api.js'
@@ -6,14 +7,6 @@ import { useLargeFile } from './useLargeFile.js'
 vi.mock('@/services/api.js', () => ({
   previewFileChunkApi: vi.fn()
 }))
-
-function deferred() {
-  let resolve
-  const promise = new Promise((res) => {
-    resolve = res
-  })
-  return { promise, resolve }
-}
 
 describe('useLargeFile', () => {
   beforeEach(() => vi.clearAllMocks())

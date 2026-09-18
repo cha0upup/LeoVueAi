@@ -1,3 +1,4 @@
+import { deferred } from '@/test-support/deferred.js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { previewFileApi } from '@/services/api.js'
 import { useFileLoader } from './useFileLoader.js'
@@ -6,14 +7,6 @@ import { useFilePreviewRequest } from './useFilePreviewRequest.js'
 
 vi.mock('@/services/api.js', () => ({ previewFileApi: vi.fn() }))
 vi.mock('@/utils/messageUtils.js', () => ({ showWarning: vi.fn() }))
-
-function deferred() {
-  let resolve
-  const promise = new Promise((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
 
 const response = (text) => ({ data: { data: btoa(text), size: text.length } })
 beforeEach(() => vi.resetAllMocks())

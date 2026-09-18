@@ -17,7 +17,6 @@
       <div class="dialog-meta">
         <span>HTTP</span>
         <span>{{ formData.requestList.length }} 请求</span>
-        <span>{{ formData.vulnerabilityList.length }} 漏洞</span>
       </div>
       <button
         class="dialog-close"
@@ -112,18 +111,6 @@
 
       <section class="form-section">
         <div class="section-heading">
-          <span>Risk Intelligence</span><strong>已知漏洞</strong>
-        </div>
-        <el-form-item>
-          <FingerprintVulnerabilityEditor v-model="formData.vulnerabilityList" />
-          <div class="form-tip">
-            可选。命中后会展示给操作员并供 AI 漏洞推荐使用，没有已知漏洞可留空。
-          </div>
-        </el-form-item>
-      </section>
-
-      <section class="form-section">
-        <div class="section-heading">
           <span>Detection Rule</span><strong>请求与命中</strong>
         </div>
         <el-form-item
@@ -184,7 +171,7 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <span>{{ formData.requestList.length }} 个请求 · {{ formData.vulnerabilityList.length }} 条漏洞</span>
+        <span>{{ formData.requestList.length }} 个请求</span>
         <div class="footer-actions">
           <el-button
             :disabled="saving"
@@ -214,11 +201,9 @@ import { showWarning } from '@/utils/messageUtils.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import FingerprintRequestEditor from './FingerprintRequestEditor.vue'
 import FingerprintDebugPanel from './FingerprintDebugPanel.vue'
-import FingerprintVulnerabilityEditor from './FingerprintVulnerabilityEditor.vue'
 import {
   buildFingerprintPayload,
   createEmptyFingerprintForm,
-  findIncompleteVulnerabilities,
   loadFingerprintForm
 } from './saveFingerprintModel.js'
 
@@ -290,11 +275,6 @@ const handleSubmit = async () => {
   }
   if (!formData.value.requestList.length) {
     showWarning('请至少添加一条请求')
-    return
-  }
-  const incompleteCount = findIncompleteVulnerabilities(formData.value.vulnerabilityList).length
-  if (incompleteCount) {
-    showWarning(`有 ${incompleteCount} 条漏洞缺少标题，请补全或删除`)
     return
   }
   try {

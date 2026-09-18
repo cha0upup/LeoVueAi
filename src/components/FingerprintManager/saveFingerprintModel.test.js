@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   buildFingerprintPayload,
   createEmptyFingerprintForm,
-  findIncompleteVulnerabilities,
   loadFingerprintForm,
   normalizeRequests,
   parseFingerprintTags
@@ -68,10 +67,9 @@ describe('saveFingerprintModel', () => {
       requestList: [
         { method: 'POST', path: ' /x ', headers: [{ key: ' X ', value: ' y ' }], body: ' z ' }
       ],
-      matchText: '{"field":"body","operator":"contains","value":"ok"}',
-      vulnerabilityList: [{ title: ' Issue ', references: [{ value: ' url ' }] }]
+      matchText: '{"field":"body","operator":"contains","value":"ok"}'
     })
-    expect(payload).toMatchObject({
+    expect(payload).toEqual({
       name: 'Demo',
       tags: ['web-app'],
       info: { version: '1.0', author: 'A' },
@@ -80,14 +78,5 @@ describe('saveFingerprintModel', () => {
         match: { field: 'body', operator: 'contains', value: 'ok' }
       }
     })
-  })
-
-  it('detects partially filled vulnerabilities that have no title', () => {
-    expect(
-      findIncompleteVulnerabilities([
-        { title: '', references: [{ value: 'https://example.com' }] },
-        { title: '' }
-      ])
-    ).toHaveLength(1)
   })
 })

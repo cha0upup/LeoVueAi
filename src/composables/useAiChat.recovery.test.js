@@ -1,6 +1,34 @@
 import { describe, expect, it, vi } from 'vitest'
 import { useAiChat } from './useAiChat.js'
 
+function createChatAwaitingAnswer(enqueueApi) {
+  const chat = useAiChat({
+    enqueueApi,
+    canSend: () => true,
+    getConversationKey: () => 'thread-question',
+    getExtraParams: threadId => ({ threadId })
+  })
+  chat.applyRecoveredEvents({
+    key: 'thread-question',
+    events: [{
+      seq: 1,
+      name: 'node',
+      turnId: 'turn-question',
+      itemId: 'assistant-question',
+      data: {
+        kind: 'user_input',
+        questionId: 'question-1',
+        type: 'CLARIFICATION',
+        prompt: '请选择范围',
+        status: 'pending'
+      }
+    }],
+    lastSeq: 1,
+    runStatus: 'waiting_for_user'
+  })
+  return chat
+}
+
 describe('useAiChat refresh recovery', () => {
   it('submits a structured answer without rendering it as a user command', async () => {
     const enqueueApi = vi.fn(async () => ({
@@ -9,30 +37,7 @@ describe('useAiChat refresh recovery', () => {
       answerToQuestionId: 'question-1',
       items: [{ id: 'user-answer', role: 'user' }, { id: 'assistant-answer', role: 'assistant' }]
     }))
-    const chat = useAiChat({
-      enqueueApi,
-      canSend: () => true,
-      getConversationKey: () => 'thread-question',
-      getExtraParams: threadId => ({ threadId })
-    })
-    chat.applyRecoveredEvents({
-      key: 'thread-question',
-      events: [{
-        seq: 1,
-        name: 'node',
-        turnId: 'turn-question',
-        itemId: 'assistant-question',
-        data: {
-          kind: 'user_input',
-          questionId: 'question-1',
-          type: 'CLARIFICATION',
-          prompt: '请选择范围',
-          status: 'pending'
-        }
-      }],
-      lastSeq: 1,
-      runStatus: 'waiting_for_user'
-    })
+    const chat = createChatAwaitingAnswer(enqueueApi)
 
     await chat.answerUserInput({ questionId: 'question-1', answer: '当前节点' })
 
@@ -56,30 +61,7 @@ describe('useAiChat refresh recovery', () => {
         status: 'queued',
         items: [{ id: 'user-answer', role: 'user' }, { id: 'assistant-answer', role: 'assistant' }]
       })
-    const chat = useAiChat({
-      enqueueApi,
-      canSend: () => true,
-      getConversationKey: () => 'thread-question',
-      getExtraParams: threadId => ({ threadId })
-    })
-    chat.applyRecoveredEvents({
-      key: 'thread-question',
-      events: [{
-        seq: 1,
-        name: 'node',
-        turnId: 'turn-question',
-        itemId: 'assistant-question',
-        data: {
-          kind: 'user_input',
-          questionId: 'question-1',
-          type: 'CLARIFICATION',
-          prompt: '请选择范围',
-          status: 'pending'
-        }
-      }],
-      lastSeq: 1,
-      runStatus: 'waiting_for_user'
-    })
+    const chat = createChatAwaitingAnswer(enqueueApi)
 
     await chat.answerUserInput({ questionId: 'question-1', answer: '当前节点' })
     const failed = chat.messages.value.at(-1)

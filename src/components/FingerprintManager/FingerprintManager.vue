@@ -141,7 +141,6 @@
             <template #extra>
               <div class="fingerprint-card-meta">
                 <span>{{ item.tags?.length || 0 }} 标签</span>
-                <span>{{ vulnerabilityCount(item) }} 漏洞</span>
                 <span>{{ requestCount(item) ?? '—' }} 请求</span>
               </div>
             </template>
@@ -277,10 +276,6 @@ const batchDeleteLoading = ref(false)
 const detailExportLoading = ref(false)
 
 const iconMap = icons
-
-function vulnerabilityCount(item) {
-  return Array.isArray(item?.info?.vulnerabilities) ? item.info.vulnerabilities.length : 0
-}
 
 function requestCount(item) {
   return Array.isArray(item?.rule?.requests) ? item.rule.requests.length : null
