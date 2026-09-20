@@ -4,15 +4,18 @@ const INITIAL_LEVEL = 0
 
 const normalize = (value) => (value ? String(value).toLowerCase() : '')
 
+// 更新接口会全量覆盖配置，快捷开关也必须保留所有持久化字段。
 const PUPPET_UPDATE_FIELDS = [
   'id',
   'puppetId',
   'parentPuppetId',
   'puppetName',
   'createByUserId',
+  'teamId',
   'connLink',
   'reqDisguiseId',
   'respDisguiseId',
+  'payloadKey',
   'headers',
   'permission',
   'proxyEnabled',
@@ -21,8 +24,15 @@ const PUPPET_UPDATE_FIELDS = [
   'proxyHost',
   'proxyPort',
   'protocol',
+  'type',
+  'lastHeartbeat',
   'heartbeatInterval',
-  'remark'
+  'remark',
+  'urlStrategy',
+  'paddingStrategy',
+  'headerNoiseStrategy',
+  'tlsFingerprintStrategy',
+  'componentClassNameStrategy'
 ]
 
 export const buildPuppetUpdatePayload = (row, overrides = {}) => {
