@@ -47,7 +47,7 @@
                         :step="10"
                         controls-position="right"
                       />
-                      <span class="item-tip">应用于容器管理中的各类列表。</span>
+                      <span class="item-tip">应用于 Web 运行时中的各类列表。</span>
                     </el-form-item>
                   </el-form>
                 </div>

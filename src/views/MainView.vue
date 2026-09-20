@@ -10,7 +10,7 @@
       >
         <div class="content-wrapper">
           <div
-            v-if="currentTab === HOME_TAB_ID"
+            v-show="currentTab === HOME_TAB_ID"
             class="content-page"
           >
             <Home @add-puppet-entity="openPuppetEntity" />

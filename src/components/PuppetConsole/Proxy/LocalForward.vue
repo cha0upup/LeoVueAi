@@ -1,25 +1,23 @@
 <template>
-  <div class="local-forward">
+  <div class="proxy-panel local-forward">
     <!-- Add rule form -->
     <section class="workspace-strip">
       <div class="workspace-status">
-        <span class="workspace-title">本地端口转发</span>
-        <el-tag
-          effect="plain"
-          round
-          size="small"
-          type="info"
-        >
-          {{ rules.length }} 条规则
-        </el-tag>
+        <span class="workspace-title">添加转发规则</span>
       </div>
 
       <div class="workspace-actions">
         <div class="rule-form">
+          <BindAddressInput
+            v-model="addForm.bindAddr"
+            :disabled="adding"
+            stacked
+          />
           <div class="form-field">
             <span class="control-label">本地端口</span>
             <el-input-number
               v-model="addForm.localPort"
+              aria-label="本地端口"
               :min="1024"
               :max="65535"
               :precision="0"
@@ -27,13 +25,12 @@
               placeholder="本地端口"
             />
           </div>
-          <span class="arrow-sep">→</span>
           <div class="form-field">
             <span class="control-label">目标主机</span>
             <el-input
               v-model="addForm.targetHost"
+              aria-label="目标主机"
               placeholder="192.168.1.1"
-              style="width: 160px"
               clearable
             />
           </div>
@@ -41,6 +38,7 @@
             <span class="control-label">目标端口</span>
             <el-input-number
               v-model="addForm.targetPort"
+              aria-label="目标端口"
               :min="1"
               :max="65535"
               :precision="0"
@@ -59,26 +57,6 @@
           <el-icon><Icon :icon="iconMap.add" /></el-icon>
           添加规则
         </el-button>
-
-        <el-button
-          v-if="rules.length > 0"
-          type="danger"
-          plain
-          :loading="stoppingAll"
-          @click="handleStopAll"
-        >
-          <el-icon><Icon :icon="iconMap.stop" /></el-icon>
-          清除全部
-        </el-button>
-
-        <el-button
-          text
-          size="small"
-          @click="fetchRules"
-        >
-          <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
-          刷新
-        </el-button>
       </div>
     </section>
 
@@ -91,6 +69,29 @@
             类似 ssh -L，将本地端口透明转发到 puppet 端可访问的目标
           </span>
         </div>
+        <div class="list-actions">
+          <span class="list-count">{{ rules.length }} 条规则</span>
+          <el-button
+            v-if="rules.length > 0"
+            type="danger"
+            text
+            size="small"
+            :loading="stoppingAll"
+            @click="handleStopAll"
+          >
+            <el-icon><Icon :icon="iconMap.stop" /></el-icon>
+            清除全部
+          </el-button>
+
+          <el-button
+            text
+            size="small"
+            @click="fetchRules"
+          >
+            <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
+            刷新
+          </el-button>
+        </div>
       </div>
 
       <div
@@ -101,6 +102,12 @@
           :data="rules"
           style="width: 100%"
         >
+          <el-table-column
+            label="监听地址"
+            prop="bindAddr"
+            min-width="180"
+            show-overflow-tooltip
+          />
           <el-table-column
             label="本地端口"
             prop="localPort"
@@ -181,15 +188,13 @@
 
       <div
         v-else
-        class="idle-shell"
+        class="empty-state"
       >
-        <el-empty
-          :image-size="88"
-        >
-          <template #description>
-            <span>暂无转发规则，填写上方表单添加第一条规则。</span>
-          </template>
-        </el-empty>
+        <el-icon aria-hidden="true">
+          <Icon :icon="iconMap.network" />
+        </el-icon>
+        <p>暂无转发规则</p>
+        <span>填写上方配置，添加第一条规则。</span>
       </div>
     </section>
   </div>
@@ -197,6 +202,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import BindAddressInput from './BindAddressInput.vue'
 import { icons } from '@/utils/icons.js'
 import {
   listLocalForwardsApi,
@@ -225,6 +231,7 @@ const stoppingAll = ref(false)
 const stoppingPort = ref(null)
 
 const addForm = ref({
+  bindAddr: '0.0.0.0',
   localPort: 8888,
   targetHost: '',
   targetPort: 80
@@ -242,6 +249,11 @@ const fetchRules = async () => {
 
 const handleAdd = async () => {
   const { localPort, targetHost, targetPort } = addForm.value
+  const bindAddr = addForm.value.bindAddr.trim()
+  if (!bindAddr) {
+    showWarning('请选择或输入监听地址')
+    return
+  }
   if (!localPort || localPort < 1024 || localPort > 65535) {
     showWarning('请输入有效的本地端口号（1024-65535）')
     return
@@ -262,6 +274,7 @@ const handleAdd = async () => {
         startLocalForwardApi({
           sessionId: props.sessionId,
           localPort,
+          bindAddr,
           targetHost: targetHost.trim(),
           targetPort
         }),
@@ -330,192 +343,4 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
-.local-forward {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.workspace-strip,
-.rules-panel {
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 40%, transparent);
-  background: color-mix(in srgb, var(--app-card-background) 94%, var(--el-bg-color-overlay));
-  box-shadow: var(--app-card-shadow-soft);
-}
-
-.workspace-strip {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 14px;
-  background: color-mix(
-    in srgb,
-    var(--app-control-background-soft) 76%,
-    var(--app-card-background)
-  );
-}
-
-.workspace-status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding-top: 2px;
-}
-
-.workspace-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-}
-
-.control-label,
-.connections-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--el-color-primary);
-}
-
-.connections-subtitle {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--el-text-color-secondary);
-}
-
-.workspace-actions {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  min-width: 0;
-}
-
-.rule-form {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.form-field :deep(.el-input-number) {
-  width: 130px;
-}
-
-.arrow-sep {
-  font-size: 18px;
-  color: var(--el-text-color-secondary);
-  padding-bottom: 4px;
-  align-self: flex-end;
-}
-
-.primary-action {
-  min-width: 110px;
-}
-
-.rules-panel {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.rules-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 14px 14px 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 36%, transparent);
-}
-
-.rules-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.table-shell,
-.idle-shell {
-  flex: 1;
-  min-height: 0;
-  margin: 12px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--app-control-background-soft) 90%, transparent);
-  overflow: hidden;
-}
-
-.table-shell {
-  padding: 8px;
-}
-
-.idle-shell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.arrow-icon {
-  font-size: 16px;
-  color: var(--el-text-color-secondary);
-}
-
-:deep(.el-table) {
-  font-size: 13px;
-  --el-table-border-color: color-mix(in srgb, var(--el-border-color) 44%, transparent);
-  --el-table-header-bg-color: transparent;
-  --el-table-tr-bg-color: transparent;
-  --el-table-row-hover-bg-color: color-mix(in srgb, var(--app-control-background) 72%, transparent);
-  background: transparent;
-}
-
-:deep(.el-table th),
-:deep(.el-table tr),
-:deep(.el-table td),
-:deep(.el-table__inner-wrapper::before) {
-  background: transparent;
-}
-
-:deep(.el-table th) {
-  font-weight: 600;
-  color: var(--el-text-color-secondary);
-}
-
-:deep(.el-empty) {
-  padding: 28px 16px;
-}
-
-@media (max-width: 980px) {
-  .rule-form {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .arrow-sep {
-    display: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .table-shell,
-  .idle-shell {
-    margin: 10px;
-  }
-}
-</style>
+<style scoped src="./proxy-panel.css"></style>

@@ -35,7 +35,7 @@
               type="primary"
               class="version-tag"
             >
-              v2.1.3
+              v{{ appVersion }}
             </el-tag>
           </div>
 
@@ -109,6 +109,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { version as appVersion } from '../../package.json'
 
 import {
   AUTH_FIELD_LIMITS,

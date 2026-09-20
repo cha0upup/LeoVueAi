@@ -488,13 +488,18 @@ const loadCacheAvailability = async (row, { showErrorMessage = false } = {}) => 
   }
 }
 
-const handleRowClick = (row) => {
+const selectPuppet = (row) => {
+  if (!row?.puppetId) return
   currentPuppet.value = row
   if (!currentPuppetSessions.value.some((session) => session.sessionId === activeSessionId.value)) {
     activeSessionId.value = ''
   }
   testConnResult.value = null
   loadCacheAvailability(row)
+}
+
+const handleRowClick = (row) => {
+  selectPuppet(row)
 }
 
 const selectSession = (session) => {
@@ -812,6 +817,10 @@ const createNewSession = async (row) => {
 
 const addPuppetEntity = (row) => {
   if (!row?.puppetId) return
+  // Entering a console from the tree must also move the directory selection.
+  // Otherwise the route/tab changes while the workbench keeps highlighting the
+  // previously selected host when the user returns to it.
+  selectPuppet(row)
   const decision = resolvePuppetSessionEntry(sessionsByPuppetId.value[row.puppetId])
   if (decision.action === 'reuse') {
     openExistingSession(decision.session)

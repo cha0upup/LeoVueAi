@@ -121,7 +121,7 @@ const SLASH_COMMANDS = [
   { name: 'enum',    desc: '枚举配置文件和凭据',   value: '请枚举目标常见配置文件路径，寻找数据库凭据、API Key 等敏感信息并汇总。' },
   { name: 'scan',    desc: '内网存活和端口扫描',   value: '请先对内网 C 段做主机存活探测，然后对发现的存活主机做常见端口扫描。' },
   { name: 'jvm',     desc: '检查 JVM 内存和线程',  value: '请帮我分析当前 JVM 内存情况（堆、非堆、GC）和线程状态，指出异常或风险。' },
-  { name: 'web',     desc: '检查 Web 容器组件',    value: '请获取当前 Web 容器挂载情况，包括 Filter、Servlet、Valve、Listener 等组件列表。' },
+  { name: 'web',     desc: '检查 Web 运行时组件', value: '请获取当前 Java Web Runtime 挂载情况，包括 Filter、Servlet、Valve、Listener 等组件列表。' },
   { name: 'report',  desc: '生成操作报告',         value: '请基于当前会话的操作记录和侦察摘要，生成一份操作报告。' },
   { name: 'privesc', desc: '提权路径分析',         value: '请分析当前主机的提权可能性，检查 SUID、sudo 配置、计划任务、服务配置等常见提权路径。' },
 ]

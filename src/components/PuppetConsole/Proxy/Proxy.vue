@@ -2,62 +2,70 @@
   <div class="proxy-workbench">
     <div class="proxy-shell">
       <div class="shell-body">
-        <aside class="protocol-rail">
+        <div
+          class="protocol-tabs"
+          role="tablist"
+          aria-label="代理类型"
+        >
           <button
-            v-for="protocol in availableProxyProtocols"
+            v-for="(protocol, index) in availableProxyProtocols"
+            :id="`${tabsId}-${protocol.value}`"
             :key="protocol.value"
             type="button"
-            class="protocol-item"
+            role="tab"
+            class="protocol-tab"
             :class="{ active: activeProxyType === protocol.value }"
+            :aria-selected="activeProxyType === protocol.value"
+            :aria-controls="`${tabsId}-panel`"
+            :aria-label="`${protocol.label}，${getProtocolStatusLabel(protocol.value)}`"
+            :tabindex="activeProxyType === protocol.value ? 0 : -1"
+            :title="[protocol.label, getProtocolStatusLabel(protocol.value), getProtocolMeta(protocol.value)].filter(Boolean).join(' · ')"
             @click="activeProxyType = protocol.value"
+            @keydown="onProtocolKeydown($event, index)"
           >
-            <div class="protocol-item-top">
-              <span class="protocol-icon-shell">
-                <el-icon>
-                  <Icon :icon="protocol.icon" />
-                </el-icon>
-              </span>
-            </div>
-            <div class="protocol-main">
-              <strong class="protocol-title">{{ protocol.label }}</strong>
-              <span
-                class="protocol-status"
-                :class="`is-${getProtocolTagType(protocol.value)}`"
-              >
-                {{ getProtocolStatusLabel(protocol.value) }}
-              </span>
-            </div>
-            <div class="protocol-meta">
-              <span>{{ getProtocolMeta(protocol.value) }}</span>
-            </div>
+            <el-icon aria-hidden="true">
+              <Icon :icon="protocol.icon" />
+            </el-icon>
+            <span>{{ protocol.label }}</span>
+            <span
+              class="protocol-status-dot"
+              :class="`is-${proxyState[protocol.value].status}`"
+              aria-hidden="true"
+            />
           </button>
-        </aside>
+        </div>
 
-        <section class="workspace-panel">
+        <section
+          :id="`${tabsId}-panel`"
+          class="workspace-panel"
+          role="tabpanel"
+          :aria-labelledby="`${tabsId}-${activeProxyType}`"
+          tabindex="0"
+        >
           <div class="workspace-body">
             <Socks5Proxy
               v-if="activeProxyType === 'socks5'"
               :session-id="sessionId"
-              @status-change="(status) => updateProxyStatus('socks5', status)"
-              @metrics-change="(payload) => updateProxyMetrics('socks5', payload)"
+              @status-change="(status) => updateProxyState('socks5', { status })"
+              @metrics-change="(payload) => updateProxyState('socks5', payload)"
             />
             <HttpProxy
               v-else-if="activeProxyType === 'http'"
               :session-id="sessionId"
-              @status-change="(status) => updateProxyStatus('http', status)"
-              @metrics-change="(payload) => updateProxyMetrics('http', payload)"
+              @status-change="(status) => updateProxyState('http', { status })"
+              @metrics-change="(payload) => updateProxyState('http', payload)"
             />
             <LocalForward
               v-else-if="activeProxyType === 'forward'"
               :session-id="sessionId"
-              @status-change="(status) => updateProxyStatus('forward', status)"
-              @rules-change="updateForwardRules"
+              @status-change="(status) => updateProxyState('forward', { status })"
+              @rules-change="(rulesCount) => updateProxyState('forward', { rulesCount })"
             />
             <ReverseTunnel
               v-else-if="activeProxyType === 'reverse'"
               :session-id="sessionId"
-              @status-change="(status) => updateProxyStatus('reverse', status)"
-              @rules-change="updateReverseTunnelRules"
+              @status-change="(status) => updateProxyState('reverse', { status })"
+              @rules-change="(rulesCount) => updateProxyState('reverse', { rulesCount })"
             />
           </div>
         </section>
@@ -67,7 +75,7 @@
 </template>
 
 <script setup>
-import { computed, inject, ref, unref, watch } from 'vue'
+import { computed, inject, ref, unref, useId, watch } from 'vue'
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { supportsCapabilityRequirements } from '@/composables/usePuppetConsoleModules.js'
@@ -86,6 +94,7 @@ defineProps({
   }
 })
 
+const tabsId = useId()
 const activeProxyType = ref('socks5')
 const proxyState = ref({
   socks5: {
@@ -152,36 +161,21 @@ watch(
   { immediate: true }
 )
 
-const updateProxyStatus = (type, status) => {
-  const current = proxyState.value[type] || {}
-  proxyState.value[type] = { ...current, status }
+const updateProxyState = (type, patch) => {
+  proxyState.value[type] = { ...proxyState.value[type], ...patch }
 }
 
-const updateProxyMetrics = (type, payload) => {
-  const current = proxyState.value[type] || {}
-  proxyState.value[type] = { ...current, ...payload }
-}
-
-const updateForwardRules = (count) => {
-  proxyState.value.forward = {
-    ...proxyState.value.forward,
-    rulesCount: count
-  }
-}
-
-const updateReverseTunnelRules = (count) => {
-  proxyState.value.reverse = {
-    ...proxyState.value.reverse,
-    rulesCount: count
-  }
-}
-
-const getProtocolTagType = (type) => {
-  const status = proxyState.value[type]?.status
-  if (status === 'running') return 'success'
-  if (status === 'error') return 'danger'
-  if (status === 'stopped') return 'info'
-  return 'info'
+const onProtocolKeydown = (event, index) => {
+  const count = availableProxyProtocols.value.length
+  let next
+  if (event.key === 'ArrowRight') next = (index + 1) % count
+  else if (event.key === 'ArrowLeft') next = (index - 1 + count) % count
+  else if (event.key === 'Home') next = 0
+  else if (event.key === 'End') next = count - 1
+  else return
+  event.preventDefault()
+  activeProxyType.value = availableProxyProtocols.value[next].value
+  event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next]?.focus()
 }
 
 const getProtocolStatusLabel = (type) => {
@@ -189,15 +183,12 @@ const getProtocolStatusLabel = (type) => {
   if (status === 'running') return '运行中'
   if (status === 'error') return '异常'
   if (status === 'stopped') return '未启动'
-  return '待检查'
+  return '未检查'
 }
 
 const getProtocolMeta = (type) => {
   const current = proxyState.value[type] || {}
-  if (type === 'socks5' && current.status === 'running') {
-    return `端口 ${current.port || '-'} · ${current.activeConnections || 0} 活跃连接`
-  }
-  if (type === 'http' && current.status === 'running') {
+  if ((type === 'socks5' || type === 'http') && current.status === 'running') {
     return `端口 ${current.port || '-'} · ${current.activeConnections || 0} 活跃连接`
   }
   if (type === 'forward') {
@@ -208,206 +199,129 @@ const getProtocolMeta = (type) => {
     const count = current.rulesCount || 0
     return count > 0 ? `${count} 条隧道运行中` : '进入工作区添加反向隧道'
   }
-  return '进入工作区配置监听与状态'
+  return ''
 }
 </script>
 
 <style scoped>
 .proxy-workbench {
   height: 100%;
+  min-width: 0;
+  min-height: 0;
+  container: proxy / inline-size;
+}
+
+.proxy-shell,
+.shell-body {
+  height: 100%;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .proxy-shell {
-  --proxy-shell-surface: color-mix(
-    in srgb,
-    var(--app-surface-background) 94%,
-    var(--el-bg-color-overlay)
-  );
-  --proxy-shell-soft-surface: color-mix(
-    in srgb,
-    var(--app-control-background-soft) 90%,
-    var(--el-bg-color-overlay)
-  );
-  --proxy-shell-muted-surface: color-mix(
-    in srgb,
-    var(--app-control-background) 92%,
-    var(--el-bg-color-overlay)
-  );
-  --proxy-shell-border: color-mix(in srgb, var(--el-border-color) 36%, transparent);
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  background: var(--app-surface-background, var(--el-bg-color));
   border-radius: var(--radius-container);
-  background: var(--proxy-shell-surface);
   overflow: hidden;
 }
 
-:global(html:not(.dark) .proxy-shell),
-:global(html[data-theme='light'] .proxy-shell) {
-  --proxy-shell-surface: var(--app-surface-background);
-  --proxy-shell-soft-surface: #f4f4f3;
-  --proxy-shell-muted-surface: #fafaf9;
-  --proxy-shell-border: color-mix(in srgb, var(--el-border-color) 78%, transparent);
-}
-
-.shell-body {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: 14px;
-  padding: 14px;
-  background: var(--proxy-shell-muted-surface);
-}
-
-.protocol-rail,
-.workspace-panel {
-  min-height: 0;
-}
-
-.protocol-rail {
+.protocol-tabs {
   display: flex;
-  flex-direction: column;
+  flex-shrink: 0;
   gap: 8px;
+  padding: 0 20px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--el-border-color-light);
+  scrollbar-width: thin;
 }
 
-.protocol-item {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
-  border-radius: var(--radius-container);
-  border: 1px solid var(--proxy-shell-border);
-  background: color-mix(in srgb, var(--proxy-shell-surface) 92%, var(--proxy-shell-soft-surface));
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.protocol-item:hover {
-  border-color: color-mix(in srgb, var(--el-color-primary) 18%, transparent);
-  background: color-mix(in srgb, var(--el-color-primary) 4%, var(--proxy-shell-surface));
-}
-
-.protocol-item.active {
-  border-color: color-mix(in srgb, var(--el-color-primary) 28%, transparent);
-  background: color-mix(in srgb, var(--el-color-primary) 6%, var(--proxy-shell-surface));
-}
-
-.protocol-item-top {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.protocol-icon-shell {
-  width: 34px;
-  height: 34px;
+.protocol-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--el-color-primary) 12%, white);
-  color: var(--el-color-primary);
-  font-size: 17px;
-}
-
-.protocol-main {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.protocol-title {
-  font-size: 14px;
-  color: var(--el-text-color-primary);
-  min-width: 0;
-}
-
-.protocol-meta {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--el-text-color-secondary);
-}
-
-.protocol-status {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.protocol-status.is-success {
-  color: var(--el-color-success);
-}
-
-.protocol-status.is-warning {
-  color: var(--el-color-warning);
-}
-
-.protocol-status.is-danger {
-  color: var(--el-color-danger);
-}
-
-.protocol-status.is-info {
-  color: var(--el-color-info);
-}
-
-.protocol-meta {
-  grid-column: 2;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 0 auto;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: var(--el-text-color-regular);
+  font: inherit;
+  font-size: 13px;
   white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
 }
 
-.protocol-item.active .protocol-title,
-.protocol-item.active .protocol-meta {
-  color: var(--el-text-color-primary);
+.protocol-tab::after {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+  content: '';
 }
+
+.protocol-tab:hover {
+  background: var(--el-fill-color-light);
+}
+
+.protocol-tab.active {
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+
+.protocol-tab.active::after {
+  background: var(--el-color-primary);
+}
+
+.protocol-tab:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: -4px;
+  border-radius: 6px;
+}
+
+.protocol-tab .el-icon {
+  font-size: 16px;
+}
+
+.protocol-status-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--el-text-color-placeholder);
+  border-radius: 50%;
+}
+
+.protocol-status-dot.is-unknown { border-style: dotted; }
+.protocol-status-dot.is-running { background: var(--el-color-success); border-color: var(--el-color-success); }
+.protocol-status-dot.is-error { background: var(--el-color-danger); border-color: var(--el-color-danger); }
 
 .workspace-panel {
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--radius-container);
-  border: 1px solid var(--proxy-shell-border);
-  background: var(--proxy-shell-surface);
-  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.workspace-panel:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: -2px;
 }
 
 .workspace-body {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  padding: 14px;
+  padding: 20px 32px 20px 20px;
 }
 
-@media (max-width: 980px) {
-  .shell-body {
-    grid-template-columns: 1fr;
-  }
-
-  .protocol-rail {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 720px) {
-  .protocol-rail {
-    grid-template-columns: 1fr;
-  }
-
-  .shell-body,
-  .workspace-body {
-    padding: 12px;
-  }
+@container proxy (max-width: 560px) {
+  .protocol-tabs { gap: 0; padding: 0 8px; }
+  .protocol-tab { gap: 6px; padding: 0 10px; min-height: 46px; }
+  .workspace-body { padding: 16px 32px 16px 12px; }
 }
 </style>

@@ -197,7 +197,7 @@ export function usePuppetConsoleModules(iconMap) {
     },
     {
       key: 'container',
-      title: '容器管理',
+      title: 'Web 运行时',
       description: '按版本画像查看并管理 Java Web Runtime、Context 与框架组件',
       icon: iconMap.server,
       iconClass: 'server-icon',

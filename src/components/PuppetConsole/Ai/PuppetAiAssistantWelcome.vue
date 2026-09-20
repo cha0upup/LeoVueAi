@@ -50,10 +50,10 @@ const props = defineProps({
 const emit = defineEmits(['pick-prompt'])
 
 const BROWSER_ARTIFACT_PROMPT = '请使用 analyze-browser-artifacts skill 分析当前节点的浏览器数据：先识别当前用户可见的浏览器和 Profile，按书签、历史记录、Cookie、表单与登录条目元数据建立最小采集清单；对 SQLite 数据创建一致性快照，将选定制品采集到当前任务工作空间，使用工作空间命令和文件工具解析为 JSONL 或 CSV，并输出带来源路径、哈希、覆盖范围和盲区的结构化报告。默认掩码秘密值。'
-const CONTAINER_PROMPT = '请检查当前节点的 Web 容器与应用框架驻留面：识别容器类型，枚举 Filter、Servlet、Valve、Listener、Controller、Interceptor 等已挂载组件，标记来源异常、命名可疑或行为高风险的组件，并结合 classpath 与运行时信息给出进一步验证路径。先完成只读检查，不卸载或修改组件。'
+const CONTAINER_PROMPT = '请检查当前节点的 Java Web Runtime 与应用框架驻留面：识别 Runtime 类型，枚举 Filter、Servlet、Valve、Listener、Controller、Interceptor 等已挂载组件，标记来源异常、命名可疑或行为高风险的组件，并结合 classpath 与运行时信息给出进一步验证路径。先完成只读检查，不卸载或修改组件。'
 const REPORT_PROMPT = '请基于当前会话的侦察摘要和操作记录生成节点行动简报，包含：当前落点与权限、已确认资产、获取的高价值线索、已执行动作及结果、受阻点、尚未验证的攻击路径，以及按优先级排列的下一步行动建议。严格区分事实与推断。'
 
-const containerPrompt = { title: '检查 Web 容器', desc: '查看已挂载组件及异常线索', value: CONTAINER_PROMPT, icon: 'lucide:container' }
+const containerPrompt = { title: '检查 Web 运行时', desc: '查看已挂载组件及异常线索', value: CONTAINER_PROMPT, icon: 'lucide:container' }
 const reportPrompt = { title: '生成节点简报', desc: '汇总已有发现与操作结果', value: REPORT_PROMPT, icon: 'lucide:file-check-2' }
 
 const generalPrompts = computed(() => {
@@ -71,8 +71,8 @@ const generalPrompts = computed(() => {
         }
       : {
           title: '开展初始落点侦察',
-          desc: '确认系统、权限、容器、进程、网络和关键资产',
-          value: '请围绕当前 WebShell 开展初始落点侦察：确认操作系统、主机名、当前身份与权限、Java/JVM、Web 容器、关键进程、网络接口、路由和监听端口。并行完成低影响检查，识别最有价值的后续方向，最后保存侦察摘要。',
+          desc: '确认系统、权限、运行时、进程、网络和关键资产',
+          value: '请围绕当前 WebShell 开展初始落点侦察：确认操作系统、主机名、当前身份与权限、Java/JVM、Java Web Runtime、关键进程、网络接口、路由和监听端口。并行完成低影响检查，识别最有价值的后续方向，最后保存侦察摘要。',
           icon: 'lucide:radar'
         },
     {
@@ -136,7 +136,7 @@ const modulePrompts = {
   ],
   container: [
     containerPrompt,
-    { title: '解释容器组件', desc: '理清 Context 与组件之间的关系', icon: 'lucide:workflow', value: '请说明当前节点 Web 容器中 Context、Servlet、Filter、Listener 和框架组件之间的关系，并解释采集信息中的未知项。' }
+    { title: '解释运行时组件', desc: '理清 Context 与组件之间的关系', icon: 'lucide:workflow', value: '请说明当前节点 Java Web Runtime 中 Context、Servlet、Filter、Listener 和框架组件之间的关系，并解释采集信息中的未知项。' }
   ],
   'system-manage-hub': [
     { title: '梳理系统运行状态', desc: '分析进程、服务及任务状态', icon: 'lucide:monitor', value: '请梳理当前节点的系统运行状态，汇总关键进程、服务和计划任务，指出需要进一步检查的异常。' },

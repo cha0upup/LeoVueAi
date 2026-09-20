@@ -16,7 +16,7 @@
           >
             <Icon :icon="iconMap.menu" />
           </el-button>
-          <strong>容器管理</strong>
+          <strong>Web 运行时</strong>
           <el-tooltip
             v-if="selectedRuntime"
             :content="runtimeDescription"
@@ -399,7 +399,7 @@ const fetchRuntimeInfo = async () => {
     runtimes.value = normalized.runtimes
     contexts.value = normalized.contexts
     const diagnosticLabels = {
-      RUNTIME_VERSION_UNKNOWN: '容器版本未识别，容器组件仅供查看'
+      RUNTIME_VERSION_UNKNOWN: 'Java Web Runtime 版本未识别，Runtime 组件仅供查看'
     }
     diagnostics.value = normalized.diagnostics.filter(value => value !== 'FRAMEWORK_CONTEXT_UNRESOLVED').map(value => diagnosticLabels[value] || String(value))
     return normalized
@@ -420,11 +420,11 @@ const runExport = async spec => {
   try {
     await writeWorkbookSpec(spec)
     if (!mounted || !requestGuard.isCurrent('export', sequence)) return false
-    showSuccess('容器信息已导出')
+    showSuccess('Java Web Runtime 信息已导出')
     return true
   } catch (exportError) {
     if (mounted && requestGuard.isCurrent('export', sequence)) {
-      showError(`导出容器信息失败：${exportError?.message || '未知错误'}`)
+      showError(`导出 Java Web Runtime 信息失败：${exportError?.message || '未知错误'}`)
     }
     return false
   } finally {
