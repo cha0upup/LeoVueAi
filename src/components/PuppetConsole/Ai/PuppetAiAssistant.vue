@@ -176,8 +176,8 @@ import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import {
   buildRequestAttachments,
   findLatestAssistantPlan,
-  mapPersistedThreadMessages
-} from './puppetAiAssistantModel.js'
+  mapPersistedMessages
+} from '@/composables/aiHistoryModel.js'
 import {
   ARTIFACT_CATEGORY,
   archiveTextArtifact,
@@ -538,7 +538,7 @@ const loadThreadHistory = async (threadId) => {
     if (!requestGuard.isCurrent('history', sequence)) return
     if (sessionId !== props.sessionId || threadId !== activeThreadId.value) return
     if (isConversationSending(threadId) || hasLocalMessages(threadId)) return
-    setMessages(mapPersistedThreadMessages(serverMessages), threadId)
+    setMessages(mapPersistedMessages(serverMessages), threadId)
     await recoverThreadProgress(threadId, { allowDuringHistoryLoading: true })
     if (requestGuard.isCurrent('history', sequence) && threadId === activeThreadId.value) {
       scrollToBottom()

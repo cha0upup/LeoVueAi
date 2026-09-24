@@ -183,8 +183,8 @@ import { useAuth } from '@/composables/useAuth.js'
 import {
   buildRequestAttachments,
   findLatestAssistantPlan,
-  mapPlatformPersistedMessages
-} from './platformAiAssistantModel.js'
+  mapPersistedMessages
+} from '@/composables/aiHistoryModel.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { createLogger } from '@/utils/logger.js'
 import {
@@ -460,7 +460,7 @@ const loadThreadHistory = async threadId => {
     if (!mounted || !requestGuard.isCurrent('history', sequence) || threadId !== activeThreadId.value) return
     if (isConversationSending(threadId) || hasLocalMessages(threadId)) return
     const serverMessages = response.data?.messages ?? []
-    setMessages(mapPlatformPersistedMessages(serverMessages), threadId)
+    setMessages(mapPersistedMessages(serverMessages, { includeSubtasks: true }), threadId)
     await recoverActiveThreadProgress({ allowDuringHistoryLoading: true })
     if (requestGuard.isCurrent('history', sequence) && threadId === activeThreadId.value) scrollToBottom()
   } catch (error) {

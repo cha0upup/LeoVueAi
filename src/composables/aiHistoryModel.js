@@ -6,6 +6,7 @@ import {
   createToolNode,
   createUserInputNode
 } from '@/composables/aiTurnModel.js'
+import { ACTIVE_AI_STATUSES } from '@/utils/aiRuntime.js'
 
 export const findLatestAssistantPlan = messages =>
   [...(Array.isArray(messages) ? messages : [])]
@@ -14,9 +15,7 @@ export const findLatestAssistantPlan = messages =>
 
 const normalizeTimestamp = value => {
   const numeric = Number(value)
-  if (Number.isFinite(numeric) && numeric > 0) return numeric
-  const parsed = Date.parse(value)
-  return Number.isFinite(parsed) ? parsed : Date.now()
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : Date.now()
 }
 
 const mergePatch = (target, patch, immutableKeys) => {
@@ -25,7 +24,7 @@ const mergePatch = (target, patch, immutableKeys) => {
   })
 }
 
-const mapAssistantNodes = message => {
+const mapAssistantNodes = (message, includeSubtasks) => {
   const toolNodes = new Map()
   const subtaskNodes = new Map()
   const ordered = []
@@ -49,7 +48,7 @@ const mapAssistantNodes = message => {
       }
       return
     }
-    if (item?.kind !== 'subtask') return
+    if (!includeSubtasks || item?.kind !== 'subtask') return
     const key = item.subagentInvocationId
     const existing = key ? subtaskNodes.get(key) : null
     if (existing) {
@@ -121,10 +120,7 @@ const persistedRuntimeStatus = message => {
   const protocolStatus = String(message?.protocolStatus || '').trim()
   if (protocolStatus === 'failed') return 'failed'
   if (protocolStatus === 'interrupted') return 'cancelled'
-  if (message?.runStatus === 'failed') return 'failed'
-  if (message?.runStatus === 'cancelled') return 'cancelled'
-  if (message?.runStatus === 'completed') return 'completed'
-  if (message?.runStatus === 'running') return 'running'
+  if (['failed', 'cancelled', 'completed', 'running'].includes(message?.runStatus)) return message.runStatus
   if (protocolStatus === 'completed') return 'completed'
   if (protocolStatus === 'inProgress') {
     return message?.dispatchStatus === 'queued'
@@ -136,7 +132,7 @@ const persistedRuntimeStatus = message => {
   return 'cancelled'
 }
 
-export const mapPlatformPersistedMessages = serverMessages => {
+export const mapPersistedMessages = (serverMessages, { includeSubtasks = false } = {}) => {
   const messages = Array.isArray(serverMessages) ? serverMessages : []
   const answeredQuestionIds = new Set(messages
     .map(message => message?.answerToQuestionId)
@@ -165,7 +161,7 @@ export const mapPlatformPersistedMessages = serverMessages => {
       }
     }
     if (message?.role === 'assistant') {
-      const { content: persistedContent, nodes } = mapAssistantNodes(message)
+      const { content: persistedContent, nodes } = mapAssistantNodes(message, includeSubtasks)
       nodes.forEach(node => {
         if (node?.kind === 'user_input' && answeredQuestionIds.has(String(node.questionId))) {
           node.status = 'answered'
@@ -173,6 +169,7 @@ export const mapPlatformPersistedMessages = serverMessages => {
         }
       })
       const runtimeStatus = persistedRuntimeStatus(message)
+      const loading = ACTIVE_AI_STATUSES.includes(runtimeStatus)
       const failed = runtimeStatus === 'failed'
       const content = persistedContent || (failed
         ? `调用失败：${message.protocolErrorMessage || '后台任务执行失败'}`
@@ -184,7 +181,7 @@ export const mapPlatformPersistedMessages = serverMessages => {
         content,
         nodes,
         review: message.review && typeof message.review === 'object' ? message.review : null,
-        loading: ['queued', 'running', 'cancelling'].includes(runtimeStatus),
+        loading,
         failed,
         retryText: failed ? retryTextByTurn.get(message.turnId) || null : null,
         answerToQuestionId: message.answerToQuestionId || null,
@@ -192,9 +189,7 @@ export const mapPlatformPersistedMessages = serverMessages => {
           ? { message: message.protocolErrorMessage }
           : null,
         startedAt: timestamp,
-        completedAt: ['queued', 'running', 'cancelling'].includes(runtimeStatus)
-          ? null
-          : timestamp,
+        completedAt: loading ? null : timestamp,
         runtime: {
           turnId: message.turnId || null,
           status: runtimeStatus,

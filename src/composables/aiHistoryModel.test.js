@@ -3,10 +3,10 @@ import { getThreadStatus } from '@/utils/aiRuntime.js'
 import {
   buildRequestAttachments,
   findLatestAssistantPlan,
-  mapPlatformPersistedMessages
-} from './platformAiAssistantModel.js'
+  mapPersistedMessages
+} from './aiHistoryModel.js'
 
-describe('platformAiAssistantModel', () => {
+describe('aiHistoryModel', () => {
   it('prefers local status and finds the latest assistant plan', () => {
     expect(getThreadStatus(
       { threadId: 'thread-1', runStatus: 'idle' },
@@ -19,11 +19,11 @@ describe('platformAiAssistantModel', () => {
     ])).toEqual({ id: 2 })
   })
 
-  it('maps ordered nodes and merges tool and subtask patches', () => {
-    const [message] = mapPlatformPersistedMessages([{
+  it.each([false, true])('merges ordered history nodes with includeSubtasks=%s', includeSubtasks => {
+    const serverMessages = [{
       role: 'assistant',
       content: 'final answer',
-      timestamp: '2026-07-15T00:00:00Z',
+      timestamp: 1784073600000,
       nodes: [
         { kind: 'tool', seq: 3, toolCallId: 'tool-1', toolName: 'scan', status: 'running', businessTool: false, toolKind: 'CONTEXT' },
         { kind: 'thinking', seq: 1, content: 'think' },
@@ -32,16 +32,21 @@ describe('platformAiAssistantModel', () => {
         { kind: 'tool', seq: 5, toolCallId: 'tool-1', success: true, resultPreview: 'ok' },
         { kind: 'subtask', seq: 6, subagentInvocationId: 'sub-1', status: 'completed', summary: 'done' }
       ]
-    }])
+    }]
+    const original = globalThis.structuredClone(serverMessages)
+    const [message] = mapPersistedMessages(serverMessages, { includeSubtasks })
 
-    expect(message.nodes.map(node => node.kind)).toEqual(['thinking', 'text', 'tool', 'subtask'])
+    expect(message.nodes.map(node => node.kind)).toEqual(
+      includeSubtasks ? ['thinking', 'text', 'tool', 'subtask'] : ['thinking', 'text', 'tool']
+    )
     expect(message.nodes[2]).toMatchObject({ status: 'done', success: true, result: 'ok', businessTool: false, toolKind: 'CONTEXT' })
-    expect(message.nodes[3]).toMatchObject({ status: 'completed', summary: 'done' })
-    expect(message.startedAt).toBe(Date.parse('2026-07-15T00:00:00Z'))
+    if (includeSubtasks) expect(message.nodes[3]).toMatchObject({ status: 'completed', summary: 'done' })
+    expect(message.startedAt).toBe(1784073600000)
+    expect(serverMessages).toEqual(original)
   })
 
   it('restores protocol failures instead of showing stale pending messages as running', () => {
-    const messages = mapPlatformPersistedMessages([
+    const messages = mapPersistedMessages([
       { role: 'user', turnId: 'turn-1', content: 'retry me', status: 'pending' },
       {
         role: 'assistant',
@@ -65,17 +70,17 @@ describe('platformAiAssistantModel', () => {
   })
 
   it('uses narration for a standalone final answer and strips attachment display fields', () => {
-    const [message] = mapPlatformPersistedMessages([{ role: 'assistant', content: 'final answer' }])
+    const [message] = mapPersistedMessages([{ role: 'assistant', content: 'final answer' }])
     expect(message.nodes).toHaveLength(1)
     expect(message.nodes[0]).toMatchObject({ kind: 'narration', content: 'final answer' })
     expect(buildRequestAttachments([{ name: 'a', mimeType: 'text/plain', size: 1, content: 'x', url: 'ignored' }]))
       .toEqual([{ name: 'a', mimeType: 'text/plain', size: 1, content: 'x' }])
   })
 
-  it('restores persisted user input request nodes', () => {
-    const [message] = mapPlatformPersistedMessages([{ role: 'assistant', nodes: [{
+  it.each(['CONFIRMATION', 'CLARIFICATION'])('restores persisted %s nodes', type => {
+    const [message] = mapPersistedMessages([{ role: 'assistant', nodes: [{
       kind: 'user_input', seq: 3, questionId: 'question-1',
-      type: 'CONFIRMATION', prompt: '确认删除吗？', options: [
+      type, prompt: '确认删除吗？', options: [
         { label: '确认', value: 'confirm', intent: 'confirm' },
         { label: '取消', value: 'cancel', intent: 'cancel' }
       ],
@@ -83,19 +88,36 @@ describe('platformAiAssistantModel', () => {
     }] }])
 
     expect(message.nodes[0]).toMatchObject({
-      kind: 'user_input', questionId: 'question-1', risk: 'HIGH', status: 'pending'
+      kind: 'user_input', questionId: 'question-1', type, risk: 'HIGH', status: 'pending'
     })
   })
 
   it('marks historical questions answered from later turn metadata', () => {
-    const messages = mapPlatformPersistedMessages([
+    const messages = mapPersistedMessages([
       { role: 'assistant', turnId: 'turn-question', nodes: [{
         kind: 'user_input', questionId: 'question-1', prompt: '选择范围', status: 'pending'
       }] },
-      { role: 'user', turnId: 'turn-answer', answerToQuestionId: 'question-1', content: '当前节点' }
+      { role: 'user', turnId: 'turn-answer', answerToQuestionId: 'question-1', content: '当前节点' },
+      { role: 'assistant', turnId: 'turn-answer', answerToQuestionId: 'question-1', content: 'done' }
     ])
-    expect(messages).toHaveLength(1)
-    expect(messages.some(message => message.role === 'user')).toBe(false)
-    expect(messages[0].nodes[0].status).toBe('answered')
+    expect(messages.map(message => message.role)).toEqual(['assistant', 'assistant'])
+    expect(messages[0].nodes[0]).toMatchObject({ status: 'answered', answer: '当前节点' })
+  })
+
+  it.each([
+    ['inProgress', 'queued', null, 'queued', true],
+    ['inProgress', 'cancelling', null, 'cancelling', true],
+    ['inProgress', 'running', 'completed', 'completed', false],
+    ['interrupted', 'interrupted', 'running', 'cancelled', false]
+  ])('restores %s/%s history with runStatus=%s', (protocolStatus, dispatchStatus, runStatus, status, loading) => {
+    const [message] = mapPersistedMessages([{
+      role: 'assistant', timestamp: 1000, protocolStatus, dispatchStatus, runStatus
+    }])
+
+    expect(message).toMatchObject({
+      loading,
+      completedAt: loading ? null : 1000,
+      runtime: { status, phase: status }
+    })
   })
 })
