@@ -53,24 +53,13 @@ function nodeAdaptDelta(msg, text) {
   live.content = `${live.content}${text}`
 }
 
-/** thinking 事件 → thinking node */
+/** node{kind:"thinking"} 事件 → thinking node */
 function nodeAdaptThinking(msg, data, seq) {
   if (!msg) return
   const nodes = ensureNodes(msg)
   sealLiveTextOrNarration(nodes)
-  const content = data?.content ?? (typeof data === 'string' ? data : '')
+  const content = data?.content ?? ''
   nodes.push(createThinkingNode({ content, seq }))
-}
-
-/** progress 事件 → sealed narration node */
-function nodeAdaptProgress(msg, data, seq) {
-  if (!msg) return
-  const nodes = ensureNodes(msg)
-  sealLiveTextOrNarration(nodes)
-  const content = data?.content ?? String(data ?? '')
-  if (content.trim()) {
-    nodes.push(createNarrationNode({ content, streaming: false, seq }))
-  }
 }
 
 /**
@@ -100,7 +89,7 @@ function nodeAdaptTextSegment(msg, data, seq) {
   nodes.push(createTextNode({ content, streaming: false, seq }))
 }
 
-/** tool_start / tool_delta / tool 事件 → find-or-create tool node */
+/** tool_delta / node / patch 事件 → find-or-create tool node */
 function nodeAdaptTool(msg, name, data, seq) {
   if (!msg) return
   const nodes = ensureNodes(msg)
@@ -188,8 +177,6 @@ function nodeAdaptSubtaskEvent(msg, data, seq) {
   if (eventName === 'delta') {
     const live = getLiveText(children)
     live.content = `${live.content}${String(eventData ?? '')}`
-  } else if (eventName === 'thinking') {
-    nodeAdaptThinking(childMsg, eventData, childSeq)
   } else if (eventName === 'tool_delta') {
     nodeAdaptTool(childMsg, eventData?.toolName ?? 'tool', eventData, childSeq)
   } else if (eventName === 'node') {
@@ -204,8 +191,6 @@ function nodeAdaptSubtaskEvent(msg, data, seq) {
     if (kind === 'tool') nodeAdaptTool(childMsg, eventData?.toolName ?? 'tool', eventData, childSeq)
     else if (kind === 'plan') node.plan = normalizePlan(eventData, childSeq)
     else if (kind === 'user_input') nodeAdaptUserInput({ pendingUserInput: null, sending: false, status: 'running' }, childMsg, eventData, childSeq)
-  } else if (eventName === 'plan') {
-    node.plan = normalizePlan(eventData, childSeq)
   } else if (eventName === 'warn') {
     sealLiveTextOrNarration(children)
     children.push(createNarrationNode({ content: `⚠ ${String(eventData ?? '')}`, streaming: false, seq: childSeq }))
@@ -231,16 +216,14 @@ function nodeAdaptUserInput(state, msg, data, seq) {
   patchRuntime(msg, { phase: 'waiting_for_user', status: 'waiting_for_user' })
 }
 
-function applyPlanStepUpdate(msg, data, seq, eventTimestamp) {
+function applyPlanStepUpdate(msg, data, seq) {
   if (!Array.isArray(msg.planEvents)) msg.planEvents = []
-  const entry = { ...data, seq }
-  if (eventTimestamp !== undefined) entry.timestamp = eventTimestamp
-  msg.planEvents.push(entry)
+  msg.planEvents.push({ ...data, seq })
 
   if (!msg.plan || !Array.isArray(msg.plan.steps)) return
   const index = Number(data?.stepIndex)
   const step = msg.plan.steps.find(item => Number(item?.index) === index)
-  const updatedAt = eventTimestamp ?? data?.timestamp ?? Date.now()
+  const updatedAt = data?.timestamp ?? Date.now()
   if (step) {
     if (typeof data?.status === 'string') step.status = normalizePlanStepStatus(data.status)
     if (typeof data?.result === 'string' && data.result.trim()) step.result = data.result
@@ -251,7 +234,7 @@ function applyPlanStepUpdate(msg, data, seq, eventTimestamp) {
   msg.plan.updatedAt = updatedAt
 }
 
-/** reply 事件 → seal live text/narration, set final text node if none collected */
+/** turn 结果 → seal live text/narration, set final text node if none collected */
 function nodeAdaptReply(msg, finalText) {
   if (!msg) return
   const nodes = ensureNodes(msg)
@@ -494,56 +477,11 @@ const EVENT_HANDLERS = {
     }
   },
 
-  phase: {
-    needsMsg: true,
-    fn: ({ state, msg }, { data }) => {
-      const phase = typeof data === 'string' ? data : data?.phase
-      patchRuntime(msg, { phase: phase || msg.runtime?.phase || 'running', status: state.status })
-      return true
-    }
-  },
-
-  thinking: {
+  tool_delta: {
     needsMsg: true,
     fn: ({ state, msg }, { data, seq }) => {
-      patchRuntime(msg, { phase: 'thinking', status: state.status })
-      nodeAdaptThinking(msg, data, seq)
-      return true
-    }
-  },
-
-  plan: {
-    needsMsg: true,
-    fn: ({ state, msg }, { data, seq }) => {
-      msg.plan = normalizePlan(data, seq)
-      patchRuntime(msg, { phase: 'planning', status: state.status })
-      // Seal any preceding live text before the plan boundary
-      sealLiveTextOrNarration(ensureNodes(msg))
-      return true
-    }
-  },
-
-  plan_step: {
-    needsMsg: true,
-    fn: ({ state, msg }, { data, seq, timestamp }) => {
-      applyPlanStepUpdate(msg, data, seq, timestamp)
-      patchRuntime(msg, {
-        phase: msg.runtime?.phase || 'planning',
-        status: state.status,
-        lastPlanAction: typeof data?.action === 'string' ? data.action : msg.runtime?.lastPlanAction || null,
-        lastPlanStepIndex: Number.isFinite(Number(data?.stepIndex))
-          ? Number(data.stepIndex)
-          : msg.runtime?.lastPlanStepIndex ?? null
-      })
-      return true
-    }
-  },
-
-  progress: {
-    needsMsg: true,
-    fn: ({ state, msg }, { data, seq }) => {
-      patchRuntime(msg, { phase: 'responding', status: state.status })
-      nodeAdaptProgress(msg, data, seq)
+      patchRuntime(msg, { phase: 'tool_preparing', status: state.status, lastToolName: data?.toolName })
+      nodeAdaptTool(msg, data?.toolName ?? 'tool_delta', data, seq)
       return true
     }
   },
@@ -580,12 +518,6 @@ const EVENT_HANDLERS = {
           status: state.status,
           stopReason: data.stopReason || null,
           lastSeq: Number(data.lastSeq || 0),
-          lastHeartbeatAt: state.lastHeartbeatAt
-        })
-      } else {
-        patchRuntime(msg, {
-          phase: 'heartbeat',
-          status: state.status,
           lastHeartbeatAt: state.lastHeartbeatAt
         })
       }
@@ -649,7 +581,7 @@ const EVENT_HANDLERS = {
         nodeAdaptTool(msg, data?.toolName ?? 'tool', data, seq)
       } else if (kind === 'plan') {
         if (data?.stepIndex != null) {
-          // 步骤级更新（原 plan_step 行为）
+          // 步骤级更新
           applyPlanStepUpdate(msg, data, seq)
           patchRuntime(msg, {
             phase: msg.runtime?.phase || 'planning',
@@ -660,7 +592,7 @@ const EVENT_HANDLERS = {
               : msg.runtime?.lastPlanStepIndex ?? null
           })
         } else {
-          // 计划整体更新（原 plan 事件的 patch 路径）
+          // 计划整体更新
           msg.plan = normalizePlan(data, seq)
           patchRuntime(msg, { phase: 'planning', status: state.status })
           sealLiveTextOrNarration(ensureNodes(msg))
@@ -723,17 +655,6 @@ const EVENT_HANDLERS = {
     }
   }
 }
-
-// tool / tool_start / tool_delta 共用同一个 handler（仅 phase 不同）
-const toolHandler = {
-  needsMsg: true,
-  fn: ({ state, msg }, { name, data, seq }) => {
-    patchRuntime(msg, { phase: 'tool_preparing', status: state.status, lastToolName: data?.toolName })
-    nodeAdaptTool(msg, data?.toolName ?? name, data, seq)
-    return true
-  }
-}
-EVENT_HANDLERS.tool_delta = toolHandler
 
 // ────────────────────────────────────────────────────────────────────
 // 主入口：dispatcher
@@ -841,16 +762,12 @@ export function createAiChatEventReducer({
         const value = Number(seq || 0)
         if (Number.isFinite(value) && value > state.lastEventSeq) state.lastEventSeq = value
       },
-      onThinking: (entry, seq, meta) => dispatch('thinking', { ...entry, seq }, seq, meta),
-      onPhase: (phase, seq, meta) => dispatch('phase', phase, seq, meta),
       onToolDelta: (entry, seq, meta) => dispatch('tool_delta', { ...entry, seq }, seq, meta),
       onStatus: (status, seq, meta) => dispatchSilent('status', status, seq, meta),
       onDelta: (delta, seq, meta) => dispatch('delta', delta, seq, meta),
       onWarn: (text, seq, meta) => dispatch('warn', text, seq, meta),
       onHeartbeat: (payload, seq, meta) => dispatchSilent('heartbeat', payload, seq, meta),
       onErrorMeta: (data, seq, meta) => dispatchSilent('error_meta', data, seq, meta),
-      onPlan: (plan, seq, meta) => dispatch('plan', plan, seq, meta),
-      onPlanStep: (entry, seq, meta) => dispatch('plan_step', { ...entry, seq }, seq, meta),
       // 新 Task Tree 原生事件
       onNode: (data, seq, meta) => dispatch('node', data, seq, meta),
       onPatch: (data, seq, meta) => dispatch('patch', data, seq, meta),

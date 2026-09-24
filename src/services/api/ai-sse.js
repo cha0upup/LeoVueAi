@@ -6,16 +6,12 @@ const logger = createLogger('AiSse')
  * 解析 AI 后端的 SSE 流（text/event-stream），并通过回调分发各类事件。
  *
  * 后端事件类型：
- *   - `thinking` — AI 思考日志（JSON 对象）
- *   - `phase`    — 当前执行阶段（纯字符串，如 thinking）
  *   - `tool_delta` — 模型正在生成的工具调用增量（JSON 对象）
  *   - `status`   — 当前任务状态（纯字符串）
  *   - `delta`    — 回复正文增量片段（纯字符串）
  *   - `warn`     — 轮次警告文本（纯字符串）
  *   - `error_meta` — 错误分类与建议动作（JSON 对象）
  *   - `error`      — 错误信息（纯字符串）
- *   - `plan`      — 计划快照（JSON：AiPlan）
- *   - `plan_step` — 计划步骤状态变更（JSON）
  *   - `node`      — 在任务树中创建新节点（JSON，kind 字段区分类型）
  *   - `patch`     — 更新任务树中的已有节点（JSON，kind 字段区分类型）
  *   - `turn`      — 轮次结束合并事件：content + usage? + review（取代 reply+usage+review）
@@ -26,17 +22,14 @@ const logger = createLogger('AiSse')
  *
  * @param {Response} response  - fetch() 返回的 Response 对象（Content-Type: text/event-stream）
  * @param {object}   handlers
- * @param {Function} [handlers.onThinking] - (entry: object) => void
  * @param {Function} [handlers.onToolDelta] - (entry: object) => void
  * @param {Function} [handlers.onStatus]   - (message: string) => void
  * @param {Function} [handlers.onDelta]    - (delta: string) => void
  * @param {Function} [handlers.onWarn]     - (message: string) => void
- * @param {Function} [handlers.onHeartbeat] - (payload: object|string) => void
+ * @param {Function} [handlers.onHeartbeat] - (payload: object) => void
  * @param {Function} [handlers.onEventSeq] - (seq: number) => void
  * @param {Function} [handlers.onErrorMeta] - (meta: object) => void
  * @param {Function} [handlers.onError]     - (message: string, meta?: object) => void
- * @param {Function} [handlers.onPlan]          - (plan: object) => void
- * @param {Function} [handlers.onPlanStep]      - (entry: object) => void
  * @param {Function} [handlers.onNode]          - (data: object, seq: number) => void
  * @param {Function} [handlers.onPatch]         - (data: object, seq: number) => void
  * @param {Function} [handlers.onTurn]          - (data: object, seq: number) => void  终态事件（含 content/usage/review）
@@ -46,8 +39,6 @@ const logger = createLogger('AiSse')
  * @returns {Promise<string>} 最终的 AI 回复文本（turn.content），若无则返回空字符串
  */
 export async function parseAiSseStream(response, {
-  onThinking,
-  onPhase,
   onToolDelta,
   onStatus,
   onDelta,
@@ -56,8 +47,6 @@ export async function parseAiSseStream(response, {
   onEventSeq,
   onErrorMeta,
   onError,
-  onPlan,
-  onPlanStep,
   onNode,
   onPatch,
   onSubagentEvent,
@@ -118,14 +107,7 @@ export async function parseAiSseStream(response, {
 
       if (!payload) return
 
-      if (eventName === 'thinking') {
-        try {
-          const entry = JSON.parse(payload)
-          onThinking?.(entry, seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
-      } else if (eventName === 'phase') {
-        onPhase?.(payload, seq, ...eventMetaArgs)
-      } else if (eventName === 'tool_delta') {
+      if (eventName === 'tool_delta') {
         try {
           const entry = JSON.parse(payload)
           onToolDelta?.(entry, seq, ...eventMetaArgs)
@@ -137,9 +119,7 @@ export async function parseAiSseStream(response, {
       } else if (eventName === 'heartbeat') {
         try {
           onHeartbeat?.(JSON.parse(payload), seq, ...eventMetaArgs)
-        } catch {
-          onHeartbeat?.(payload, seq, ...eventMetaArgs)
-        }
+        } catch { /* ignore */ }
       } else if (eventName === 'error_meta') {
         try {
           errorMeta = JSON.parse(payload)
@@ -147,14 +127,6 @@ export async function parseAiSseStream(response, {
         } catch { /* ignore */ }
       } else if (eventName === 'error') {
         onError?.(payload, errorMeta, seq, ...eventMetaArgs)
-      } else if (eventName === 'plan') {
-        try {
-          onPlan?.(JSON.parse(payload), seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
-      } else if (eventName === 'plan_step') {
-        try {
-          onPlanStep?.(JSON.parse(payload), seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
       } else if (eventName === 'node') {
         try {
           onNode?.(JSON.parse(payload), seq, ...eventMetaArgs)

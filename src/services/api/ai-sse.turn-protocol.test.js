@@ -1,7 +1,46 @@
 import { describe, expect, it, vi } from 'vitest'
 import { parseAiSseStream } from './ai-sse.js'
+import { createAiChatEventReducer } from '@/composables/aiChatEventReducer.js'
+import { createAssistantMessage } from '@/composables/aiMessageFactory.js'
 
 describe('parseAiSseStream Turn protocol', () => {
+  it('renders thinking and plan updates through node and patch events', async () => {
+    const assistant = createAssistantMessage()
+    const state = { messages: [assistant], status: 'running', lastEventSeq: 0 }
+    const reducer = createAiChatEventReducer({
+      ensureState: () => state,
+      getActiveKey: () => 'thread-1'
+    })
+    const events = [
+      ['turn/started', { turn: { id: 'turn-1', status: 'running' } }],
+      ['delta', 'draft'],
+      ['node', { kind: 'thinking', content: 'Consider the request' }],
+      ['node', { kind: 'plan', planId: 'plan-1', steps: [{ index: 0, description: 'Prepare answer', status: 'PENDING' }] }],
+      ['patch', { kind: 'plan', stepIndex: 0, action: 'start', status: 'IN_PROGRESS' }],
+      ['patch', { kind: 'plan', stepIndex: 0, action: 'complete', status: 'COMPLETED', result: 'Ready' }],
+      ['heartbeat', { status: 'running', lastSeq: 6 }],
+      ['turn', { content: 'Final answer' }],
+      ['turn/completed', { turn: { id: 'turn-1', status: 'completed' } }]
+    ]
+    const body = events.map(([name, data], index) =>
+      `id: ${index + 1}|turn-1|||\nevent: ${name}\ndata: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`
+    ).join('')
+
+    await parseAiSseStream(new globalThis.Response(body), reducer.makeLogHandlers('thread-1', 0))
+
+    expect(assistant.nodes.slice(0, 2)).toMatchObject([
+      { kind: 'text', content: 'draft', streaming: false },
+      { kind: 'thinking', content: 'Consider the request' }
+    ])
+    expect(assistant.plan.steps[0]).toMatchObject({ status: 'COMPLETED', result: 'Ready' })
+    expect(assistant.planEvents.map(event => event.action)).toEqual(['start', 'complete'])
+    expect(state.heartbeat).toEqual({ status: 'running', lastSeq: 6 })
+    expect(state.lastEventSeq).toBe(events.length)
+    expect(state.status).toBe('completed')
+    expect(assistant.content).toBe('Final answer')
+    expect(assistant.loading).toBe(false)
+  })
+
   it('keeps reading after model turn and finishes on turn/completed', async () => {
     const onTurn = vi.fn()
     const onTurnStarted = vi.fn()
