@@ -8,7 +8,7 @@ describe('AI Turn trace protocol', () => {
     const onTrace = vi.fn()
     const body = [
       'event: trace',
-      'id: 7',
+      'id: 7|turn-1|item-1|run-1|',
       'data: {"traceId":"trace-1","source":"platform","startedAt":100}',
       '',
       ''
@@ -22,7 +22,7 @@ describe('AI Turn trace protocol', () => {
       traceId: 'trace-1',
       source: 'platform',
       startedAt: 100
-    }, 7)
+    }, 7, expect.objectContaining({ turnId: 'turn-1', itemId: 'item-1', runId: 'run-1' }))
   })
 
   it('binds trace, turn and run identities to the assistant runtime', () => {

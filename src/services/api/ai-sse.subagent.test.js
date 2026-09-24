@@ -6,7 +6,7 @@ describe('parseAiSseStream subagent events', () => {
     const onSubagentEvent = vi.fn()
     const body = [
       'event: subagent_event',
-      'id: 12',
+      'id: 12|turn-1|item-1|run-1|',
       'data: {"subagentInvocationId":"inv-1","eventName":"delta","eventData":"root"}',
       '',
       ''
@@ -20,6 +20,6 @@ describe('parseAiSseStream subagent events', () => {
       subagentInvocationId: 'inv-1',
       eventName: 'delta',
       eventData: 'root'
-    }, 12)
+    }, 12, expect.objectContaining({ turnId: 'turn-1', itemId: 'item-1', runId: 'run-1' }))
   })
 })

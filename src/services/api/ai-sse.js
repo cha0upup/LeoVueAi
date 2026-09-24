@@ -71,6 +71,19 @@ export async function parseAiSseStream(response, {
   let receivedTurnStarted = false
   let receivedTurnCompleted = false
 
+  const jsonHandlers = new Map([
+    ['tool_delta', onToolDelta],
+    ['heartbeat', onHeartbeat],
+    ['error_meta', onErrorMeta],
+    ['node', onNode],
+    ['patch', onPatch],
+    ['subagent_event', onSubagentEvent],
+    ['turn', onTurn],
+    ['turn/started', onTurnStarted],
+    ['turn/completed', onTurnCompleted],
+    ['trace', onTrace]
+  ])
+
   const parseDataLine = (line) => {
     let value = line.slice(5)
     if (value.startsWith(' ')) value = value.slice(1)
@@ -92,91 +105,44 @@ export async function parseAiSseStream(response, {
 
   const dispatchEvent = (eventName, dataStr, eventId) => {
     const payload = eventName === 'delta' ? dataStr : dataStr.trimEnd()
-    if (!eventName) return false
+    if (!eventName) return
     const eventMeta = parseEventId(eventId)
     const seq = eventMeta.seq
-    const eventMetaArgs = String(eventId || '').includes('|') ? [eventMeta] : []
-    let accepted = false
-    let shouldAdvanceCursor = true
+    let shouldAdvanceCursor = eventName !== 'turn/completed'
 
     try {
       if (eventName === 'delta') {
-        onDelta?.(payload, seq, ...eventMetaArgs)
+        onDelta?.(payload, seq, eventMeta)
         return
       }
 
       if (!payload) return
 
-      if (eventName === 'tool_delta') {
-        try {
-          const entry = JSON.parse(payload)
-          onToolDelta?.(entry, seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
-      } else if (eventName === 'status') {
-        onStatus?.(payload, seq, ...eventMetaArgs)
+      if (eventName === 'status') {
+        onStatus?.(payload, seq, eventMeta)
       } else if (eventName === 'warn') {
-        onWarn?.(payload, seq, ...eventMetaArgs)
-      } else if (eventName === 'heartbeat') {
-        try {
-          onHeartbeat?.(JSON.parse(payload), seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
-      } else if (eventName === 'error_meta') {
-        try {
-          errorMeta = JSON.parse(payload)
-          onErrorMeta?.(errorMeta, seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
+        onWarn?.(payload, seq, eventMeta)
       } else if (eventName === 'error') {
-        onError?.(payload, errorMeta, seq, ...eventMetaArgs)
-      } else if (eventName === 'node') {
-        try {
-          onNode?.(JSON.parse(payload), seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
-      } else if (eventName === 'patch') {
-        try {
-          onPatch?.(JSON.parse(payload), seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
-      } else if (eventName === 'subagent_event') {
-        try {
-          onSubagentEvent?.(JSON.parse(payload), seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
-      } else if (eventName === 'turn') {
-        // turn 是模型结果聚合事件；控制协议以 turn/completed 作为真正终态。
+        onError?.(payload, errorMeta, seq, eventMeta)
+      } else if (jsonHandlers.has(eventName)) {
         try {
           const entry = JSON.parse(payload)
-          replyText = String(entry?.content ?? '')
-          onTurn?.(entry, seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
-      } else if (eventName === 'turn/started') {
-        try {
-          const entry = JSON.parse(payload)
-          onTurnStarted?.(entry, seq, ...eventMetaArgs)
-          receivedTurnStarted = true
-          accepted = true
+          if (eventName === 'error_meta') errorMeta = entry
+          if (eventName === 'turn') replyText = String(entry?.content ?? '')
+          jsonHandlers.get(eventName)?.(entry, seq, eventMeta)
+          // turn 仅聚合模型结果，控制协议终态由 turn/completed 决定。
+          if (eventName === 'turn/started') receivedTurnStarted = true
+          if (eventName === 'turn/completed') receivedTurnCompleted = true
+          shouldAdvanceCursor = true
         } catch {
-          shouldAdvanceCursor = false
+          shouldAdvanceCursor = eventName !== 'turn/started' && eventName !== 'turn/completed'
         }
-      } else if (eventName === 'turn/completed') {
-        try {
-          const entry = JSON.parse(payload)
-          onTurnCompleted?.(entry, seq, ...eventMetaArgs)
-          receivedTurnCompleted = true
-          accepted = true
-        } catch {
-          shouldAdvanceCursor = false
-        }
-      } else if (eventName === 'trace') {
-        try {
-          onTrace?.(JSON.parse(payload), seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
       }
     } finally {
-      const advanceCursor = shouldAdvanceCursor &&
-        !(eventName === 'turn/completed' && !accepted)
-      if (advanceCursor && Number.isFinite(seq) && seq > 0) {
-        onEventSeq?.(seq, ...eventMetaArgs)
+      if (shouldAdvanceCursor && seq > 0) {
+        onEventSeq?.(seq, eventMeta)
       }
     }
-    return accepted
   }
 
   try {

@@ -46,15 +46,15 @@ describe('parseAiSseStream Turn protocol', () => {
     const onTurnStarted = vi.fn()
     const onTurnCompleted = vi.fn()
     const body = [
-      'id: 1',
+      'id: 1|turn-1|||',
       'event: turn/started',
-      'data: {"turn":{"id":"turn-1","status":"inProgress"}}',
+      'data: {"turn":{"id":"turn-1","status":"running"}}',
       '',
       'id: 2|turn-1|item-assistant-1|run-1|',
       'event: turn',
       'data: {"content":"partial result"}',
       '',
-      'id: 3',
+      'id: 3|turn-1|||',
       'event: turn/completed',
       'data: {"turn":{"id":"turn-1","status":"interrupted"}}',
       '',
@@ -132,25 +132,49 @@ describe('parseAiSseStream Turn protocol', () => {
     expect(onEventSeq).toHaveBeenCalledWith(2, expect.any(Object))
   })
 
-  it('does not advance cursor when turn/completed payload is malformed', async () => {
-    const onEventSeq = vi.fn()
-    const body = [
-      'id: 1|turn-1|item-1|run-1|',
-      'event: turn/started',
-      'data: {"turn":{"id":"turn-1","status":"inProgress"}}',
-      '',
-      'id: 2|turn-1|item-1|run-1|',
-      'event: turn/completed',
-      'data: {malformed',
-      '',
-      ''
-    ].join('\n')
+  it.each(['{malformed', '', '{"turn":{"id":"turn-1","status":"completed"}}'])(
+    'does not advance cursor when turn/completed cannot be parsed or applied: %s', async payload => {
+      const onEventSeq = vi.fn()
+      const onTurnCompleted = vi.fn(() => { throw new Error('Could not apply terminal state') })
+      const body = [
+        'id: 1|turn-1|item-1|run-1|',
+        'event: turn/started',
+        'data: {"turn":{"id":"turn-1","status":"running"}}',
+        '',
+        'id: 2|turn-1|item-1|run-1|',
+        'event: turn/completed',
+        `data: ${payload}`,
+        '',
+        ''
+      ].join('\n')
 
-    await expect(parseAiSseStream(new globalThis.Response(body, {
-      headers: { 'Content-Type': 'text/event-stream' }
-    }), { onEventSeq })).rejects.toMatchObject({ code: 'AI_TURN_INCOMPLETE' })
+      await expect(parseAiSseStream(new globalThis.Response(body, {
+        headers: { 'Content-Type': 'text/event-stream' }
+      }), { onEventSeq, onTurnCompleted })).rejects.toMatchObject({ code: 'AI_TURN_INCOMPLETE' })
 
-    expect(onEventSeq).toHaveBeenCalledTimes(1)
-    expect(onEventSeq).toHaveBeenCalledWith(1, expect.any(Object))
+      expect(onEventSeq).toHaveBeenCalledTimes(1)
+      expect(onEventSeq).toHaveBeenCalledWith(1, expect.any(Object))
+    }
+  )
+
+  it('preserves delta whitespace and error details across malformed nonterminal events', async () => {
+    const handlers = { onDelta: vi.fn(), onError: vi.fn(), onEventSeq: vi.fn(), onHeartbeat: vi.fn() }
+    const events = [
+      ['delta', '  text  '],
+      ['error_meta', '{"category":"timeout"}'],
+      ['error_meta', '{malformed'],
+      ['node', '{malformed'],
+      ['error', 'request timed out']
+    ]
+    const body = events.map(([name, data], index) =>
+      `id: ${index + 1}|turn-1|||\nevent: ${name}\ndata: ${data}\n\n`
+    ).join('') + 'event: heartbeat\ndata: {"status":"running"}\n\n'
+
+    await parseAiSseStream(new globalThis.Response(body), handlers)
+
+    expect(handlers.onDelta).toHaveBeenCalledWith('  text  ', 1, expect.objectContaining({ turnId: 'turn-1' }))
+    expect(handlers.onError).toHaveBeenCalledWith('request timed out', { category: 'timeout' }, 5, expect.any(Object))
+    expect(handlers.onHeartbeat).toHaveBeenCalledWith({ status: 'running' }, 0, expect.objectContaining({ turnId: null }))
+    expect(handlers.onEventSeq.mock.calls.map(([seq]) => seq)).toEqual([1, 2, 3, 4, 5])
   })
 })
