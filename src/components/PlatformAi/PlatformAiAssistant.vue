@@ -288,10 +288,10 @@ const {
   applyPrompt,
   retry
 } = useAiChat({
-  enqueueApi: (params) => platformAiStartTurnApi(params),
-  stopApi: (params) => platformAiStopApi(params),
-  recoverEventsApi: (params) => platformAiEventsApi(params).then(res => res.data),
-  subscribeApi: (params) => platformAiStreamApi(params),
+  enqueueApi: platformAiStartTurnApi,
+  stopApi: platformAiStopApi,
+  recoverEventsApi: platformAiEventsApi,
+  subscribeApi: platformAiStreamApi,
   onComplete: () => {
     if (mounted) fetchThreadsSilently()
   },

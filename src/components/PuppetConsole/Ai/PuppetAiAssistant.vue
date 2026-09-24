@@ -152,6 +152,7 @@ import {
   puppetNodeAiStartTurnApi,
   puppetNodeAiStopApi,
   puppetNodeAiThreadStreamApi,
+  puppetNodeAiThreadEventsApi,
   puppetNodeAiSwitchChannelApi,
   listAvailableAiModelsApi,
   getReconSummaryApi,
@@ -220,8 +221,7 @@ const {
   deleteThread,
   renameThread,
   switchThread,
-  loadMessages,
-  loadEvents
+  loadMessages
 } = useAiThreads({ sessionId: sessionIdRef })
 
 /** 正在执行中的线程 ID 集合（用于执行状态同步）。 */
@@ -311,10 +311,10 @@ const {
   applyPrompt,
   retry,
 } = useAiChat({
-  enqueueApi: (params) => puppetNodeAiStartTurnApi(params),
-  stopApi:    (params) => puppetNodeAiStopApi(params),
-  recoverEventsApi: (params) => loadEvents(params.threadId || activeThreadId.value, params.afterSeq, params.limit),
-  subscribeApi: (params) => puppetNodeAiThreadStreamApi(params),
+  enqueueApi: puppetNodeAiStartTurnApi,
+  stopApi: puppetNodeAiStopApi,
+  recoverEventsApi: puppetNodeAiThreadEventsApi,
+  subscribeApi: puppetNodeAiThreadStreamApi,
   onComplete: ({ key } = {}) => {
     const tid = key || [...sendingSessionsByThread.keys()].at(-1)
     const completedSessionId = sendingSessionsByThread.get(tid)

@@ -4,14 +4,10 @@ import {
   puppetNodeAiThreadCreateApi,
   puppetNodeAiThreadDeleteApi,
   puppetNodeAiThreadRenameApi,
-  puppetNodeAiThreadMessagesApi,
-  puppetNodeAiThreadEventsApi
+  puppetNodeAiThreadMessagesApi
 } from '@/services/api.js'
 import { showError } from '@/utils/messageUtils.js'
-import { createLogger } from '@/utils/logger.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
-
-const logger = createLogger('AiThreads')
 
 /**
  * AI 对话线程管理 composable。
@@ -192,41 +188,6 @@ export function useAiThreads({ sessionId }) {
     }
   }
 
-  const loadEvents = async (threadId, afterSeq = 0, limit = 200) => {
-    if (!sessionId.value || !threadId) {
-      logger.warn(`跳过事件加载 sessionId=${sessionId.value} threadId=${threadId}`)
-      return { events: [], lastSeq: 0, runStatus: 'idle', executing: false }
-    }
-    const startedAt = Date.now()
-    try {
-      const res = await puppetNodeAiThreadEventsApi({
-        sessionId: sessionId.value,
-        threadId,
-        afterSeq,
-        limit
-      })
-      const events = res.data?.events ?? []
-      const runStatus = res.data?.runStatus ?? 'idle'
-      return {
-        events,
-        lastSeq: Number(res.data?.lastSeq ?? 0),
-        runStatus,
-        executing: !!res.data?.executing,
-        activeTurn: res.data?.activeTurn ?? null,
-        queuedTurns: Array.isArray(res.data?.queuedTurns)
-          ? res.data.queuedTurns
-          : [],
-        pendingTurnCount: Number(res.data?.pendingTurnCount ?? 0),
-        stopReason: res.data?.stopReason ?? null
-      }
-    } catch (err) {
-      // 快照读取失败必须交给线程订阅的重连循环处理，不能伪装成 idle。
-      const code = err?.code || err?.response?.status || 'UNKNOWN'
-      logger.error(`事件加载失败 threadId=${threadId} afterSeq=${afterSeq} code=${code} 耗时=${Date.now() - startedAt}ms message=${err?.message}`, err)
-      throw err
-    }
-  }
-
   // ── 当前活跃线程对象 ──────────────────────────────────────────────────────
 
   const activeThread = computed(() =>
@@ -244,7 +205,6 @@ export function useAiThreads({ sessionId }) {
     deleteThread,
     renameThread,
     switchThread,
-    loadMessages,
-    loadEvents
+    loadMessages
   }
 }

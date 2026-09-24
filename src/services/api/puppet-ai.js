@@ -61,8 +61,9 @@ export function puppetNodeAiThreadMessagesApi(params) {
  * @param {number} [params.afterSeq=0]
  * @param {number} [params.limit=200]
  */
-export function puppetNodeAiThreadEventsApi(params) {
-  return http.post('/puppet-node/ai/thread/events', params)
+export async function puppetNodeAiThreadEventsApi(params) {
+  const { data } = await http.post('/puppet-node/ai/thread/events', params)
+  return data
 }
 
 /** 重新附着指定节点 AI 线程的可重放实时事件流。 */

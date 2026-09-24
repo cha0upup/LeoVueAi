@@ -42,8 +42,9 @@ export function platformAiStopApi(params) {
 /**
  * 获取当前平台 AI 最近 SSE 事件，用于流中断后的补拉恢复。
  */
-export function platformAiEventsApi(params) {
-  return http.post('/platform/ai/events', params || {})
+export async function platformAiEventsApi(params) {
+  const { data } = await http.post('/platform/ai/events', params || {})
+  return data
 }
 
 /** 仅创建并持久化 Turn，不等待执行或打开事件流。 */
