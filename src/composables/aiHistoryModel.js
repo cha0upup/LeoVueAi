@@ -30,54 +30,41 @@ const mapAssistantNodes = (message, includeSubtasks) => {
   const ordered = []
   let hasTextSegment = false
 
-  ;(Array.isArray(message?.nodes) ? message.nodes : []).forEach((item, index) => {
+  ;(Array.isArray(message?.nodes) ? message.nodes : []).forEach(item => {
     if (item?.kind === 'thinking' || item?.kind === 'text' || item?.kind === 'user_input') {
       hasTextSegment ||= item.kind === 'text'
-      ordered.push({ kind: item.kind, seq: item.seq, index, item })
+      ordered.push(item)
       return
     }
-    if (item?.kind === 'tool') {
-      const key = item.toolCallId
-      const existing = key ? toolNodes.get(key) : null
-      if (existing) {
-        mergePatch(existing, item, ['kind', 'seq', 'toolCallId'])
-      } else {
-        const merged = { ...item }
-        if (key) toolNodes.set(key, merged)
-        ordered.push({ kind: 'tool', seq: item.seq, index, item: merged })
-      }
-      return
-    }
-    if (!includeSubtasks || item?.kind !== 'subtask') return
-    const key = item.subagentInvocationId
-    const existing = key ? subtaskNodes.get(key) : null
+    const isTool = item?.kind === 'tool'
+    if (!isTool && (!includeSubtasks || item?.kind !== 'subtask')) return
+    const nodesById = isTool ? toolNodes : subtaskNodes
+    const idField = isTool ? 'toolCallId' : 'subagentInvocationId'
+    const key = item[idField]
+    const existing = key ? nodesById.get(key) : null
     if (existing) {
-      mergePatch(existing, item, ['kind', 'seq', 'subagentInvocationId'])
+      mergePatch(existing, item, ['kind', 'seq', idField])
     } else {
       const merged = { ...item }
-      if (key) subtaskNodes.set(key, merged)
-      ordered.push({ kind: 'subtask', seq: item.seq, index, item: merged })
+      if (key) nodesById.set(key, merged)
+      ordered.push(merged)
     }
   })
 
-  ordered.sort((left, right) => {
-    const sequenceDifference = Number(left.seq ?? 0) - Number(right.seq ?? 0)
-    return sequenceDifference || left.index - right.index
-  })
+  ordered.sort((left, right) => Number(left.seq ?? 0) - Number(right.seq ?? 0))
 
-  const nodes = ordered.flatMap(entry => {
-    const item = entry.item
-    if (entry.kind === 'thinking') {
-      return [createThinkingNode({ content: item.content ?? '', seq: entry.seq })]
+  const nodes = ordered.flatMap(item => {
+    if (item.kind === 'thinking') {
+      return [createThinkingNode({ content: item.content ?? '', seq: item.seq })]
     }
-    if (entry.kind === 'text') {
+    if (item.kind === 'text') {
       const content = String(item.content ?? '').trim()
-      return content ? [createTextNode({ content, streaming: false, seq: entry.seq })] : []
+      return content ? [createTextNode({ content, streaming: false, seq: item.seq })] : []
     }
-    if (entry.kind === 'user_input') {
-      return [createUserInputNode({ ...entry.item, seq: entry.seq })]
+    if (item.kind === 'user_input') {
+      return [createUserInputNode(item)]
     }
-    if (entry.kind === 'subtask') {
+    if (item.kind === 'subtask') {
       return [createSubtaskNode({
         invocationId: item.subagentInvocationId,
         childThreadId: item.childThreadId,

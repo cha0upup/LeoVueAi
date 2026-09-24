@@ -27,10 +27,10 @@ describe('aiHistoryModel', () => {
       nodes: [
         { kind: 'tool', seq: 3, toolCallId: 'tool-1', toolName: 'scan', status: 'running', businessTool: false, toolKind: 'CONTEXT' },
         { kind: 'thinking', seq: 1, content: 'think' },
-        { kind: 'subtask', seq: 4, subagentInvocationId: 'sub-1', task: 'inspect', status: 'running' },
+        { kind: 'subtask', seq: 4, subagentInvocationId: 'tool-1', task: 'inspect', status: 'running' },
         { kind: 'text', seq: 2, content: 'answer' },
         { kind: 'tool', seq: 5, toolCallId: 'tool-1', success: true, resultPreview: 'ok' },
-        { kind: 'subtask', seq: 6, subagentInvocationId: 'sub-1', status: 'completed', summary: 'done' }
+        { kind: 'subtask', seq: 6, subagentInvocationId: 'tool-1', status: 'completed', summary: 'done' }
       ]
     }]
     const original = globalThis.structuredClone(serverMessages)
@@ -39,8 +39,8 @@ describe('aiHistoryModel', () => {
     expect(message.nodes.map(node => node.kind)).toEqual(
       includeSubtasks ? ['thinking', 'text', 'tool', 'subtask'] : ['thinking', 'text', 'tool']
     )
-    expect(message.nodes[2]).toMatchObject({ status: 'done', success: true, result: 'ok', businessTool: false, toolKind: 'CONTEXT' })
-    if (includeSubtasks) expect(message.nodes[3]).toMatchObject({ status: 'completed', summary: 'done' })
+    expect(message.nodes[2]).toMatchObject({ seq: 3, status: 'done', success: true, result: 'ok', businessTool: false, toolKind: 'CONTEXT' })
+    if (includeSubtasks) expect(message.nodes[3]).toMatchObject({ seq: 4, status: 'completed', summary: 'done' })
     expect(message.startedAt).toBe(1784073600000)
     expect(serverMessages).toEqual(original)
   })
