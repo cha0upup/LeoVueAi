@@ -3,14 +3,13 @@ export const ACTIVE_AI_STATUSES = ['queued', 'running', 'cancelling']
 
 export function normalizeAiStatus(status, fallback = 'idle') {
   if (status === 'interrupted') return 'cancelled'
-  if (status === 'inProgress') return 'running'
   return status || fallback
 }
 
 export const getThreadStatus = (thread, conversationStatus = {}) => {
   const localStatus = normalizeAiStatus(conversationStatus?.[thread?.threadId]?.status)
   if (localStatus && localStatus !== 'idle') return localStatus
-  return normalizeAiStatus(thread?.runStatus || (thread?.executing ? 'running' : 'idle'))
+  return normalizeAiStatus(thread?.runStatus)
 }
 
 export const isDefaultThreadTitle = title => !title?.trim() || /^(对话\s*\d+|新对话|未命名对话|平台\s*AI)$/.test(title.trim())

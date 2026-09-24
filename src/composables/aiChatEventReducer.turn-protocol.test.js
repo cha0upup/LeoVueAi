@@ -91,6 +91,40 @@ describe('aiChatEventReducer Turn protocol', () => {
     })
   })
 
+  it.each([
+    ['completed', 'completed'],
+    ['interrupted', 'cancelled']
+  ])('clears the active turn when it is %s', (protocolStatus, status) => {
+    const { state, assistant, handlers } = fixture()
+    handlers.onDelta('partial answer', 1)
+
+    handlers.onTurnCompleted({ turn: { id: 'turn-1', status: protocolStatus } }, 2)
+
+    expect(state).toMatchObject({
+      status, sending: false, activeTurnId: null, activeItemId: null, activeClientUserMessageId: null
+    })
+    expect(assistant).toMatchObject({ loading: false, runtime: { status, phase: status } })
+    expect(assistant.completedAt).toBeGreaterThan(0)
+    expect(assistant.nodes[0]).toMatchObject({ content: 'partial answer', streaming: false })
+  })
+
+  it('cancels a queued turn without clearing another running turn', () => {
+    const { state, assistant, handlers } = fixture()
+    const queued = createAssistantMessage({ id: 'item-2', turnId: 'turn-2' })
+    state.messages.push(queued)
+    state.queuedTurnIds = ['turn-2']
+
+    handlers.onTurnCompleted({ turn: { id: 'turn-2', status: 'interrupted' } }, 1, {
+      turnId: 'turn-2', itemId: 'item-2'
+    })
+
+    expect(state).toMatchObject({
+      status: 'running', sending: true, activeTurnId: 'turn-1', activeItemId: 'item-1', queuedTurnIds: []
+    })
+    expect(assistant.loading).toBe(true)
+    expect(queued).toMatchObject({ loading: false, content: '（已取消）', runtime: { status: 'cancelled' } })
+  })
+
   it('clears the pending question when its answer turn starts', () => {
     const { state, assistant, handlers } = fixture()
     assistant.nodes = [{ kind: 'user_input', questionId: 'question-1', status: 'pending' }]

@@ -67,8 +67,11 @@ describe('useAiChat refresh recovery', () => {
     const failed = chat.messages.value.at(-1)
     expect(failed).toMatchObject({
       failed: true,
-      answerToQuestionId: 'question-1'
+      answerToQuestionId: 'question-1',
+      loading: false,
+      runtime: { status: 'failed', phase: 'failed' }
     })
+    expect(failed.completedAt).toBeGreaterThan(0)
     const firstRequest = enqueueApi.mock.calls[0][0]
 
     chat.retry(failed)
@@ -136,7 +139,7 @@ describe('useAiChat refresh recovery', () => {
       params.onTurnStarted({
         turn: {
           id: 'turn-live',
-          status: 'inProgress',
+          status: 'running',
           items: [{ id: 'item-live', role: 'assistant' }]
         }
       }, 8)

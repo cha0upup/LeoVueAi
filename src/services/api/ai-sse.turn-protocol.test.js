@@ -116,7 +116,7 @@ describe('parseAiSseStream Turn protocol', () => {
     const body = [
       'id: 1|turn-1|item-1|run-1|',
       'event: turn/started',
-      'data: {"turn":{"id":"turn-1","status":"inProgress"}}',
+      'data: {"turn":{"id":"turn-1","status":"running"}}',
       '',
       'id: 2|turn-1|item-1|run-1|',
       'event: turn',

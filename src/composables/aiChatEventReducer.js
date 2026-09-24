@@ -352,7 +352,7 @@ const EVENT_HANDLERS = {
       }
       state.interrupting = !!turn.interruptRequested
       state.sending = true
-      const status = turn.status === 'inProgress' ? 'running' : (turn.status || 'running')
+      const status = turn.status
       transitionStatus(state, status, 'turn-started')
       const msg = resolveMsg(false)
       if (msg) {
@@ -379,9 +379,7 @@ const EVENT_HANDLERS = {
     fn: ({ state, resolveMsg }, { data }) => {
       const turn = data?.turn
       if (!turn?.id) return false
-      const status = turn.status === 'interrupted'
-        ? 'cancelled'
-        : (turn.status === 'inProgress' ? 'running' : turn.status)
+      const status = normalizeAiStatus(turn.status)
       // queued Turn 可以在另一个 Turn 运行时被取消：只收口对应消息和队列项，
       // 不得覆盖当前 active Turn 的线程级状态。
       if (state.activeTurnId && String(turn.id) !== String(state.activeTurnId)) {
@@ -409,12 +407,10 @@ const EVENT_HANDLERS = {
         : status
       transitionStatus(state, effectiveStatus, 'turn-completed')
       state.interrupting = false
-      if (status !== 'running') {
-        state.sending = false
-        state.activeTurnId = null
-        state.activeItemId = null
-        state.activeClientUserMessageId = null
-      }
+      state.sending = false
+      state.activeTurnId = null
+      state.activeItemId = null
+      state.activeClientUserMessageId = null
       if (msg) {
         applyTerminalRuntime(msg, effectiveStatus, {
           turnId: String(turn.id),
@@ -435,7 +431,7 @@ const EVENT_HANDLERS = {
       }
       state.queuedTurnIds = (state.queuedTurnIds || [])
         .filter(id => String(id) !== String(turn.id))
-      if (status !== 'running' && !hasPendingInput && state.queuedTurnIds.length > 0) {
+      if (!hasPendingInput && state.queuedTurnIds.length > 0) {
         state.sending = true
         transitionStatus(state, 'queued', 'queued-turn-remains')
       }
@@ -825,26 +821,13 @@ export function createAiChatEventReducer({
       if (ACTIVE_AI_STATUSES.includes(status)) {
         state.sending = true
         assistantMsg = assistantMsg || ensureAssistantTurnForRecovery(state)
-      }
-      if (TERMINAL_AI_STATUSES.includes(status) && assistantMsg) {
-        state.sending = false
-        applyTerminalRuntime(assistantMsg, status, {
-          stopReason: stopReason || null
-        })
-      }
-      if (status === 'waiting_for_user') {
-        state.sending = false
-        if (assistantMsg) {
-          applyTerminalRuntime(assistantMsg, status, {
-            stopReason: stopReason || null
-          })
-        }
-      }
-      if (ACTIVE_AI_STATUSES.includes(status) && assistantMsg) {
         patchRuntime(assistantMsg, {
           status,
           stopReason: stopReason || null
         })
+      } else if (status === 'waiting_for_user' || (TERMINAL_AI_STATUSES.includes(status) && assistantMsg)) {
+        state.sending = false
+        applyTerminalRuntime(assistantMsg, status, { stopReason: stopReason || null })
       }
     }
 

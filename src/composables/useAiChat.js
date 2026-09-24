@@ -15,19 +15,6 @@ function createClientUserMessageId() {
   return `client-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-/** 写入 assistant 消息的终态 runtime + loading + completedAt。 */
-function finalizeAssistantMessage(msg, { status, phase }) {
-  if (!msg) return
-  msg.loading = false
-  msg.completedAt = Date.now()
-  msg.runtime = {
-    ...(msg.runtime || {}),
-    phase: phase || status,
-    status,
-    updatedAt: Date.now()
-  }
-}
-
 /**
  * 通用 AI 对话 composable，供 PlatformAiAssistant 和 PuppetAiAssistant 共用。
  *
@@ -564,7 +551,7 @@ export function useAiChat({
           assistant.content = `调用失败：${error?.message || '指令提交失败'}`
           assistant.failed = true
           assistant.retryText = text
-          finalizeAssistantMessage(assistant, { status: 'failed' })
+          aiEventReducer.applyTerminalRuntime(assistant, 'failed')
         }
         state.sending = !!state.activeTurnId || state.queuedTurnIds.length > 0
         state.answeringQuestionId = null
