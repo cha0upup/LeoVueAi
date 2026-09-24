@@ -20,7 +20,6 @@ import {
   createUserInputNode,
   findSubtask,
   normalizePlan,
-  normalizePlanStepStatus,
   getLiveText,
   sealLiveTextOrNarration,
   findTool,
@@ -216,16 +215,13 @@ function nodeAdaptUserInput(state, msg, data, seq) {
   patchRuntime(msg, { phase: 'waiting_for_user', status: 'waiting_for_user' })
 }
 
-function applyPlanStepUpdate(msg, data, seq) {
-  if (!Array.isArray(msg.planEvents)) msg.planEvents = []
-  msg.planEvents.push({ ...data, seq })
-
+function applyPlanStepUpdate(msg, data) {
   if (!msg.plan || !Array.isArray(msg.plan.steps)) return
   const index = Number(data?.stepIndex)
   const step = msg.plan.steps.find(item => Number(item?.index) === index)
   const updatedAt = data?.timestamp ?? Date.now()
   if (step) {
-    if (typeof data?.status === 'string') step.status = normalizePlanStepStatus(data.status)
+    if (typeof data?.status === 'string') step.status = data.status
     if (typeof data?.result === 'string' && data.result.trim()) step.result = data.result
     if (typeof data?.reason === 'string' && data.reason.trim()) step.reason = data.reason
     if (typeof data?.action === 'string') step.action = data.action
@@ -578,7 +574,7 @@ const EVENT_HANDLERS = {
       } else if (kind === 'plan') {
         if (data?.stepIndex != null) {
           // 步骤级更新
-          applyPlanStepUpdate(msg, data, seq)
+          applyPlanStepUpdate(msg, data)
           patchRuntime(msg, {
             phase: msg.runtime?.phase || 'planning',
             status: state.status,

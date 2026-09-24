@@ -33,7 +33,7 @@ describe('parseAiSseStream Turn protocol', () => {
       { kind: 'thinking', content: 'Consider the request' }
     ])
     expect(assistant.plan.steps[0]).toMatchObject({ status: 'COMPLETED', result: 'Ready' })
-    expect(assistant.planEvents.map(event => event.action)).toEqual(['start', 'complete'])
+    expect(assistant.runtime).toMatchObject({ lastPlanAction: 'complete', lastPlanStepIndex: 0 })
     expect(state.heartbeat).toEqual({ status: 'running', lastSeq: 6 })
     expect(state.lastEventSeq).toBe(events.length)
     expect(state.status).toBe('completed')

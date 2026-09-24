@@ -18,7 +18,6 @@ export function createAssistantMessage(overrides = {}) {
     content: '',
     // Task Tree（渲染数据源）
     nodes: [],
-    planEvents: [],
     plan: null,
     // 状态类
     loading: true,

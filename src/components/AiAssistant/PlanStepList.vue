@@ -60,14 +60,14 @@ defineProps({
 function stepTone(status) {
   if (status === 'COMPLETED') return 'success'
   if (status === 'FAILED') return 'danger'
-  if (status === 'RUNNING') return 'primary'
+  if (status === 'IN_PROGRESS') return 'primary'
   if (status === 'SKIPPED') return 'muted'
   return 'default'
 }
 
 function stepStatusLabel(status) {
   const map = {
-    PENDING: '待执行', RUNNING: '执行中', COMPLETED: '已完成',
+    PENDING: '待执行', IN_PROGRESS: '执行中', COMPLETED: '已完成',
     FAILED: '失败', SKIPPED: '已跳过'
   }
   return map[status] ?? ''
@@ -75,7 +75,7 @@ function stepStatusLabel(status) {
 
 function stepIcon(status) {
   const map = {
-    RUNNING: 'mdi:progress-clock',
+    IN_PROGRESS: 'mdi:progress-clock',
     COMPLETED: 'mdi:check',
     FAILED: 'mdi:close',
     SKIPPED: 'mdi:minus'

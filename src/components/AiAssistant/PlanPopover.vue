@@ -221,7 +221,7 @@ const totalCount = computed(() => props.plan?.steps?.length ?? 0)
 const progressPercent = computed(() => totalCount.value
   ? Math.round((completedCount.value / totalCount.value) * 100)
   : 0)
-const runningStep = computed(() => props.plan?.steps?.find(s => s.status === 'RUNNING') || null)
+const runningStep = computed(() => props.plan?.steps?.find(s => s.status === 'IN_PROGRESS') || null)
 </script>
 
 <style scoped>

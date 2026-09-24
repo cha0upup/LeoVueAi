@@ -31,19 +31,6 @@ export const TOOL_STATUS = Object.freeze({
   FAILED:  'failed'
 })
 
-const STEP_STATUS = Object.freeze({
-  PENDING:   'PENDING',
-  RUNNING:   'RUNNING',
-  COMPLETED: 'COMPLETED',
-  FAILED:    'FAILED',
-  SKIPPED:   'SKIPPED'
-})
-
-export function normalizePlanStepStatus(status) {
-  if (status === 'IN_PROGRESS') return STEP_STATUS.RUNNING
-  return status ?? STEP_STATUS.PENDING
-}
-
 // ── ID 生成 ───────────────────────────────────────────────────────────
 
 let _nodeSeq = 0
@@ -178,7 +165,7 @@ function normalizePlanStep(step, fallbackIndex = 0) {
     successCriteria:step?.successCriteria ?? '',
     maxRetries:     Number(step?.maxRetries ?? 1),
     dependsOn:      Array.isArray(step?.dependsOn) ? step.dependsOn : [],
-    status:         normalizePlanStepStatus(step?.status),
+    status:         step?.status ?? 'PENDING',
     result:         step?.result ?? '',
     reason:         step?.reason ?? '',
     startedAt:      Number(step?.startedAt ?? 0),
@@ -187,7 +174,7 @@ function normalizePlanStep(step, fallbackIndex = 0) {
 }
 
 /**
- * 将服务端传来的 plan 数据规范化为前端 PlanBar / TaskNode 需要的统一形状。
+ * 将服务端传来的 plan 数据规范化为前端 PlanPopover 需要的统一形状。
  * @param plan 原始 plan 对象（可能来自 SSE 事件或历史消息恢复）
  * @param seq  事件序号（仅当来自 SSE 时有效）
  * @returns 规范化 plan 快照，输入无效则返回 null
@@ -212,22 +199,6 @@ export function normalizePlan(plan, seq = 0) {
 // ── 树操作 helper ─────────────────────────────────────────────────────
 
 /**
- * 封闭末尾 live narration（结束流式输出）。
- * 空内容时从数组移除。
- */
-function sealLiveNarration(nodes) {
-  const last = nodes[nodes.length - 1]
-  if (!last || last.kind !== NODE_KIND.NARRATION || !last.streaming) return
-  const trimmed = last.content.trim()
-  if (!trimmed) {
-    nodes.pop()
-    return
-  }
-  last.content  = trimmed
-  last.streaming = false
-}
-
-/**
  * 获取或创建位于 nodes 数组末尾的 live text node（用于 delta 累积阶段）。
  * 若末尾不是 streaming text，则新建并 push。
  */
@@ -240,12 +211,12 @@ export function getLiveText(nodes) {
 }
 
 /**
- * 封闭末尾 live text node（在 thinking / tool / complete 边界由 node{kind:"text"} 触发）。
+ * 封闭末尾流式 text / narration 节点。
  * 空内容时从数组移除。
  */
-function sealLiveText(nodes) {
+export function sealLiveTextOrNarration(nodes) {
   const last = nodes[nodes.length - 1]
-  if (!last || last.kind !== NODE_KIND.TEXT || !last.streaming) return
+  if (!last?.streaming || (last.kind !== NODE_KIND.TEXT && last.kind !== NODE_KIND.NARRATION)) return
   const trimmed = last.content.trim()
   if (!trimmed) {
     nodes.pop()
@@ -253,14 +224,6 @@ function sealLiveText(nodes) {
   }
   last.content  = trimmed
   last.streaming = false
-}
-
-/** 同时 seal 末尾的 live narration 或 live text，调用方不必关心是哪种。 */
-export function sealLiveTextOrNarration(nodes) {
-  const last = nodes[nodes.length - 1]
-  if (!last || !last.streaming) return
-  if (last.kind === NODE_KIND.NARRATION) return sealLiveNarration(nodes)
-  if (last.kind === NODE_KIND.TEXT)      return sealLiveText(nodes)
 }
 
 /**
