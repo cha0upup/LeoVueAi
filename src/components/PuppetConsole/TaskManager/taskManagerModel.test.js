@@ -65,7 +65,7 @@ describe('taskManagerModel', () => {
     })
   })
 
-  it('merges server snapshots, keeps unrelated tasks, and excludes legacy shell tasks', () => {
+  it('merges server snapshots and keeps unrelated tasks', () => {
     const localDownload = {
       id: 'local-download',
       engineTaskId: 'd1',
@@ -74,9 +74,8 @@ describe('taskManagerModel', () => {
       fileName: 'local.txt'
     }
     const scan = { id: 'scan-1', type: TaskType.SCAN, status: TaskStatus.SCANNING }
-    const legacyShell = { id: 'shell-1', type: 'shell', status: TaskStatus.PENDING }
     const tasks = buildTaskList({
-      localTasks: [localDownload, scan, legacyShell],
+      localTasks: [localDownload, scan],
       serverDownloadTasks: [
         {
           viewId: 'server:d1',

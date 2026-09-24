@@ -196,7 +196,6 @@ export const buildTaskList = ({
   const otherTasks = localTasks
     .filter(
       (task) =>
-        task.type !== 'shell' &&
         ![TaskType.DOWNLOAD, TaskType.UPLOAD, TaskType.DB_EXPORT].includes(task.type)
     )
     .map((task) => prepareLocalTask(task, task.serverTaskId || task.backendTaskId))

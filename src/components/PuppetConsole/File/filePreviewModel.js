@@ -53,8 +53,7 @@ export function getTextPreviewStats(content) {
 }
 
 export function resolvePreviewFileSize(responseData, fallbackMeta = {}) {
-  const rawSize = responseData?.size ?? responseData?.length ?? responseData?.fileSize ??
-    fallbackMeta?.size ?? fallbackMeta?.length ?? fallbackMeta?.fileSize
+  const rawSize = responseData?.size ?? fallbackMeta?.size
   const size = Number(rawSize)
   return Number.isFinite(size) && size >= 0 ? size : 0
 }

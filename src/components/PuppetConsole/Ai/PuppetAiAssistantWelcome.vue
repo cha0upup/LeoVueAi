@@ -57,7 +57,7 @@ const containerPrompt = { title: '检查 Web 运行时', desc: '查看已挂载�
 const reportPrompt = { title: '生成节点简报', desc: '汇总已有发现与操作结果', value: REPORT_PROMPT, icon: 'lucide:file-check-2' }
 
 const generalPrompts = computed(() => {
-  const osName = props.basicInfo?.OSInfo?.OSName ?? props.basicInfo?.osName ?? props.basicInfo?.os ?? ''
+  const osName = props.basicInfo?.OSInfo?.OSName || ''
   const isWindows = /windows/i.test(osName)
   const isLinux = /linux/i.test(osName)
 

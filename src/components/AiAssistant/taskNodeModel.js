@@ -64,7 +64,7 @@ export const getShellResultId = result => {
   if (!result) return null
   try {
     const value = typeof result === 'string' ? JSON.parse(result) : result
-    const resultId = value?.resultId || value?.data?.resultId
+    const resultId = value?.resultId
     return typeof resultId === 'string' && resultId.trim() ? resultId.trim() : null
   } catch {
     return null
@@ -75,15 +75,14 @@ export const getWorkspaceFileRef = result => {
   if (!result) return null
   try {
     const value = typeof result === 'string' ? JSON.parse(result) : result
-    const candidate = value?.userWorkspacePath ? value : value?.data
-    const path = candidate?.userWorkspacePath
+    const path = value?.userWorkspacePath
     if (typeof path !== 'string' || !path.trim()) return null
     const normalized = path.trim()
     return {
       path: normalized,
       filename: normalized.split('/').filter(Boolean).at(-1) || 'workspace-file',
-      sha256: typeof candidate?.sha256 === 'string' ? candidate.sha256 : null,
-      size: Number.isFinite(Number(candidate?.size)) ? Number(candidate.size) : null
+      sha256: typeof value?.sha256 === 'string' ? value.sha256 : null,
+      size: Number.isFinite(Number(value?.size)) ? Number(value.size) : null
     }
   } catch {
     return null

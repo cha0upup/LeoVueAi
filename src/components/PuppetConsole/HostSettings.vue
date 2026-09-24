@@ -394,12 +394,11 @@ const handleLoadNew = async (classname) => {
           params: { classname }
         })
         const data = response?.data || {}
-        const inner = (data.code !== undefined && data.data) ? data.data : data
-        if (inner.code === 200 || data.code === 200) {
-          showSuccess(inner.msg || data.msg || '组件加载成功')
+        if (data.code === 200) {
+          showSuccess(data.msg || '组件加载成功')
           loadedComponents.value = [...loadedComponents.value, classname]
         } else {
-          showError(inner.msg || data.msg || '组件加载失败')
+          showError(data.msg || '组件加载失败')
         }
         return response
       },

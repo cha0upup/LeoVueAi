@@ -283,7 +283,7 @@ function toggleAiDock() {
 function _updateTaskBadge() {
   const sid = props.sessionId
   if (!sid) return
-  const tasks = taskEngine.getTasksBySession(sid).filter(t => t.type !== 'shell')
+  const tasks = taskEngine.getTasksBySession(sid)
   const running = tasks.filter(t =>
     t.status === TaskStatus.DOWNLOADING ||
     t.status === TaskStatus.UPLOADING ||

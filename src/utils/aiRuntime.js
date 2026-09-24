@@ -2,11 +2,8 @@ export const TERMINAL_AI_STATUSES = ['completed', 'failed', 'cancelled']
 export const ACTIVE_AI_STATUSES = ['queued', 'running', 'cancelling']
 
 export function normalizeAiStatus(status, fallback = 'idle') {
-  if (status === 'done') return 'completed'
-  if (status === 'stopped') return 'cancelled'
   if (status === 'interrupted') return 'cancelled'
   if (status === 'inProgress') return 'running'
-  if (status === 'waitingForUser') return 'waiting_for_user'
   return status || fallback
 }
 

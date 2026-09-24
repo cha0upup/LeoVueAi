@@ -8,7 +8,7 @@ const clampTaskProgress = (progress) => {
 }
 
 const getSortTime = (task) => {
-  const value = task?.endTime || task?.startTime || task?.createdTime
+  const value = task?.endTime || task?.startTime || task?.createdAt || task?.createdTime
   if (!value) return 0
   const numeric = Number(value)
   if (Number.isFinite(numeric)) return numeric
@@ -40,15 +40,9 @@ const taskMatchesKeyword = (task, keyword) => {
     task.backendTaskId,
     task.scanKind,
     task.targetLabel,
-    task.scanHost,
     task.scanHosts,
-    task.openPortList,
     task.reachableHostList,
-    task.unreachableHostList,
-    task.fingerprintId,
-    task.fingerprintIds,
-    task.protocol,
-    task.resultSummary
+    task.scanPorts
   ]
   return searchFields.some((field) =>
     String(field || '')

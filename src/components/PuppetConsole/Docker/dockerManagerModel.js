@@ -20,10 +20,7 @@ export const DOCKER_TAB_CONFIG = Object.freeze({
 })
 
 export function unwrapDockerResponse(response) {
-  let data = response.data
-  if (data && typeof data === 'object' && 'code' in data && 'data' in data) {
-    data = data.data
-  }
+  const data = response?.data
   return data && typeof data === 'object' ? data : {}
 }
 

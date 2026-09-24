@@ -24,7 +24,7 @@ describe('filePreviewModel', () => {
 
   it('resolves metadata and download paths defensively', () => {
     expect(resolvePreviewFileSize({ size: '12' })).toBe(12)
-    expect(resolvePreviewFileSize({}, { length: -1 })).toBe(0)
+    expect(resolvePreviewFileSize({}, { size: -1 })).toBe(0)
     expect(splitPreviewDownloadPath('C:\\Temp\\a.txt')).toEqual({
       directoryPath: 'C:/Temp/',
       fileName: 'a.txt'

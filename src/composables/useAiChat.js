@@ -235,9 +235,7 @@ export function useAiChat({
       state.activeClientUserMessageId = null
     }
 
-    const status = normalizeAiStatus(
-      snapshot?.runStatus || snapshot?.status || state.status
-    )
+    const status = normalizeAiStatus(snapshot?.runStatus || state.status)
     const hasEventBacklog =
       Number(snapshot?.lastSeq || 0) > Number(state.lastEventSeq || 0)
     const hasInProgressTurns = !!activeTurn || queuedTurns.length > 0 ||
@@ -308,7 +306,6 @@ export function useAiChat({
         events,
         runStatus: snapshot?.runStatus,
         lastSeq: snapshot?.lastSeq,
-        taskTimeoutAt: snapshot?.taskTimeoutAt,
         stopReason: snapshot?.stopReason
       })
       pageCount += 1
@@ -637,7 +634,6 @@ export function useAiChat({
         lastEventSeq: Number(state.lastEventSeq || 0),
         lastHeartbeatAt: state.lastHeartbeatAt,
         heartbeat: state.heartbeat,
-        taskTimeoutAt: state.heartbeat?.taskTimeoutAt || null,
         stopReason: state.heartbeat?.stopReason || null,
         failed: state.status === 'failed',
         stopped: state.status === 'cancelled',

@@ -422,7 +422,7 @@ const removeTask = async (task) => {
   const isNetworkWorkflow =
     task?.type === TaskType.SCAN &&
     task?.scanKind === 'network_workflow' &&
-    (task?.backendTaskId || task?.serverTaskId)
+    task?.backendTaskId
   const canRemoveServerTransfer =
     [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task?.type) && task?.serverTaskId
   if (!task?.taskId && !canRemoveServerTransfer && !isNetworkWorkflow) {
@@ -434,7 +434,7 @@ const removeTask = async (task) => {
   if (isNetworkWorkflow) {
     await deleteNetworkProbeWorkflowApi({
       sessionId: task.sessionId || props.sessionId,
-      taskId: task.backendTaskId || task.serverTaskId
+      taskId: task.backendTaskId
     })
     if (task.taskId) taskEngine.removeTaskById(task.taskId)
     await taskEngine.syncNetworkWorkflowTasks(task.sessionId || props.sessionId)

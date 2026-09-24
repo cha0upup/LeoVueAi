@@ -11,8 +11,8 @@ import {
 } from './dockerManagerModel.js'
 
 describe('dockerManagerModel', () => {
-  it('unwraps nested API payloads and normalizes malformed lists', () => {
-    const response = { data: { code: 0, data: { containers: [{ id: 'one' }] } } }
+  it('reads the current API payload and normalizes malformed lists', () => {
+    const response = { data: { containers: [{ id: 'one' }] } }
     expect(unwrapDockerResponse(response)).toEqual({ containers: [{ id: 'one' }] })
     expect(normalizeDockerList(response, 'containers')).toEqual([{ id: 'one' }])
     expect(normalizeDockerList({ data: { images: null } }, 'images')).toEqual([])

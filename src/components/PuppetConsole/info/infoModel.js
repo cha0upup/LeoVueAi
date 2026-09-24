@@ -39,7 +39,7 @@ const NON_CAPACITY_FILE_SYSTEMS = new Set([
 ])
 
 export function isCapacityFileSystem(disk) {
-  const type = String(disk?.Type || disk?.fsType || '').toLowerCase().trim()
+  const type = String(disk?.Type || '').toLowerCase().trim()
   return !NON_CAPACITY_FILE_SYSTEMS.has(type) && Number(disk?.TotalSpaceMB) > 0
 }
 

@@ -344,14 +344,7 @@ const fingerprintStats = computed(() => activeTask.value?.stages?.find(stage => 
 const hasReachability = computed(() => stageDefinitions.value.some(stage => stage.name === 'REACHABILITY'))
 
 const activeBackendTaskId = computed(() => {
-  const task = activeTask.value
-  return (
-    task?.backendTaskId ||
-    task?.serverTaskId ||
-    task?.taskId ||
-    task?.result?.taskId ||
-    selectedTaskId.value
-  )
+  return activeTask.value?.backendTaskId || null
 })
 const metrics = computed(() => getMetrics(activeTask.value))
 const currentStageLabel = computed(() => {
@@ -365,7 +358,7 @@ const currentStageLabel = computed(() => {
 })
 const throughputText = computed(() => {
   const task = activeTask.value
-  const value = Number(task?.speed ?? task?.scanSpeed ?? task?.metrics?.speed ?? 0)
+  const value = Number(task?.speed || 0)
   if (Number.isFinite(value) && value > 0) return `${formatCount(Math.round(value))} 目标/秒`
   const startedAt = timestampValue(task?.startTime)
   const processed = metrics.value.processed
@@ -397,16 +390,15 @@ const reachableHostOverflow = computed(() =>
 const historyTasks = computed(() =>
   [...tasks.value].sort(
     (left, right) =>
-      timestampValue(right.createdAt || right.createdTime) -
-      timestampValue(left.createdAt || left.createdTime)
+      timestampValue(right.createdAt) - timestampValue(left.createdAt)
   )
 )
 function getTaskId(task) {
-  return task?.id || task?.taskId || task?.backendTaskId || null
+  return task?.id || null
 }
 function handleScanStarted(task) {
   if (task?.sessionId && task.sessionId !== props.sessionId) return
-  const backendTaskId = task?.taskId || task?.result?.taskId
+  const backendTaskId = task?.taskId
   if (!backendTaskId) {
     ElMessage.error('启动响应缺少任务编号')
     return
@@ -509,22 +501,15 @@ function isPaused(task) {
   return [TaskStatus.PAUSED, 'PAUSED'].includes(task?.status)
 }
 function getMetrics(task) {
-  const targetTotal = Number(
-    task?.targetCount || task?.metrics?.targetTotal || task?.totalCount || 0
-  )
-  const rawProcessed = Number(
-    task?.processedCount ?? task?.scannedCount ?? task?.metrics?.processed ?? 0
-  )
+  const targetTotal = Number(task?.targetCount || 0)
+  const rawProcessed = Number(task?.processedCount || 0)
   const progress = Number(task?.progress || 0)
   const processed = rawProcessed > 0 || progress < 100 ? rawProcessed : targetTotal
   return {
     targetTotal,
     processed: Math.max(0, processed),
     reachableHostCount: Number(
-      task?.reachableHostCount ??
-        task?.reachableHostList?.length ??
-        task?.metrics?.reachableHostCount ??
-        0
+      task?.reachableHostCount ?? task?.reachableHostList?.length ?? 0
     ),
     openCount: Number(
       task?.openCount ?? (Array.isArray(task?.openPortResults) ? task.openPortResults.length : 0)
@@ -535,7 +520,7 @@ function getMetrics(task) {
     fingerprintCount: Number(task?.fingerprintCount || 0),
     identifiedApplicationCount: Number(task?.identifiedApplicationCount || 0),
     errorCount: Number(
-      task?.errorCount ?? (Array.isArray(task?.errors) ? task.errors.length : task?.error ? 1 : 0)
+      task?.errorCount ?? (task?.error ? 1 : 0)
     )
   }
 }

@@ -22,8 +22,8 @@ describe('taskNodeModel', () => {
     expect(formatToolValue(cyclic)).toBe('[object Object]')
   })
 
-  it('extracts nested shell result identifiers', () => {
-    expect(getShellResultId('{"data":{"resultId":" result-1 "}}')).toBe('result-1')
+  it('extracts shell result identifiers', () => {
+    expect(getShellResultId('{"resultId":" result-1 "}')).toBe('result-1')
     expect(getShellResultId('plain output')).toBeNull()
   })
 })

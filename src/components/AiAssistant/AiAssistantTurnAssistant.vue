@@ -388,7 +388,7 @@ const reviewInfo = computed(() => {
 })
 
 const usageInfo = computed(() => {
-  const usage = props.msg?.usage ?? props.msg?.review?.usage ?? props.msg?.runtime?.usage
+  const usage = props.msg?.usage ?? props.msg?.runtime?.usage
   if (!usage || typeof usage !== 'object') return null
   const input        = Number(usage.inputTokens ?? 0)
   const output       = Number(usage.outputTokens ?? 0)

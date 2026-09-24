@@ -738,7 +738,7 @@ const GenShell = async () => {
     }
 
     showSuccess('脚本生成成功')
-    const warnings = resp?.data?.compatibilityWarnings || resp?.data?.warnings
+    const warnings = resp?.data?.warnings
     if (Array.isArray(warnings) && warnings.length) {
       showWarning(warnings.join('；'))
     }

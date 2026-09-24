@@ -377,7 +377,7 @@ const canArchiveReport = computed(() => {
 
 const archiveCurrentReport = async () => {
   if (!canArchiveReport.value || archivingReport.value) return
-  const hostName = props.basicInfo?.hostName || props.basicInfo?.hostname || props.sessionId
+  const hostName = props.basicInfo?.OSInfo?.HostName || props.sessionId
   const title = activeThread.value?.title || '节点 AI 分析'
   archivingReport.value = true
   try {

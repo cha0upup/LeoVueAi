@@ -9,22 +9,8 @@ vi.mock('@/services/api.js', () => ({
   listNetworkProbeWorkflowTasksApi: vi.fn()
 }))
 
-import { normalizeNetworkWorkflowKind } from '../taskFactories.js'
 import { applyScanExecutor } from './scanExecutor.js'
 import { queryNetworkProbeWorkflowApi, stopNetworkProbeWorkflowApi, listNetworkProbeWorkflowTasksApi } from '@/services/api.js'
-
-describe('normalizeNetworkWorkflowKind', () => {
-  it('maps the legacy hyphenated value to the task engine identifier', () => {
-    expect(normalizeNetworkWorkflowKind('network-workflow')).toBe('network_workflow')
-    expect(normalizeNetworkWorkflowKind('NETWORK-WORKFLOW')).toBe('network_workflow')
-  })
-
-  it('leaves the canonical and unrelated values unchanged', () => {
-    expect(normalizeNetworkWorkflowKind('network_workflow')).toBe('network_workflow')
-    expect(normalizeNetworkWorkflowKind('other')).toBe('other')
-    expect(normalizeNetworkWorkflowKind(null)).toBe(null)
-  })
-})
 
 describe('scan executor request lifecycle', () => {
   beforeEach(() => { vi.clearAllMocks(); vi.stubGlobal('window', {}) })
@@ -95,14 +81,14 @@ describe('scan executor request lifecycle', () => {
 describe('scan executor task hydration', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('keeps a task visible when a legacy snapshot uses a hyphenated kind', () => {
+  it('hydrates a running canonical workflow snapshot', () => {
     const task = {
       id: 'local-task',
       type: TaskType.SCAN,
       scanKind: 'network_workflow',
       status: TaskStatus.SCANNING,
       progress: 10,
-      totalCount: 1,
+      targetCount: 1,
       processedCount: 0
     }
     const events = []
@@ -115,7 +101,7 @@ describe('scan executor task hydration', () => {
     const engine = new FakeTaskEngine()
     engine.hydrateScanTask(task.id, {
       taskId: 'backend-task',
-      scanKind: 'network-workflow',
+      scanKind: 'network_workflow',
       status: 'RUNNING',
       progress: 30
     })

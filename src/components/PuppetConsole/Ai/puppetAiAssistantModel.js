@@ -94,8 +94,7 @@ const persistedRuntimeStatus = message => {
         ? 'cancelling'
         : 'running'
   }
-  if (message?.status === 'pending') return 'running'
-  return message?.status === 'committed' ? 'completed' : 'cancelled'
+  return 'cancelled'
 }
 
 export const mapPersistedThreadMessages = serverMessages => {

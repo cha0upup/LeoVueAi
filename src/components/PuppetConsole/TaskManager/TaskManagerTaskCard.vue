@@ -22,15 +22,15 @@
     <div class="task-meta">
       <span>{{ typeLabel }}</span>
       <template v-if="task.type === 'scan'">
-        <span>目标 {{ task.totalCount ?? task.targetCount ?? '—' }}</span>
-        <span>发现 {{ task.hitCount || 0 }}</span>
+        <span>目标 {{ task.targetCount ?? '—' }}</span>
+        <span>开放 {{ task.openCount || 0 }}</span>
       </template>
       <template v-else>
         <span>{{ formatFileSize(task.fileSize) }}</span>
         <span v-if="statusKey === 'running' && task.speed > 0">{{ formatFileSize(task.speed) }}/s</span>
       </template>
       <span>{{
-        formatDateTime(task.updatedAt || task.endTime || task.startTime || task.createdTime)
+        formatDateTime(task.updatedAt || task.endTime || task.startTime || task.createdAt || task.createdTime)
       }}</span>
     </div>
     <div class="task-card-bottom">

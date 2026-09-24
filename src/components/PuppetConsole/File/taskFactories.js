@@ -126,12 +126,6 @@ const SCAN_KIND_LABELS = {
   network_workflow: '一键扫描'
 }
 
-export function normalizeNetworkWorkflowKind(value) {
-  return String(value || '').toLowerCase() === 'network-workflow'
-    ? 'network_workflow'
-    : value
-}
-
 export function createScanTask({
   taskId,
   sessionId,
@@ -152,31 +146,14 @@ export function createScanTask({
     fileName: options.fileName || `${kindLabel} · ${targetLabel || '未命名目标'}`,
     fileSize: 0,
     backendTaskId: options.backendTaskId || null,
-    serverTaskId: options.backendTaskId || null,
     status: TaskStatus.PENDING,
     progress: 0,
-    currentStep: '',
-    totalCount: Number(totalCount || 0),
     processedCount: 0,
     targetCount: Number(options.targetCount ?? totalCount ?? 0),
-    hitCount: 0,
-    missCount: 0,
-    resultSummary: '',
-    scanHost: options.scanHost || '',
     scanHosts: options.scanHosts || [],
     scanPorts: options.scanPorts || [],
-    portLength: Number(options.portLength ?? totalCount ?? 0),
-    scannedCount: 0,
-    openPortList: [],
     reachableHostList: [],
-    unreachableHostList: [],
-    fingerprintId: options.fingerprintId || '',
-    fingerprintIds: options.fingerprintIds || [],
-    protocol: options.protocol || '',
-    result: null,
     createdAt: createdTime,
-    createdTime,
-    createTime: createdTime,
     startTime: null,
     endTime: null,
     isPaused: false,

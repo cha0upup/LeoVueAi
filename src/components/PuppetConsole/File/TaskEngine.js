@@ -306,7 +306,6 @@ class TaskEngine {
       return
     }
 
-    // 其它任务（如旧上传）仍使用本地暂停逻辑
     if (task.status === TaskStatus.DOWNLOADING) {
       task.isPaused = true
       task.status = TaskStatus.PAUSED

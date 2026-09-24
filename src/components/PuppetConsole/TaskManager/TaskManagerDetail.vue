@@ -79,7 +79,7 @@
           </template>
           <div class="metric-item">
             <span>任务编号</span>
-            <strong>{{ task.serverTaskId || task.taskId || '-' }}</strong>
+            <strong>{{ task.type === TaskType.SCAN ? task.backendTaskId : task.serverTaskId || task.taskId || '-' }}</strong>
           </div>
           <div
             v-if="task.currentStage"
@@ -120,50 +120,11 @@
               <span>{{ task.targetLabel }}</span>
             </div>
             <div
-              v-if="task.protocol"
-              class="detail-info-item"
-            >
-              <label>协议</label>
-              <span>{{ String(task.protocol).toUpperCase() }}</span>
-            </div>
-            <div
-              v-if="task.fingerprintIds?.length || task.fingerprintId"
-              class="detail-info-item"
-            >
-              <label>指纹</label>
-              <span>{{
-                task.fingerprintIds?.length > 1
-                  ? `${task.fingerprintIds.length} 条`
-                  : task.fingerprintIds?.[0] || task.fingerprintId
-              }}</span>
-            </div>
-            <div
-              v-if="task.totalCount"
+              v-if="task.targetCount"
               class="detail-info-item"
             >
               <label>处理进度</label>
-              <span>{{ task.processedCount || 0 }} / {{ task.totalCount }}</span>
-            </div>
-            <div
-              v-if="task.hitCount || task.missCount"
-              class="detail-info-item"
-            >
-              <label>结果统计</label>
-              <span>命中 {{ task.hitCount || 0 }} / 未命中 {{ task.missCount || 0 }}</span>
-            </div>
-            <div
-              v-if="task.resultSummary"
-              class="detail-info-item detail-info-item--full"
-            >
-              <label>摘要</label>
-              <span>{{ task.resultSummary }}</span>
-            </div>
-            <div
-              v-if="task.openPortList?.length"
-              class="detail-info-item detail-info-item--full"
-            >
-              <label>开放端口</label>
-              <span>{{ task.openPortList.join(', ') }}</span>
+              <span>{{ task.processedCount || 0 }} / {{ task.targetCount }}</span>
             </div>
             <div
               v-if="task.reachableHostList?.length"

@@ -38,7 +38,6 @@ function patchRuntime(msg, patch) {
 
 // ────────────────────────────────────────────────────────────────────
 // Task Tree adapter helpers
-// 每个 SSE 事件处理完旧结构后，同步写入 msg.nodes（新架构）。
 // ────────────────────────────────────────────────────────────────────
 
 function ensureNodes(msg) {
@@ -134,7 +133,6 @@ function nodeAdaptTool(msg, name, data, seq) {
     node.status  = data.success === false ? TOOL_STATUS.FAILED : TOOL_STATUS.DONE
   }
   if (data?.resultPreview != null) node.result = data.resultPreview
-  if (data?.result != null) node.result = data.result
   if (data?.error != null) node.error = String(data.error)
   if (data?.endTime) node.endTime = Number(data.endTime)
   node.updatedAt = Date.now()
@@ -233,6 +231,26 @@ function nodeAdaptUserInput(state, msg, data, seq) {
   patchRuntime(msg, { phase: 'waiting_for_user', status: 'waiting_for_user' })
 }
 
+function applyPlanStepUpdate(msg, data, seq, eventTimestamp) {
+  if (!Array.isArray(msg.planEvents)) msg.planEvents = []
+  const entry = { ...data, seq }
+  if (eventTimestamp !== undefined) entry.timestamp = eventTimestamp
+  msg.planEvents.push(entry)
+
+  if (!msg.plan || !Array.isArray(msg.plan.steps)) return
+  const index = Number(data?.stepIndex)
+  const step = msg.plan.steps.find(item => Number(item?.index) === index)
+  const updatedAt = eventTimestamp ?? data?.timestamp ?? Date.now()
+  if (step) {
+    if (typeof data?.status === 'string') step.status = normalizePlanStepStatus(data.status)
+    if (typeof data?.result === 'string' && data.result.trim()) step.result = data.result
+    if (typeof data?.reason === 'string' && data.reason.trim()) step.reason = data.reason
+    if (typeof data?.action === 'string') step.action = data.action
+    step.updatedAt = updatedAt
+  }
+  msg.plan.updatedAt = updatedAt
+}
+
 /** reply 事件 → seal live text/narration, set final text node if none collected */
 function nodeAdaptReply(msg, finalText) {
   if (!msg) return
@@ -299,14 +317,6 @@ function applyFinalReplyText(msg, value) {
   return finalText || msg.content
 }
 
-function completeAssistantTurn(state, msg, finalText, transitionReason) {
-  msg.loading = false
-  msg.completedAt = Date.now()
-  patchRuntime(msg, { phase: 'completed', status: 'completed' })
-  transitionStatus(state, 'completed', transitionReason)
-  nodeAdaptReply(msg, finalText)
-}
-
 function ensureAssistantTurnForRecovery(state) {
   const idx = state.messages.length - 1
   const tail = state.messages[idx]
@@ -333,7 +343,7 @@ const EVENT_HANDLERS = {
   'turn/started': {
     needsMsg: false,
     fn: ({ state, resolveMsg }, { data }) => {
-      const turn = data?.turn ?? data
+      const turn = data?.turn
       if (!turn?.id) return false
       const items = Array.isArray(turn.items) ? turn.items : []
       const userItem = items.find(item => item?.role === 'user')
@@ -384,7 +394,7 @@ const EVENT_HANDLERS = {
   'turn/completed': {
     needsMsg: false,
     fn: ({ state, resolveMsg }, { data }) => {
-      const turn = data?.turn ?? data
+      const turn = data?.turn
       if (!turn?.id) return false
       const status = turn.status === 'interrupted'
         ? 'cancelled'
@@ -516,22 +526,7 @@ const EVENT_HANDLERS = {
   plan_step: {
     needsMsg: true,
     fn: ({ state, msg }, { data, seq, timestamp }) => {
-      if (!Array.isArray(msg.planEvents)) msg.planEvents = []
-      msg.planEvents.push({ ...data, seq, timestamp })
-      if (msg.plan && Array.isArray(msg.plan.steps)) {
-        const index = Number(data?.stepIndex)
-        const step = msg.plan.steps.find((item) => Number(item?.index) === index)
-        if (step) {
-          if (typeof data?.status === 'string') {
-            step.status = normalizePlanStepStatus(data.status)
-          }
-          if (typeof data?.result === 'string' && data.result.trim()) step.result = data.result
-          if (typeof data?.reason === 'string' && data.reason.trim()) step.reason = data.reason
-          if (typeof data?.action === 'string') step.action = data.action
-          step.updatedAt = timestamp
-        }
-        msg.plan.updatedAt = timestamp
-      }
+      applyPlanStepUpdate(msg, data, seq, timestamp)
       patchRuntime(msg, {
         phase: msg.runtime?.phase || 'planning',
         status: state.status,
@@ -583,8 +578,6 @@ const EVENT_HANDLERS = {
         patchRuntime(msg, {
           phase: 'heartbeat',
           status: state.status,
-          elapsedMs: Number(data.elapsedMs || 0),
-          taskTimeoutAt: data.taskTimeoutAt || null,
           stopReason: data.stopReason || null,
           lastSeq: Number(data.lastSeq || 0),
           lastHeartbeatAt: state.lastHeartbeatAt
@@ -604,35 +597,6 @@ const EVENT_HANDLERS = {
     needsMsg: true,
     fn: ({ msg }, { data }) => {
       msg.errorMeta = data
-      return true
-    }
-  },
-
-  review: {
-    needsMsg: true,
-    fn: ({ msg }, { data }) => {
-      msg.review = data
-      return true
-    }
-  },
-
-  usage: {
-    needsMsg: true,
-    fn: ({ msg }, { data }) => {
-      msg.usage = data
-      patchRuntime(msg, {
-        usage: data,
-        finishReason: data?.finishReason || msg.runtime?.finishReason || null
-      })
-      return true
-    }
-  },
-
-  reply: {
-    needsMsg: true,
-    fn: ({ state, msg }, { data }) => {
-      const finalText = applyFinalReplyText(msg, data)
-      completeAssistantTurn(state, msg, finalText, 'sse-reply')
       return true
     }
   },
@@ -686,20 +650,7 @@ const EVENT_HANDLERS = {
       } else if (kind === 'plan') {
         if (data?.stepIndex != null) {
           // 步骤级更新（原 plan_step 行为）
-          if (!Array.isArray(msg.planEvents)) msg.planEvents = []
-          msg.planEvents.push({ ...data, seq })
-          if (msg.plan && Array.isArray(msg.plan.steps)) {
-            const index = Number(data.stepIndex)
-            const step = msg.plan.steps.find((item) => Number(item?.index) === index)
-            if (step) {
-              if (typeof data?.status === 'string') step.status = normalizePlanStepStatus(data.status)
-              if (typeof data?.result === 'string' && data.result.trim()) step.result = data.result
-              if (typeof data?.reason === 'string' && data.reason.trim()) step.reason = data.reason
-              if (typeof data?.action === 'string') step.action = data.action
-              step.updatedAt = data.timestamp || Date.now()
-            }
-            msg.plan.updatedAt = data.timestamp || Date.now()
-          }
+          applyPlanStepUpdate(msg, data, seq)
           patchRuntime(msg, {
             phase: msg.runtime?.phase || 'planning',
             status: state.status,
@@ -732,7 +683,6 @@ const EVENT_HANDLERS = {
 
   /**
    * turn 事件：轮次结束，合并 content + usage + review。
-   * 取代旧的 reply + usage + review 三连事件。
    */
   turn: {
     needsMsg: true,
@@ -899,8 +849,6 @@ export function createAiChatEventReducer({
       onWarn: (text, seq, meta) => dispatch('warn', text, seq, meta),
       onHeartbeat: (payload, seq, meta) => dispatchSilent('heartbeat', payload, seq, meta),
       onErrorMeta: (data, seq, meta) => dispatchSilent('error_meta', data, seq, meta),
-      onReview: (review, seq, meta) => dispatchSilent('review', review, seq, meta),
-      onUsage: (usage, seq, meta) => dispatchSilent('usage', usage, seq, meta),
       onPlan: (plan, seq, meta) => dispatch('plan', plan, seq, meta),
       onPlanStep: (entry, seq, meta) => dispatch('plan_step', { ...entry, seq }, seq, meta),
       // 新 Task Tree 原生事件
@@ -925,7 +873,6 @@ export function createAiChatEventReducer({
     events = [],
     runStatus,
     lastSeq,
-    taskTimeoutAt,
     stopReason
   } = {}) => {
     const state = ensureState(key)
@@ -965,7 +912,6 @@ export function createAiChatEventReducer({
       if (TERMINAL_AI_STATUSES.includes(status) && assistantMsg) {
         state.sending = false
         applyTerminalRuntime(assistantMsg, status, {
-          taskTimeoutAt: taskTimeoutAt || null,
           stopReason: stopReason || null
         })
       }
@@ -973,7 +919,6 @@ export function createAiChatEventReducer({
         state.sending = false
         if (assistantMsg) {
           applyTerminalRuntime(assistantMsg, status, {
-            taskTimeoutAt: taskTimeoutAt || null,
             stopReason: stopReason || null
           })
         }
@@ -981,7 +926,6 @@ export function createAiChatEventReducer({
       if (ACTIVE_AI_STATUSES.includes(status) && assistantMsg) {
         patchRuntime(assistantMsg, {
           status,
-          taskTimeoutAt: taskTimeoutAt || assistantMsg.runtime?.taskTimeoutAt || null,
           stopReason: stopReason || null
         })
       }

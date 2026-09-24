@@ -211,14 +211,12 @@ export function useAiThreads({ sessionId }) {
         events,
         lastSeq: Number(res.data?.lastSeq ?? 0),
         runStatus,
-        status: res.data?.status ?? runStatus,
         executing: !!res.data?.executing,
         activeTurn: res.data?.activeTurn ?? null,
         queuedTurns: Array.isArray(res.data?.queuedTurns)
           ? res.data.queuedTurns
           : [],
         pendingTurnCount: Number(res.data?.pendingTurnCount ?? 0),
-        taskTimeoutAt: Number(res.data?.taskTimeoutAt ?? 0),
         stopReason: res.data?.stopReason ?? null
       }
     } catch (err) {

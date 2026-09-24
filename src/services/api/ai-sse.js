@@ -11,10 +11,7 @@ const logger = createLogger('AiSse')
  *   - `tool_delta` — 模型正在生成的工具调用增量（JSON 对象）
  *   - `status`   — 当前任务状态（纯字符串）
  *   - `delta`    — 回复正文增量片段（纯字符串）
- *   - `reply`    — 最终回复文本（纯字符串）
  *   - `warn`     — 轮次警告文本（纯字符串）
- *   - `review`   — 本轮执行复盘信息（JSON 对象）
- *   - `usage`    — 模型 token 使用与停止原因（JSON 对象）
  *   - `error_meta` — 错误分类与建议动作（JSON 对象）
  *   - `error`      — 错误信息（纯字符串）
  *   - `plan`      — 计划快照（JSON：AiPlan）
@@ -35,8 +32,6 @@ const logger = createLogger('AiSse')
  * @param {Function} [handlers.onDelta]    - (delta: string) => void
  * @param {Function} [handlers.onWarn]     - (message: string) => void
  * @param {Function} [handlers.onHeartbeat] - (payload: object|string) => void
- * @param {Function} [handlers.onReview]    - (review: object) => void
- * @param {Function} [handlers.onUsage]     - (usage: object) => void
  * @param {Function} [handlers.onEventSeq] - (seq: number) => void
  * @param {Function} [handlers.onErrorMeta] - (meta: object) => void
  * @param {Function} [handlers.onError]     - (message: string, meta?: object) => void
@@ -48,7 +43,7 @@ const logger = createLogger('AiSse')
  * @param {Function} [handlers.onTurnStarted]   - (data: object, seq: number) => void
  * @param {Function} [handlers.onTurnCompleted] - (data: object, seq: number) => void
  * @param {Function} [handlers.onTrace]         - (data: object, seq: number) => void
- * @returns {Promise<string>} 最终的 AI 回复文本（turn.content 或 reply 的数据），若无则返回空字符串
+ * @returns {Promise<string>} 最终的 AI 回复文本（turn.content），若无则返回空字符串
  */
 export async function parseAiSseStream(response, {
   onThinking,
@@ -58,8 +53,6 @@ export async function parseAiSseStream(response, {
   onDelta,
   onWarn,
   onHeartbeat,
-  onReview,
-  onUsage,
   onEventSeq,
   onErrorMeta,
   onError,
@@ -86,7 +79,6 @@ export async function parseAiSseStream(response, {
   let currentId = ''
   let replyText = ''
   let errorMeta = null
-  let receivedReply = false
   let receivedTurnStarted = false
   let receivedTurnCompleted = false
 
@@ -110,7 +102,7 @@ export async function parseAiSseStream(response, {
   }
 
   const dispatchEvent = (eventName, dataStr, eventId) => {
-    const payload = eventName === 'delta' || eventName === 'reply' ? dataStr : dataStr.trimEnd()
+    const payload = eventName === 'delta' ? dataStr : dataStr.trimEnd()
     if (!eventName) return false
     const eventMeta = parseEventId(eventId)
     const seq = eventMeta.seq
@@ -119,13 +111,6 @@ export async function parseAiSseStream(response, {
     let shouldAdvanceCursor = true
 
     try {
-      if (eventName === 'reply') {
-        replyText = payload
-        receivedReply = true
-        accepted = true
-        return true
-      }
-
       if (eventName === 'delta') {
         onDelta?.(payload, seq, ...eventMetaArgs)
         return
@@ -155,14 +140,6 @@ export async function parseAiSseStream(response, {
         } catch {
           onHeartbeat?.(payload, seq, ...eventMetaArgs)
         }
-      } else if (eventName === 'review') {
-        try {
-          onReview?.(JSON.parse(payload), seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
-      } else if (eventName === 'usage') {
-        try {
-          onUsage?.(JSON.parse(payload), seq, ...eventMetaArgs)
-        } catch { /* ignore */ }
       } else if (eventName === 'error_meta') {
         try {
           errorMeta = JSON.parse(payload)
@@ -195,7 +172,6 @@ export async function parseAiSseStream(response, {
         try {
           const entry = JSON.parse(payload)
           replyText = String(entry?.content ?? '')
-          receivedReply = true
           onTurn?.(entry, seq, ...eventMetaArgs)
         } catch { /* ignore */ }
       } else if (eventName === 'turn/started') {
@@ -268,7 +244,6 @@ export async function parseAiSseStream(response, {
       error.code = 'AI_TURN_INCOMPLETE'
       throw error
     }
-    if (receivedReply) return replyText
   } finally {
     reader.releaseLock()
   }
