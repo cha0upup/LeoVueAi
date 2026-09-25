@@ -35,6 +35,17 @@ function patchRuntime(msg, patch) {
   msg.runtime = { ...(msg.runtime || {}), ...patch, updatedAt: Date.now() }
 }
 
+function applyTrace(state, msg, trace) {
+  if (!trace || typeof trace !== 'object') return false
+  state.activeTrace = { ...state.activeTrace, ...trace }
+  patchRuntime(msg, {
+    traceId: trace.traceId || msg?.runtime?.traceId || null,
+    turnId: trace.turnId || msg?.runtime?.turnId || null,
+    runId: trace.runId || msg?.runtime?.runId || null
+  })
+  return true
+}
+
 // ────────────────────────────────────────────────────────────────────
 // Task Tree adapter helpers
 // ────────────────────────────────────────────────────────────────────
@@ -316,7 +327,6 @@ function ensureAssistantTurnForRecovery(state) {
 
 /**
  * needsMsg：是否需要先解析 assistant 消息；若 true 且无法解析则跳过事件
- * recoverIfMissing：解析时若不存在是否自动创建（recovery 路径用）
  */
 const EVENT_HANDLERS = {
   'turn/started': {
@@ -437,22 +447,7 @@ const EVENT_HANDLERS = {
 
   trace: {
     needsMsg: false,
-    fn: ({ state, resolveMsg }, { data }) => {
-      if (!data || typeof data !== 'object') return false
-      state.activeTrace = {
-        ...(state.activeTrace || {}),
-        ...data
-      }
-      const msg = resolveMsg(false)
-      if (msg) {
-        patchRuntime(msg, {
-          traceId: data.traceId || msg.runtime?.traceId || null,
-          turnId: data.turnId || msg.runtime?.turnId || null,
-          runId: data.runId || msg.runtime?.runId || null
-        })
-      }
-      return true
-    }
+    fn: ({ state, resolveMsg }, { data }) => applyTrace(state, resolveMsg(false), data)
   },
 
   status: {
@@ -630,17 +625,7 @@ const EVENT_HANDLERS = {
       // 应用 review
       const review = data?.review
       if (review) msg.review = review
-      if (data?.trace && typeof data.trace === 'object') {
-        state.activeTrace = {
-          ...(state.activeTrace || {}),
-          ...data.trace
-        }
-        patchRuntime(msg, {
-          traceId: data.trace.traceId || msg.runtime?.traceId || null,
-          turnId: data.trace.turnId || msg.runtime?.turnId || null,
-          runId: data.trace.runId || msg.runtime?.runId || null
-        })
-      }
+      applyTrace(state, msg, data?.trace)
       // turn 仅是模型结果聚合事件；控制协议终态只由 turn/completed 决定。
       nodeAdaptReply(msg, finalText)
       return true
@@ -713,17 +698,13 @@ export function createAiChatEventReducer({
       resolveAssistantMessage(state, assistantIdx, recover, event)
     const ctx = {
       state,
-      key,
       resolveMsg,
       msg: handler.needsMsg ? resolveMsg(createForRecovery) : null
     }
     if (handler.needsMsg && !ctx.msg) return false
 
     const normalizedEvent = {
-      name: event.name,
       data: event.data,
-      turnId: event.turnId || event.data?.turn?.id || null,
-      itemId: event.itemId || null,
       seq,
       timestamp: event.timestamp || Date.now()
     }
@@ -731,22 +712,14 @@ export function createAiChatEventReducer({
   }
 
   const makeHandlers = (key, assistantIdx, createForRecovery) => {
-    const dispatch = (name, data, seq, meta) => {
+    const dispatch = (name, visible = false) => (data, seq, meta) => {
       applyAiEvent({
         key,
         assistantIdx,
         createForRecovery,
         event: { name, data, seq, ...(meta || {}) }
       })
-      onVisibleEvent(key)
-    }
-    const dispatchSilent = (name, data, seq, meta) => {
-      applyAiEvent({
-        key,
-        assistantIdx,
-        createForRecovery,
-        event: { name, data, seq, ...(meta || {}) }
-      })
+      if (visible) onVisibleEvent(key)
     }
     return {
       onEventSeq: (seq) => {
@@ -754,20 +727,19 @@ export function createAiChatEventReducer({
         const value = Number(seq || 0)
         if (Number.isFinite(value) && value > state.lastEventSeq) state.lastEventSeq = value
       },
-      onToolDelta: (entry, seq, meta) => dispatch('tool_delta', { ...entry, seq }, seq, meta),
-      onStatus: (status, seq, meta) => dispatchSilent('status', status, seq, meta),
-      onDelta: (delta, seq, meta) => dispatch('delta', delta, seq, meta),
-      onWarn: (text, seq, meta) => dispatch('warn', text, seq, meta),
-      onHeartbeat: (payload, seq, meta) => dispatchSilent('heartbeat', payload, seq, meta),
-      onErrorMeta: (data, seq, meta) => dispatchSilent('error_meta', data, seq, meta),
-      // 新 Task Tree 原生事件
-      onNode: (data, seq, meta) => dispatch('node', data, seq, meta),
-      onPatch: (data, seq, meta) => dispatch('patch', data, seq, meta),
-      onSubagentEvent: (data, seq, meta) => dispatch('subagent_event', data, seq, meta),
-      onTurn: (data, seq, meta) => dispatchSilent('turn', data, seq, meta),
-      onTurnStarted: (data, seq, meta) => dispatchSilent('turn/started', data, seq, meta),
-      onTurnCompleted: (data, seq, meta) => dispatchSilent('turn/completed', data, seq, meta),
-      onTrace: (data, seq, meta) => dispatchSilent('trace', data, seq, meta)
+      onToolDelta: (entry, seq, meta) => dispatch('tool_delta', true)({ ...entry, seq }, seq, meta),
+      onStatus: dispatch('status'),
+      onDelta: dispatch('delta', true),
+      onWarn: dispatch('warn', true),
+      onHeartbeat: dispatch('heartbeat'),
+      onErrorMeta: dispatch('error_meta'),
+      onNode: dispatch('node', true),
+      onPatch: dispatch('patch', true),
+      onSubagentEvent: dispatch('subagent_event', true),
+      onTurn: dispatch('turn'),
+      onTurnStarted: dispatch('turn/started'),
+      onTurnCompleted: dispatch('turn/completed'),
+      onTrace: dispatch('trace')
     }
   }
 
@@ -839,9 +811,6 @@ export function createAiChatEventReducer({
     applyRecoveredEvents,
     applyTerminalRuntime,
     makeLogHandlers,
-    makeRecoveryHandlers,
-    /** Seal live node + apply authoritative reply text to nodes.
-     *  Call from send() when the stream ends without a clean reply SSE event. */
-    sealNodesWithReply: (msg, finalText) => nodeAdaptReply(msg, finalText)
+    makeRecoveryHandlers
   }
 }
