@@ -428,7 +428,7 @@ export function buildWherePayloadFromRow(headers, rowData, columnsMeta = []) {
  * @param {Object} params - 删除参数
  * @returns {Promise<void>}
  */
-export async function deleteRowData({
+async function deleteRowData({
   sessionId,
   connection,
   objectRef = null,

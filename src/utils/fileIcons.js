@@ -76,7 +76,7 @@ const COLOR_BY_TYPE = {
   default: 'var(--el-text-color-secondary)'
 }
 
-export const getFileTypeNameByExtension = (extension = '') => {
+const getFileTypeNameByExtension = (extension = '') => {
   const normalized = String(extension).trim().toLowerCase().replace(/^\./, '')
   if (!normalized) return 'default'
 

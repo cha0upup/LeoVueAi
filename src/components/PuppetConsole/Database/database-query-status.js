@@ -4,9 +4,9 @@ const TRUNCATION_MESSAGES = Object.freeze({
   MAX_CELL_BYTES: '至少一个字段超过单元格大小上限，内容已截断'
 })
 
-export const DEFAULT_DATABASE_QUERY_TIMEOUT_SECONDS = 30
-export const MIN_DATABASE_QUERY_TIMEOUT_SECONDS = 1
-export const MAX_DATABASE_QUERY_TIMEOUT_SECONDS = 300
+const DEFAULT_DATABASE_QUERY_TIMEOUT_SECONDS = 30
+const MIN_DATABASE_QUERY_TIMEOUT_SECONDS = 1
+const MAX_DATABASE_QUERY_TIMEOUT_SECONDS = 300
 
 export function normalizeDatabaseQueryTimeout(value) {
   const parsed = Number(value)

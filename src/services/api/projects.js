@@ -28,7 +28,7 @@ export function getUnassignedPuppetsApi() {
   return http.get('/platform/projects/unassigned/puppets')
 }
 
-export function getProjectPuppetChildrenApi(projectId, parentPuppetId) {
+function getProjectPuppetChildrenApi(projectId, parentPuppetId) {
   return http.post(`/platform/projects/${encodeURIComponent(projectId)}/children`, {
     parentPuppetId
   })

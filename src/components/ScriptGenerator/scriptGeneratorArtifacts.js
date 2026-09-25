@@ -1,6 +1,6 @@
 const CLASS_MAGIC = [0xca, 0xfe, 0xba, 0xbe]
 
-export const CLASS_ARTIFACT_ROLE_LABELS = Object.freeze({
+const CLASS_ARTIFACT_ROLE_LABELS = Object.freeze({
   core: 'Core',
   shell: 'Shell',
   injector: 'Injector'

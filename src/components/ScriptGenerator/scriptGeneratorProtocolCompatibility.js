@@ -1,6 +1,6 @@
 export const normalizeTransportProtocol = protocol => String(protocol || 'http').trim().toLowerCase()
 
-export const DEFAULT_MEMORY_SELECTION = Object.freeze({
+const DEFAULT_MEMORY_SELECTION = Object.freeze({
   serverType: 'Tomcat',
   shellType: 'FilterInjector',
   packerType: 'DefaultBase64'

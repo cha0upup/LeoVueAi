@@ -51,7 +51,7 @@ export function getUsageType(usage) {
 export const getUsageColor = (usage) =>
   `var(--el-color-${getUsageType(usage)})`
 
-export function isLocalAddress(ip) {
+function isLocalAddress(ip) {
   const value = String(ip || '').split('%')[0].toLowerCase()
   return !value || /^(127\.|169\.254\.|0\.)/.test(value) ||
     ['::', '::1', '0:0:0:0:0:0:0:0', '0:0:0:0:0:0:0:1'].includes(value) ||
