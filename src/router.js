@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/constants/app.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { resolveAuthNavigation } from '@/routerGuards.js'
-import { installChunkLoadRecovery } from '@/utils/chunkLoadRecovery.js'
 import { configureHttpErrorHandling } from '@/services/http.js'
 
 // 路由按需加载，减小首屏包体积
@@ -80,7 +79,5 @@ router.beforeEach(async (to, from, next) => {
   const redirect = resolveAuthNavigation(to, currentUser.value)
   return redirect ? next(redirect) : next()
 })
-
-installChunkLoadRecovery(router)
 
 export default router
