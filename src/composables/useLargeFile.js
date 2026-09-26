@@ -17,18 +17,12 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
   let loadGeneration = 0
   let decodeChunk = null
 
-  const resolveNextOffset = (payload, fallbackOffset, fallbackSize) => {
+  const resolveNextOffset = (payload, fallbackOffset) => {
     const nextOffset = Number(payload?.nextOffset)
-    if (Number.isFinite(nextOffset) && nextOffset >= fallbackOffset) {
-      return nextOffset
+    if (!Number.isFinite(nextOffset) || nextOffset <= fallbackOffset) {
+      throw new Error('文件分片偏移未推进')
     }
-
-    const bytesRead = Number(payload?.bytesRead)
-    if (Number.isFinite(bytesRead) && bytesRead >= 0) {
-      return fallbackOffset + bytesRead
-    }
-
-    return fallbackOffset + fallbackSize
+    return nextOffset
   }
 
   /**
@@ -53,8 +47,7 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
         throw new Error('文件内容提前结束，请刷新后重试')
       }
 
-      const nextOffset = resolveNextOffset(result, loadedOffset.value, CHUNK_SIZE)
-      if (nextOffset <= loadedOffset.value) throw new Error('文件分片偏移未推进')
+      const nextOffset = resolveNextOffset(result, loadedOffset.value)
       const editor = getEditorFn()
       const model = editor && toRaw(editor).getModel()
       if (!model) return
@@ -130,7 +123,7 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
     totalFileSize.value = responseData?.size || 0
     if (!chunkBase64) throw new Error('后端返回数据为空')
 
-    loadedOffset.value = resolveNextOffset(responseData, 0, 1024 * 1024)
+    loadedOffset.value = resolveNextOffset(responseData, 0)
     return decodeChunk(chunkBase64, loadedOffset.value >= totalFileSize.value)
   }
 
