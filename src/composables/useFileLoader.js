@@ -63,16 +63,16 @@ export function useFileLoader({
   const isModified = ref(false)
   let loadGeneration = 0
 
-  const isZeroSizePreview = (payload, fallbackMeta = {}) => {
-    const rawSize = payload?.size ?? fallbackMeta?.size
+  const isZeroSizePreview = (payload) => {
+    const rawSize = payload?.size
     const size = Number(rawSize)
     return Number.isFinite(size) && size === 0
   }
 
-  const resolvePreviewData = (payload, fallbackMeta = {}) => {
+  const resolvePreviewData = (payload) => {
     const fileData = payload?.data
     if (fileData === null || fileData === undefined) {
-      if (isZeroSizePreview(payload, fallbackMeta)) {
+      if (isZeroSizePreview(payload)) {
         return ''
       }
       throw new Error('后端返回数据为空')
@@ -132,7 +132,7 @@ export function useFileLoader({
       return { truncated: true, responseData }
     }
 
-    const fileData = resolvePreviewData(responseData, fileMeta)
+    const fileData = resolvePreviewData(responseData)
     setFileType(filePath)
 
     if (fileType.value === 'image') {

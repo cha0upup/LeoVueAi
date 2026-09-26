@@ -266,7 +266,7 @@ const updateStatsFromContent = (content) => {
 }
 
 const syncPreviewMetadata = (responseData) => {
-  fileSize.value = resolvePreviewFileSize(responseData, previewFileMeta.value)
+  fileSize.value = resolvePreviewFileSize(responseData)
 }
 
 const resetPreviewMetadata = () => {
