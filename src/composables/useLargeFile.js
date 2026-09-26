@@ -119,40 +119,19 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
   /**
    * 初始化大文件模式
    * @param {Object} responseData - 首次 preview 返回的 {data, size, truncated}
-   * @param {string} sessionId
-   * @param {string} filePath
    * @returns {string} 解码后的首片文本内容
    */
-  const initLargeFileMode = async (responseData, sessionId, filePath) => {
-    const generation = ++loadGeneration
+  const initLargeFileMode = (responseData) => {
+    loadGeneration += 1
     decodeChunk = createBase64StreamDecoder(currentEncoding.value)
     isLargeFileMode.value = true
 
     const chunkBase64 = responseData?.data
     totalFileSize.value = responseData?.size || 0
+    if (!chunkBase64) throw new Error('后端返回数据为空')
 
-    if (!chunkBase64) {
-      // 首次响应没有数据，用 preview-chunk 重新请求
-      const response = await previewFileChunkApi({
-        sessionId,
-        path: filePath,
-        offset: 0,
-        size: CHUNK_SIZE
-      })
-      if (generation !== loadGeneration) return null
-      const result = response.data
-      if (!result || !result.data) {
-        throw new Error('后端返回数据为空')
-      }
-      totalFileSize.value = result.size || 0
-      loadedOffset.value = resolveNextOffset(result, 0, CHUNK_SIZE)
-      const text = decodeChunk(result.data, loadedOffset.value >= totalFileSize.value)
-      return text
-    } else {
-      loadedOffset.value = resolveNextOffset(responseData, 0, 1024 * 1024)
-      const text = decodeChunk(chunkBase64, loadedOffset.value >= totalFileSize.value)
-      return text
-    }
+    loadedOffset.value = resolveNextOffset(responseData, 0, 1024 * 1024)
+    return decodeChunk(chunkBase64, loadedOffset.value >= totalFileSize.value)
   }
 
   const resetLargeFile = () => {

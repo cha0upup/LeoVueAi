@@ -534,7 +534,7 @@ const preView = async (
       if (result.truncated) {
         setFileType(target.filePath)
         if (fileType.value !== 'text') throw new Error('大文件仅支持文本预览')
-        const text = await initLargeFileMode(result.responseData, target.sessionId, target.filePath)
+        const text = initLargeFileMode(result.responseData)
         if (text === null || !isCurrent()) return false
         fileContent.value = text
         originalContent.value = text
