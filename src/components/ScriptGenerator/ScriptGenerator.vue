@@ -755,7 +755,20 @@ const writeTextToClipboard = async (text, successMessage = '已复制到剪贴�
     await navigator.clipboard.writeText(text)
     showSuccess(successMessage)
   } catch {
-    showError('复制失败，请手动复制')
+    // 降级方案：使用传统方法
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      showSuccess(successMessage)
+    } catch {
+      showError('复制失败，请手动复制')
+    }
   }
 }
 

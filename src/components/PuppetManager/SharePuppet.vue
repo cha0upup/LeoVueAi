@@ -304,12 +304,36 @@ const close = () => {
   loading.value = false
   selectedDescendantIds.value = new Set()
 }
+const fallbackCopyToClipboard = (text) => {
+  try {
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    textArea.style.position = 'fixed'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    const successful = document.execCommand('copy')
+    document.body.removeChild(textArea)
+    if (successful) {
+      showSuccess('内容已复制到剪贴板')
+    } else {
+      showError('复制到剪贴板失败')
+    }
+  } catch {
+    showError('复制到剪贴板失败')
+  }
+}
+
 const copyToClipboard = async () => {
   copying.value = true
   try {
     const textToCopy = output.value
-    await navigator.clipboard.writeText(textToCopy)
-    showSuccess('内容已复制到剪贴板')
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(textToCopy)
+      showSuccess('内容已复制到剪贴板')
+    } else {
+      fallbackCopyToClipboard(textToCopy)
+    }
   } catch {
     showError('复制到剪贴板失败')
   } finally {
