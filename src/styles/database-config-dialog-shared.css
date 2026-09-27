@@ -20,9 +20,13 @@
 }
 
 .config-dialog .el-dialog__body {
-  max-height: min(68vh, 680px);
+  max-height: min(72vh, 720px);
   overflow-y: auto;
   padding: 16px 20px;
+}
+
+.dialect-capability-alert {
+  margin: -2px 0 14px 104px;
 }
 
 .dialog-footer {
@@ -47,6 +51,16 @@
   transition:
     background-color var(--el-transition-duration) var(--el-transition-function),
     border-color var(--el-transition-duration) var(--el-transition-function);
+}
+
+.config-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+}
+
+.config-form-grid .el-form-item {
+  min-width: 0;
 }
 
 .section-title {
@@ -102,4 +116,14 @@
   background: var(--database-config-muted-surface);
   border-radius: var(--el-border-radius-small);
   border-left: 0.1875rem solid var(--el-color-primary);
+}
+
+@media (max-width: 640px) {
+  .config-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dialect-capability-alert {
+    margin-left: 0;
+  }
 }

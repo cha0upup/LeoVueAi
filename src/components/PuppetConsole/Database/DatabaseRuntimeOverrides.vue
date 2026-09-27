@@ -1,23 +1,14 @@
 <template>
-  <el-collapse class="runtime-overrides">
+  <el-collapse v-model="activeNames" class="runtime-overrides">
     <el-collapse-item name="runtime-overrides">
       <template #title>
         <div class="runtime-overrides__title">
           <el-icon><Icon icon="mdi:tune-variant" /></el-icon>
           <span>高级运行时覆盖</span>
-          <el-tag
-            size="small"
-            :type="runtimeStatusType"
-            effect="plain"
-          >
+          <el-tag size="small" :type="runtimeStatusType" effect="plain">
             {{ runtimeStatusLabel }}
           </el-tag>
-          <el-button
-            text
-            size="small"
-            :loading="loading"
-            @click.stop="$emit('refresh')"
-          >
+          <el-button text size="small" :loading="loading" @click.stop="$emit('refresh')">
             重新探测
           </el-button>
         </div>
@@ -25,8 +16,8 @@
 
       <div class="runtime-overrides__tip">
         标准连接模式下这些字段是可选覆盖；自定义连接模式至少要完整配置一种当前 Puppet
-        可用的运行时连接。平台不会远程安装驱动：JDBC 驱动须已在 Java Puppet
-        的类路径中，PDO 驱动须已安装在 PHP Puppet 的运行环境中。
+        可用的运行时连接。平台不会远程安装驱动：JDBC 驱动须已在 Java Puppet 的类路径中，PDO
+        驱动须已安装在 PHP Puppet 的运行环境中。
       </div>
 
       <el-alert
@@ -46,18 +37,14 @@
         class="runtime-overrides__alert"
       />
 
-      <section
-        v-if="showJava"
-        class="runtime-overrides__group"
-      >
-        <div class="runtime-overrides__group-title">
-          Java / JDBC
-        </div>
+      <section v-if="showJava" class="runtime-overrides__group">
+        <div class="runtime-overrides__group-title">Java / JDBC</div>
         <el-form-item label="JDBC URL">
           <el-input
             v-model="model.java.jdbcUrl"
             placeholder="留空时自动生成"
             clearable
+            @blur="emit('refresh')"
           />
         </el-form-item>
         <el-form-item label="驱动类">
@@ -68,7 +55,7 @@
             default-first-option
             placeholder="例如 com.mysql.cj.jdbc.Driver"
             style="width: 100%"
-            @change="$emit('refresh')"
+            @change="emit('refresh')"
           >
             <el-option
               v-for="driver in availableDrivers"
@@ -83,23 +70,19 @@
             v-model="model.java.propertiesText"
             type="textarea"
             :rows="3"
-            placeholder="JSON 对象，例如 {&quot;sslMode&quot;:&quot;verify-full&quot;}"
+            placeholder='JSON 对象，例如 {"sslMode":"verify-full"}'
           />
         </el-form-item>
       </section>
 
-      <section
-        v-if="showPhp"
-        class="runtime-overrides__group"
-      >
-        <div class="runtime-overrides__group-title">
-          PHP / PDO
-        </div>
+      <section v-if="showPhp" class="runtime-overrides__group">
+        <div class="runtime-overrides__group-title">PHP / PDO</div>
         <el-form-item label="PDO DSN">
           <el-input
             v-model="model.php.dsn"
             placeholder="留空时自动生成"
             clearable
+            @blur="emit('refresh')"
           />
         </el-form-item>
         <el-form-item label="PDO 驱动">
@@ -110,7 +93,7 @@
             default-first-option
             placeholder="例如 mysql、pgsql、sqlsrv、oci、sqlite"
             style="width: 100%"
-            @change="$emit('refresh')"
+            @change="emit('refresh')"
           >
             <el-option
               v-for="driver in availableDrivers"
@@ -127,16 +110,25 @@
 
 <script setup>
 import { Icon } from '@iconify/vue'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const model = defineModel({ type: Object, required: true })
 
 const props = defineProps({
   capabilities: { type: Object, default: null },
-  loading: { type: Boolean, default: false }
+  loading: { type: Boolean, default: false },
+  defaultOpen: { type: Boolean, default: false }
 })
 
-defineEmits(['refresh'])
+const emit = defineEmits(['refresh'])
+const activeNames = ref(props.defaultOpen ? ['runtime-overrides'] : [])
+
+watch(
+  () => props.defaultOpen,
+  (open) => {
+    activeNames.value = open ? ['runtime-overrides'] : []
+  }
+)
 
 const runtime = computed(() => props.capabilities?.runtime || '')
 const showJava = computed(() => !runtime.value || runtime.value === 'java')

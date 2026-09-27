@@ -1,6 +1,9 @@
 <template>
   <div class="main-content">
-    <div class="top-bar">
+    <div
+      v-if="workspaceView !== 'connection-info'"
+      class="top-bar"
+    >
       <div class="breadcrumb context-breadcrumb">
         <el-breadcrumb separator="/">
           <el-breadcrumb-item v-if="currentDatabase">

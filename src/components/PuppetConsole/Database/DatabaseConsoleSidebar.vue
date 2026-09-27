@@ -2,12 +2,18 @@
   <div class="sidebar">
     <section class="connection-strip">
       <div class="connection-strip-main">
-        <strong class="connection-strip-title">
-          {{ connection.dialect ? connection.dialect.toUpperCase() : '未连接数据库' }}
-        </strong>
-        <span class="connection-strip-meta">{{ connection.username || '-' }}</span>
-      </div>
-      <div class="connection-strip-actions">
+        <div class="connection-strip-identity">
+          <strong
+            class="connection-strip-title"
+            :title="connection.dialect ? connection.dialect.toUpperCase() : '未连接数据库'"
+          >
+            {{ connection.dialect ? connection.dialect.toUpperCase() : '未连接数据库' }}
+          </strong>
+          <span
+            class="connection-strip-meta"
+            :title="connection.username || '-'"
+          >{{ connection.username || '-' }}</span>
+        </div>
         <el-tag
           :type="connectionStatusPresentation.type"
           effect="dark"
@@ -15,6 +21,11 @@
         >
           {{ connectionStatusPresentation.label }}
         </el-tag>
+      </div>
+      <div
+        v-if="connectionStatus !== 'idle' || canCreateDatabase"
+        class="connection-strip-actions"
+      >
         <el-button
           v-if="connectionStatus !== 'idle'"
           size="small"
@@ -156,8 +167,9 @@ const emit = defineEmits([
 
 .connection-strip {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
+  flex-direction: column;
   gap: 8px;
   padding: 9px 10px;
   border-radius: 0;
@@ -173,9 +185,22 @@ const emit = defineEmits([
 .connection-strip-main {
   display: flex;
   align-items: center;
-  gap: 5px 8px;
+  justify-content: space-between;
+  gap: 8px;
   min-width: 0;
-  flex-wrap: wrap;
+}
+
+.connection-strip-identity {
+  flex: 1;
+  min-width: 0;
+}
+
+.connection-strip-title,
+.connection-strip-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .connection-strip-title {
@@ -185,12 +210,9 @@ const emit = defineEmits([
 }
 
 .connection-strip-meta {
+  margin-top: 3px;
   color: color-mix(in srgb, var(--el-text-color-primary) 78%, var(--el-color-primary));
   font-size: 0.75rem;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .connection-strip-actions {
@@ -198,22 +220,31 @@ const emit = defineEmits([
   gap: 5px;
   align-items: center;
   flex-wrap: wrap;
-  flex-shrink: 0;
+  width: 100%;
 }
 
-.connection-strip-actions :deep(.el-tag) {
+.connection-strip-actions :deep(.el-button) {
+  min-width: 0;
+  flex: 1 1 0;
+  margin-left: 0;
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+.connection-strip-main :deep(.el-tag) {
+  flex-shrink: 0;
   height: 24px;
   border-radius: 4px;
   font-weight: 600;
 }
 
-.connection-strip-actions :deep(.el-tag.el-tag--success) {
+.connection-strip-main :deep(.el-tag.el-tag--success) {
   background: color-mix(in srgb, var(--el-color-success-light-8) 80%, white);
   border-color: color-mix(in srgb, var(--el-color-success) 36%, transparent);
   color: var(--el-color-success-dark-2);
 }
 
-.connection-strip-actions :deep(.el-tag.el-tag--info) {
+.connection-strip-main :deep(.el-tag.el-tag--info) {
   background: color-mix(in srgb, var(--el-color-info-light-8) 80%, white);
   border-color: color-mix(in srgb, var(--el-color-info) 34%, transparent);
   color: var(--el-color-info-dark-2);

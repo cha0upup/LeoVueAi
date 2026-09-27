@@ -141,14 +141,22 @@ export async function executeBatchDelete(items, deleteFn, options = {}) {
   if (!confirmed) return false
 
   return withLoading(loadingRef, async () => {
-    const results = await Promise.allSettled(items.map((item) => deleteFn(item)))
-
     let successCount = 0
     let failCount = 0
-    results.forEach((res) => {
-      if (res.status === 'fulfilled') successCount += 1
-      else failCount += 1
-    })
+
+    // SQLite only allows one writer at a time.  Running delete requests in
+    // parallel makes a batch operation contend for the same database lock and
+    // can turn otherwise valid deletes into SQLITE_BUSY failures.  Keep the
+    // requests ordered while still continuing after an individual failure so
+    // the caller receives the same partial-result counts.
+    for (const item of items) {
+      try {
+        await deleteFn(item)
+        successCount += 1
+      } catch {
+        failCount += 1
+      }
+    }
 
     if (successCount > 0 && failCount === 0) {
       showSuccess(`批量删除成功 ${successCount} 个${itemName}`)

@@ -63,9 +63,33 @@ export function createDatabaseConfigForm() {
 }
 
 export function resetDatabaseConfigForm(form, formRef) {
-  Object.assign(form, createDatabaseConfigForm())
   formRef.value?.resetFields?.()
+  Object.assign(form, createDatabaseConfigForm())
   formRef.value?.clearValidate?.()
+}
+
+export function createEditingDatabaseConfigForm(config) {
+  const connection = config.connection || config
+  const dialect = connection.dialect || config.dialect || 'mysql'
+  return {
+    ...createDatabaseConfigForm(),
+    dialect,
+    connectionMode: connection.connectionMode || (dialect === 'generic' ? 'custom' : 'standard'),
+    variant: connection.variant || (dialect === 'sqlite' ? 'file' : 'default'),
+    host: connection.host ?? config.host ?? 'localhost',
+    port:
+      connection.port ?? config.port ?? sqlEngine.getDatabaseConfig(dialect)?.defaultPort ?? 3306,
+    database: connection.database ?? config.databaseName ?? '',
+    service: connection.service || '',
+    sid: connection.sid || '',
+    file: connection.file || (dialect === 'sqlite' ? config.databaseName || '' : ''),
+    username: connection.username ?? config.username ?? '',
+    password: '',
+    timeoutSeconds: connection.timeoutSeconds ?? config.timeoutSeconds ?? 30,
+    optionsText: prettyJson(connection.options),
+    testSql: connection.dialectOptions?.testSql ?? 'SELECT 1 AS version',
+    runtimeOptions: createRuntimeOptions(connection.runtimeOptions)
+  }
 }
 
 export function buildDatabaseConnection(form, { omitEmptyPassword = false } = {}) {
@@ -128,8 +152,9 @@ function runtimePairState(first, second) {
   }
 }
 
-function isDatabaseConnectionComplete(form, runtime, runtimeSupport = {}) {
+function isDatabaseConnectionComplete(form, runtime, runtimeSupport = {}, connectionModes = []) {
   if (!form.dialect || !parseJsonObject(form.optionsText).valid) return false
+  if (connectionModes.length > 0 && !connectionModes.includes(form.connectionMode)) return false
   if (form.dialect === 'generic' && !form.testSql?.trim()) return false
   if (!parseJsonObject(form.runtimeOptions?.java?.propertiesText).valid) return false
 
@@ -165,6 +190,23 @@ export function useDatabaseConfigDialogBase({ form, templates, sessionId }) {
     () => templates.value.find((template) => template.value === form.dialect) || null
   )
   const variants = computed(() => selectedTemplate.value?.variants || [])
+  const dialectGroups = computed(() => {
+    const builtIn = templates.value.filter((template) => template.value !== 'generic')
+    const generic = templates.value.filter((template) => template.value === 'generic')
+    return [
+      builtIn.length ? { value: 'builtin', label: '内置方言', options: builtIn } : null,
+      generic.length
+        ? { value: 'generic', label: '通用 SQL / 自定义数据库', options: generic }
+        : null
+    ].filter(Boolean)
+  })
+  const connectionModeOptions = computed(() => {
+    const modes = selectedTemplate.value?.connectionModes || []
+    return modes.map((value) => ({
+      value,
+      label: value === 'custom' ? '自定义运行时' : '标准配置'
+    }))
+  })
   const selectedVariant = computed(
     () =>
       variants.value.find((variant) => variant.key === form.variant) || variants.value[0] || null
@@ -186,7 +228,8 @@ export function useDatabaseConfigDialogBase({ form, templates, sessionId }) {
       isDatabaseConnectionComplete(
         form,
         currentRuntime.value,
-        selectedTemplate.value?.runtimeSupport || {}
+        selectedTemplate.value?.runtimeSupport || {},
+        selectedTemplate.value?.connectionModes || []
       ) &&
       runtimeReady.value
   )
@@ -217,7 +260,10 @@ export function useDatabaseConfigDialogBase({ form, templates, sessionId }) {
     const defaultVariant = variants.value[0]
     form.variant = defaultVariant?.key || ''
     if (selectedTemplate.value.defaultPort) form.port = selectedTemplate.value.defaultPort
-    if (form.dialect === 'generic') form.connectionMode = 'custom'
+    const modes = selectedTemplate.value.connectionModes || []
+    if (form.dialect === 'generic' || !modes.includes(form.connectionMode)) {
+      form.connectionMode = modes.includes('custom') ? 'custom' : modes[0] || 'custom'
+    }
     if (form.dialect === 'sqlite') form.username = ''
     else if (!form.username) form.username = DEFAULT_DATABASE_USER
   }
@@ -268,6 +314,8 @@ export function useDatabaseConfigDialogBase({ form, templates, sessionId }) {
   return {
     selectedTemplate,
     variants,
+    dialectGroups,
+    connectionModeOptions,
     visibleFields,
     isComplete,
     runtimeCapabilities,

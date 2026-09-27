@@ -213,7 +213,7 @@
                     type="success"
                     plain
                     :disabled="!isStatusEnabled(row.status)"
-                    :loading="testingConnectionId === row.connectionId"
+                    :loading="testingConnectionIds.has(row.connectionId)"
                     :aria-label="`测试连接 ${row.connectionName || row.connectionId}`"
                     @click="testSavedConnection(row)"
                   >
@@ -258,18 +258,20 @@
     </section>
 
     <!-- 新增配置弹窗 -->
-    <AddDatabaseConfigDialog
+    <DatabaseConfigDialog
       v-model:visible="addDialogVisible"
       :session-id="sessionId"
+      mode="create"
       @success="handleConfigSuccess"
       @cancel="handleAddDialogCancel"
     />
 
     <!-- 编辑配置弹窗 -->
-    <EditDatabaseConfigDialog
+    <DatabaseConfigDialog
       v-model:visible="editDialogVisible"
       :session-id="sessionId"
       :editing-config="editingConfig"
+      mode="edit"
       @success="handleConfigSuccess"
       @cancel="handleEditDialogCancel"
     />
@@ -282,8 +284,7 @@ import { Icon } from '@iconify/vue'
 import { confirmDelete } from '@/utils/confirmUtils.js'
 import { v4 as uuidV4 } from 'uuid'
 import { icons } from '@/utils/icons.js'
-import AddDatabaseConfigDialog from '@/components/PuppetConsole/Database/AddDatabaseConfigDialog.vue'
-import EditDatabaseConfigDialog from '@/components/PuppetConsole/Database/EditDatabaseConfigDialog.vue'
+import DatabaseConfigDialog from '@/components/PuppetConsole/Database/DatabaseConfigDialog.vue'
 import {
   getDatabaseConnectionsApi,
   deleteDatabaseConnectionApi,
@@ -319,7 +320,7 @@ const savedConfigs = ref([])
 const savedLoading = ref(true)
 const loadFailed = ref(false)
 const hasConfigs = computed(() => savedConfigs.value.length > 0)
-const testingConnectionId = ref('')
+const testingConnectionIds = ref(new Set())
 const updatingStatusId = ref('')
 const addDialogVisible = ref(false)
 const editDialogVisible = ref(false)
@@ -358,14 +359,14 @@ const filteredConfigs = computed(() => {
   })
 })
 
-const loadSavedConfigs = async () => {
+const loadSavedConfigs = async ({ silent = false } = {}) => {
   if (!props.sessionId) {
     loadFailed.value = true
     savedLoading.value = false
     return
   }
 
-  savedLoading.value = true
+  if (!silent) savedLoading.value = true
   loadFailed.value = false
   try {
     const resp = await getDatabaseConnectionsApi({
@@ -376,7 +377,7 @@ const loadSavedConfigs = async () => {
   } catch {
     loadFailed.value = true
   } finally {
-    savedLoading.value = false
+    if (!silent) savedLoading.value = false
   }
 }
 
@@ -467,20 +468,23 @@ const getTestStatusTooltip = (row) => {
 }
 
 const testSavedConnection = async (row) => {
-  if (!row?.connectionId || !isStatusEnabled(row.status) || testingConnectionId.value) return
-  testingConnectionId.value = row.connectionId
+  const connectionId = row?.connectionId
+  if (!connectionId || !isStatusEnabled(row.status) || testingConnectionIds.value.has(connectionId)) return
+  testingConnectionIds.value = new Set([...testingConnectionIds.value, connectionId])
   try {
     await sqlEngine.testConnection({
       sessionId: props.sessionId,
-      connection: { connectionId: row.connectionId }
+      connection: { connectionId }
     })
     showSuccess('数据库连接测试成功')
   } catch (error) {
     const message = error?.response?.data?.msg || error?.message || '数据库连接测试失败'
     showError(message)
   } finally {
-    testingConnectionId.value = ''
-    await loadSavedConfigs()
+    const nextTestingIds = new Set(testingConnectionIds.value)
+    nextTestingIds.delete(connectionId)
+    testingConnectionIds.value = nextTestingIds
+    await loadSavedConfigs({ silent: true })
   }
 }
 

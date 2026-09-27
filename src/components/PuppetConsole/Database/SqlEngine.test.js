@@ -18,6 +18,8 @@ const { default: sqlEngine } = await import('./SqlEngine.js')
 const {
   buildDatabaseConnection,
   createDatabaseConfigForm,
+  createEditingDatabaseConfigForm,
+  resetDatabaseConfigForm,
   useDatabaseConfigDialogBase,
   verifySavedDatabaseConnection
 } = await import('./database-config-dialog-shared.js')
@@ -25,6 +27,68 @@ const {
 afterEach(() => {
   sqlEngine.clearDialectCatalog()
   vi.restoreAllMocks()
+})
+
+describe('shared connection dialog edit state', () => {
+  it.each([
+    { dialect: 'mysql', host: 'db.internal', port: 43306, database: 'inventory', username: '' },
+    { dialect: 'oracle', variant: 'sid', host: 'oracle.internal', port: 1525, sid: 'LEGACY' },
+    { dialect: 'sqlite', variant: 'file', file: '/data/app.sqlite', username: '' },
+    {
+      dialect: 'generic',
+      connectionMode: 'custom',
+      testSql: 'VALUES 1',
+      runtimeOptions: {
+        java: { jdbcUrl: 'jdbc:vendor:analytics', driverClass: 'vendor.Driver', propertiesText: '{"ssl":true}' },
+        php: { dsn: 'vendor:analytics', pdoDriver: 'vendor' }
+      }
+    }
+  ])('preserves saved $dialect settings without exposing the password', (settings) => {
+    const original = buildDatabaseConnection({
+      ...createDatabaseConfigForm(),
+      ...settings,
+      password: 'saved-secret',
+      timeoutSeconds: 75,
+      optionsText: '{"applicationName":"reporting"}'
+    })
+    const form = createEditingDatabaseConfigForm({ connectionId: 'saved-1', connection: original })
+    const updated = buildDatabaseConnection(form, { omitEmptyPassword: true })
+    const { password, ...expected } = original
+
+    expect(password).toBe('saved-secret')
+    expect(form.password).toBe('')
+    expect(updated).toEqual(expected)
+    expect(updated).not.toHaveProperty('password')
+    form.runtimeOptions.java.driverClass = 'changed.Driver'
+    expect(original.runtimeOptions.java?.driverClass).not.toBe('changed.Driver')
+  })
+
+  it('opens legacy Generic SQL configurations in custom runtime mode', () => {
+    const form = createEditingDatabaseConfigForm({
+      dialect: 'generic',
+      runtimeOptions: { java: { jdbcUrl: 'jdbc:vendor:db', driverClass: 'vendor.Driver' } },
+      dialectOptions: { testSql: 'VALUES 1' }
+    })
+
+    expect(form.connectionMode).toBe('custom')
+    expect(form.testSql).toBe('VALUES 1')
+    expect(form.runtimeOptions.java.driverClass).toBe('vendor.Driver')
+  })
+
+  it('clears edit values even when form controls restore their previous initial values', () => {
+    const form = reactive(createDatabaseConfigForm())
+    form.password = 'unsaved-secret'
+    form.runtimeOptions.java.jdbcUrl = 'jdbc:vendor:previous'
+    const formRef = ref({
+      resetFields: vi.fn(() => Object.assign(form, { dialect: 'oracle', port: 1525 })),
+      clearValidate: vi.fn()
+    })
+
+    resetDatabaseConfigForm(form, formRef)
+
+    expect(form).toEqual(createDatabaseConfigForm())
+    expect(formRef.value.clearValidate).toHaveBeenCalledOnce()
+  })
 })
 
 describe('SqlEngine runtime-neutral connections', () => {
