@@ -76,7 +76,7 @@ import FileTransfer from './FileTransfer.vue'
 import FileTouch from './FileTouch.vue'
 import FileRename from './FileRename.vue'
 import FileChmod from './FileChmod.vue'
-import { getFilePreviewMeta, resolveCurrentFileDirectory, resolveFileEntryPath } from './fileTableModel.js'
+import { resolveCurrentFileDirectory, resolveFileEntryPath } from './fileTableModel.js'
 
 const props = defineProps({
   sessionId: { type: String, required: true },
@@ -118,14 +118,14 @@ async function open(action, file) {
   dialogRefs[action]?.value?.openDialog()
 }
 
-function preview(path, fileMeta = {}) {
+function preview(path) {
   if (!path) return
-  filePreviewRef.value?.preView(props.sessionId, path, fileMeta)
+  filePreviewRef.value?.preView(props.sessionId, path)
 }
 
 function previewEntry(file) {
   const path = resolveFileEntryPath(file, props)
-  preview(path, getFilePreviewMeta(file))
+  preview(path)
 }
 
 function download(file) {

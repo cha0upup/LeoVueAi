@@ -129,7 +129,7 @@
                 size="small"
                 text
                 :disabled="isContainerPending(row)"
-                @click="handleInspect(row.id || row.name)"
+                @click="handleInspect(getDockerResourceId(row))"
               >
                 详情
               </el-button>
@@ -137,7 +137,7 @@
                 size="small"
                 text
                 :disabled="isContainerPending(row)"
-                @click="handleLogs(row.id || row.name)"
+                @click="handleLogs(getDockerResourceId(row))"
               >
                 日志
               </el-button>
@@ -264,7 +264,7 @@
                     size="small"
                     text
                     type="danger"
-                    :loading="isActionPending('remove-image', getDockerResourceId(row, 'image'))"
+                    :loading="isActionPending('remove-image', getDockerResourceId(row))"
                   >
                     删除
                   </el-button>
@@ -404,12 +404,12 @@ import {
   DOCKER_TAB_CONFIG,
   formatDockerInfo,
   getDockerExportConfig,
+  getDockerPayload,
   getDockerResourceId,
   getDockerStatusTag,
   isDockerContainerPaused,
   isDockerContainerRunning,
   normalizeDockerList,
-  unwrapDockerResponse
 } from './dockerManagerModel.js'
 import { useDockerTerminal } from './useDockerTerminal.js'
 
@@ -622,7 +622,7 @@ async function handleLifecycle(command, row) {
       containerId,
       ...action.params
     })
-    const data = unwrapDockerResponse(response)
+    const data = getDockerPayload(response)
     if (props.sessionId !== capturedSessionId) return
     if (data.success) {
       showSuccess(`${action.label}容器成功: ${containerId}`)
@@ -650,7 +650,7 @@ async function confirmRemoveContainer({ containerId, force }) {
       containerId,
       force
     })
-    const data = unwrapDockerResponse(response)
+    const data = getDockerPayload(response)
     if (props.sessionId !== capturedSessionId) return
     if (data.success) {
       showSuccess(`删除容器成功: ${containerId}`)
@@ -669,7 +669,7 @@ async function confirmRemoveContainer({ containerId, force }) {
 }
 
 async function handleRemoveImage(row) {
-  const imageId = getDockerResourceId(row, 'image')
+  const imageId = getDockerResourceId(row)
   if (!imageId) return
   const capturedSessionId = props.sessionId
   const key = getActionKey('remove-image', imageId, capturedSessionId)
@@ -681,7 +681,7 @@ async function handleRemoveImage(row) {
       imageId,
       force: false
     })
-    const data = unwrapDockerResponse(response)
+    const data = getDockerPayload(response)
     if (props.sessionId !== capturedSessionId) return
     if (data.success) {
       showSuccess(`删除镜像成功: ${imageId}`)

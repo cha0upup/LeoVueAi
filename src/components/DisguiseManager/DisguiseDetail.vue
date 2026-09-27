@@ -319,19 +319,7 @@ async function copyText(text, successMessage) {
     await navigator.clipboard.writeText(text)
     showSuccess(successMessage)
   } catch {
-    try {
-      const textArea = document.createElement('textarea')
-      textArea.value = text
-      textArea.style.position = 'fixed'
-      textArea.style.opacity = '0'
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      showSuccess(successMessage)
-    } catch {
-      showError('复制失败，请手动复制')
-    }
+    showError('复制失败，请手动复制')
   }
 }
 

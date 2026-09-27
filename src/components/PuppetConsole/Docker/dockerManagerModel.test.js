@@ -1,31 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatDockerInfo,
+  getDockerPayload,
   getDockerExportConfig,
   getDockerResourceId,
   isDockerContainerPaused,
   isDockerContainerRunning,
   normalizeDockerList,
   quoteShellArg,
-  unwrapDockerResponse
 } from './dockerManagerModel.js'
 
 describe('dockerManagerModel', () => {
   it('reads the current API payload and normalizes malformed lists', () => {
-    const response = { data: { containers: [{ id: 'one' }] } }
-    expect(unwrapDockerResponse(response)).toEqual({ containers: [{ id: 'one' }] })
+    const response = { data: { code: 200, data: { containers: [{ id: 'one' }] } } }
+    expect(getDockerPayload(response)).toEqual({ containers: [{ id: 'one' }] })
     expect(normalizeDockerList(response, 'containers')).toEqual([{ id: 'one' }])
     expect(normalizeDockerList({ data: { images: null } }, 'images')).toEqual([])
     expect(normalizeDockerList({}, 'unknown')).toEqual([])
   })
 
-  it('derives resource identifiers without creating dangling image separators', () => {
+  it('uses the backend resource id for every Docker resource', () => {
     expect(getDockerResourceId({ id: 'abc', name: 'web' })).toBe('abc')
-    expect(getDockerResourceId({ name: 'web' })).toBe('web')
-    expect(getDockerResourceId({ repository: 'nginx', tag: 'latest' }, 'image')).toBe(
-      'nginx:latest'
+    expect(getDockerResourceId({ name: 'web' })).toBe('')
+    expect(getDockerResourceId({ id: 'sha256:abc', repository: 'nginx', tag: 'latest' })).toBe(
+      'sha256:abc'
     )
-    expect(getDockerResourceId({ repository: 'nginx' }, 'image')).toBe('nginx')
+    expect(getDockerResourceId({ repository: 'nginx' })).toBe('')
   })
 
   it('recognizes a paused running container', () => {
@@ -37,8 +37,10 @@ describe('dockerManagerModel', () => {
     const first = getDockerExportConfig('containers')
     first.columns.pop()
     expect(getDockerExportConfig('containers').columns).toHaveLength(6)
-    expect(formatDockerInfo({ data: { logs: '' } }, 'logs', '(无日志)')).toBe('(无日志)')
-    expect(formatDockerInfo({ data: { inspect: { Id: 'abc' } } }, 'inspect')).toBe(
+    expect(formatDockerInfo({ data: { code: 200, data: { logs: '' } } }, 'logs', '(无日志)')).toBe(
+      '(无日志)'
+    )
+    expect(formatDockerInfo({ data: { code: 200, data: { inspect: { Id: 'abc' } } } }, 'inspect')).toBe(
       '{\n  "Id": "abc"\n}'
     )
   })

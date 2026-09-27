@@ -368,13 +368,8 @@ const refreshFiles = async () => {
 
 const handleCreatedEntry = async (entry) => {
   if (!entry?.open || entry.type !== 'file') return
-  const extension = entry.name?.includes('.') ? entry.name.split('.').pop()?.toLowerCase() : ''
   await nextTick()
-  fileTableRef.value?.previewFile(entry.path, {
-    name: entry.name || '',
-    size: Number(entry.size ?? 0),
-    extension: extension || ''
-  })
+  fileTableRef.value?.previewFile(entry.path)
 }
 
 /**

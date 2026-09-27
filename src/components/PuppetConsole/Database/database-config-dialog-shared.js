@@ -33,9 +33,7 @@ export function createRuntimeOptions(source = {}) {
     java: {
       jdbcUrl: source?.java?.jdbcUrl || '',
       driverClass: source?.java?.driverClass || '',
-      propertiesText: prettyJson(
-        source?.java?.connectionProperties || source?.java?.properties || {}
-      )
+      propertiesText: prettyJson(source?.java?.connectionProperties || {})
     },
     php: {
       dsn: source?.php?.dsn || '',

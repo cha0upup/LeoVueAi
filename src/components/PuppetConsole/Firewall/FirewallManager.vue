@@ -496,7 +496,7 @@ async function handleGetStatus() {
   loadType.value = 'status'
   try {
     const res = await getFirewallStatusApi({ sessionId: props.sessionId })
-    const data = res.data
+    const data = res.data.data
     fwStatus.value = data
     // 尝试判断是否启用
     const raw = JSON.stringify(data).toLowerCase()
@@ -517,7 +517,7 @@ async function handleListRules() {
   rulesLoaded.value = true
   try {
     const res = await listFirewallRulesApi({ sessionId: props.sessionId })
-    const data = res.data
+    const data = res.data.data
     rules.value = data.rules || []
     if (rules.value.length === 0) {
       showWarning('未获取到防火墙规则')

@@ -130,9 +130,9 @@ const handleFileClick = (fileOrRow) => {
   }
 }
 
-const previewFile = (path, fileMeta = {}) => {
+const previewFile = (path) => {
   if (!path) return
-  fileOperationDialogsRef.value?.preview(formatFilePath(path), fileMeta)
+  fileOperationDialogsRef.value?.preview(formatFilePath(path))
 }
 
 const openFileOperation = (action, file) => fileOperationDialogsRef.value?.open(action, file)

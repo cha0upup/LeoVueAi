@@ -19,7 +19,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="路径" class="inline-item">
-          <el-input v-model="request.path" placeholder="/path 或 uri" size="small" clearable />
+          <el-input v-model="request.path" placeholder="/path" size="small" clearable />
         </el-form-item>
         <el-form-item label="超时(ms)" class="inline-item">
           <el-input-number

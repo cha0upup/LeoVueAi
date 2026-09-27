@@ -43,10 +43,7 @@ export const getDownloadRelativePath = (downloadPath) => {
   return normalized.startsWith('downloads/') ? normalized : null
 }
 
-export const normalizeServerDownloadTask = (raw) => {
-  const snapshot = raw?.meta
-    ? { taskId: raw.taskId, sessionId: raw.sessionId, state: raw.state, ...raw.meta }
-    : raw || {}
+export const normalizeServerDownloadTask = (snapshot = {}) => {
   const expectedLength = Number(snapshot.expectedLength || 0)
   const downloadedBytes = Number(snapshot.downloadedBytes || 0)
   const mappedStatus = normalizeStatus(snapshot.state, STATUS_BY_ENGINE_STATE)

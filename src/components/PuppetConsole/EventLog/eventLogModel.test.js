@@ -12,7 +12,7 @@ describe('eventLogModel', () => {
   it('recognizes access logs and resolves the level field', () => {
     expect(isEventLogAccessFormat('nginx-access')).toBe(true)
     expect(isEventLogAccessFormat('tomcat')).toBe(false)
-    expect(getEventLogLevel({ Level: 'Error', level: 'info' })).toBe('Error')
+    expect(getEventLogLevel({ level: 'info' })).toBe('info')
   })
 
   it('builds normalized query and aggregate parameters', () => {

@@ -15,10 +15,10 @@
     >
       <el-form-item
         label="用户名"
-        prop="username"
+        prop="userName"
       >
         <el-input
-          v-model="form.username"
+          v-model="form.userName"
           placeholder="请输入用户名"
           :maxlength="AUTH_FIELD_LIMITS.usernameMaxLength"
           :disabled="editing"
@@ -82,10 +82,10 @@
 
       <el-form-item
         label="所属团队"
-        prop="teamname"
+        prop="teamId"
       >
         <el-select
-          v-model="form.teamname"
+          v-model="form.teamId"
           placeholder="请选择团队，不加入团队请置空"
           clearable
           :disabled="isLeader || editingBuiltInAdmin"
@@ -93,9 +93,9 @@
         >
           <el-option
             v-for="team in teams"
-            :key="team.id"
-            :label="team.teamname || team.teamName"
-            :value="team.id"
+            :key="team.teamId"
+            :label="team.teamName"
+            :value="team.teamId"
           />
         </el-select>
       </el-form-item>

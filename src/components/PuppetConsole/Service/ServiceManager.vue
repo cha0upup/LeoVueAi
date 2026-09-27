@@ -493,7 +493,7 @@ async function handleListAll() {
   loaded.value = true
   try {
     const res = await listServicesApi({ sessionId: props.sessionId })
-    const data = res.data
+    const data = res.data.data
     services.value = data.services || []
     if (services.value.length === 0) {
       showWarning('未获取到服务列表')
@@ -517,7 +517,7 @@ async function handleQueryDetail(serviceName) {
   detailTarget.value = serviceName
   try {
     const res = await queryServiceApi({ sessionId: props.sessionId, serviceName })
-    serviceDetail.value = res.data
+    serviceDetail.value = res.data.data
   } catch (err) {
     showError('查询服务详情失败: ' + (err.message || err))
     showDetailDialog.value = false

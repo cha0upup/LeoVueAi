@@ -41,11 +41,9 @@ describe('taskManagerModel', () => {
         taskId: 'd1',
         sessionId: 's1',
         state: 'RUNNING',
-        meta: {
-          expectedLength: '10',
-          downloadedBytes: '10',
-          downloadPath: 'downloads/a.txt'
-        }
+        expectedLength: '10',
+        downloadedBytes: '10',
+        downloadPath: 'downloads/a.txt'
       }
     )
     expect(download).toMatchObject({

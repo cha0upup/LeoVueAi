@@ -6,7 +6,6 @@ const normalize = (value) => (value ? String(value).toLowerCase() : '')
 
 // 更新接口会全量覆盖配置，快捷开关也必须保留所有持久化字段。
 const PUPPET_UPDATE_FIELDS = [
-  'id',
   'puppetId',
   'parentPuppetId',
   'puppetName',

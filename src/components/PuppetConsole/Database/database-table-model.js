@@ -5,11 +5,9 @@ export function getTableColumnNames(columns = []) {
     .filter(Boolean)
 }
 
-export function normalizeQueryRows({ queryColumns = [], rows = [], fallbackColumns = [] } = {}) {
+export function normalizeQueryRows({ queryColumns = [], rows = [] } = {}) {
   const resultColumns = Array.isArray(queryColumns) ? queryColumns : []
-  const fallbackNames = getTableColumnNames(fallbackColumns)
-  const columnNames =
-    fallbackNames.length > 0 ? fallbackNames : getTableColumnNames(resultColumns)
+  const columnNames = getTableColumnNames(resultColumns)
 
   if (!Array.isArray(rows)) return { columnNames, rows: [] }
 

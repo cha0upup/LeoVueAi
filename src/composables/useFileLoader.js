@@ -105,7 +105,7 @@ export function useFileLoader({
    * 加载预览；显式 encoding 用于重新解析，否则自动检测编码。
    * @returns {{ truncated: boolean, responseData: Object }|null}
    */
-  const loadFile = async (sessionId, filePath, fileMeta = {}, options = {}) => {
+  const loadFile = async (sessionId, filePath, options = {}) => {
     const generation = ++loadGeneration
     const isCurrent = () => generation === loadGeneration && (options.isCurrent?.() ?? true)
     let encoding = options.encoding ?? currentEncoding.value
@@ -122,10 +122,7 @@ export function useFileLoader({
     }
     if (!isCurrent()) return null
 
-    const responseData = {
-      ...fileMeta,
-      ...(response.data || {})
-    }
+    const responseData = response.data
 
     if (responseData.truncated) {
       if (options.encoding !== undefined) throw new Error('文件过大，仅支持预览1MB以下内容')

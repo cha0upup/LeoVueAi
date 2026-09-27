@@ -46,7 +46,7 @@ export const normalizeRequests = (requests, ensureOne = true) => {
         : []
     return {
       method: String(request?.method || 'GET').toUpperCase(),
-      path: String(request?.uri || request?.path || '/').trim() || '/',
+      path: String(request?.path || '/').trim() || '/',
       timeout: toTimeout(request?.timeout),
       headers,
       body: String(request?.body ?? ''),

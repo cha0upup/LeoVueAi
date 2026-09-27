@@ -3,27 +3,26 @@ import { describe, expect, it } from 'vitest'
 import {
   canEditUser,
   canManageUser,
+  createUserForm,
   filterUsers,
   getEditDisabledReason,
   isBuiltInAdmin,
-  normalizeUserRecord,
   normalizeUserStatus,
   userStats
 } from './userManagerModel.js'
 
 describe('userManagerModel', () => {
-  it('maps canonical user records into the table model', () => {
+  it('uses canonical user records directly', () => {
     expect(normalizeUserStatus(0)).toBe(0)
     expect(normalizeUserStatus(1)).toBe(1)
     expect(normalizeUserStatus(undefined)).toBe(1)
-    expect(normalizeUserRecord({ userId: 42, userName: 'alice', status: 0 }))
-      .toMatchObject({ id: 42, username: 'alice', status: 0 })
+    expect(createUserForm()).toMatchObject({ userId: '', userName: '', teamId: '' })
   })
 
   it('filters safely when identifiers are numeric', () => {
     const users = [
-      { id: 42, username: 'Alice', privilege: 'normal', teamname: 'team-a' },
-      { id: 7, username: 'Bob', privilege: 'leader', teamname: 'team-b' }
+      { userId: 42, userName: 'Alice', privilege: 'normal', teamId: 'team-a' },
+      { userId: 7, userName: 'Bob', privilege: 'leader', teamId: 'team-b' }
     ]
 
     expect(filterUsers(users, { keyword: '42' })).toEqual([users[0]])
@@ -31,7 +30,7 @@ describe('userManagerModel', () => {
   })
 
   it('keeps built-in admin immutable through edit controls', () => {
-    const builtIn = { id: 'ADMIN', username: 'renamed', privilege: 'admin' }
+    const builtIn = { userId: 'ADMIN', userName: 'renamed', privilege: 'admin' }
     const actor = { isAdmin: true, currentUser: { privilege: 'admin' } }
 
     expect(isBuiltInAdmin(builtIn)).toBe(true)
@@ -43,15 +42,15 @@ describe('userManagerModel', () => {
   it('limits leaders to normal users in their own team', () => {
     const actor = { isLeader: true, currentUser: { teamId: 'team-a' } }
 
-    expect(canManageUser({ privilege: 'normal', teamname: 'team-a' }, actor)).toBe(true)
-    expect(canManageUser({ privilege: 'leader', teamname: 'team-a' }, actor)).toBe(false)
-    expect(canManageUser({ privilege: 'normal', teamname: 'team-b' }, actor)).toBe(false)
+    expect(canManageUser({ privilege: 'normal', teamId: 'team-a' }, actor)).toBe(true)
+    expect(canManageUser({ privilege: 'leader', teamId: 'team-a' }, actor)).toBe(false)
+    expect(canManageUser({ privilege: 'normal', teamId: 'team-b' }, actor)).toBe(false)
   })
 
   it('derives role and team statistics from normalized users', () => {
     expect(userStats([
-      { privilege: 'admin', teamname: 'adminteam' },
-      { privilege: 'leader', teamname: 'team-a' },
+      { privilege: 'admin', teamId: 'adminteam' },
+      { privilege: 'leader', teamId: 'team-a' },
       { privilege: 'normal' }
     ])).toEqual({ total: 3, admin: 1, leader: 1, normal: 1, assignedToTeam: 2 })
   })

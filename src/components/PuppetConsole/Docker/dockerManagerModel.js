@@ -19,24 +19,20 @@ export const DOCKER_TAB_CONFIG = Object.freeze({
   })
 })
 
-export function unwrapDockerResponse(response) {
-  const data = response?.data
+export function getDockerPayload(response) {
+  const data = response?.data?.data
   return data && typeof data === 'object' ? data : {}
 }
 
 export function normalizeDockerList(response, tab) {
   const config = DOCKER_TAB_CONFIG[tab]
   if (!config) return []
-  const list = unwrapDockerResponse(response)[config.listKey]
+  const list = getDockerPayload(response)[config.listKey]
   return Array.isArray(list) ? list : []
 }
 
-export function getDockerResourceId(row, type = 'container') {
-  if (!row || typeof row !== 'object') return ''
-  if (type === 'image') {
-    return row.id || [row.repository, row.tag].filter(Boolean).join(':')
-  }
-  return row.id || row.name || ''
+export function getDockerResourceId(row) {
+  return row && typeof row === 'object' && row.id ? String(row.id) : ''
 }
 
 export function isDockerContainerRunning(status) {
@@ -63,7 +59,7 @@ export function getDockerExportConfig(tab) {
 }
 
 export function formatDockerInfo(response, key, emptyText = '') {
-  const data = unwrapDockerResponse(response)
+  const data = getDockerPayload(response)
   const value = data[key]
   if (typeof value === 'string') return value || emptyText
   if (value !== undefined) return JSON.stringify(value, null, 2)

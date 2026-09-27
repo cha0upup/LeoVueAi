@@ -3,7 +3,6 @@ import {
   filterFileEntries,
   formatFileModifiedDate,
   getFileEntryKey,
-  getFilePreviewMeta,
   normalizeFileEntries,
   resolveCurrentFileDirectory,
   resolveFileEntryPath,
@@ -20,7 +19,6 @@ describe('fileTableModel', () => {
     ])
     expect(sortFileEntries(entries).map((file) => file.name)).toEqual(['目录', '/z.txt'])
     expect(summarizeFileEntries(entries)).toEqual({ total: 2, directories: 1, files: 1 })
-    expect(getFilePreviewMeta(entries[0])).toEqual({ name: '/z.txt', size: 3, extension: '' })
     expect(getFileEntryKey(entries[1])).toBe('dir:目录')
   })
 

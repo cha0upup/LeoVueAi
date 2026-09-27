@@ -8,7 +8,7 @@ import { TaskStatus } from '@/constants/task.js'
 
 // 启动与轮询共用快照处理，零值和清空的错误信息也按服务端结果更新。
 function applyDownloadSnapshot(task, payload = {}) {
-  const snap = payload.meta ? { ...payload, ...payload.meta } : payload
+  const snap = payload
   task.engineTaskId = snap.taskId || task.engineTaskId
   task.fileSize = Number(snap.expectedLength ?? task.fileSize ?? 0)
   task.expectedMd5 = snap.expectedMd5 ?? task.expectedMd5

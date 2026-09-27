@@ -78,14 +78,6 @@ export function resolveFileEntryPath(
   return formatFilePath(`${basePath}${basePath.endsWith('/') ? '' : '/'}${name}`)
 }
 
-export function getFilePreviewMeta(file) {
-  return {
-    name: String(file?.name || ''),
-    size: Number(file?.size ?? 0),
-    extension: String(file?.extension || '')
-  }
-}
-
 export function getFileEntryKey(file) {
   return String(file?.path || `${file?.isDirectory ? 'dir' : 'file'}:${file?.name || ''}`)
 }

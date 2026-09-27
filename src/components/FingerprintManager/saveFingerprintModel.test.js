@@ -25,14 +25,6 @@ describe('saveFingerprintModel', () => {
     expect(() => buildFingerprintPayload(form)).toThrow('版本提取配置必须是 JSON 对象')
   })
 
-  it('preserves a built-in uri when editing and saving the rule', () => {
-    const form = loadFingerprintForm({ name: 'Actuator', rule: {
-      requests: [{ uri: '/actuator', headers: { Accept: 'application/json' } }],
-      match: { field: 'body', value: '_links' }
-    } })
-    expect(buildFingerprintPayload(form).rule.requests[0].path).toBe('/actuator')
-  })
-
   it('normalizes HTTP requests', () => {
     expect(normalizeRequests([{ body: 'PING', timeout: -1 }])).toEqual([
       { method: 'GET', path: '/', timeout: 0, headers: [], body: 'PING' }

@@ -5,12 +5,12 @@ const normalizeIdentity = (value) => normalizeText(value).toLowerCase()
 
 export function createUserForm() {
   return {
-    id: '',
-    username: '',
+    userId: '',
+    userName: '',
     password: '',
     confirmPassword: '',
     privilege: 'normal',
-    teamname: '',
+    teamId: '',
     status: 1
   }
 }
@@ -33,34 +33,8 @@ export const formatUserStatus = (status) => (isUserEnabled(status) ? '启用' : 
 
 export function isBuiltInAdmin(user) {
   if (!user) return false
-  return [user.id, user.username]
+  return [user.userId, user.userName]
     .some((value) => normalizeIdentity(value) === BUILT_IN_ADMIN)
-}
-
-export function normalizeUserRecord(user = {}) {
-  return {
-    ...user,
-    id: user.userId,
-    username: user.userName,
-    privilege: user.privilege || 'normal',
-    teamname: user.teamId || '',
-    status: normalizeUserStatus(user.status),
-    email: user.email || '',
-    phone: user.phone || '',
-    lastLoginTime: user.lastLoginTime || '',
-    loginCount: user.loginCount || 0,
-    remark: user.remark || '',
-    updateTime: user.updateTime || '',
-    createTime: user.createTime
-  }
-}
-
-export function normalizeTeamRecord(team = {}) {
-  return {
-    ...team,
-    id: team.teamId,
-    teamname: team.teamName
-  }
 }
 
 export function filterUsers(users, { keyword = '', role = '', team = '' } = {}) {
@@ -70,8 +44,8 @@ export function filterUsers(users, { keyword = '', role = '', team = '' } = {}) 
   return list.filter((user) => {
     if (query) {
       const matchesQuery = [
-        user.username,
-        user.id,
+        user.userName,
+        user.userId,
         user.privilege
       ].some((value) => normalizeIdentity(value).includes(query))
       if (!matchesQuery) return false
@@ -79,7 +53,7 @@ export function filterUsers(users, { keyword = '', role = '', team = '' } = {}) 
 
     if (role && normalizeText(user.privilege) !== normalizeText(role)) return false
     if (team) {
-      const matchesTeam = normalizeText(user.teamname) === normalizeText(team)
+      const matchesTeam = normalizeText(user.teamId) === normalizeText(team)
       if (!matchesTeam) return false
     }
     return true
@@ -93,7 +67,7 @@ export function userStats(users) {
     admin: list.filter((user) => user.privilege === 'admin').length,
     leader: list.filter((user) => user.privilege === 'leader').length,
     normal: list.filter((user) => user.privilege === 'normal').length,
-    assignedToTeam: list.filter((user) => user.teamname).length
+    assignedToTeam: list.filter((user) => user.teamId).length
   }
 }
 
@@ -114,7 +88,7 @@ export function canManageUser(user, { isAdmin = false, isLeader = false, current
   if (isAdmin) return true
   if (!isLeader || !currentUser?.teamId) return false
   return user.privilege === 'normal'
-    && normalizeText(user.teamname) === normalizeText(currentUser.teamId)
+    && normalizeText(user.teamId) === normalizeText(currentUser.teamId)
 }
 
 export function canEditUser(user, actor) {

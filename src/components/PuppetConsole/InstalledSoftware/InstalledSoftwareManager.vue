@@ -169,15 +169,6 @@ import { listAllSoftwareApi } from '@/services/api.js'
 import { showError, showWarning, showSuccess } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 
-// ── 解包 Component 返回的 {code, data} 信封 ──
-function unwrap(res) {
-  let d = res.data
-  if (d && typeof d === 'object' && 'code' in d && 'data' in d) {
-    d = d.data
-  }
-  return d || {}
-}
-
 const props = defineProps({
   sessionId: {
     type: String,
@@ -259,7 +250,7 @@ async function handleLoad() {
   searchText.value = ''
   try {
     const res = await listAllSoftwareApi({ sessionId: props.sessionId })
-    const data = unwrap(res)
+    const data = res.data.data
     allItems.value = flattenResult(data)
     if (allItems.value.length === 0) {
       showWarning('未发现已安装软件')

@@ -84,7 +84,7 @@ export function resolveHttpStatusTagType(code) {
 }
 
 export function getEventLogLevel(entry) {
-  return entry?.Level || entry?.level || null
+  return entry?.level || null
 }
 
 export function resolveEventLogLevelTagType(level) {

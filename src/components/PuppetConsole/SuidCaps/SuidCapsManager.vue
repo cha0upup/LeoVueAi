@@ -168,14 +168,6 @@ const flatList = ref([])
 
 const exploitableCount = computed(() => flatList.value.filter(f => f.gtfobins || f.dangerous).length)
 
-function unwrap(res) {
-  let d = res.data
-  if (d && typeof d === 'object' && 'code' in d && 'data' in d) {
-    d = d.data
-  }
-  return d || {}
-}
-
 function flatten(rawData) {
   const items = []
   if (rawData.suid && rawData.suid.files) {
@@ -208,7 +200,7 @@ async function handleLoadAll() {
   loaded.value = true
   try {
     const res = await listAllSuidCapsApi({ sessionId: props.sessionId })
-    const data = unwrap(res)
+    const data = res.data.data
     flatList.value = flatten(data)
     if (flatList.value.length === 0) showWarning('未发现 SUID/SGID/Capabilities 文件')
   } catch (err) {
@@ -228,7 +220,7 @@ async function handleLoad(type) {
     else if (type === 'sgid') res = await listSgidFilesApi({ sessionId: props.sessionId })
     else res = await listCapabilitiesApi({ sessionId: props.sessionId })
 
-    const data = unwrap(res)
+    const data = res.data.data
     const wrapper = {}
     if (type === 'suid') wrapper.suid = data.suid
     else if (type === 'sgid') wrapper.sgid = data.sgid

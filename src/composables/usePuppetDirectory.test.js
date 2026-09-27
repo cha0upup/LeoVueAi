@@ -40,6 +40,7 @@ describe('proxy quick-toggle update payload', () => {
     }
 
     const payload = buildPuppetUpdatePayload({
+      id: 'legacy-host-id',
       ...host,
       hasChildren: true,
       level: 0,
@@ -49,6 +50,7 @@ describe('proxy quick-toggle update payload', () => {
     }, { proxyEnabled: next })
 
     expect(payload).toEqual({ ...host, proxyEnabled: next })
+    expect(payload).not.toHaveProperty('id')
     expect(host.proxyEnabled).toBe(current)
   })
 })

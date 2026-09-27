@@ -177,7 +177,6 @@ const {
 const preViewVisible = ref(false)
 const filePath = ref('')
 const sessionId = ref('')
-const previewFileMeta = ref({})
 const fileDownloadRef = ref(null)
 const textPreviewRef = ref(null)
 const previewRequest = useFilePreviewRequest()
@@ -270,7 +269,6 @@ const syncPreviewMetadata = (responseData) => {
 }
 
 const resetPreviewMetadata = () => {
-  previewFileMeta.value = {}
   fileSize.value = 0
   editorLineCount.value = 0
   editorCharCount.value = 0
@@ -375,7 +373,7 @@ const switchPreviewEncoding = async (encoding, confirmation, successMessage) => 
   return previewRequest.run('encoding', async (isCurrent) => {
     try {
       if (!(await confirmAction(confirmation)) || !isCurrent()) return false
-      const result = await loadFile(target.sessionId, target.filePath, previewFileMeta.value, {
+      const result = await loadFile(target.sessionId, target.filePath, {
         encoding,
         isCurrent
       })
@@ -438,7 +436,7 @@ const downloadFile = async () => {
 
 const refreshFile = () => {
   if (isSaving.value || isPreviewLoading.value || isEncoding.value) return false
-  return preView(sessionId.value, filePath.value, previewFileMeta.value, 'refresh')
+  return preView(sessionId.value, filePath.value, 'refresh')
 }
 
 const {
@@ -495,7 +493,6 @@ const resetPreviewState = () => {
 const preView = async (
   sessionIdParam,
   filePathParam,
-  fileMetaParam = {},
   operation = 'preview'
 ) => {
   const target = {
@@ -523,9 +520,8 @@ const preView = async (
       clearPreviewState()
       sessionId.value = target.sessionId
       filePath.value = target.filePath
-      previewFileMeta.value = fileMetaParam || {}
       preViewVisible.value = true
-      const result = await loadFile(target.sessionId, target.filePath, previewFileMeta.value, {
+      const result = await loadFile(target.sessionId, target.filePath, {
         isCurrent
       })
       if (!result || !isCurrent()) return false

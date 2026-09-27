@@ -19,17 +19,9 @@ afterEach(() => {
 })
 
 describe('download finalization', () => {
-  it.each([false, true])(
-    'applies zero progress and cleared errors from snapshots (wrapped=%s)',
-    async (wrapped) => {
+  it('applies zero progress and cleared errors from snapshots', async () => {
       const response = (snapshot) => ({
-        data: wrapped
-          ? {
-              taskId: snapshot.taskId,
-              state: snapshot.state,
-              meta: snapshot
-            }
-          : snapshot
+        data: snapshot
       })
       const engine = new Engine()
       const task = {
@@ -84,8 +76,7 @@ describe('download finalization', () => {
         downloadPath: 'downloads/file'
       })
       expect(downloadEngineProgressApi).toHaveBeenCalledWith({ taskId: 'd' })
-    }
-  )
+  })
 
   it('completes an empty file only when the server reports completion', async () => {
     const engine = new Engine()

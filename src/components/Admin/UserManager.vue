@@ -48,9 +48,9 @@
         />
         <el-option
           v-for="team in teams"
-          :key="team.id"
-          :label="team.teamname || team.teamName"
-          :value="team.id"
+          :key="team.teamId"
+          :label="team.teamName"
+          :value="team.teamId"
         />
       </el-select>
 
@@ -139,21 +139,21 @@
         empty-text="暂无用户"
       >
         <el-table-column
-          prop="id"
+          prop="userId"
           label="用户ID"
           min-width="150"
         >
           <template #default="{ row }">
             <el-tooltip
-              :content="row.id"
+              :content="row.userId"
               placement="top"
             >
-              <span class="user-id">{{ row.id || '未知ID' }}</span>
+              <span class="user-id">{{ row.userId || '未知ID' }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
         <el-table-column
-          prop="username"
+          prop="userName"
           label="用户名"
           min-width="180"
         >
@@ -163,9 +163,9 @@
                 :size="32"
                 class="user-avatar"
               >
-                {{ (row.username || 'U').charAt(0).toUpperCase() }}
+                {{ (row.userName || 'U').charAt(0).toUpperCase() }}
               </el-avatar>
-              <span class="username">{{ row.username || '未知用户' }}</span>
+              <span class="username">{{ row.userName || '未知用户' }}</span>
             </div>
           </template>
         </el-table-column>
@@ -185,18 +185,18 @@
           </template>
         </el-table-column>
         <el-table-column
-          prop="teamname"
+          prop="teamId"
           label="所属团队"
           min-width="150"
         >
           <template #default="{ row }">
             <el-tag
-              v-if="row.teamname"
+              v-if="row.teamId"
               type="info"
               size="small"
               effect="plain"
             >
-              {{ row.teamname }}
+              {{ row.teamId }}
             </el-tag>
             <span
               v-else
@@ -333,8 +333,6 @@ import {
   getRoleTagType,
   isBuiltInAdmin,
   isUserEnabled,
-  normalizeTeamRecord,
-  normalizeUserRecord,
   normalizeUserStatus,
   userStats
 } from './userManagerModel.js'
@@ -380,7 +378,7 @@ const resetForm = reactive(createPasswordResetForm())
 
 // 表单验证规则
 const userRules = {
-  username: [
+  userName: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
     {
       max: AUTH_FIELD_LIMITS.usernameMaxLength,
@@ -466,25 +464,19 @@ const refreshData = async () => {
 
 const getAllUsers = async () => {
   const response = await getAllUsersApi()
-  userData.value = Array.isArray(response?.data)
-    ? response.data.map(normalizeUserRecord)
-    : []
+  userData.value = Array.isArray(response?.data) ? response.data : []
 }
 
 const getAllTeams = async () => {
   const response = await getAllTeamsApi()
-  teams.value = Array.isArray(response?.data)
-    ? response.data.map(normalizeTeamRecord)
-    : []
+  teams.value = Array.isArray(response?.data) ? response.data : []
 }
 
 const openAddDialog = () => {
   userDialog.open()
   Object.assign(userForm, defaultUserForm)
   // 队长创建用户时预填充并锁定团队
-  if (isLeader.value && currentUser.value?.teamId) {
-    userForm.teamname = currentUser.value.teamId
-  }
+  if (isLeader.value && currentUser.value?.teamId) userForm.teamId = currentUser.value.teamId
 }
 
 const editUser = (user) => {
@@ -506,10 +498,10 @@ const editUser = (user) => {
   }
   userDialog.open(user)
   Object.assign(userForm, {
-    id: user.id,
-    username: user.username,
+    userId: user.userId,
+    userName: user.userName,
     privilege: user.privilege || 'normal',
-    teamname: user.teamname,
+    teamId: user.teamId,
     status: isBuiltInAdmin(user) ? 1 : normalizeUserStatus(user.status)
   })
 }
@@ -536,27 +528,20 @@ const submitUser = async () => {
     async () => {
       // 构建用户数据，排除确认密码字段
       const userData = omitFields(userForm, ['confirmPassword'])
-      userData.userName = userData.username
-      userData.teamId = userData.teamname
-      delete userData.username
-      delete userData.teamname
       userData.status = normalizeUserStatus(userData.status)
       if (editing && isBuiltInAdmin(userData)) {
         const originalUser = userDialog.currentItem.value || {}
         userData.privilege = originalUser.privilege || 'admin'
-        userData.teamId = originalUser.teamname || ''
+        userData.teamId = originalUser.teamId || ''
         userData.status = 1
       }
 
       if (!editing) {
         userData.userId = uuidV4()
       } else {
-        userData.userId = userData.id
         // 编辑时排除密码字段（如果为空）
         delete userData.password
       }
-      delete userData.id
-
       const response = editing
         ? await updateUserApi(userData)
         : await addUserApi(userData)
@@ -607,7 +592,7 @@ const deleteUser = async (user) => {
 
   await executeDeleteWithConfirm(
     async () => {
-      const response = await deleteUserApi({ id: user.id || user.userId })
+      const response = await deleteUserApi({ id: user.userId })
       if (!response.data) {
         throw new Error('删除失败')
       }
@@ -615,7 +600,7 @@ const deleteUser = async (user) => {
     },
     {
       title: '删除确认',
-      message: `确定要删除用户 "${user.username || '未知用户'}" 吗？此操作不可撤销。`,
+      message: `确定要删除用户 "${user.userName || '未知用户'}" 吗？此操作不可撤销。`,
       successMessage: null, // 使用ElNotification
       errorMessage: null,
       onSuccess: () => {
@@ -646,7 +631,7 @@ const resetPassword = (user) => {
     })
     return
   }
-  resetForm.userId = user.id || user.userId
+  resetForm.userId = user.userId
   resetForm.newPassword = ''
   resetForm.confirmPassword = ''
   resetPasswordDialog.open()
@@ -702,10 +687,10 @@ const exportUsers = async () => {
   if (!confirmed) return
 
   exportTsv(filteredUsers.value, `admin-users-${Date.now()}`, [
-    { label: 'User ID', key: 'id' },
-    { label: 'Username', key: 'username' },
+    { label: 'User ID', key: 'userId' },
+    { label: 'Username', key: 'userName' },
     { label: 'Role', key: 'privilege' },
-    { label: 'Team', key: 'teamname' },
+    { label: 'Team', key: 'teamId' },
     { label: 'Status', key: user => formatUserStatus(user.status) },
     { label: 'Email', key: 'email' },
     { label: 'Phone', key: 'phone' },

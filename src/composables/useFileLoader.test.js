@@ -22,7 +22,7 @@ describe('file preview loading', () => {
     const loader = useFileLoader(useFileEncoding())
     const request = useFilePreviewRequest()
     const refresh = () =>
-      request.run('refresh', (isCurrent) => loader.loadFile('s', '/file.txt', {}, { isCurrent }))
+      request.run('refresh', (isCurrent) => loader.loadFile('s', '/file.txt', { isCurrent }))
 
     const oldLoad = refresh()
     await refresh()
@@ -58,7 +58,7 @@ describe('file preview loading', () => {
     const request = useFilePreviewRequest()
     await loader.loadFile('s', '/file.txt')
     const load = request.run('encoding', (isCurrent) =>
-      loader.loadFile('s', '/file.txt', {}, { encoding: 'utf-8-bom', isCurrent })
+      loader.loadFile('s', '/file.txt', { encoding: 'utf-8-bom', isCurrent })
     )
     request.reset()
     pending.resolve(response('stale'))
@@ -73,7 +73,7 @@ describe('file preview loading', () => {
     previewFileApi.mockResolvedValueOnce(response('original'))
     await loader.loadFile('s', '/file.txt')
     previewFileApi.mockResolvedValueOnce({ data: { truncated: true, size: 2000000 } })
-    await expect(loader.loadFile('s', '/file.txt', {}, { encoding: 'utf-8-bom' })).rejects.toThrow(
+    await expect(loader.loadFile('s', '/file.txt', { encoding: 'utf-8-bom' })).rejects.toThrow(
       '文件过大'
     )
     expect(loader.fileContent.value).toBe('original')

@@ -65,7 +65,7 @@
         empty-text="暂无团队"
       >
         <el-table-column
-          prop="id"
+          prop="teamId"
           label="团队ID"
           min-width="180"
           show-overflow-tooltip
@@ -122,7 +122,7 @@
               type="danger"
               text
               size="small"
-              @click="delTeam(row.teamId || row.id)"
+              @click="delTeam(row.teamId)"
             >
               <el-icon><Icon :icon="iconMap.delete" /></el-icon>
               删除
@@ -198,8 +198,8 @@ import AdminStatsGrid from '@/components/Admin/shared/AdminStatsGrid.vue'
 import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
 
 const iconMap = icons
-const BUILT_IN_TEAM_IDS = new Set(['system-admin', 'admin-team', 'adminteam'])
-const BUILT_IN_TEAM_NAMES = new Set(['系统管理员', 'adminteam'])
+const BUILT_IN_TEAM_ID = 'system-admin'
+const BUILT_IN_TEAM_NAME = '系统管理员'
 
 const { isAdmin, fetchAuth } = useAuth()
 
@@ -217,7 +217,7 @@ const filteredTeams = computed(() => {
 
   return teamData.value.filter((item) => {
     const leaderName = getUserName(item.leaderId).toLowerCase()
-    return [item.teamId || item.id, item.teamName, item.teamname, leaderName]
+    return [item.teamId, item.teamName, leaderName]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(keyword))
   })
@@ -230,11 +230,7 @@ const getAllTeam = async () => {
   loading.value = true
   try {
     const resp = await getAllTeamsApi()
-    teamData.value = (resp.data || []).map((item) => ({
-      ...item,
-      id: item.id || item.teamId,
-      teamName: item.teamName || item.teamname
-    }))
+    teamData.value = resp.data || []
   } finally {
     loading.value = false
   }
@@ -288,7 +284,7 @@ const close = () => {
 }
 
 const delTeam = async (id) => {
-  const found = teamData.value.find((t) => (t.teamId || t.id) === id)
+  const found = teamData.value.find((t) => t.teamId === id)
   const teamName = found ? found.teamName : '该团队'
   if (isBuiltInTeam(found || { teamId: id })) {
     ElNotification({ title: '禁止操作', message: '内置系统管理员团队禁止删除。', type: 'warning' })
@@ -318,15 +314,13 @@ const refreshData = async () => {
 }
 
 const getUserName = (userId) => {
-  const user = allUsers.value.find((u) => u.userId === userId || u.id === userId)
-  return user ? user.userName || user.username : '未知用户'
+  const user = allUsers.value.find((u) => u.userId === userId)
+  return user ? user.userName : '未知用户'
 }
 
 const isBuiltInTeam = (item) => {
   if (!item) return false
-  const teamId = item.teamId || item.id
-  const teamName = item.teamName || item.teamname
-  return BUILT_IN_TEAM_IDS.has(teamId) || BUILT_IN_TEAM_NAMES.has(teamName)
+  return item.teamId === BUILT_IN_TEAM_ID || item.teamName === BUILT_IN_TEAM_NAME
 }
 
 onMounted(async () => {

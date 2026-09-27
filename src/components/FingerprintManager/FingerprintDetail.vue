@@ -184,7 +184,7 @@
               >
                 {{ req.method }}
               </el-tag>
-              <code class="request-path">{{ req.path || req.uri || '/' }}</code>
+              <code class="request-path">{{ req.path || '/' }}</code>
             </div>
 
             <div class="request-card-body">

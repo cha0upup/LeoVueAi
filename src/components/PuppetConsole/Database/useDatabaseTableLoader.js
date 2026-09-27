@@ -170,8 +170,7 @@ export function useDatabaseTableLoader({
       const data = queryResponse?.data || {}
       tableRows.value = normalizeQueryRows({
         queryColumns: data.columns,
-        rows: data.rows,
-        fallbackColumns: tableColumns.value
+        rows: data.rows
       }).rows
       queryStatus.truncated = data.truncated === true
       queryStatus.truncationReason = data.truncationReason || ''
