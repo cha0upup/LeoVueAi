@@ -401,9 +401,9 @@ async function handleWhoami() {
   isLoading.value = true
   try {
     const res = await whoamiApi(withSession())
-    const data = res.data
-    whoamiData.value = data.detail || data
-    osInfo.value = data.os || ''
+    const data = res.data.data
+    whoamiData.value = data.detail
+    osInfo.value = data.os
   } catch (e) {
     handleApiError(e, '获取身份信息失败')
   } finally {
@@ -416,10 +416,10 @@ async function handleListUsers() {
   activeTab.value = 'users'
   try {
     const res = await listUsersApi(withSession())
-    const data = res.data
+    const data = res.data.data
     users.value = data.users || []
     usersLoaded.value = true
-    osInfo.value = data.os || osInfo.value
+    osInfo.value = data.os
     if (!users.value.length) showWarning('未找到用户')
   } catch (e) {
     handleApiError(e, '获取用户列表失败')
@@ -433,10 +433,10 @@ async function handleListGroups() {
   activeTab.value = 'groups'
   try {
     const res = await listGroupsApi(withSession())
-    const data = res.data
+    const data = res.data.data
     groups.value = data.groups || []
     groupsLoaded.value = true
-    osInfo.value = data.os || osInfo.value
+    osInfo.value = data.os
     if (!groups.value.length) showWarning('未找到组')
   } catch (e) {
     handleApiError(e, '获取组列表失败')
@@ -468,8 +468,7 @@ async function handleQueryUser(username) {
   showDetailDialog.value = true
   try {
     const res = await queryUserApi(withSession({ username }))
-    const data = res.data
-    detailData.value = data.detail || data
+    detailData.value = res.data.data.detail
   } catch (e) {
     handleApiError(e, '查询用户失败')
     showDetailDialog.value = false
@@ -482,8 +481,7 @@ async function handleQueryGroup(groupName) {
   showDetailDialog.value = true
   try {
     const res = await queryGroupApi(withSession({ groupName }))
-    const data = res.data
-    detailData.value = data.detail || data
+    detailData.value = res.data.data.detail
   } catch (e) {
     handleApiError(e, '查询组失败')
     showDetailDialog.value = false

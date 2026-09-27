@@ -295,8 +295,7 @@ async function handleQuery(row) {
       type: row.type,
       path: row.path
     }))
-    const data = res.data
-    detailData.value = data.detail || data
+    detailData.value = res.data.detail
   } catch (err) {
     handleApiError(err, '查询详情失败')
     showDetailDialog.value = false

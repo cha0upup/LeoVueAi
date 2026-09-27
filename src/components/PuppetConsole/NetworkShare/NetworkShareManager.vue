@@ -516,8 +516,7 @@ async function handleQueryShare(shareName) {
   detailTarget.value = shareName
   try {
     const res = await queryNetworkShareApi({ sessionId: props.sessionId, shareName })
-    const data = res.data
-    shareDetail.value = data.detail || data
+    shareDetail.value = res.data.detail
   } catch (err) {
     showError('查询共享详情失败: ' + (err.message || err))
     showDetailDialog.value = false
