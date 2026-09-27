@@ -230,9 +230,9 @@ async function handleLoad(type) {
 
     const data = unwrap(res)
     const wrapper = {}
-    if (type === 'suid') wrapper.suid = data.suid || data
-    else if (type === 'sgid') wrapper.sgid = data.sgid || data
-    else wrapper.capabilities = data.capabilities || data
+    if (type === 'suid') wrapper.suid = data.suid
+    else if (type === 'sgid') wrapper.sgid = data.sgid
+    else wrapper.capabilities = data.capabilities
 
     flatList.value = flatten(wrapper)
     if (flatList.value.length === 0) showWarning('未发现 ' + type.toUpperCase() + ' 文件')
