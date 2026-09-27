@@ -46,8 +46,7 @@ describe('taskManagerModel', () => {
           downloadedBytes: '10',
           downloadPath: 'downloads/a.txt'
         }
-      },
-      'fallback'
+      }
     )
     expect(download).toMatchObject({
       serverTaskId: 'd1',

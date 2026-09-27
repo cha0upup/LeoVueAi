@@ -337,7 +337,7 @@ const syncRemoteTasks = (force = false) => {
         ? downloadResult.value.data.tasks
         : []
       serverDownloadTasks.value = snapshots
-        .map((task) => normalizeServerDownloadTask(task, sessionId))
+        .map((task) => normalizeServerDownloadTask(task))
         .filter((task) => task.serverTaskId)
     }
     if (uploadResult.status === 'fulfilled') {
@@ -345,7 +345,7 @@ const syncRemoteTasks = (force = false) => {
         ? uploadResult.value.data.tasks
         : []
       serverUploadTasks.value = snapshots
-        .map((task) => normalizeServerUploadTask(task, sessionId))
+        .map((task) => normalizeServerUploadTask(task))
         .filter((task) => task.serverTaskId)
     }
     if (sqlResult.status === 'fulfilled') {

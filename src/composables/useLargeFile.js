@@ -17,9 +17,9 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
   let loadGeneration = 0
   let decodeChunk = null
 
-  const resolveNextOffset = (payload, fallbackOffset) => {
+  const resolveNextOffset = (payload, currentOffset) => {
     const nextOffset = Number(payload?.nextOffset)
-    if (!Number.isFinite(nextOffset) || nextOffset <= fallbackOffset) {
+    if (!Number.isFinite(nextOffset) || nextOffset <= currentOffset) {
       throw new Error('文件分片偏移未推进')
     }
     return nextOffset
@@ -111,7 +111,7 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
 
   /**
    * 初始化大文件模式
-   * @param {Object} responseData - 首次 preview 返回的 {data, size, truncated}
+   * @param {Object} responseData - 首次 preview 返回的 {data, size, truncated, nextOffset}
    * @returns {string} 解码后的首片文本内容
    */
   const initLargeFileMode = (responseData) => {

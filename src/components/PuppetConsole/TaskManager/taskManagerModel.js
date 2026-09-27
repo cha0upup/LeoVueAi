@@ -43,7 +43,7 @@ export const getDownloadRelativePath = (downloadPath) => {
   return normalized.startsWith('downloads/') ? normalized : null
 }
 
-export const normalizeServerDownloadTask = (raw, fallbackSessionId = '') => {
+export const normalizeServerDownloadTask = (raw) => {
   const snapshot = raw?.meta
     ? { taskId: raw.taskId, sessionId: raw.sessionId, state: raw.state, ...raw.meta }
     : raw || {}
@@ -64,14 +64,14 @@ export const normalizeServerDownloadTask = (raw, fallbackSessionId = '') => {
     downloadPath: snapshot.downloadPath || null,
     taskTempPath: snapshot.taskTempPath || null,
     fileName: basename(snapshot.downloadPath || snapshot.filePath || snapshot.taskId) || '下载任务',
-    sessionId: snapshot.sessionId || fallbackSessionId,
+    sessionId: snapshot.sessionId,
     lastError: snapshot.lastError || null,
     error: snapshot.lastError || null,
     currentStage: snapshot.currentStage || null,
     errorStage: snapshot.errorStage || null,
-    createdTime: snapshot.createAtMs || snapshot.createdTime || null,
-    startTime: snapshot.startAtMs || snapshot.startTime || null,
-    endTime: snapshot.endAtMs || snapshot.endTime || null,
+    createdTime: snapshot.createAtMs || null,
+    startTime: snapshot.startAtMs || null,
+    endTime: snapshot.endAtMs || null,
     updatedAt: snapshot.updatedAtMs || null,
     isManagedLocally: false
   }
@@ -110,7 +110,7 @@ export const normalizeServerSqlExportTask = (snapshot, sessionId = '') => {
   }
 }
 
-export const normalizeServerUploadTask = (snapshot, fallbackSessionId = '') => {
+export const normalizeServerUploadTask = (snapshot) => {
   const task = snapshot || {}
   const fileSize = Number(task.fileSize || 0)
   const uploadedBytes = Number(task.uploadedBytes || 0)
@@ -131,7 +131,7 @@ export const normalizeServerUploadTask = (snapshot, fallbackSessionId = '') => {
     speed: Number(task.speedBytesPerSec || 0),
     fileName: task.fileName || basename(task.filePath) || '上传任务',
     filePath: task.filePath || '',
-    sessionId: task.sessionId || fallbackSessionId,
+    sessionId: task.sessionId,
     currentStage: task.currentStage || null,
     errorStage: task.errorStage || null,
     error: task.errorMessage || null,

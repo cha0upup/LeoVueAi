@@ -54,4 +54,29 @@ describe('useLargeFile', () => {
     expect(applyEdits.mock.calls[0][0][0].text).toBe('中')
     expect(largeFile.loadedOffset.value).toBe(3)
   })
+
+  it('reports a missing offset without consuming the chunk or guessing its position', async () => {
+    const onChunkError = vi.fn()
+    const largeFile = useLargeFile({ currentEncoding: ref('utf-8'), onChunkError })
+    largeFile.initLargeFileMode({ size: 3, data: btoa('\xe4'), nextOffset: 1 })
+    const applyEdits = vi.fn()
+    const getEditor = () => ({
+      getModel: () => ({
+        getLineCount: () => 1,
+        getLineMaxColumn: () => 1,
+        applyEdits
+      })
+    })
+    previewFileChunkApi.mockResolvedValueOnce({ data: { data: btoa('\xb8\xad'), bytesRead: 2 } })
+    await largeFile.loadNextChunk('s', '/file', getEditor)
+    expect(onChunkError).toHaveBeenCalledWith(expect.objectContaining({ message: '文件分片偏移未推进' }))
+    expect(largeFile.loadedOffset.value).toBe(1)
+    expect(largeFile.isLoadingChunk.value).toBe(false)
+    expect(applyEdits).not.toHaveBeenCalled()
+
+    previewFileChunkApi.mockResolvedValueOnce({ data: { data: btoa('\xb8\xad'), nextOffset: 3 } })
+    await largeFile.loadNextChunk('s', '/file', getEditor)
+    expect(applyEdits.mock.calls[0][0][0].text).toBe('中')
+    expect(largeFile.loadedOffset.value).toBe(3)
+  })
 })
