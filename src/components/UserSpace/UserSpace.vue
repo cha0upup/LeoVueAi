@@ -255,6 +255,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { confirmAction, confirmDelete } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
+import { downloadBlob } from '@/utils/downloadBlob.js'
 import {
   userFileListApi,
   userWorkspaceOverviewApi,
@@ -558,20 +559,6 @@ const handleUploadChange = async (event) => {
     showError(`上传失败: ${error?.message || '未知错误'}`)
   } finally {
     uploading.value = false
-  }
-}
-
-const downloadBlob = (blob, filename) => {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  try {
-    a.href = url
-    a.download = filename || 'download-file'
-    document.body.appendChild(a)
-    a.click()
-  } finally {
-    a.remove()
-    URL.revokeObjectURL(url)
   }
 }
 

@@ -16,10 +16,7 @@ export function normalizeQueryRows({ queryColumns = [], rows = [] } = {}) {
     rows: rows.map((row) => {
       const source = row && typeof row === 'object' && !Array.isArray(row) ? row : {}
       return Object.fromEntries(
-        columnNames.map((name, index) => {
-          const sourceKey = resultColumns[index]?.name || resultColumns[index]?.label || name
-          return [name, Object.prototype.hasOwnProperty.call(source, sourceKey) ? source[sourceKey] : null]
-        })
+        columnNames.map((name) => [name, Object.prototype.hasOwnProperty.call(source, name) ? source[name] : null])
       )
     })
   }

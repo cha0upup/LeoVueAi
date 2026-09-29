@@ -284,8 +284,14 @@ function sourceTagType(source) {
 }
 
 function handleExport() {
-  if (displayList.value.length === 0) return
-  exportTsv(displayList.value, 'installed-software.tsv', ['name', 'version', 'vendor', 'source', 'group', 'status'])
+  exportTsv(displayList.value, 'installed-software', [
+    { label: 'name', key: 'name' },
+    { label: 'version', key: 'version' },
+    { label: 'vendor', key: 'vendor' },
+    { label: 'source', key: 'source' },
+    { label: 'group', key: 'group' },
+    { label: 'status', key: 'status' }
+  ])
 }
 </script>
 

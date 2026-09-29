@@ -379,6 +379,7 @@ import {
   exportRegistryApi
 } from '@/services/api.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { downloadBlob } from '@/utils/downloadBlob.js'
 
 const props = defineProps({
   sessionId: {
@@ -593,12 +594,7 @@ async function handleExport() {
       return
     }
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'registry-export.reg'
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, 'registry-export.reg')
   } catch (err) {
     showError('导出注册表失败: ' + (err.message || err))
   } finally {

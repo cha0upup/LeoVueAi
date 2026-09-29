@@ -224,11 +224,11 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
 import { Icon } from '@iconify/vue'
-import { confirmDelete } from '@/utils/confirmUtils.js'
+import { executeBatchDelete, executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
 import { handleError } from '@/utils/errorHandler.js'
+import { executeRequest } from '@/utils/apiUtils.js'
 import {
   addDisguiseApi,
   deleteDisguiseApi,
@@ -239,7 +239,7 @@ import {
   exportDisguiseApi,
   exportDisguisesBatchApi
 } from '@/services/api.js'
-import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { showSuccess, showWarning } from '@/utils/messageUtils.js'
 import DisguiseDetail from './DisguiseDetail.vue'
 import DisguiseEditorDialog from './DisguiseEditorDialog.vue'
 import ImportDisguiseDialog from './ImportDisguiseDialog.vue'
@@ -247,8 +247,10 @@ import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import EntityCard from '@/components/common/EntityCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import BatchActionBar from '@/components/common/BatchActionBar.vue'
-import { downloadBlob } from '@/utils/downloadBlob.js'
+import { executeBlobDownload } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
+import { useBatchSelection } from '@/composables/useBatchSelection.js'
+import { createDisguiseIdPreview } from './disguiseEditorModel.js'
 
 const iconMap = icons
 const { isAdmin } = useAuth()
@@ -272,9 +274,6 @@ const editorVisible = ref(false)
 const editorMode = ref('add')
 const editorDisguise = ref(null)
 const importVisible = ref(false)
-
-// 批量选择
-const selectedIds = ref(new Set())
 
 const builtinCount = computed(
   () => disguises.value.filter((item) => isBuiltIn(item.disguiseId)).length
@@ -302,41 +301,17 @@ const filteredDisguises = computed(() => {
   })
 })
 
-const allFilteredSelected = computed(() => {
-  if (!filteredDisguises.value.length) return false
-  return filteredDisguises.value.every((d) => selectedIds.value.has(d.disguiseId))
-})
-
-const someFilteredSelected = computed(() => {
-  if (!filteredDisguises.value.length) return false
-  const hits = filteredDisguises.value.filter((d) => selectedIds.value.has(d.disguiseId)).length
-  return hits > 0 && hits < filteredDisguises.value.length
-})
+const {
+  selectedIds,
+  allFilteredSelected,
+  someFilteredSelected,
+  setSelected,
+  toggleSelectAll,
+  clearBatchSelection
+} = useBatchSelection(filteredDisguises, item => item?.disguiseId)
 
 function isBuiltIn(disguiseId) {
   return disguiseId?.startsWith('inner_')
-}
-
-function setSelected(item, val) {
-  if (!item?.disguiseId) return
-  const next = new Set(selectedIds.value)
-  if (val) next.add(item.disguiseId)
-  else next.delete(item.disguiseId)
-  selectedIds.value = next
-}
-
-function toggleSelectAll(val) {
-  const next = new Set(selectedIds.value)
-  for (const d of filteredDisguises.value) {
-    if (!d.disguiseId) continue
-    if (val) next.add(d.disguiseId)
-    else next.delete(d.disguiseId)
-  }
-  selectedIds.value = next
-}
-
-function clearBatchSelection() {
-  selectedIds.value = new Set()
 }
 
 // 切换筛选时清空选中
@@ -407,41 +382,17 @@ function openEditDialog(disguise) {
 }
 
 async function handleSaveDisguise(payload) {
-  saveLoading.value = true
-  try {
-    if (editorMode.value === 'add') {
-      await addDisguiseApi(removeUndefinedFields(payload))
-      showSuccess('伪装创建成功')
-    } else {
-      await updateDisguiseApi(removeUndefinedFields(payload))
-      showSuccess('伪装更新成功')
+  const adding = editorMode.value === 'add'
+  const request = adding ? addDisguiseApi : updateDisguiseApi
+  await executeRequest(() => request(payload), {
+    loadingRef: saveLoading,
+    successMessage: adding ? '伪装创建成功' : '伪装更新成功',
+    errorMessage: adding ? '创建伪装失败' : '更新伪装失败',
+    onSuccess: async () => {
+      editorVisible.value = false
+      await refreshList(adding ? createDisguiseIdPreview(payload) : payload.disguiseId)
     }
-    editorVisible.value = false
-    const preferredId =
-      editorMode.value === 'edit' ? payload.disguiseId : inferCreatedDisguiseId(payload)
-    await refreshList(preferredId)
-  } catch (error) {
-    handleError(error, {
-      defaultMessage: editorMode.value === 'add' ? '创建伪装失败' : '更新伪装失败'
-    })
-  } finally {
-    saveLoading.value = false
-  }
-}
-
-function inferCreatedDisguiseId(payload) {
-  if (payload.disguiseId) return payload.disguiseId
-  const safeName =
-    (payload.disguiseName || 'disguise')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9._-]+/g, '_')
-      .replace(/^_+|_+$/g, '') || 'disguise'
-  return `${safeName}_${payload.version || '1.0.0'}`
-}
-
-function removeUndefinedFields(payload) {
-  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
+  }).catch(() => false)
 }
 
 async function handleTestDisguise(payload) {
@@ -473,25 +424,21 @@ async function handleDeleteDisguise(disguise) {
     showWarning('内置伪装不建议删除，接口在文件不存在时会直接返回 404')
     return
   }
-  const confirmed = await confirmDelete({
+  await executeDeleteWithConfirm(() => deleteDisguiseApi({ disguiseId: disguise.disguiseId }), {
     title: '删除确认',
-    message: `确认删除伪装 ${disguise.disguiseName || disguise.disguiseId}？`
-  })
-  if (!confirmed) return
-  deleteLoading.value = true
-  try {
-    await deleteDisguiseApi({ disguiseId: disguise.disguiseId })
-    showSuccess('伪装删除成功')
-    const nextCandidate =
-      disguises.value.find((item) => item.disguiseId !== disguise.disguiseId)?.disguiseId || ''
-    selectedDisguiseId.value = ''
-    selectedDisguise.value = null
-    await refreshList(nextCandidate)
-  } catch (error) {
-    handleError(error, { defaultMessage: '删除伪装失败' })
-  } finally {
-    deleteLoading.value = false
-  }
+    message: `确认删除伪装 ${disguise.disguiseName || disguise.disguiseId}？`,
+    loadingRef: deleteLoading,
+    successMessage: '伪装删除成功',
+    errorMessage: '删除伪装失败',
+    onSuccess: () => {
+      setSelected(disguise, false)
+      const nextCandidate =
+        disguises.value.find((item) => item.disguiseId !== disguise.disguiseId)?.disguiseId || ''
+      selectedDisguiseId.value = ''
+      selectedDisguise.value = null
+      return refreshList(nextCandidate)
+    }
+  }).catch(() => {}) // 删除和刷新函数已显示错误提示。
 }
 
 async function handleBatchDelete() {
@@ -504,77 +451,45 @@ async function handleBatchDelete() {
     return
   }
   const hint = builtinCount > 0 ? `（${builtinCount} 条内置伪装将被跳过）` : ''
-  try {
-    await ElMessageBox.confirm(
-      `确认删除选中的 ${customIds.length} 条自定义伪装？${hint}此操作不可恢复。`,
-      '批量删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消', confirmButtonClass: 'el-button--danger' }
-    )
-  } catch {
-    return
-  }
-  batchDeleteLoading.value = true
-  try {
-    await Promise.all(customIds.map((disguiseId) => deleteDisguiseApi({ disguiseId })))
-    showSuccess(`已删除 ${customIds.length} 条伪装`)
-    clearBatchSelection()
-    await refreshList()
-  } catch (e) {
-    handleError(e, { defaultMessage: '批量删除失败' })
-  } finally {
-    batchDeleteLoading.value = false
-  }
+  await executeBatchDelete(customIds, async (disguiseId) => {
+    await deleteDisguiseApi({ disguiseId })
+    selectedIds.value.delete(disguiseId)
+  }, {
+    itemName: '伪装',
+    confirmMessage: `确认删除选中的 ${customIds.length} 条自定义伪装？${hint}此操作不可恢复。`,
+    loadingRef: batchDeleteLoading,
+    onSuccess: () => refreshList()
+  }).catch(() => {}) // 删除和刷新函数已显示错误提示。
 }
 
 // ── 导出 ──────────────────────────────────────────────────────────────────
 
-async function handleQuickExport(item) {
+function handleQuickExport(item, loadingRef) {
   if (!item?.disguiseId) return
-  try {
-    const res = await exportDisguiseApi(item.disguiseId)
-    const blob = res?.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/octet-stream' })
-    downloadBlob(blob, `${item.disguiseId}.disguise`)
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '导出失败')
-  }
+  return executeBlobDownload(
+    () => exportDisguiseApi(item.disguiseId),
+    `${item.disguiseId}.disguise`,
+    { loadingRef }
+  ).catch(() => false)
 }
 
-async function handleExportList(list) {
-  const ids = (list || []).map((d) => d.disguiseId).filter(Boolean)
-  if (!ids.length) return
-  batchExportLoading.value = true
-  try {
-    const res = await exportDisguisesBatchApi({ disguiseIds: ids })
-    const blob = res?.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/zip' })
-    const date = new Date().toISOString().slice(0, 10)
-    downloadBlob(blob, `disguises_${date}.zip`)
-    showSuccess(`已导出 ${ids.length} 条伪装`)
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '导出失败')
-  } finally {
-    batchExportLoading.value = false
-  }
-}
-
-async function handleDetailExport(disguise) {
-  if (!disguise?.disguiseId) return
-  detailExportLoading.value = true
-  try {
-    const res = await exportDisguiseApi(disguise.disguiseId)
-    const blob = res?.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/octet-stream' })
-    downloadBlob(blob, `${disguise.disguiseId}.disguise`)
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '导出失败')
-  } finally {
-    detailExportLoading.value = false
-  }
-}
+const handleDetailExport = (disguise) => handleQuickExport(disguise, detailExportLoading)
 
 async function handleBatchExport() {
-  if (!selectedIds.value.size) return
   const ids = Array.from(selectedIds.value)
-  await handleExportList(ids.map((disguiseId) => ({ disguiseId })))
-  clearBatchSelection()
+  if (!ids.length) return
+  const date = new Date().toISOString().slice(0, 10)
+  await executeBlobDownload(
+    () => exportDisguisesBatchApi({ disguiseIds: ids }),
+    `disguises_${date}.zip`,
+    {
+      loadingRef: batchExportLoading,
+      successMessage: `已导出 ${ids.length} 条伪装`,
+      onSuccess: () => {
+        for (const id of ids) selectedIds.value.delete(id)
+      }
+    }
+  ).catch(() => false)
 }
 
 // ── 导入回调 ──────────────────────────────────────────────────────────────

@@ -268,7 +268,7 @@ const handleExport = () => {
   emit(
     'export-database',
     currentDatabase.value,
-    props.tables.map((table) => ({ name: table.name, objectRef: table.objectRef })),
+    props.tables.map((table) => table.objectRef),
     props.objectRef
   )
 }

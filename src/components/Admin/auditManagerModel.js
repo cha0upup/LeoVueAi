@@ -223,10 +223,9 @@ export function clearAuditFilterField(filter, label) {
 export function formatAuditJson(value) {
   if (!value) return '-'
   try {
-    const parsed = typeof value === 'string' ? JSON.parse(value) : value
-    return JSON.stringify(parsed, null, 2)
+    return JSON.stringify(JSON.parse(value), null, 2)
   } catch {
-    return String(value)
+    return value
   }
 }
 

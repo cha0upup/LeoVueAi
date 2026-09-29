@@ -125,7 +125,7 @@
             selectable
             :selected="selectedIds.has(item.fingerprintId)"
             :in-selection-mode="selectedIds.size > 0"
-            @click="selectFingerprint(item)"
+            @click="selectedFingerprint = item"
             @toggle-selected="(val) => setSelected(item, val)"
           >
             <template #status>
@@ -141,7 +141,6 @@
             <template #extra>
               <div class="fingerprint-card-meta">
                 <span>{{ item.tags?.length || 0 }} 标签</span>
-                <span>{{ requestCount(item) ?? '—' }} 请求</span>
               </div>
             </template>
             <template #actions>
@@ -223,12 +222,11 @@
 </template>
 
 <script setup>
-import { ElMessageBox } from 'element-plus'
 import { ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
-import { executeRequest, executeRequestWithStatus } from '@/utils/apiUtils.js'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { executeRequest } from '@/utils/apiUtils.js'
+import { executeBatchDelete, executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
 import {
   getFingerprintsApi,
   getFingerprintDetailApi,
@@ -245,8 +243,9 @@ import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import EntityCard from '@/components/common/EntityCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import BatchActionBar from '@/components/common/BatchActionBar.vue'
-import { downloadBlob } from '@/utils/downloadBlob.js'
+import { executeBlobDownload } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
+import { useBatchSelection } from '@/composables/useBatchSelection.js'
 
 const { isAdmin } = useAuth()
 
@@ -270,16 +269,11 @@ const showImportDialog = ref(false)
 const currentEditDetail = ref(null)
 
 // 批量选择 / 导出
-const selectedIds = ref(new Set())
 const batchExportLoading = ref(false)
 const batchDeleteLoading = ref(false)
 const detailExportLoading = ref(false)
 
 const iconMap = icons
-
-function requestCount(item) {
-  return Array.isArray(item?.rule?.requests) ? item.rule.requests.length : null
-}
 
 const filteredFingerprints = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
@@ -292,10 +286,6 @@ const filteredFingerprints = computed(() => {
     return matchKeyword
   })
 })
-
-function selectFingerprint(row) {
-  selectedFingerprint.value = row
-}
 
 function getRowId(row) {
   return row?.fingerprintId
@@ -386,23 +376,20 @@ function openEditDialog(row) {
 }
 
 async function handleSave(payload) {
-  await executeRequestWithStatus(() => saveFingerprintApi(payload), {
+  await executeRequest(() => saveFingerprintApi(payload), {
     loadingRef: saveLoading,
-    successMessages: { 200: '保存成功' },
+    successMessage: '保存成功',
     errorMessages: {
       400: '参数错误（如缺少 name、rule、version）',
       401: '用户未登录，请先登录',
       default: '保存失败，请重试'
     },
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       showSaveDialog.value = false
       currentEditDetail.value = null
       const savedId = response?.data?.fingerprintId
-      getFingerprints().then(() => {
-        if (savedId) {
-          fetchDetail(savedId)
-        }
-      })
+      await getFingerprints()
+      if (savedId) await fetchDetail(savedId)
     }
   })
 }
@@ -411,132 +398,71 @@ async function handleSave(payload) {
 async function handleDelete(item) {
   const id = item?.fingerprintId
   if (!id) return
-  try {
-    await ElMessageBox.confirm(
-      `确认删除指纹「${item.name || id}」？此操作不可恢复。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消', confirmButtonClass: 'el-button--danger' }
-    )
-  } catch {
-    return
-  }
-  await executeRequest(
-    async () => {
-      const res = await deleteFingerprintApi({ fingerprintId: id })
-      await getFingerprints()
-      return res
-    },
-    { successMessage: '删除成功', errorMessage: '删除失败，请重试' }
-  )
+  await executeDeleteWithConfirm(() => deleteFingerprintApi({ fingerprintId: id }), {
+    title: '删除确认',
+    message: `确认删除指纹「${item.name || id}」？此操作不可恢复。`,
+    confirmButtonText: '删除',
+    confirmButtonClass: 'el-button--danger',
+    successMessage: '删除成功',
+    errorMessage: '删除失败，请重试',
+    onSuccess: () => {
+      setSelected(item, false)
+      return getFingerprints()
+    }
+  })
 }
 
 async function handleBatchDelete() {
   if (!selectedIds.value.size) return
   const ids = Array.from(selectedIds.value)
-  try {
-    await ElMessageBox.confirm(
-      `确认删除选中的 ${ids.length} 条指纹？此操作不可恢复。`,
-      '批量删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消', confirmButtonClass: 'el-button--danger' }
-    )
-  } catch {
-    return
-  }
-  batchDeleteLoading.value = true
-  try {
-    await Promise.all(ids.map((fingerprintId) => deleteFingerprintApi({ fingerprintId })))
-    showSuccess(`已删除 ${ids.length} 条指纹`)
-    clearBatchSelection()
-    await getFingerprints()
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '批量删除失败')
-  } finally {
-    batchDeleteLoading.value = false
-  }
+  await executeBatchDelete(ids, async (fingerprintId) => {
+    await deleteFingerprintApi({ fingerprintId })
+    selectedIds.value.delete(fingerprintId)
+  }, {
+    itemName: '指纹',
+    confirmMessage: `确认删除选中的 ${ids.length} 条指纹？此操作不可恢复。`,
+    loadingRef: batchDeleteLoading,
+    onSuccess: getFingerprints
+  }).catch(() => {}) // 删除和刷新函数已显示错误提示。
 }
 
 // ── 导出 ──────────────────────────────────────────────────────────────────
-async function handleQuickExport(item) {
+function handleQuickExport(item, loadingRef) {
   if (!item?.fingerprintId) return
-  try {
-    const res = await exportFingerprintApi(item.fingerprintId)
-    const blob = res?.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/json' })
-    downloadBlob(blob, `${item.fingerprintId}.json`)
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '导出失败')
-  }
+  return executeBlobDownload(
+    () => exportFingerprintApi(item.fingerprintId),
+    `${item.fingerprintId}.json`,
+    { loadingRef }
+  ).catch(() => false)
 }
 
-async function handleDetailExport(item) {
-  if (!item?.fingerprintId) return
-  detailExportLoading.value = true
-  try {
-    const res = await exportFingerprintApi(item.fingerprintId)
-    const blob = res?.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/json' })
-    downloadBlob(blob, `${item.fingerprintId}.json`)
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '导出失败')
-  } finally {
-    detailExportLoading.value = false
-  }
-}
-
-async function handleExportList(list) {
-  const ids = (list || []).map((f) => f.fingerprintId).filter(Boolean)
-  if (!ids.length) return
-  batchExportLoading.value = true
-  try {
-    const res = await exportFingerprintsBatchApi({ fingerprintIds: ids })
-    const blob = res?.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/zip' })
-    const date = new Date().toISOString().slice(0, 10)
-    downloadBlob(blob, `fingerprints_${date}.zip`)
-    showSuccess(`已导出 ${ids.length} 条指纹`)
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '导出失败')
-  } finally {
-    batchExportLoading.value = false
-  }
-}
+const handleDetailExport = (item) => handleQuickExport(item, detailExportLoading)
 
 // ── 批量选择 ──────────────────────────────────────────────────────────────
-const allFilteredSelected = computed(() => {
-  if (!filteredFingerprints.value.length) return false
-  return filteredFingerprints.value.every((f) => selectedIds.value.has(f.fingerprintId))
-})
-
-const someFilteredSelected = computed(() => {
-  if (!filteredFingerprints.value.length) return false
-  const hits = filteredFingerprints.value.filter((f) => selectedIds.value.has(f.fingerprintId)).length
-  return hits > 0 && hits < filteredFingerprints.value.length
-})
-
-function setSelected(item, val) {
-  if (!item?.fingerprintId) return
-  const next = new Set(selectedIds.value)
-  if (val) next.add(item.fingerprintId)
-  else next.delete(item.fingerprintId)
-  selectedIds.value = next
-}
-
-function toggleSelectAll(val) {
-  const next = new Set(selectedIds.value)
-  for (const f of filteredFingerprints.value) {
-    if (!f.fingerprintId) continue
-    if (val) next.add(f.fingerprintId)
-    else next.delete(f.fingerprintId)
-  }
-  selectedIds.value = next
-}
-
-function clearBatchSelection() {
-  selectedIds.value = new Set()
-}
+const {
+  selectedIds,
+  allFilteredSelected,
+  someFilteredSelected,
+  setSelected,
+  toggleSelectAll,
+  clearBatchSelection
+} = useBatchSelection(filteredFingerprints, item => item?.fingerprintId)
 
 async function handleBatchExport() {
-  if (!selectedIds.value.size) return
   const ids = Array.from(selectedIds.value)
-  await handleExportList(ids.map((fingerprintId) => ({ fingerprintId })))
-  clearBatchSelection()
+  if (!ids.length) return
+  const date = new Date().toISOString().slice(0, 10)
+  await executeBlobDownload(
+    () => exportFingerprintsBatchApi({ fingerprintIds: ids }),
+    `fingerprints_${date}.zip`,
+    {
+      loadingRef: batchExportLoading,
+      successMessage: `已导出 ${ids.length} 条指纹`,
+      onSuccess: () => {
+        for (const id of ids) selectedIds.value.delete(id)
+      }
+    }
+  ).catch(() => false)
 }
 
 // ── 导入回调 ──────────────────────────────────────────────────────────────

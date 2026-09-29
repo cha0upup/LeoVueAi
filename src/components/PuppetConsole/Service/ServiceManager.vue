@@ -429,6 +429,7 @@ import {
   deleteServiceApi
 } from '@/services/api.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { exportTsv } from '@/utils/exportUtils.js'
 
 const props = defineProps({
   sessionId: {
@@ -607,23 +608,12 @@ function handleSortChange({ prop, order }) {
 }
 
 function handleExport() {
-  if (filteredServices.value.length === 0) return
-  const header = 'ServiceName\tDisplayName\tStatus\tStartType\n'
-  const rows = filteredServices.value.map(s =>
-    [
-      s.serviceName || '',
-      s.displayName || '',
-      s.status || '',
-      s.startType || ''
-    ].join('\t')
-  ).join('\n')
-  const blob = new Blob([header + rows], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'services.tsv'
-  a.click()
-  URL.revokeObjectURL(url)
+  exportTsv(filteredServices.value, 'services', [
+    { label: 'ServiceName', key: 'serviceName' },
+    { label: 'DisplayName', key: 'displayName' },
+    { label: 'Status', key: 'status' },
+    { label: 'StartType', key: 'startType' }
+  ])
 }
 
 function statusColor(status) {

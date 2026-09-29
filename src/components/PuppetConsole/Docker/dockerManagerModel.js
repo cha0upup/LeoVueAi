@@ -55,7 +55,10 @@ export function getDockerStatusTag(status) {
 
 export function getDockerExportConfig(tab) {
   const config = DOCKER_TAB_CONFIG[tab]
-  return config ? { filename: config.filename, columns: [...config.columns] } : null
+  return config ? {
+    filename: config.filename,
+    columns: config.columns.map((key) => ({ label: key, key }))
+  } : null
 }
 
 export function formatDockerInfo(response, key, emptyText = '') {

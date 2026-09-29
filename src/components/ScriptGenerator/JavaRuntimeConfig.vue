@@ -309,9 +309,7 @@ const protocolMetadata = Object.freeze({
 })
 const protocolOptions = computed(() => {
   const key = form.value.generateType === 'memoryshell' ? 'memoryshell' : 'webshell'
-  const protocols = Array.isArray(props.transportProtocols?.[key])
-    ? props.transportProtocols[key]
-    : []
+  const protocols = props.transportProtocols[key] || []
   return protocols.map(protocol => protocolMetadata[protocol]).filter(Boolean)
 })
 const targetJavaLabel = version => version === 'auto' ? 'JDK 自动兼容' : `JDK ${version}`
@@ -383,15 +381,15 @@ const routeField = computed(() => getInjectorRouteField(
 ))
 const isInjectorNamespaceCompatible = namespace => {
   const resolved = namespace === 'auto' ? 'javax' : namespace
-  const supported = selectedInjectorCapability.value?.servletNamespaces
-  return !Array.isArray(supported) || supported.includes(resolved)
+  const capability = selectedInjectorCapability.value
+  return !capability || capability.servletNamespaces.includes(resolved)
 }
 const handleInjectorChange = () => {
-  const versions = selectedInjectorCapability.value?.serverVersions
-  if (!selectedInjectorCapability.value?.requiresServerVersion) {
+  const capability = selectedInjectorCapability.value
+  if (!capability?.requiresServerVersion) {
     form.value.serverVersion = ''
-  } else if (!Array.isArray(versions) || !versions.includes(form.value.serverVersion)) {
-    form.value.serverVersion = versions?.length === 1 ? versions[0] : ''
+  } else if (!capability.serverVersions.includes(form.value.serverVersion)) {
+    form.value.serverVersion = capability.serverVersions.length === 1 ? capability.serverVersions[0] : ''
   }
   const supportedPackers = selectedInjectorPackers.value
   if (Array.isArray(supportedPackers) && supportedPackers.length > 0

@@ -142,16 +142,7 @@ const handlePluginSaved = async () => {
 const handleLoadScript = (plugin) => {
   if (!plugin) return
   activeTab.value = 'script'
-  // 等 v-show 生效（实际无需等待，因为组件一直挂载，scriptEditorRef 始终存在）
-  if (scriptEditorRef.value) {
-    // 注意：plugin 对象当前不带脚本明文，需要后续从后端拉。
-    // 这里先把基础元信息 + 占位文本传过去，由 ScriptEditor 的 loadPlugin 处理
-    scriptEditorRef.value.loadPlugin({
-      ...plugin,
-      // 暂未实现「拉脚本明文」端点，提示用户后续可扩展
-      scriptText: plugin.scriptText || '// 该插件的脚本明文未在前端缓存。\n// 后续可扩展 /platform/plugin-manage/decompile 返回 scriptText。\n'
-    })
-  }
+  scriptEditorRef.value?.loadPlugin(plugin)
 }
 </script>
 

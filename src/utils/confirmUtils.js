@@ -5,7 +5,7 @@
 
 import { ElMessageBox } from 'element-plus'
 import { showError, showSuccess, showWarning } from './messageUtils.js'
-import { withLoading } from './apiUtils.js'
+import { executeRequest, withLoading } from './apiUtils.js'
 
 /**
  * 底层确认弹窗，供 confirmDelete / confirmAction 复用
@@ -14,7 +14,11 @@ import { withLoading } from './apiUtils.js'
  * @param {string} opts.message
  * @param {string} [opts.confirmButtonText='确定']
  * @param {string} [opts.cancelButtonText='取消']
+ * @param {string} [opts.confirmButtonClass]
  * @param {string} [opts.type='warning']
+ * @param {boolean} [opts.showCancelButton]
+ * @param {boolean} [opts.closeOnClickModal]
+ * @param {boolean} [opts.closeOnPressEscape]
  * @returns {Promise<boolean>}
  */
 async function showConfirm({
@@ -22,13 +26,17 @@ async function showConfirm({
   message,
   confirmButtonText = '确定',
   cancelButtonText = '取消',
-  type = 'warning'
+  confirmButtonClass,
+  type = 'warning',
+  ...dialogOptions
 }) {
   try {
     await ElMessageBox.confirm(message, title, {
       confirmButtonText,
       cancelButtonText,
+      confirmButtonClass,
       type,
+      ...dialogOptions,
       dangerouslyUseHTMLString: false
     })
     return true
@@ -79,6 +87,8 @@ export async function confirmAction(options = {}) {
  * @param {Object} options - 配置选项
  * @param {string} options.title - 确认对话框标题
  * @param {string} options.message - 确认对话框消息
+ * @param {string} options.confirmButtonText - 确认按钮文字
+ * @param {string} options.confirmButtonClass - 确认按钮样式
  * @param {string} options.successMessage - 成功消息
  * @param {string} options.errorMessage - 错误消息
  * @param {Function} options.onSuccess - 成功回调
@@ -90,27 +100,18 @@ export async function executeDeleteWithConfirm(deleteFn, options = {}) {
   const {
     title = '确认删除',
     message = '此操作不可恢复，确定要继续吗？',
-    successMessage = '删除成功',
-    errorMessage = '删除失败，请稍后重试',
-    onSuccess,
-    onError,
-    loadingRef
+    confirmButtonText,
+    confirmButtonClass,
+    ...requestOptions
   } = options
 
-  const confirmed = await confirmDelete({ title, message })
+  const confirmed = await confirmDelete({ title, message, confirmButtonText, confirmButtonClass })
   if (!confirmed) return false
 
-  return withLoading(loadingRef, async () => {
-    try {
-      const result = await deleteFn()
-      if (successMessage) showSuccess(successMessage)
-      if (typeof onSuccess === 'function') onSuccess(result)
-      return result
-    } catch (error) {
-      if (errorMessage) showError(errorMessage)
-      if (typeof onError === 'function') onError(error)
-      throw error
-    }
+  return executeRequest(deleteFn, {
+    successMessage: '删除成功',
+    errorMessage: '删除失败，请稍后重试',
+    ...requestOptions
   })
 }
 
@@ -136,6 +137,9 @@ export async function executeBatchDelete(items, deleteFn, options = {}) {
   }
 
   const confirmed = await confirmDelete({
+    title: '批量删除确认',
+    confirmButtonText: '删除',
+    confirmButtonClass: 'el-button--danger',
     message: confirmMessage || `确定要删除选中的 ${count} 个${itemName}吗？此操作不可恢复。`
   })
   if (!confirmed) return false
@@ -167,7 +171,8 @@ export async function executeBatchDelete(items, deleteFn, options = {}) {
       throw new Error('批量删除失败')
     }
 
-    if (typeof onSuccess === 'function') onSuccess({ successCount, failCount })
-    return { successCount, failCount }
+    const result = { successCount, failCount }
+    if (typeof onSuccess === 'function') await onSuccess(result)
+    return result
   })
 }

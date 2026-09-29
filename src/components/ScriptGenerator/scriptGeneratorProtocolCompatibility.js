@@ -6,30 +6,20 @@ const DEFAULT_MEMORY_SELECTION = Object.freeze({
   packerType: 'DefaultBase64'
 })
 
-const getPackerSupportedProtocols = metadata => {
-  const protocols = Array.isArray(metadata?.supportedProtocols)
-    ? metadata.supportedProtocols.map(normalizeTransportProtocol).filter(Boolean)
-    : []
-  return protocols
-}
-
 export const isPackerProtocolCompatible = (metadata, protocol) =>
-  getPackerSupportedProtocols(metadata).includes(normalizeTransportProtocol(protocol))
+  metadata.supportedProtocols.some(supported =>
+    normalizeTransportProtocol(supported) === normalizeTransportProtocol(protocol))
 
 export const filterPackerTypesStructure = (packerTypes, packerCompatibility, protocol) => {
-  const source = packerTypes || {}
-  const isCompatible = packer => isPackerProtocolCompatible(packerCompatibility?.[packer], protocol)
-  const groups = (Array.isArray(source.groups) ? source.groups : [])
+  const isCompatible = packer => isPackerProtocolCompatible(packerCompatibility[packer], protocol)
+  const groups = packerTypes.groups
     .map(group => ({
       ...group,
-      packers: (Array.isArray(group.packers) ? group.packers : []).filter(isCompatible)
+      packers: group.packers.filter(isCompatible)
     }))
     .filter(group => group.packers.length)
-  const ungrouped = (Array.isArray(source.ungrouped) ? source.ungrouped : []).filter(isCompatible)
-  const sourceFlat = Array.isArray(source.flat) && source.flat.length
-    ? source.flat
-    : [...groups.flatMap(group => group.packers), ...ungrouped]
-  const flat = sourceFlat.filter(isCompatible)
+  const ungrouped = packerTypes.ungrouped.filter(isCompatible)
+  const flat = [...groups.flatMap(group => group.packers), ...ungrouped]
 
   return { groups, ungrouped, flat }
 }

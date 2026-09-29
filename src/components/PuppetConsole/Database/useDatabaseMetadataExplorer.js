@@ -1,8 +1,6 @@
 import { getCurrentScope, onScopeDispose, ref } from 'vue'
 
 import {
-  createNamespaceRef,
-  createTableRef,
   getDatabaseObjectCacheKey,
   normalizeDatabaseObjectRef
 } from './database-domain.js'
@@ -77,9 +75,7 @@ export function useDatabaseMetadataExplorer({
       const items = Array.isArray(response?.data?.databases) ? response.data.databases : []
       namespaces.value = items.map((item) => ({
         name: item.name || '',
-        objectRef:
-          item.ref ||
-          createNamespaceRef(item.name, sqlEngine.getNamespaceLevels(connection.dialect))
+        objectRef: normalizeDatabaseObjectRef(item.ref)
       }))
       namespacesLoaded = true
       return namespaces.value
@@ -125,12 +121,7 @@ export function useDatabaseMetadataExplorer({
         name: item.name || '',
         schema: item.schema || '',
         comment: item.comment || '',
-        objectRef: createTableRef({
-          namespaceRef,
-          table: item.name,
-          schema: item.schema,
-          ref: item.ref
-        })
+        objectRef: normalizeDatabaseObjectRef(item.ref)
       }))
       const nextCache = new Map(tableCache.value)
       nextCache.set(key, tables)

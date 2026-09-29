@@ -24,7 +24,10 @@ export function downloadBlob(blob, filename) {
   a.download = filename
   a.style.display = 'none'
   document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  try {
+    a.click()
+  } finally {
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
 }

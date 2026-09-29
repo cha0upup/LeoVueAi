@@ -56,7 +56,6 @@
 import { markRaw, ref, toRefs } from 'vue'
 import DatabaseHome from './DatabaseHome.vue'
 import DatabaseConsole from './DatabaseConsole.vue'
-import { v4 as uuidV4 } from 'uuid'
 import {
   DATABASE_TAB_CONSTANTS as TAB_CONSTANTS,
   formatDatabaseConnectionTarget
@@ -82,7 +81,6 @@ const databaseTabs = ref([
   {
     id: TAB_CONSTANTS.HOME_TAB_ID,
     title: TAB_CONSTANTS.HOME_TAB_TITLE,
-    name: TAB_CONSTANTS.HOME_TAB_ID,
     component: DatabaseHomeView,
     props: { sessionId: sessionId.value }
   }
@@ -105,27 +103,13 @@ const getConnectionUser = (databaseTab) => getTabConnection(databaseTab).usernam
 
 const getConnectionUrl = (databaseTab) => {
   const connection = getTabConnection(databaseTab)
-  return databaseTab?.url || formatDatabaseConnectionTarget(connection)
+  return formatDatabaseConnectionTarget(connection)
 }
 
 const addDatabaseTab = (payload) => {
-  if (!payload || typeof payload !== 'object') return
-  const connectionId = payload.connectionId
-  const url = payload.url
-  const connectionName = payload.connectionName || url
-  const initialConnection = payload.connection || {}
-
-  const existingTab = databaseTabs.value.find((tab) => {
-    if (tab.id === TAB_CONSTANTS.HOME_TAB_ID) {
-      return false
-    }
-
-    return (
-      (connectionId && tab.props?.connectionId === connectionId) ||
-      (url && tab.url === url) ||
-      (connectionName && tab.title === connectionName)
-    )
-  })
+  if (!payload?.connectionId) return
+  const { connectionId, connectionName, connection: initialConnection } = payload
+  const existingTab = databaseTabs.value.find((tab) => tab.id === connectionId)
 
   if (existingTab) {
     activeTabId.value = existingTab.id
@@ -133,10 +117,8 @@ const addDatabaseTab = (payload) => {
   }
 
   const connectionTab = {
-    id: uuidV4(),
+    id: connectionId,
     title: connectionName,
-    name: connectionId,
-    url,
     component: DatabaseConsoleView,
     props: { sessionId: sessionId.value, connectionId, initialConnection }
   }

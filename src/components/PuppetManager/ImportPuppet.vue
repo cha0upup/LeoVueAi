@@ -271,23 +271,12 @@ let fileReadSequence = 0
 
 const canProceed = computed(() => fileContent.value.trim().length > 0)
 
-const normalizeImportedPuppet = (config = {}) => {
-  const source = config && typeof config === 'object' ? config : {}
-  return createDefaultPuppet({
-    ...source,
-    type: source.type || 'java'
-  })
-}
-
 const getTransferDepth = (record, byId) => {
   let depth = 0
-  let current = record
-  const visited = new Set()
-  while (current?.parentTransferId) {
-    if (visited.has(current.transferId)) break
-    visited.add(current.transferId)
-    current = byId.get(current.parentTransferId)
-    if (current) depth += 1
+  let parentId = record.parentTransferId
+  while (parentId) {
+    depth += 1
+    parentId = byId.get(parentId).parentTransferId
   }
   return depth
 }
@@ -356,7 +345,7 @@ const parseContent = () => {
 
     const byId = new Map(transfer.records.map((record) => [record.transferId, record]))
     const importedPuppets = transfer.records.map((record) => ({
-      ...normalizeImportedPuppet({
+      ...createDefaultPuppet({
         ...record.config,
         parentPuppetId: record.parentTransferId || 'root'
       }),

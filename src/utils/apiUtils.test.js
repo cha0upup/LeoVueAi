@@ -14,7 +14,7 @@ vi.mock('./messageUtils.js', () => ({
   showSuccess: mocks.showSuccess
 }))
 
-import { executeRequest, executeRequestWithStatus, withLoading } from './apiUtils.js'
+import { executeRequest, withLoading } from './apiUtils.js'
 
 const deferred = () => {
   let resolve
@@ -47,12 +47,12 @@ describe('apiUtils', () => {
     expect(loading.value).toBe(false)
   })
 
-  it('reuses the common request pipeline for status-based requests', async () => {
+  it('shows the configured success message and returns the request result', async () => {
     const onSuccess = vi.fn()
     const payload = { id: 'saved-item' }
 
-    const result = await executeRequestWithStatus(async () => payload, {
-      successMessages: { default: '保存完成' },
+    const result = await executeRequest(async () => payload, {
+      successMessage: '保存完成',
       onSuccess
     })
 
@@ -62,19 +62,76 @@ describe('apiUtils', () => {
   })
 
   it('waits for asynchronous success callbacks before completing', async () => {
+    const loading = ref(false)
     const callback = deferred()
     const onSuccess = vi.fn(() => callback.promise)
     let completed = false
 
-    const request = executeRequest(async () => 'saved', { onSuccess })
+    const request = executeRequest(async () => 'saved', { onSuccess, loadingRef: loading })
       .then(() => { completed = true })
     await Promise.resolve()
 
     expect(onSuccess).toHaveBeenCalledWith('saved')
     expect(completed).toBe(false)
+    expect(loading.value).toBe(true)
 
     callback.resolve()
     await request
     expect(completed).toBe(true)
+    expect(loading.value).toBe(false)
+  })
+
+  it('treats an empty successful result as success', async () => {
+    const onSuccess = vi.fn()
+    await expect(executeRequest(async () => undefined, {
+      successMessage: '保存成功',
+      onSuccess
+    })).resolves.toBeUndefined()
+
+    expect(onSuccess).toHaveBeenCalledWith(undefined)
+    expect(mocks.showSuccess).toHaveBeenCalledWith('保存成功')
+    expect(mocks.handleError).not.toHaveBeenCalled()
+  })
+
+  it('lets callers handle errors without displaying a duplicate default message', async () => {
+    const failure = new Error('验证失败')
+    const loading = ref(false)
+    const onError = vi.fn()
+    await expect(executeRequest(async () => { throw failure }, {
+      loadingRef: loading,
+      errorMessage: null,
+      onError
+    })).rejects.toBe(failure)
+
+    expect(onError).toHaveBeenCalledExactlyOnceWith(failure)
+    expect(mocks.handleError).not.toHaveBeenCalled()
+    expect(mocks.showSuccess).not.toHaveBeenCalled()
+    expect(loading.value).toBe(false)
+  })
+
+  it('keeps loading active while asynchronous error handling finishes', async () => {
+    const failure = new Error('保存失败')
+    const callback = deferred()
+    const loading = ref(false)
+    const onError = vi.fn(() => callback.promise)
+    const request = executeRequest(async () => { throw failure }, {
+      loadingRef: loading,
+      errorMessage: '操作失败',
+      errorMessages: { 409: '名称重复' },
+      onError
+    })
+    const rejected = expect(request).rejects.toBe(failure)
+    await Promise.resolve()
+
+    expect(onError).toHaveBeenCalledWith(failure)
+    expect(loading.value).toBe(true)
+    expect(mocks.handleError).toHaveBeenCalledWith(failure, {
+      defaultMessage: '操作失败',
+      defaultMessages: { 409: '名称重复' }
+    })
+
+    callback.resolve()
+    await rejected
+    expect(loading.value).toBe(false)
   })
 })

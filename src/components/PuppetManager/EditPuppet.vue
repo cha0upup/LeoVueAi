@@ -93,7 +93,8 @@ import { reactive, ref, onMounted, watch } from 'vue'
 import { icons } from '@/utils/icons.js'
 import { createDefaultPuppet } from '@/utils/constants.js'
 import { useEditDialog } from '@/utils/dialogUtils.js'
-import { validateForm, handleFormSubmit, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { executeRequest } from '@/utils/apiUtils.js'
 import { getAllDisguises } from '@/utils/puppetUtils.js'
 import { formatHeadersForEditor, stringifyHeadersForSubmit } from '@/utils/headers.js'
 import { usePuppetStrategies } from '@/composables/usePuppetStrategies.js'
@@ -229,11 +230,8 @@ const handleEdit = async () => {
   if (!isValid) return
 
   // 处理表单提交
-  await handleFormSubmit(
-    async () => {
-      const response = await updatePuppetApi(buildPuppetPayload())
-      return response
-    },
+  await executeRequest(
+    () => updatePuppetApi(buildPuppetPayload()),
     {
       loadingRef: loading,
       successMessage: '主机更新成功！',

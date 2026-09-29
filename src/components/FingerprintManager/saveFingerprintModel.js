@@ -29,45 +29,34 @@ export const createEmptyFingerprintForm = () => ({
   matchText: JSON.stringify(DEFAULT_MATCH, null, 2)
 })
 
-export const normalizeRequests = (requests, ensureOne = true) => {
-  const source =
-    Array.isArray(requests) && requests.length ? requests : ensureOne ? [createEmptyRequest()] : []
-  return source.map((request) => {
-    const headers = Array.isArray(request?.headers)
-      ? request.headers.map((header) => ({
-          key: String(header?.key ?? ''),
-          value: String(header?.value ?? '')
-        }))
-      : request?.headers && typeof request.headers === 'object'
-        ? Object.entries(request.headers).map(([key, value]) => ({
-            key,
-            value: String(value ?? '')
-          }))
-        : []
-    return {
-      method: String(request?.method || 'GET').toUpperCase(),
-      path: String(request?.path || '/').trim() || '/',
-      timeout: toTimeout(request?.timeout),
-      headers,
-      body: String(request?.body ?? ''),
-      ...(request?.charset ? { charset: request.charset } : {}),
-      ...(request?.maxBodyBytes != null ? { maxBodyBytes: request.maxBodyBytes } : {})
-    }
-  })
-}
+const normalizeRequest = (request) => ({
+  method: String(request?.method || 'GET').toUpperCase(),
+  path: String(request?.path || '/').trim() || '/',
+  timeout: toTimeout(request?.timeout),
+  body: String(request?.body ?? ''),
+  ...(request?.charset ? { charset: request.charset } : {}),
+  ...(request?.maxBodyBytes != null ? { maxBodyBytes: request.maxBodyBytes } : {})
+})
 
 export const loadFingerprintForm = (fingerprint) => {
   if (!fingerprint) return createEmptyFingerprintForm()
+  const requests = fingerprint.rule?.requests
   return {
     fingerprintId: String(fingerprint.fingerprintId || ''),
     name: String(fingerprint.name || ''),
     version: String(fingerprint.info?.version ?? '1.0'),
-    tagsStr: Array.isArray(fingerprint.tags)
-      ? fingerprint.tags.join(', ')
-      : String(fingerprint.tags || ''),
+    tagsStr: Array.isArray(fingerprint.tags) ? fingerprint.tags.join(', ') : '',
     infoAuthor: String(fingerprint.info?.author || ''),
     infoRemark: String(fingerprint.info?.remark || ''),
-    requestList: normalizeRequests(fingerprint.rule?.requests),
+    requestList: requests?.length
+      ? requests.map((request) => ({
+          ...normalizeRequest(request),
+          headers: Object.entries(request.headers || {}).map(([key, value]) => ({
+            key,
+            value: String(value ?? '')
+          }))
+        }))
+      : [createEmptyRequest()],
     versionExtractText: fingerprint.rule?.version ? JSON.stringify(fingerprint.rule.version, null, 2) : '',
     matchText: JSON.stringify(fingerprint.rule?.match || DEFAULT_MATCH, null, 2)
   }
@@ -92,16 +81,14 @@ const buildHeaders = (headers) => {
 }
 
 export const buildFingerprintPayload = (form) => {
-  const requests = normalizeRequests(form?.requestList, false).map((request) => {
-    const result = { method: request.method, path: request.path, timeout: request.timeout }
-    if (request.charset) result.charset = request.charset
-    if (request.maxBodyBytes != null) result.maxBodyBytes = request.maxBodyBytes
-    const headers = buildHeaders(request.headers)
-    if (Object.keys(headers).length) result.headers = headers
-    if (!['GET', 'HEAD'].includes(request.method) && request.body.trim()) {
-      result.body = request.body.trim()
+  const requests = (form?.requestList || []).map((source) => {
+    const { body, ...request } = normalizeRequest(source)
+    const headers = buildHeaders(source.headers)
+    if (Object.keys(headers).length) request.headers = headers
+    if (!['GET', 'HEAD'].includes(request.method) && body.trim()) {
+      request.body = body.trim()
     }
-    return result
+    return request
   })
   const info = { version: String(form?.version || '').trim() }
   const author = String(form?.infoAuthor || '').trim()

@@ -21,18 +21,6 @@ const createTabKey = () => {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-const ensureTabShape = (tab) => {
-  const tabKey = tab.tabKey || createTabKey()
-  const rawId = String(tab.id || '')
-  const shouldRefreshId =
-    !rawId || (rawId.startsWith('puppet-') && !rawId.startsWith('puppet-tab-'))
-  return {
-    ...tab,
-    id: shouldRefreshId ? `puppet-tab-${tabKey}` : tab.id,
-    tabKey
-  }
-}
-
 export function useMainTabs({ confirmAction, iconMap }) {
   const saveTabsToStorage = () => {
     const tabsToSave = tabs.value.map(
@@ -93,13 +81,11 @@ export function useMainTabs({ confirmAction, iconMap }) {
 
     const savedTabs = safeLocalStorage
       .getJSON(MAIN_TAB_STORAGE_KEYS.tabs, [], Array.isArray)
-      .filter((tab) => tab && typeof tab === 'object')
+      .filter((tab) => typeof tab?.tabKey === 'string' && tab.tabKey &&
+        tab.id === 'puppet-tab-' + tab.tabKey)
     const savedCurrentTab = safeLocalStorage.getItem(MAIN_TAB_STORAGE_KEYS.currentTab)
 
-    tabs.value = savedTabs.map((tab) => ({
-      ...ensureTabShape(tab),
-      icon: iconMap.server
-    }))
+    tabs.value = savedTabs.map((tab) => ({ ...tab, icon: iconMap.server }))
 
     if (savedCurrentTab && tabs.value.some((tab) => tab.id === savedCurrentTab)) {
       currentTab.value = savedCurrentTab

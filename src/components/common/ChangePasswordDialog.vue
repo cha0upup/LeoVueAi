@@ -123,7 +123,8 @@ import { ref, reactive } from 'vue'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
 import { icons } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
-import { validateForm, handleFormSubmit, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { executeRequest } from '@/utils/apiUtils.js'
 import { changePasswordApi } from '@/services/api/auth.js'
 
 const dialog = useDialog()
@@ -182,14 +183,12 @@ const submitForm = async () => {
   })
   if (!isValid) return
 
-  await handleFormSubmit(
-    async () => {
-      const response = await changePasswordApi({
+  await executeRequest(
+    () =>
+      changePasswordApi({
         oldPassword: form.oldPassword,
         newPassword: form.newPassword
-      })
-      return response
-    },
+      }),
     {
       successMessage: '密码修改成功',
       errorMessage: '请求失败，请稍后重试',

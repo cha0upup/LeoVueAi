@@ -122,47 +122,42 @@ export function createDbExportTask({ taskId, sessionId, databaseName, tableCount
   }
 }
 
-const SCAN_KIND_LABELS = {
-  network_workflow: '一键扫描'
-}
-
 export function createScanTask({
   taskId,
   sessionId,
-  scanKind,
   targetLabel,
-  totalCount = 0,
   options = {}
 }) {
-  const kindLabel = SCAN_KIND_LABELS[scanKind] || '扫描任务'
-  const createdTime = Date.now()
-
   return {
     id: taskId,
     type: TaskType.SCAN,
     sessionId,
-    scanKind,
+    scanKind: 'network_workflow',
     targetLabel: targetLabel || '',
-    fileName: options.fileName || `${kindLabel} · ${targetLabel || '未命名目标'}`,
+    fileName: `一键扫描 · ${targetLabel || '未命名目标'}`,
     fileSize: 0,
     backendTaskId: options.backendTaskId || null,
     status: TaskStatus.PENDING,
     progress: 0,
     processedCount: 0,
-    targetCount: Number(options.targetCount ?? totalCount ?? 0),
+    targetCount: Number(options.targetCount ?? 0),
+    openCount: 0,
+    serviceCount: 0,
+    fingerprintCount: 0,
+    identifiedApplicationCount: 0,
     scanHosts: options.scanHosts || [],
     scanPorts: options.scanPorts || [],
     reachableHostList: [],
-    createdAt: createdTime,
+    reachableHostCount: 0,
+    reachabilityLoaded: false,
+    stages: [],
+    currentStage: null,
+    createdAt: Date.now(),
     startTime: null,
     endTime: null,
     isPaused: false,
     isCancelled: false,
     canControl: options.canControl !== false,
-    error: null,
-    options: {
-      background: options.background !== false,
-      ...options
-    }
+    error: null
   }
 }

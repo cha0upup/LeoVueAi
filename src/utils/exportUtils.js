@@ -1,3 +1,30 @@
+import { downloadBlob } from './downloadBlob.js'
+import { executeRequest } from './apiUtils.js'
+
+/**
+ * 执行返回 Blob 的导出请求，并统一处理下载、loading 和错误提示。
+ * @param {Function} request 请求函数，返回包含 Blob data 的响应
+ * @param {string} filename 下载文件名
+ * @param {Object} [options]
+ * @param {Object} [options.loadingRef]
+ * @param {string|null} [options.successMessage=null]
+ * @param {string|null} [options.errorMessage='导出失败']
+ * @returns {Promise<Object>}
+ */
+export function executeBlobDownload(request, filename, options = {}) {
+  return executeRequest(
+    async () => {
+      const response = await request()
+      downloadBlob(response.data, filename)
+      return response
+    },
+    {
+      errorMessage: '导出失败',
+      ...options
+    }
+  )
+}
+
 /**
  * TSV 导出工具
  *
@@ -26,44 +53,25 @@
 export function exportTsv(data, filename, columns) {
   if (!data || data.length === 0) return
 
-  let header, rows
-
-  if (columns && columns.length > 0) {
-    // 固定列模式
-    header = columns.map(c => c.label).join('\t')
-    rows = data.map(row =>
-      columns.map(c => {
-        const val = typeof c.key === 'function' ? c.key(row) : (row[c.key] ?? '')
-        return sanitize(val)
-      }).join('\t')
-    )
-  } else {
-    // 自动列模式：从数据中收集所有 key
-    const keySet = new Set()
-    data.forEach(row => Object.keys(row).forEach(k => keySet.add(k)))
-    const cols = [...keySet]
-    header = cols.join('\t')
-    rows = data.map(row =>
-      cols.map(k => sanitize(row[k] ?? '')).join('\t')
-    )
-  }
+  const exportColumns = columns?.length
+    ? columns
+    : [...new Set(data.flatMap((row) => Object.keys(row)))].map((key) => ({ label: key, key }))
+  const header = exportColumns.map((column) => column.label).join('\t')
+  const rows = data.map((row) =>
+    exportColumns.map(({ key }) =>
+      sanitize(typeof key === 'function' ? key(row) : (row[key] ?? ''))
+    ).join('\t')
+  )
 
   const tsv = header + '\n' + rows.join('\n')
-  download(tsv, filename)
+  downloadBlob(
+    new Blob([tsv], { type: 'text/tab-separated-values;charset=utf-8' }),
+    filename.endsWith('.tsv') ? filename : `${filename}.tsv`
+  )
 }
 
 // ────── internal ──────
 
 function sanitize(val) {
   return String(val).replace(/[\t\n\r]/g, ' ')
-}
-
-function download(content, filename) {
-  const blob = new Blob([content], { type: 'text/tab-separated-values;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename.endsWith('.tsv') ? filename : `${filename}.tsv`
-  a.click()
-  URL.revokeObjectURL(url)
 }

@@ -184,8 +184,7 @@ const downloadWorkspaceFile = async () => {
   workspaceError.value = ''
   try {
     const response = await userFileDownloadApi({ path: file.path })
-    const blob = response?.data instanceof Blob ? response.data : new Blob([response?.data])
-    downloadBlob(blob, file.filename)
+    downloadBlob(response.data, file.filename)
   } catch (downloadError) {
     workspaceError.value = downloadError?.message || '下载失败'
   } finally {

@@ -130,6 +130,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
+import { parsePuppetStrategy } from '@/composables/usePuppetStrategies.js'
 
 const props = defineProps({
   puppet: {
@@ -138,20 +139,10 @@ const props = defineProps({
   }
 })
 
-const parseStrategy = (json) => {
-  if (!json) return { enabled: false }
-  try {
-    const parsed = typeof json === 'string' ? JSON.parse(json) : json
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : { enabled: false }
-  } catch {
-    return { enabled: false }
-  }
-}
-
-const urlStrategy = computed(() => parseStrategy(props.puppet.urlStrategy))
-const paddingStrategy = computed(() => parseStrategy(props.puppet.paddingStrategy))
-const headerNoiseStrategy = computed(() => parseStrategy(props.puppet.headerNoiseStrategy))
-const tlsFingerprintStrategy = computed(() => parseStrategy(props.puppet.tlsFingerprintStrategy))
+const urlStrategy = computed(() => parsePuppetStrategy(props.puppet.urlStrategy))
+const paddingStrategy = computed(() => parsePuppetStrategy(props.puppet.paddingStrategy))
+const headerNoiseStrategy = computed(() => parsePuppetStrategy(props.puppet.headerNoiseStrategy))
+const tlsFingerprintStrategy = computed(() => parsePuppetStrategy(props.puppet.tlsFingerprintStrategy))
 
 const showDisabled = ref(false)
 const enabledCount = computed(() =>

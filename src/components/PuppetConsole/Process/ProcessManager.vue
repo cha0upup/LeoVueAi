@@ -182,6 +182,7 @@ import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { listProcessesApi, findProcessesApi, killProcessApi } from '@/services/api.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { exportTsv } from '@/utils/exportUtils.js'
 
 const props = defineProps({
   sessionId: {
@@ -305,18 +306,14 @@ function formatMem(kb) {
 }
 
 function handleExport() {
-  if (processes.value.length === 0) return
-  const header = 'PID\tPPID\tName\tUser\tMemKB\tCommand\n'
-  const rows = processes.value.map(p =>
-    [p.pid, p.ppid ?? '', p.name || '', p.user || '', p.memKb ?? '', p.cmd || ''].join('\t')
-  ).join('\n')
-  const blob = new Blob([header + rows], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'processes.tsv'
-  a.click()
-  URL.revokeObjectURL(url)
+  exportTsv(processes.value, 'processes', [
+    { label: 'PID', key: 'pid' },
+    { label: 'PPID', key: 'ppid' },
+    { label: 'Name', key: 'name' },
+    { label: 'User', key: 'user' },
+    { label: 'MemKB', key: 'memKb' },
+    { label: 'Command', key: 'cmd' }
+  ])
 }
 </script>
 

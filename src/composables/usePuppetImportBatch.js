@@ -56,8 +56,8 @@ export function usePuppetImportBatch() {
   }
 
   const loadBundle = (puppets, targetIds) => {
-    batchPuppets.value = Array.isArray(puppets) ? puppets : []
-    batchTargetIds.value = new Set(targetIds || [])
+    batchPuppets.value = puppets
+    batchTargetIds.value = new Set(targetIds)
     batchSelectedTargetIds.value = new Set(batchTargetIds.value)
     syncSelection()
   }

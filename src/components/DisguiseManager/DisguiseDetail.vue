@@ -90,9 +90,9 @@
       </div>
 
       <div class="meta-strip">
-        <span>版本 {{ disguise.version || '1.0.0' }}</span>
+        <span>版本 {{ disguise.version }}</span>
         <span>运行时 {{ runtimeLabels }}</span>
-        <span>协议 v{{ disguise.protocolVersion || 1 }}</span>
+        <span>协议 v{{ disguise.protocolVersion }}</span>
         <span>Headers {{ headerEntries.length }}</span>
         <span>创建用户 {{ disguise.createUserId || '-' }}</span>
         <span>更新 {{ formatTime(disguise.updateTime || disguise.createTime) }}</span>
@@ -114,7 +114,7 @@
             </div>
             <div class="kv-item">
               <label>版本号</label>
-              <span>{{ disguise.version || '1.0.0' }}</span>
+              <span>{{ disguise.version }}</span>
             </div>
             <div class="kv-item">
               <label>创建时间</label>
@@ -301,10 +301,7 @@ const headersText = computed(() =>
   headerEntries.value.map(([key, value]) => `${key}: ${value || '-'}`).join('\n')
 )
 const runtimeLabels = computed(() => {
-  const runtimes = Array.isArray(props.disguise?.supportedRuntimes)
-    ? props.disguise.supportedRuntimes
-    : ['java']
-  return runtimes.map((runtime) => String(runtime).toUpperCase()).join(' / ')
+  return props.disguise?.supportedRuntimes?.map(runtime => runtime.toUpperCase()).join(' / ') || '-'
 })
 
 function handleActionCommand(command) {

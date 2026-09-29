@@ -308,6 +308,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { Icon } from '@iconify/vue'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { downloadBlob } from '@/utils/downloadBlob.js'
 import { renderAssistantMarkdown } from '@/utils/ai.js'
 import { emitAppEvent, useAppEvent } from '@/composables/useAppEvent.js'
 import {
@@ -479,14 +480,7 @@ async function handleExportReport() {
       return
     }
     const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, filename)
     showSuccess('报告已导出')
   } catch {
     showError('导出报告失败')

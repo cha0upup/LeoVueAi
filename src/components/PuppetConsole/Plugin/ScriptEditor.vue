@@ -283,6 +283,7 @@ import ScriptBytecodeInput from './ScriptBytecodeInput.vue'
 import {
   buildPluginPayload,
   createEmptyBytecode,
+  decodePluginScript,
   formatExecutionResult,
   getScriptLanguageOptions,
   SCRIPT_PLACEHOLDERS
@@ -473,15 +474,26 @@ const copyResult = async () => {
 
 const loadPlugin = plugin => {
   if (!plugin || isExecuting.value || isSaving.value || !canUseScriptMode.value) return
-  const type = String(plugin.pluginType || 'js').toLowerCase()
+  const type = String(plugin.pluginType).toLowerCase()
   if (!languageOptions.value.some(option => option.value === type)) {
     showWarning('该插件类型与当前运行时不匹配')
+    return
+  }
+  let source
+  try {
+    source = decodePluginScript(plugin.bytecode)
+  } catch {
+    showWarning('插件脚本内容无效')
+    return
+  }
+  if (!source.trim()) {
+    showWarning('插件脚本内容为空')
     return
   }
   requestGuard.invalidate(['execute'])
   mode.value = 'script'
   language.value = type
-  script.value = plugin.scriptText || plugin.content || ''
+  script.value = source
   resetOutput()
   showSuccess(`已载入 ${plugin.pluginName || plugin.pluginId}`)
 }

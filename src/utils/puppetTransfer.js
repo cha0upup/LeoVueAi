@@ -120,8 +120,13 @@ export const parsePuppetTransferPayload = (payload) => {
     }
   })
   const sorted = sortRecordsByDependency(records)
-  const targetIds = new Set((payload.roots || []).map(String).filter((id) => seen.has(id)))
-  if (!targetIds.size) sorted.forEach((record) => targetIds.add(record.transferId))
+  if (!Array.isArray(payload.roots) || !payload.roots.length) {
+    throw new Error('主机配置包缺少导入目标')
+  }
+  const targetIds = new Set(payload.roots.map(String))
+  if ([...targetIds].some((id) => !seen.has(id))) {
+    throw new Error('主机配置包包含不存在的导入目标')
+  }
   return { records: sorted, targetIds }
 }
 

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { confirmAction } from '@/utils/confirmUtils.js'
 
 import { useAppModeNavigation } from '@/composables/useAppModeNavigation.js'
 import { useAuth } from '@/composables/useAuth.js'
@@ -94,27 +94,17 @@ export function useAiAvailability({ autoFetch = true } = {}) {
 
     if (available.value) return true
 
-    try {
-      await ElMessageBox.confirm(
-        isAdmin.value
-          ? '系统尚未配置任何 AI 模型通道，需要先在「系统配置」中添加可用的模型才能使用 AI 助理。'
-          : '系统尚未配置任何 AI 模型通道，请联系管理员在「系统配置」中添加可用的模型后再使用。',
-        '无可用 AI 模型',
-        {
-          confirmButtonText: isAdmin.value ? '前往配置' : '知道了',
-          cancelButtonText: '取消',
-          showCancelButton: isAdmin.value,
-          type: 'warning',
-          closeOnClickModal: false,
-          closeOnPressEscape: true
-        }
-      )
-      if (isAdmin.value) {
-        goToAdmin({ tab: 'system' })
-      }
-    } catch {
-      // 用户取消，静默
-    }
+    const confirmed = await confirmAction({
+      title: '无可用 AI 模型',
+      message: isAdmin.value
+        ? '系统尚未配置任何 AI 模型通道，需要先在「系统配置」中添加可用的模型才能使用 AI 助理。'
+        : '系统尚未配置任何 AI 模型通道，请联系管理员在「系统配置」中添加可用的模型后再使用。',
+      confirmButtonText: isAdmin.value ? '前往配置' : '知道了',
+      showCancelButton: isAdmin.value,
+      closeOnClickModal: false,
+      closeOnPressEscape: true
+    })
+    if (confirmed && isAdmin.value) goToAdmin({ tab: 'system' })
     return false
   }
 

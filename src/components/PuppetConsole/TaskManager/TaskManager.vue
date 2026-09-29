@@ -147,6 +147,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { confirmDelete } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
+import { downloadBlob } from '@/utils/downloadBlob.js'
 import { taskEngine } from '../File/TaskEngine.js'
 import { ACTIVE_TASK_STATUSES, TaskStatus, TaskType } from '@/constants/task.js'
 import {
@@ -462,21 +463,11 @@ const downloadToLocal = async (task) => {
     return
   }
 
-  let url = ''
-  let link = null
   try {
     const response = await downloadLocalFileApi({ path: relativePath, filename: task.fileName })
-    url = URL.createObjectURL(response.data)
-    link = document.createElement('a')
-    link.href = url
-    link.download = task.fileName || 'downloaded-file'
-    document.body.appendChild(link)
-    link.click()
+    downloadBlob(response.data, task.fileName || 'downloaded-file')
   } catch (error) {
     showError(`下载失败: ${error?.message || '未知错误'}`)
-  } finally {
-    link?.remove()
-    if (url) URL.revokeObjectURL(url)
   }
 }
 

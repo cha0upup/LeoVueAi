@@ -8,10 +8,6 @@ import {
 import { TERMINAL_TASK_STATUSES, TaskStatus, TaskType } from '@/constants/task.js'
 
 export function applyScanExecutor(TaskEngine) {
-  TaskEngine.prototype.getScanBackendTaskId = function (task) {
-    return task?.backendTaskId || null
-  }
-
   // Keep request revisions outside the task data exposed to the task center.
   const requestStates = new WeakMap()
   const stateFor = task => {
@@ -21,7 +17,7 @@ export function applyScanExecutor(TaskEngine) {
 
   const controlTask = async (engine, task, api) => {
     task = engine.getTaskById(task.id)
-    const backendTaskId = engine.getScanBackendTaskId(task)
+    const backendTaskId = task?.backendTaskId
     if (!backendTaskId) throw new Error('缺少扫描任务编号')
     if (task.scanKind !== 'network_workflow') {
       throw new Error('未知的扫描任务类型')
@@ -82,49 +78,32 @@ export function applyScanExecutor(TaskEngine) {
     if (!task || task.type !== TaskType.SCAN || !snapshot) return
 
     const previousStatus = task.status
-    const totalCount = Number(snapshot.targetCount ?? task.targetCount ?? 0)
     const nextStatus = snapshot.status ? this.mapScanStatus(snapshot.status, snapshot) : task.status
-    const targetCount = Number(snapshot.targetCount ?? task.targetCount ?? totalCount)
+    const targetCount = Number(snapshot.targetCount ?? task.targetCount)
     const processedCount = nextStatus === TaskStatus.COMPLETED ? targetCount : task.processedCount
-    const progress =
-      snapshot.progress !== undefined
-        ? this.clampProgress(snapshot.progress)
-        : totalCount > 0
-          ? this.clampProgress((processedCount / totalCount) * 100)
-          : task.progress
+    const progress = this.clampProgress(snapshot.progress ?? task.progress)
 
     task.backendTaskId = snapshot.taskId || task.backendTaskId
-    task.scanKind = snapshot.scanKind || task.scanKind
     task.status = nextStatus
     task.progress = nextStatus === TaskStatus.COMPLETED ? 100 : progress
     task.processedCount = processedCount
     task.targetCount = targetCount
-    task.openCount = Number(snapshot.openCount ?? task.openCount ?? 0)
-    task.serviceCount = Number(snapshot.serviceCount ?? task.serviceCount ?? 0)
-    task.fingerprintCount = Number(snapshot.fingerprintCount ?? task.fingerprintCount ?? 0)
-    task.identifiedApplicationCount = Number(snapshot.identifiedApplicationCount ?? task.identifiedApplicationCount ?? 0)
-    task.errorCount = Number(snapshot.errorCount ?? task.errorCount ?? 0)
-    task.scanHosts = snapshot.hosts || task.scanHosts || []
-    task.scanPorts = snapshot.ports || task.scanPorts || []
-    task.openPortResults = Array.isArray(snapshot.openPortResults)
-      ? snapshot.openPortResults
-      : task.openPortResults || []
-    task.serviceResults = Array.isArray(snapshot.serviceResults)
-      ? snapshot.serviceResults
-      : task.serviceResults || []
-    task.reachableHostList = snapshot.reachableHostList || task.reachableHostList || []
-    task.reachableHostCount = Number(snapshot.reachableHostCount ?? task.reachableHostCount ?? task.reachableHostList.length)
+    task.openCount = Number(snapshot.openCount ?? task.openCount)
+    task.serviceCount = Number(snapshot.serviceCount ?? task.serviceCount)
+    task.fingerprintCount = Number(snapshot.fingerprintCount ?? task.fingerprintCount)
+    task.identifiedApplicationCount = Number(snapshot.identifiedApplicationCount ?? task.identifiedApplicationCount)
+    task.scanHosts = snapshot.hosts ?? task.scanHosts
+    task.scanPorts = snapshot.ports ?? task.scanPorts
+    task.reachableHostList = snapshot.reachableHostList ?? task.reachableHostList
+    task.reachableHostCount = Number(snapshot.reachableHostCount ?? task.reachableHostCount)
     if (snapshot.reachableHostList !== undefined || snapshot.reachableHostCount !== undefined) {
       task.reachabilityLoaded = true
     }
-    task.outcome = snapshot.outcome || task.outcome || null
-    task.stages = Array.isArray(snapshot.stages) ? snapshot.stages : task.stages || []
+    task.stages = snapshot.stages ?? task.stages
     // A terminal workflow deliberately returns currentStage=null. Do not
     // retain the previous live stage when hydrating a completed history item.
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'currentStage')) {
+    if (snapshot.currentStage !== undefined) {
       task.currentStage = snapshot.currentStage
-    } else {
-      task.currentStage = task.currentStage || null
     }
     const createdAt = snapshot.createdAt
     if (createdAt != null) {
@@ -171,7 +150,7 @@ export function applyScanExecutor(TaskEngine) {
 
   TaskEngine.prototype.queryScanTask = async function (task) {
     task = this.getTaskById(task?.id)
-    const backendTaskId = this.getScanBackendTaskId(task)
+    const backendTaskId = task?.backendTaskId
     if (!backendTaskId || !task?.sessionId) return null
     const state = stateFor(task)
     if (state.controlling) return null
@@ -205,7 +184,7 @@ export function applyScanExecutor(TaskEngine) {
     const revisions = new Map([...sessionTasks.values()].map(task => [task.id, stateFor(task).revision]))
     const previousTasks = new Map([...sessionTasks.values()]
       .filter(task => task.scanKind === 'network_workflow')
-      .map(task => [this.getScanBackendTaskId(task), task]))
+      .map(task => [task.backendTaskId, task]))
     const response = await listNetworkProbeWorkflowTasksApi({ sessionId })
     if (this.sessionTasks.get(sessionId) !== sessionTasks) return []
     const snapshots = Array.isArray(response?.data?.tasks) ? response.data.tasks : []
@@ -221,15 +200,12 @@ export function applyScanExecutor(TaskEngine) {
       if (!task) {
         const taskId = this.createScanTask(
           sessionId,
-          'network_workflow',
           snapshot.name || '网络资产发现',
-          snapshot.stageCount || 3,
           {
             backendTaskId,
             targetCount: snapshot.targetCount,
             scanHosts: snapshot.hosts,
-            scanPorts: snapshot.ports,
-            canControl: true
+            scanPorts: snapshot.ports
           }
         )
         task = this.getTaskById(taskId)

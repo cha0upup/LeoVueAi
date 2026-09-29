@@ -46,12 +46,10 @@ export async function withLoading(loadingRef, fn) {
  * @param {Object} [options]
  * @param {Object} [options.loadingRef] - loading状态的ref对象
  * @param {string} [options.successMessage] - 成功消息（null则不显示）
- * @param {string} [options.errorMessage='操作失败，请稍后重试'] - 错误消息
+ * @param {string|null} [options.errorMessage='操作失败，请稍后重试'] - 错误消息（null则不显示）
  * @param {Function} [options.onSuccess] - 成功回调
  * @param {Function} [options.onError] - 错误回调
  * @param {Object} [options.errorMessages] - 状态码 → 文案覆盖映射
- * @param {boolean} [options.showSuccessMessage=true] - 是否显示成功消息
- * @param {boolean} [options.showErrorMessage=true] - 是否显示错误消息
  * @returns {Promise}
  */
 export async function executeRequest(requestFn, options = {}) {
@@ -61,16 +59,14 @@ export async function executeRequest(requestFn, options = {}) {
     errorMessage = '操作失败，请稍后重试',
     errorMessages,
     onSuccess,
-    onError,
-    showSuccessMessage = true,
-    showErrorMessage = true
+    onError
   } = options
 
   return withLoading(loadingRef, async () => {
     try {
       const result = await requestFn()
 
-      if (successMessage && showSuccessMessage) {
+      if (successMessage) {
         showSuccess(successMessage)
       }
       if (typeof onSuccess === 'function') {
@@ -79,11 +75,10 @@ export async function executeRequest(requestFn, options = {}) {
 
       return result
     } catch (error) {
-      if (showErrorMessage) {
+      if (errorMessage) {
         handleError(error, {
           defaultMessage: errorMessage,
-          defaultMessages: errorMessages,
-          showMessage: true
+          defaultMessages: errorMessages
         })
       }
       if (typeof onError === 'function') {
@@ -91,29 +86,5 @@ export async function executeRequest(requestFn, options = {}) {
       }
       throw error
     }
-  })
-}
-
-/**
- * 执行API请求并在成功时显示提示消息
- * 响应格式已由 axios 拦截器统一处理，此处直接使用 response.data。
- * @param {Function} requestFn - API请求函数
- * @param {Object} [options]
- * @param {Object} [options.loadingRef] - loading状态的ref对象
- * @param {Object} [options.successMessages] - 成功消息映射，{ default: '操作成功' }
- * @param {Object} [options.errorMessages] - 错误消息映射，{ 400: '参数错误' }
- * @param {Function} [options.onSuccess] - 成功回调
- * @param {Function} [options.onError] - 错误回调
- * @returns {Promise}
- */
-export async function executeRequestWithStatus(requestFn, options = {}) {
-  const { loadingRef, successMessages = {}, errorMessages = {}, onSuccess, onError } = options
-
-  return executeRequest(requestFn, {
-    loadingRef,
-    successMessage: successMessages.default || '操作成功',
-    errorMessages,
-    onSuccess,
-    onError
   })
 }

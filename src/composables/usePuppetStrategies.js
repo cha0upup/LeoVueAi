@@ -43,16 +43,14 @@ const splitCommaList = (value) =>
     .map((item) => item.trim())
     .filter(Boolean)
 
-const parseStrategy = (value) => {
-  if (!value) return null
-  if (typeof value === 'object' && !Array.isArray(value)) return value
-  if (typeof value !== 'string' || !value.trim()) return null
+export const parsePuppetStrategy = (value) => {
+  if (typeof value !== 'string' || !value.trim()) return { enabled: false }
 
   try {
     const parsed = JSON.parse(value)
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : { enabled: false }
   } catch {
-    return null
+    return { enabled: false }
   }
 }
 
@@ -83,69 +81,44 @@ export function usePuppetStrategies() {
   }
 
   const parseUrlStrategy = (value) => {
-    const strategy = parseStrategy(value)
-    urlStrategyEnabled.value = Boolean(strategy?.enabled)
-    Object.assign(
-      urlStrategyForm,
-      DEFAULT_URL_STRATEGY,
-      strategy
-        ? {
-            mode: strategy.mode || DEFAULT_URL_STRATEGY.mode,
-            prefix: strategy.prefix || '',
-            urlPoolText: Array.isArray(strategy.urlPool) ? strategy.urlPool.join('\n') : '',
-            urlTemplate: strategy.urlTemplate || '',
-            extensionsText: Array.isArray(strategy.extensions) ? strategy.extensions.join(',') : ''
-          }
-        : {}
-    )
+    const strategy = parsePuppetStrategy(value)
+    urlStrategyEnabled.value = Boolean(strategy.enabled)
+    Object.assign(urlStrategyForm, {
+      mode: strategy.mode || DEFAULT_URL_STRATEGY.mode,
+      prefix: strategy.prefix || '',
+      urlPoolText: Array.isArray(strategy.urlPool) ? strategy.urlPool.join('\n') : '',
+      urlTemplate: strategy.urlTemplate || '',
+      extensionsText: Array.isArray(strategy.extensions) ? strategy.extensions.join(',') : ''
+    })
   }
 
   const parsePaddingStrategy = (value) => {
-    const strategy = parseStrategy(value)
-    paddingEnabled.value = Boolean(strategy?.enabled)
-    Object.assign(
-      paddingForm,
-      DEFAULT_PADDING_STRATEGY,
-      strategy
-        ? {
-            lengthDistribution:
-              strategy.lengthDistribution || DEFAULT_PADDING_STRATEGY.lengthDistribution,
-            minBytes: strategy.minBytes ?? DEFAULT_PADDING_STRATEGY.minBytes,
-            maxBytes: strategy.maxBytes ?? DEFAULT_PADDING_STRATEGY.maxBytes
-          }
-        : {}
-    )
+    const strategy = parsePuppetStrategy(value)
+    paddingEnabled.value = Boolean(strategy.enabled)
+    Object.assign(paddingForm, {
+      lengthDistribution: strategy.lengthDistribution || DEFAULT_PADDING_STRATEGY.lengthDistribution,
+      minBytes: strategy.minBytes ?? DEFAULT_PADDING_STRATEGY.minBytes,
+      maxBytes: strategy.maxBytes ?? DEFAULT_PADDING_STRATEGY.maxBytes
+    })
   }
 
   const parseHeaderNoiseStrategy = (value) => {
-    const strategy = parseStrategy(value)
-    headerNoiseEnabled.value = Boolean(strategy?.enabled)
-    Object.assign(
-      headerNoiseForm,
-      DEFAULT_HEADER_NOISE_STRATEGY,
-      strategy
-        ? {
-            valueMode: strategy.valueMode || DEFAULT_HEADER_NOISE_STRATEGY.valueMode,
-            minHeaders: strategy.minHeaders ?? DEFAULT_HEADER_NOISE_STRATEGY.minHeaders,
-            maxHeaders: strategy.maxHeaders ?? DEFAULT_HEADER_NOISE_STRATEGY.maxHeaders
-          }
-        : {}
-    )
+    const strategy = parsePuppetStrategy(value)
+    headerNoiseEnabled.value = Boolean(strategy.enabled)
+    Object.assign(headerNoiseForm, {
+      valueMode: strategy.valueMode || DEFAULT_HEADER_NOISE_STRATEGY.valueMode,
+      minHeaders: strategy.minHeaders ?? DEFAULT_HEADER_NOISE_STRATEGY.minHeaders,
+      maxHeaders: strategy.maxHeaders ?? DEFAULT_HEADER_NOISE_STRATEGY.maxHeaders
+    })
   }
 
   const parseTlsFingerprintStrategy = (value) => {
-    const strategy = parseStrategy(value)
-    tlsFingerprintEnabled.value = Boolean(strategy?.enabled)
-    Object.assign(
-      tlsFingerprintForm,
-      DEFAULT_TLS_FINGERPRINT_STRATEGY,
-      strategy
-        ? {
-            profile: strategy.profile || DEFAULT_TLS_FINGERPRINT_STRATEGY.profile,
-            rotate: Boolean(strategy.rotate)
-          }
-        : {}
-    )
+    const strategy = parsePuppetStrategy(value)
+    tlsFingerprintEnabled.value = Boolean(strategy.enabled)
+    Object.assign(tlsFingerprintForm, {
+      profile: strategy.profile || DEFAULT_TLS_FINGERPRINT_STRATEGY.profile,
+      rotate: Boolean(strategy.rotate)
+    })
   }
 
   const loadStrategies = (puppet = {}) => {

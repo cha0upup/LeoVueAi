@@ -13,11 +13,10 @@ describe('script generator protocol compatibility', () => {
     expect(normalizeTransportProtocol(undefined)).toBe('http')
   })
 
-  it('filters packer groups with backend protocol metadata', () => {
+  it('filters packer groups and derives flat names from backend protocol metadata', () => {
     const packers = {
       groups: [{ groupName: 'Base64', packers: ['AllProtocols', 'HttpOnly'] }],
-      ungrouped: ['WebSocketOnly'],
-      flat: ['AllProtocols', 'HttpOnly', 'WebSocketOnly']
+      ungrouped: ['WebSocketOnly']
     }
     const compatibility = {
       AllProtocols: { supportedProtocols: ['http', 'httpchunk', 'websocket'] },
@@ -30,7 +29,8 @@ describe('script generator protocol compatibility', () => {
       ungrouped: ['WebSocketOnly'],
       flat: ['AllProtocols', 'WebSocketOnly']
     })
-    expect(isPackerProtocolCompatible(undefined, 'httpchunk')).toBe(false)
+    expect(isPackerProtocolCompatible({ supportedProtocols: ['HTTPCHUNK'] }, 'httpchunk')).toBe(true)
+    expect(isPackerProtocolCompatible({ supportedProtocols: ['http'] }, 'websocket')).toBe(false)
   })
 
   it('repairs stale selections and auto-selects the only compatible injector', () => {

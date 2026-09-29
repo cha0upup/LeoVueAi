@@ -318,7 +318,8 @@ import {
   PUPPET_MIN_REQUEST_COUNT
 } from '@/utils/constants.js'
 import { useDialog } from '@/utils/dialogUtils.js'
-import { validateForm, handleFormSubmit, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { executeRequest } from '@/utils/apiUtils.js'
 import { getAllDisguises } from '@/utils/puppetUtils.js'
 import { stringifyHeadersForSubmit } from '@/utils/headers.js'
 import { addPuppetApi } from '@/services/api.js'
@@ -395,12 +396,11 @@ const handleSubmit = async () => {
   if (!isValid) return
 
   // 处理表单提交
-  await handleFormSubmit(
-    async () => {
+  await executeRequest(
+    () => {
       childPuppet.proxyEnabled = proxyEnabled.value ? 1 : 0
       childPuppet.headers = stringifyHeadersForSubmit(childPuppet.headers)
-      const response = await addPuppetApi(childPuppet)
-      return response
+      return addPuppetApi(childPuppet)
     },
     {
       loadingRef: loading,

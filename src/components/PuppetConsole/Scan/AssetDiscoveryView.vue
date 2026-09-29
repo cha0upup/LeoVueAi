@@ -29,7 +29,7 @@
           >
             <div class="task-option">
               <span class="task-option-name">{{ task.name || task.targetLabel || '未命名扫描' }}</span>
-              <span class="task-option-meta">{{ getStatusText(task.status, task.outcome) }} · {{ formatCount(getMetrics(task).targetTotal) }} 个目标</span>
+              <span class="task-option-meta">{{ TASK_STATUS_TEXT[task.status] }} · {{ formatCount(getMetrics(task).targetTotal) }} 个目标</span>
             </div>
           </el-option>
         </el-select>
@@ -39,9 +39,9 @@
         >
           <span
             class="status-mark"
-            :class="statusClass(activeTask.status, activeTask.outcome)"
+            :class="`status-${activeTask.status}`"
           />
-          <span>{{ getStatusText(activeTask.status, activeTask.outcome) }}</span>
+          <span>{{ TASK_STATUS_TEXT[activeTask.status] }}</span>
           <span class="meta-divider" />
           <span>{{ shortTaskId(activeBackendTaskId) }}</span>
         </div>
@@ -299,13 +299,14 @@ import {
   VideoPause,
   VideoPlay
 } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmAction } from '@/utils/confirmUtils.js'
 import AssetResultTable from './AssetResultTable.vue'
 import ScanComposer from './ScanComposer.vue'
 import FingerprintScanComposer from './FingerprintScanComposer.vue'
 import { selectScanStages } from './scanStages.js'
 import { taskEngine } from '../File/TaskEngine.js'
-import { TaskStatus } from '@/constants/task.js'
+import { TASK_STATUS_TEXT, TERMINAL_TASK_STATUSES, TaskStatus } from '@/constants/task.js'
 import { useAssetDiscoveryTasks } from './useAssetDiscoveryTasks.js'
 
 const props = defineProps({ sessionId: { type: String, required: true } })
@@ -348,9 +349,9 @@ const activeBackendTaskId = computed(() => {
 })
 const metrics = computed(() => getMetrics(activeTask.value))
 const currentStageLabel = computed(() => {
-  const outcome = normalizedOutcome(activeTask.value?.status, activeTask.value?.outcome)
-  if (outcome === 'COMPLETED') return '已完成'
-  if (outcome === 'FAILED') return '扫描失败'
+  const status = activeTask.value?.status
+  if (status === TaskStatus.COMPLETED) return '已完成'
+  if (status === TaskStatus.FAILED) return '扫描失败'
   return (
     stageDefinitions.value.find((stage) => stage.name === activeTask.value?.currentStage)?.label ||
     '准备扫描'
@@ -358,13 +359,10 @@ const currentStageLabel = computed(() => {
 })
 const throughputText = computed(() => {
   const task = activeTask.value
-  const value = Number(task?.speed || 0)
-  if (Number.isFinite(value) && value > 0) return `${formatCount(Math.round(value))} 目标/秒`
   const startedAt = timestampValue(task?.startTime)
   const processed = metrics.value.processed
-  const outcome = normalizedOutcome(task?.status, task?.outcome)
-  if (outcome === 'COMPLETED') return '扫描已完成'
-  if (outcome === 'FAILED' || outcome === 'CANCELLED') return '扫描已结束'
+  if (task?.status === TaskStatus.COMPLETED) return '扫描已完成'
+  if (TERMINAL_TASK_STATUSES.includes(task?.status)) return '扫描已结束'
   if (!startedAt || processed <= 0) return '等待数据'
   const elapsed = Math.max(1, (Date.now() - startedAt) / 1000)
   return `${formatCount(Math.round(processed / elapsed))} 目标/秒`
@@ -408,9 +406,7 @@ function handleScanStarted(task) {
   const stages = selectScanStages(scan.stages)
   const taskId = taskEngine.createScanTask(
     props.sessionId,
-    'network_workflow',
     scan.name || '网络资产发现',
-    stages.length,
     {
       backendTaskId,
       targetCount: targetItems.length,
@@ -419,18 +415,9 @@ function handleScanStarted(task) {
     }
   )
   taskEngine.hydrateScanTask(taskId, {
-    taskId: backendTaskId,
-    scanKind: 'network_workflow',
     status: 'RUNNING',
-    outcome: 'RUNNING',
-    targetLabel: scan.name || '网络资产发现',
-    targetCount: targetItems.length,
-    hosts: targetItems,
     currentStage: stages[0]?.name,
-    stages: stages.map(stage => ({ name: stage.name, status: 'PENDING', progress: 0 })),
-    stageCount: stages.length,
-    completedStageCount: 0,
-    progress: 0
+    stages: stages.map(stage => ({ name: stage.name, status: 'PENDING', progress: 0 }))
   })
   selectedTaskId.value = taskId
   supplementalSelection.value = null
@@ -445,12 +432,12 @@ async function controlActiveTask(action, successMessage) {
   const sessionId = props.sessionId
   controlPending.value = true
   try {
-    if (action === 'stopTask') {
-      await ElMessageBox.confirm('停止后将保留当前已发现结果。', '停止扫描', {
-        type: 'warning',
-        confirmButtonText: '停止',
-        cancelButtonText: '取消'
-      })
+    if (action === 'stopTask' && !(await confirmAction({
+      title: '停止扫描',
+      message: '停止后将保留当前已发现结果。',
+      confirmButtonText: '停止'
+    }))) {
+      return
     }
     if (props.sessionId !== sessionId || !taskEngine.getTaskById(task.id)) return
     await taskEngine[action](task.id)
@@ -469,70 +456,32 @@ async function controlActiveTask(action, successMessage) {
 const pauseActiveTask = () => controlActiveTask('pauseTask', '扫描已暂停')
 const resumeActiveTask = () => controlActiveTask('resumeTask', '扫描已继续')
 const stopActiveTask = () => controlActiveTask('stopTask', '扫描已停止')
-function normalizedOutcome(status, outcome) {
-  const normalizedStatus = String(status || '').toUpperCase()
-  const normalizedOutcome = String(outcome || '').toUpperCase()
-  if (normalizedStatus !== 'STOPPED') return normalizedStatus
-  return normalizedOutcome || normalizedStatus
-}
-function statusClass(status, outcome) {
-  return `status-${String(normalizedOutcome(status, outcome) || '').toLowerCase()}`
-}
-function getStatusText(status, outcome) {
-  return (
-    {
-      PENDING: '等待中',
-      RUNNING: '扫描中',
-      SCANNING: '扫描中',
-      PAUSED: '已暂停',
-      STOPPED: '已结束',
-      COMPLETED: '已完成',
-      FAILED: '失败',
-      CANCELLED: '已取消'
-    }[normalizedOutcome(status, outcome)] ||
-    status ||
-    '等待中'
-  )
-}
 function isRunning(task) {
-  return [TaskStatus.SCANNING, 'RUNNING'].includes(task?.status)
+  return task?.status === TaskStatus.SCANNING
 }
 function isPaused(task) {
-  return [TaskStatus.PAUSED, 'PAUSED'].includes(task?.status)
+  return task?.status === TaskStatus.PAUSED
 }
 function getMetrics(task) {
-  const targetTotal = Number(task?.targetCount || 0)
-  const rawProcessed = Number(task?.processedCount || 0)
-  const progress = Number(task?.progress || 0)
-  const processed = rawProcessed > 0 || progress < 100 ? rawProcessed : targetTotal
   return {
-    targetTotal,
-    processed: Math.max(0, processed),
-    reachableHostCount: Number(
-      task?.reachableHostCount ?? task?.reachableHostList?.length ?? 0
-    ),
-    openCount: Number(
-      task?.openCount ?? (Array.isArray(task?.openPortResults) ? task.openPortResults.length : 0)
-    ),
-    serviceCount: Number(
-      task?.serviceCount ?? (Array.isArray(task?.serviceResults) ? task.serviceResults.length : 0)
-    ),
-    fingerprintCount: Number(task?.fingerprintCount || 0),
-    identifiedApplicationCount: Number(task?.identifiedApplicationCount || 0),
-    errorCount: Number(
-      task?.errorCount ?? (task?.error ? 1 : 0)
-    )
+    targetTotal: task?.targetCount ?? 0,
+    processed: task?.processedCount ?? 0,
+    reachableHostCount: task?.reachableHostCount ?? 0,
+    openCount: task?.openCount ?? 0,
+    serviceCount: task?.serviceCount ?? 0,
+    fingerprintCount: task?.fingerprintCount ?? 0,
+    identifiedApplicationCount: task?.identifiedApplicationCount ?? 0
   }
 }
 function portPolicyLabel(task) {
   if (task?.stages?.length === 1 && task.stages[0].name === 'REACHABILITY') return '仅主机探活'
   const ports = Array.isArray(task?.scanPorts) ? task.scanPorts.length : 0
   if (ports) return `${formatCount(ports)} 个端口`
-  return task?.options?.portPolicy?.profile || task?.portPolicy?.profile || '预设策略'
+  return '预设策略'
 }
 function getProgressStatus(task) {
   if (!task) return undefined
-  if (String(task.status || '').toUpperCase() === 'FAILED') return 'exception'
+  if (task.status === TaskStatus.FAILED) return 'exception'
   if (isPaused(task)) return 'warning'
   return undefined
 }
@@ -558,22 +507,18 @@ function stageSnapshot(name) {
 }
 function stageIsComplete(name) {
   const stage = stageSnapshot(name)
-  if (stage) return ['COMPLETED', 'SKIPPED'].includes(String(stage.status || '').toUpperCase())
-  return normalizedOutcome(activeTask.value?.status, activeTask.value?.outcome) === 'COMPLETED'
+  if (stage) return ['COMPLETED', 'SKIPPED'].includes(stage.status)
+  return activeTask.value?.status === TaskStatus.COMPLETED
 }
 function stageClass(name) {
   const stage = stageSnapshot(name)
-  const status = String(stage?.status || '').toLowerCase()
   const terminalWithoutSnapshot =
-    !stage &&
-    ['COMPLETED', 'FAILED', 'CANCELLED'].includes(
-      normalizedOutcome(activeTask.value?.status, activeTask.value?.outcome)
-    )
+    !stage && TERMINAL_TASK_STATUSES.includes(activeTask.value?.status)
   return {
     complete: stageIsComplete(name),
     current:
-      !terminalWithoutSnapshot && (activeTask.value?.currentStage === name || status === 'running'),
-    failed: status === 'failed'
+      !terminalWithoutSnapshot && (activeTask.value?.currentStage === name || stage?.status === 'RUNNING'),
+    failed: stage?.status === 'FAILED'
   }
 }
 function stageStatusText(name) {
@@ -591,12 +536,12 @@ function stageStatusText(name) {
     }
     if (name === 'SERVICE_PROBE' && getMetrics(activeTask.value).serviceCount)
       return `${formatCount(getMetrics(activeTask.value).serviceCount)} 个服务`
-    return getStatusText(stage.status, stage.outcome)
+    return stage.status === 'RUNNING' ? '扫描中' : TASK_STATUS_TEXT[stage.status.toLowerCase()] || stage.status
   }
-  const outcome = normalizedOutcome(activeTask.value?.status, activeTask.value?.outcome)
-  if (outcome === 'COMPLETED') return '已完成'
-  if (outcome === 'FAILED') return '未完成'
-  if (outcome === 'CANCELLED') return '已取消'
+  const status = activeTask.value?.status
+  if (status === TaskStatus.COMPLETED) return '已完成'
+  if (status === TaskStatus.FAILED) return '未完成'
+  if (status === TaskStatus.CANCELLED) return '已取消'
   return '等待中'
 }
 </script>

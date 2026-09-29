@@ -151,8 +151,7 @@ const formData = reactive({})
 const submitting = ref(false)
 const { tableRows } = useDatabaseRowDialog({
   props,
-  formData,
-  mode: 'edit'
+  formData
 })
 
 watch(

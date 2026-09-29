@@ -485,10 +485,6 @@ function disposeEditors() {
   disposeMonacoEditors(encodeEditor, decodeEditor)
 }
 
-function normalizePayload() {
-  return buildDisguisePayload(formData)
-}
-
 function insertHeaderExample() {
   formData.headersText = DEFAULT_DISGUISE_HEADERS
 }
@@ -525,7 +521,7 @@ function handleSubmit() {
       return
     }
 
-    emit('submit', normalizePayload())
+    emit('submit', buildDisguisePayload(formData))
   })
 }
 

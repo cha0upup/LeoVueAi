@@ -125,7 +125,7 @@ const Disguises = ref([])
 const supportedTypes = ref({
   serverProtocolInjectorTypes: {},
   injectorCapabilities: [],
-  packerTypes: { groups: [], ungrouped: [], flat: [] },
+  packerTypes: { groups: [], ungrouped: [] },
   packerObfuscationSteps: {},
   packerCompatibility: {},
   packerAvailability: {},
@@ -155,14 +155,12 @@ const isResultStale = computed(() => {
 })
 
 const isPhpRuntime = computed(() => form.runtime === 'php')
-const runtimeGenerators = computed(() => supportedTypes.value.runtimeGenerators || {})
+const runtimeGenerators = computed(() => supportedTypes.value.runtimeGenerators)
 const phpGeneratorMetadata = computed(() => runtimeGenerators.value.php || {})
 const availableDisguises = computed(() => {
   if (!isPhpRuntime.value) return Disguises.value
   return Disguises.value.filter((item) =>
-    Array.isArray(item.supportedRuntimes)
-      ? item.supportedRuntimes.some((runtime) => String(runtime).toLowerCase() === 'php')
-      : Boolean(item.phpTrafficEncodeBody && item.phpTrafficDecodeBody)
+    item.supportedRuntimes?.includes('php')
   )
 })
 
@@ -183,15 +181,12 @@ const packerTypesStructure = computed(() => filterPackerTypesStructure(
 const packerTypesFlat = computed(() => packerTypesStructure.value.flat)
 
 /** packer 名称 -> 支持的混淆步骤 ID 列表（空列表表示不支持） */
-const packerObfuscationSteps = computed(() => supportedTypes.value.packerObfuscationSteps || {})
-const packerCompatibility = computed(() => supportedTypes.value.packerCompatibility || {})
-const targetJavaVersions = computed(() => supportedTypes.value.targetJavaVersions || ['auto', '6', '7', '8', '9+', '17+'])
-const servletNamespaces = computed(() => supportedTypes.value.servletNamespaces || ['auto', 'javax', 'jakarta'])
-const transportProtocols = computed(() => supportedTypes.value.transportProtocols || {
-  webshell: ['http', 'httpchunk'],
-  memoryshell: ['http', 'httpchunk', 'websocket']
-})
-const injectorCapabilities = computed(() => supportedTypes.value.injectorCapabilities || [])
+const packerObfuscationSteps = computed(() => supportedTypes.value.packerObfuscationSteps)
+const packerCompatibility = computed(() => supportedTypes.value.packerCompatibility)
+const targetJavaVersions = computed(() => supportedTypes.value.targetJavaVersions)
+const servletNamespaces = computed(() => supportedTypes.value.servletNamespaces)
+const transportProtocols = computed(() => supportedTypes.value.transportProtocols)
+const injectorCapabilities = computed(() => supportedTypes.value.injectorCapabilities)
 
 const selectedPackerCompatible = computed(() => {
   if (isPhpRuntime.value || form.generateType !== 'memoryshell' || !form.packerType) return true
@@ -213,8 +208,8 @@ const servletNamespaceCompatible = computed(() =>
 /** 判断 packer 是否属于 Jsp 分组（与 ConfigPanel.isJspPackerSelected 保持一致） */
 const isJspGroupPacker = (packerType) => {
   if (!packerType) return false
-  for (const group of (packerTypesStructure.value.groups || [])) {
-    if (group.groupName === 'Jsp' && Array.isArray(group.packers) && group.packers.includes(packerType)) {
+  for (const group of packerTypesStructure.value.groups) {
+    if (group.groupName === 'Jsp' && group.packers.includes(packerType)) {
       return true
     }
   }
@@ -249,15 +244,14 @@ const selectedInjectorCapability = computed(() => injectorCapabilities.value.fin
     && item?.injectorName === form.shellType
 ))
 const injectorNamespaceCompatible = computed(() => {
-  const supported = selectedInjectorCapability.value?.servletNamespaces
+  const capability = selectedInjectorCapability.value
   const namespace = form.servletNamespace === 'auto' ? 'javax' : form.servletNamespace
-  return !Array.isArray(supported) || supported.includes(namespace)
+  return !capability || capability.servletNamespaces.includes(namespace)
 })
 const injectorServerVersionCompatible = computed(() => {
   const capability = selectedInjectorCapability.value
   if (!capability?.requiresServerVersion) return true
-  return Array.isArray(capability.serverVersions)
-    && capability.serverVersions.includes(form.serverVersion)
+  return capability.serverVersions.includes(form.serverVersion)
 })
 const injectorPackerCompatible = computed(() => {
   return isInjectorPackerCompatible(
@@ -365,18 +359,19 @@ const configSummaryText = computed(() =>
 
 const resultMeta = computed(() => {
   if (isPhpRuntime.value) {
-    const metadata = webMetadata.value?.metadata || webMetadata.value || {}
+    const metadata = webMetadata.value?.metadata
+    if (!metadata) return []
     return [
       { label: '运行时', value: 'PHP' },
-      { label: '协议', value: metadata.protocol || 'http' },
-      { label: '最低版本', value: `PHP ${metadata.minimumVersion || '5.6'}+` },
-      { label: '输出模式', value: metadata.outputMode || form.phpOutputMode || 'compact' },
-      { label: '伪装协议', value: `v${metadata.protocolVersion || 2}` },
-      { label: '内核协议', value: metadata.coreProtocol || 'M0-M3' },
-      { label: '按需加载组件', value: metadata.components?.length ? `全部（${metadata.components.length}）` : '全部' },
-      { label: '加载模式', value: metadata.componentDeliveryMode || 'on-demand-disk-cache' },
-      { label: '启动器编码', value: metadata.bootstrapEncoding || 'minified-php' },
-      { label: '生成体积', value: metadata.generatedBytes ? `${(metadata.generatedBytes / 1024).toFixed(1)} KB` : '-' },
+      { label: '协议', value: metadata.protocol },
+      { label: '最低版本', value: `PHP ${metadata.minimumVersion}+` },
+      { label: '输出模式', value: metadata.outputMode },
+      { label: '伪装协议', value: `v${metadata.protocolVersion}` },
+      { label: '内核协议', value: metadata.coreProtocol },
+      { label: '按需加载组件', value: `全部（${metadata.components.length}）` },
+      { label: '加载模式', value: metadata.componentDeliveryMode },
+      { label: '启动器编码', value: metadata.bootstrapEncoding },
+      { label: '生成体积', value: `${(metadata.generatedBytes / 1024).toFixed(1)} KB` },
       { label: '字符编码', value: 'UTF-8' }
     ]
   }
@@ -451,46 +446,9 @@ const getAllDisguises = async () => {
 const getSupportedTypes = async () => {
   try {
     const resp = await getShellGeneratorSupportedTypesApi()
-    const raw = resp.data || {}
-    const pt = raw.packerTypes || {}
-    supportedTypes.value = {
-      serverProtocolInjectorTypes: (raw.serverProtocolInjectorTypes && typeof raw.serverProtocolInjectorTypes === 'object')
-        ? raw.serverProtocolInjectorTypes
-        : {},
-      injectorCapabilities: Array.isArray(raw.injectorCapabilities)
-        ? raw.injectorCapabilities
-        : [],
-      packerTypes: {
-        groups: Array.isArray(pt.groups) ? pt.groups : [],
-        ungrouped: Array.isArray(pt.ungrouped) ? pt.ungrouped : [],
-        flat: Array.isArray(pt.flat) ? pt.flat : []
-      },
-      packerObfuscationSteps: (raw.packerObfuscationSteps && typeof raw.packerObfuscationSteps === 'object')
-        ? raw.packerObfuscationSteps
-        : {},
-      packerCompatibility: (raw.packerCompatibility && typeof raw.packerCompatibility === 'object')
-        ? raw.packerCompatibility
-        : {},
-      packerAvailability: (raw.packerAvailability && typeof raw.packerAvailability === 'object')
-        ? raw.packerAvailability
-        : {},
-      targetJavaVersions: Array.isArray(raw.targetJavaVersions)
-        ? raw.targetJavaVersions
-        : ['auto', '6', '7', '8', '9+', '17+'],
-      servletNamespaces: Array.isArray(raw.servletNamespaces)
-        ? raw.servletNamespaces
-        : ['auto', 'javax', 'jakarta'],
-      transportProtocols: (raw.transportProtocols && typeof raw.transportProtocols === 'object')
-        ? raw.transportProtocols
-        : {
-            webshell: ['http', 'httpchunk'],
-            memoryshell: ['http', 'httpchunk', 'websocket']
-          },
-      runtimeGenerators: (raw.runtimeGenerators && typeof raw.runtimeGenerators === 'object')
-        ? raw.runtimeGenerators
-        : {}
-    }
-    const phpMetadata = supportedTypes.value.runtimeGenerators?.php
+    if (!resp.data) throw new Error('获取支持类型失败')
+    supportedTypes.value = resp.data
+    const phpMetadata = resp.data.runtimeGenerators?.php
     form.phpMinimumVersion = phpMetadata?.minimumVersion || '5.6'
     form.phpOutputMode = phpMetadata?.defaultOutputMode || 'compact'
   } catch {

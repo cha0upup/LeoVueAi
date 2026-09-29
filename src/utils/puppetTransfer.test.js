@@ -37,6 +37,15 @@ describe('puppet transfer bundle', () => {
     ])
   })
 
+  it('rejects bundles without the current format target list', () => {
+    const bundle = buildPuppetTransferBundle(puppets, ['leaf-c'])
+    delete bundle.roots
+    expect(() => parsePuppetTransferPayload(bundle)).toThrow('主机配置包缺少导入目标')
+
+    bundle.roots = ['missing-id']
+    expect(() => parsePuppetTransferPayload(bundle)).toThrow('主机配置包包含不存在的导入目标')
+  })
+
   it('includes selected descendants and their intermediate parents only', () => {
     const withSibling = [...puppets, {
       puppetId: 'sibling-d',

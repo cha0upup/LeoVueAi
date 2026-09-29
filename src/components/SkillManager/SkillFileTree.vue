@@ -215,10 +215,11 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import { ElMessageBox } from 'element-plus'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { icons } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { executeRequest } from '@/utils/apiUtils.js'
+import { executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
 import { saveSkillFileApi, deleteSkillFileApi, moveSkillFileApi } from '@/services/api.js'
 
 const iconMap = icons
@@ -346,78 +347,52 @@ const confirmDialog = async () => {
     return
   }
 
-  dialogSubmitting.value = true
-  try {
-    if (dialogMode.value === 'create-file') {
-      await saveSkillFileApi({
-        scope: props.scope,
-        name: props.skillName,
-        path: target,
-        content: '',
-        encoding: 'text'
-      })
-      showSuccess('已创建')
-      emit('refresh')
-      emit('open-after-write', target)
-    } else if (dialogMode.value === 'create-folder') {
-      // 后端没有显式创建空目录，借助占位文件创建后立即删除占位是不必要的
-      // 直接提示用户：通过新建文件时输入 "folder/file.txt" 自动建目录
-      // 这里用 .gitkeep 作为占位以创建目录
-      await saveSkillFileApi({
-        scope: props.scope,
-        name: props.skillName,
-        path: `${target}/.gitkeep`,
-        content: '',
-        encoding: 'text'
-      })
-      showSuccess('已创建文件夹')
-      emit('refresh')
-    } else if (dialogMode.value === 'rename') {
-      if (target === dialogOriginal.value) {
-        dialogVisible.value = false
-        return
-      }
-      await moveSkillFileApi({
-        scope: props.scope,
-        name: props.skillName,
-        from: dialogOriginal.value,
-        to: target
-      })
-      showSuccess('已重命名')
-      emit('refresh')
-      emit('open-after-write', target)
-    }
+  const rename = dialogMode.value === 'rename'
+  const folder = dialogMode.value === 'create-folder'
+  if (rename && target === dialogOriginal.value) {
     dialogVisible.value = false
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '操作失败')
-  } finally {
-    dialogSubmitting.value = false
+    return
   }
+  const context = { scope: props.scope, name: props.skillName }
+  const request = rename
+    ? () => moveSkillFileApi({ ...context, from: dialogOriginal.value, to: target })
+    : () => saveSkillFileApi({
+      ...context,
+      // 通过占位文件创建目录。
+      path: folder ? `${target}/.gitkeep` : target,
+      content: '',
+      encoding: 'text'
+    })
+  await executeRequest(request, {
+    loadingRef: dialogSubmitting,
+    successMessage: rename ? '已重命名' : folder ? '已创建文件夹' : '已创建',
+    errorMessage: '操作失败',
+    onSuccess: () => {
+      emit('refresh')
+      if (!folder) emit('open-after-write', target)
+      dialogVisible.value = false
+    }
+  }).catch(() => false)
 }
 
 // ── 删除 ──────────────────────────────────────────────────────────
 const confirmDelete = async (node) => {
   if (props.readOnly) return
-  try {
-    await ElMessageBox.confirm(`确定删除「${node.path}」？`, '删除确认', {
-      type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消'
-    })
-  } catch {
-    return
-  }
-  try {
-    await deleteSkillFileApi({
+  await executeDeleteWithConfirm(
+    () => deleteSkillFileApi({
       scope: props.scope,
       name: props.skillName,
       path: node.path
-    })
-    showSuccess('已删除')
-    emit('refresh')
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '删除失败')
-  }
+    }),
+    {
+      title: '删除确认',
+      message: `确定删除「${node.path}」？`,
+      confirmButtonText: '删除',
+      successMessage: '已删除',
+      errorMessage: '删除失败',
+      onSuccess: () => emit('refresh')
+    }
+  ).catch(() => false)
 }
 
 // ── 上传 ──────────────────────────────────────────────────────────

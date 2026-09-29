@@ -247,8 +247,13 @@ function rowClassName({ row }) {
 }
 
 function handleExport() {
-  if (flatList.value.length === 0) return
-  exportTsv(flatList.value, 'suid-caps.tsv', ['path', 'type', 'capabilities', 'gtfobins', 'dangerous'])
+  exportTsv(flatList.value, 'suid-caps', [
+    { label: 'path', key: 'path' },
+    { label: 'type', key: 'type' },
+    { label: 'capabilities', key: 'capabilities' },
+    { label: 'gtfobins', key: 'gtfobins' },
+    { label: 'dangerous', key: 'dangerous' }
+  ])
 }
 </script>
 

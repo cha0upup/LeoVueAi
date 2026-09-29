@@ -86,7 +86,7 @@
 
       <div class="result-row">
         <span>当前 {{ filteredPlugins.length }} / {{ plugins.length }} 个</span>
-        <span>{{ javaCount }} Java · {{ javaScriptCount }} JS · {{ shellCount }} Shell</span>
+        <span>{{ typeCounts.java }} Java · {{ typeCounts.javaScript }} JS · {{ typeCounts.shellCode }} Shell</span>
       </div>
 
       <BatchActionBar
@@ -139,7 +139,7 @@
             selectable
             :selected="selectedIds.has(item.pluginId)"
             :in-selection-mode="selectedIds.size > 0"
-            @click="selectPlugin(item)"
+            @click="selectedPlugin = item"
             @toggle-selected="(val) => setSelected(item, val)"
           >
             <template #status>
@@ -234,14 +234,12 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
-import { executeRequest, executeRequestWithStatus } from '@/utils/apiUtils.js'
-import { executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
+import { executeRequest } from '@/utils/apiUtils.js'
+import { executeBatchDelete, executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
 import { useDialogs, useEditDialog } from '@/utils/dialogUtils.js'
 import { buildUpdateParams, findUpdatedPlugin, PLUGIN_TYPES } from '@/utils/plugin.js'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
 import {
   deletePluginApi,
   addPluginApi,
@@ -258,14 +256,15 @@ import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import EntityCard from '@/components/common/EntityCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import BatchActionBar from '@/components/common/BatchActionBar.vue'
-import { downloadBlob } from '@/utils/downloadBlob.js'
+import { executeBlobDownload } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
+import { useBatchSelection } from '@/composables/useBatchSelection.js'
 
 const { isAdmin } = useAuth()
 
 const plugins = ref([])
 const selectedPlugin = ref(null)
-const selectedPluginId = ref('')
+const selectedPluginId = computed(() => selectedPlugin.value?.pluginId || '')
 const searchKeyword = ref('')
 const activeType = ref('all')
 
@@ -283,25 +282,16 @@ const batchExportLoading = ref(false)
 const batchDeleteLoading = ref(false)
 const detailExportLoading = ref(false)
 
-// 批量选择
-const selectedIds = ref(new Set())
-
 const pluginTypes = PLUGIN_TYPES
 const iconMap = icons
 
-const javaCount = computed(() => plugins.value.filter((item) => item.pluginType === 'java').length)
-const javaScriptCount = computed(
-  () => plugins.value.filter((item) => item.pluginType === 'javaScript').length
-)
-const shellCount = computed(() => plugins.value.filter((item) => item.pluginType === 'shellCode').length)
-const phpCount = computed(() => plugins.value.filter((item) => item.pluginType === 'php').length)
+const typeCounts = computed(() => Object.fromEntries(
+  pluginTypes.map(({ value }) => [value, plugins.value.filter(item => item.pluginType === value).length])
+))
 
 const typeTabs = computed(() => [
   { label: '全部', value: 'all', count: plugins.value.length },
-  { label: 'Java', value: 'java', count: javaCount.value },
-  { label: 'PHP', value: 'php', count: phpCount.value },
-  { label: 'JS', value: 'javaScript', count: javaScriptCount.value },
-  { label: 'Shell', value: 'shellCode', count: shellCount.value }
+  ...pluginTypes.map(({ value }) => ({ label: typeLabel(value), value, count: typeCounts.value[value] }))
 ])
 
 function typeLabel(type) {
@@ -335,63 +325,29 @@ const filteredPlugins = computed(() => {
   })
 })
 
-const allFilteredSelected = computed(() => {
-  if (!filteredPlugins.value.length) return false
-  return filteredPlugins.value.every((p) => selectedIds.value.has(p.pluginId))
-})
-
-const someFilteredSelected = computed(() => {
-  if (!filteredPlugins.value.length) return false
-  const hits = filteredPlugins.value.filter((p) => selectedIds.value.has(p.pluginId)).length
-  return hits > 0 && hits < filteredPlugins.value.length
-})
-
-const selectPlugin = (plugin) => {
-  selectedPlugin.value = plugin
-  selectedPluginId.value = plugin?.pluginId || ''
-}
-
-function setSelected(item, val) {
-  if (!item?.pluginId) return
-  const next = new Set(selectedIds.value)
-  if (val) next.add(item.pluginId)
-  else next.delete(item.pluginId)
-  selectedIds.value = next
-}
-
-function toggleSelectAll(val) {
-  const next = new Set(selectedIds.value)
-  for (const p of filteredPlugins.value) {
-    if (!p.pluginId) continue
-    if (val) next.add(p.pluginId)
-    else next.delete(p.pluginId)
-  }
-  selectedIds.value = next
-}
-
-function clearBatchSelection() {
-  selectedIds.value = new Set()
-}
+const {
+  selectedIds,
+  allFilteredSelected,
+  someFilteredSelected,
+  setSelected,
+  toggleSelectAll,
+  clearBatchSelection
+} = useBatchSelection(filteredPlugins, item => item?.pluginId)
 
 // 切换类型筛选时清空选中
 watch(activeType, clearBatchSelection)
 
-const deletePlugin = async (pluginId) => {
-  await executeDeleteWithConfirm(() => deletePluginApi({ pluginId }), {
-    successMessage: '删除插件成功',
-    errorMessage: '删除插件失败',
-    onSuccess: () => getPlugins()
-  })
-}
-
 const handleDeletePlugin = async (plugin) => {
   if (!plugin?.pluginId) return
-  deleteLoading.value = true
-  try {
-    await deletePlugin(plugin.pluginId)
-  } finally {
-    deleteLoading.value = false
-  }
+  await executeDeleteWithConfirm(() => deletePluginApi({ pluginId: plugin.pluginId }), {
+    loadingRef: deleteLoading,
+    successMessage: '删除插件成功',
+    errorMessage: '删除插件失败',
+    onSuccess: () => {
+      setSelected(plugin, false)
+      return getPlugins()
+    }
+  })
 }
 
 const handleAddPlugin = async (pluginData) => {
@@ -416,11 +372,10 @@ const getPlugins = async () => {
         .slice()
         .sort((a, b) => (a.pluginName || a.pluginId).localeCompare(b.pluginName || b.pluginId))
 
-      const nextPlugin =
+      selectedPlugin.value =
         plugins.value.find((item) => item.pluginId === selectedPluginId.value) ||
         plugins.value[0] ||
         null
-      selectPlugin(nextPlugin)
       return response
     },
     {
@@ -436,16 +391,14 @@ const openEditDialog = (plugin) => {
 }
 
 const handleUpdatePlugin = async (pluginData) => {
-  await executeRequestWithStatus(
+  await executeRequest(
     () => {
       const updateParams = buildUpdateParams(pluginData)
       return updatePluginApi(updateParams)
     },
     {
       loadingRef: updateLoading,
-      successMessages: {
-        200: '插件更新成功'
-      },
+      successMessage: '插件更新成功',
       errorMessages: {
         400: '字节码验证失败',
         404: '插件不存在',
@@ -458,7 +411,7 @@ const handleUpdatePlugin = async (pluginData) => {
 
         const updatedPlugin = findUpdatedPlugin(plugins.value, response, pluginData.pluginId)
         if (updatedPlugin) {
-          selectPlugin(updatedPlugin)
+          selectedPlugin.value = updatedPlugin
         }
       }
     }
@@ -468,77 +421,43 @@ const handleUpdatePlugin = async (pluginData) => {
 async function handleBatchDelete() {
   if (!selectedIds.value.size) return
   const ids = Array.from(selectedIds.value)
-  try {
-    await ElMessageBox.confirm(
-      `确认删除选中的 ${ids.length} 个插件？此操作不可恢复。`,
-      '批量删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消', confirmButtonClass: 'el-button--danger' }
-    )
-  } catch {
-    return
-  }
-  batchDeleteLoading.value = true
-  try {
-    await Promise.all(ids.map((pluginId) => deletePluginApi({ pluginId })))
-    showSuccess(`已删除 ${ids.length} 个插件`)
-    clearBatchSelection()
-    await getPlugins()
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '批量删除失败')
-  } finally {
-    batchDeleteLoading.value = false
-  }
+  await executeBatchDelete(ids, async (pluginId) => {
+    await deletePluginApi({ pluginId })
+    selectedIds.value.delete(pluginId)
+  }, {
+    itemName: '插件',
+    confirmMessage: `确认删除选中的 ${ids.length} 个插件？此操作不可恢复。`,
+    loadingRef: batchDeleteLoading,
+    onSuccess: getPlugins
+  }).catch(() => {}) // 删除和刷新函数已显示错误提示。
 }
 
 // ── 导出 ──────────────────────────────────────────────────────────────────
 
-async function handleQuickExport(item) {
+function handleQuickExport(item, loadingRef) {
   if (!item?.pluginId) return
-  try {
-    const res = await exportPluginApi(item.pluginId)
-    const blob = res?.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/octet-stream' })
-    downloadBlob(blob, item.pluginId)
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '导出失败')
-  }
+  return executeBlobDownload(() => exportPluginApi(item.pluginId), item.pluginId, {
+    loadingRef
+  }).catch(() => false)
 }
 
-async function handleExportList(list) {
-  const ids = (list || []).map((p) => p.pluginId).filter(Boolean)
-  if (!ids.length) return
-  batchExportLoading.value = true
-  try {
-    const res = await exportPluginsBatchApi({ pluginIds: ids })
-    const blob = res?.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/zip' })
-    const date = new Date().toISOString().slice(0, 10)
-    downloadBlob(blob, `plugins_${date}.zip`)
-    showSuccess(`已导出 ${ids.length} 个插件`)
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '导出失败')
-  } finally {
-    batchExportLoading.value = false
-  }
-}
-
-async function handleDetailExport(plugin) {
-  if (!plugin?.pluginId) return
-  detailExportLoading.value = true
-  try {
-    const res = await exportPluginApi(plugin.pluginId)
-    const blob = res?.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/octet-stream' })
-    downloadBlob(blob, plugin.pluginId)
-  } catch (e) {
-    showError(e?.response?.data?.msg || e?.message || '导出失败')
-  } finally {
-    detailExportLoading.value = false
-  }
-}
+const handleDetailExport = (plugin) => handleQuickExport(plugin, detailExportLoading)
 
 async function handleBatchExport() {
-  if (!selectedIds.value.size) return
   const ids = Array.from(selectedIds.value)
-  await handleExportList(ids.map((pluginId) => ({ pluginId })))
-  clearBatchSelection()
+  if (!ids.length) return
+  const date = new Date().toISOString().slice(0, 10)
+  await executeBlobDownload(
+    () => exportPluginsBatchApi({ pluginIds: ids }),
+    `plugins_${date}.zip`,
+    {
+      loadingRef: batchExportLoading,
+      successMessage: `已导出 ${ids.length} 个插件`,
+      onSuccess: () => {
+        for (const id of ids) selectedIds.value.delete(id)
+      }
+    }
+  ).catch(() => false)
 }
 
 // ── 导入回调 ──────────────────────────────────────────────────────────────

@@ -309,7 +309,7 @@ import { executeRequest } from '@/utils/apiUtils.js'
 import { executeDeleteWithConfirm, confirmAction } from '@/utils/confirmUtils.js'
 import { omitFields } from '@/utils/dataUtils.js'
 import { useEditDialog, useDialog } from '@/utils/dialogUtils.js'
-import { validateForm, handleFormSubmit, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
 import { addUserApi, deleteUserApi, getAllUsersApi, getAllTeamsApi, updateUserApi, resetUserPasswordApi } from '@/services/api.js'
 import { showError } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
@@ -524,8 +524,8 @@ const submitUser = async () => {
 
   const editing = isEdit.value
 
-  await handleFormSubmit(
-    async () => {
+  await executeRequest(
+    () => {
       // 构建用户数据，排除确认密码字段
       const userData = omitFields(userForm, ['confirmPassword'])
       userData.status = normalizeUserStatus(userData.status)
@@ -542,11 +542,7 @@ const submitUser = async () => {
         // 编辑时排除密码字段（如果为空）
         delete userData.password
       }
-      const response = editing
-        ? await updateUserApi(userData)
-        : await addUserApi(userData)
-
-      return response
+      return editing ? updateUserApi(userData) : addUserApi(userData)
     },
     {
       loadingRef: submitting,
@@ -559,7 +555,7 @@ const submitUser = async () => {
           type: 'success'
         })
         closeUserDialog()
-        getAllUsers()
+        return getAllUsers()
       },
       onError: (error) => {
         ElNotification({
@@ -591,13 +587,7 @@ const deleteUser = async (user) => {
   }
 
   await executeDeleteWithConfirm(
-    async () => {
-      const response = await deleteUserApi({ id: user.userId })
-      if (!response.data) {
-        throw new Error('删除失败')
-      }
-      return response
-    },
+    () => deleteUserApi({ id: user.userId }),
     {
       title: '删除确认',
       message: `确定要删除用户 "${user.userName || '未知用户'}" 吗？此操作不可撤销。`,
@@ -609,7 +599,7 @@ const deleteUser = async (user) => {
           message: '用户删除成功！',
           type: 'success'
         })
-        getAllUsers()
+        return getAllUsers()
       },
       onError: () => {
         ElNotification({
@@ -642,18 +632,12 @@ const submitResetPassword = async () => {
   const isValid = await validateForm(resetFormRef)
   if (!isValid) return
 
-  await handleFormSubmit(
-    async () => {
-      const response = await resetUserPasswordApi({
+  await executeRequest(
+    () =>
+      resetUserPasswordApi({
         userId: resetForm.userId,
         newPassword: resetForm.newPassword
-      })
-
-      if (!response.data) {
-        throw new Error('重置失败')
-      }
-      return response
-    },
+      }),
     {
       loadingRef: resetting,
       successMessage: null, // 使用ElNotification

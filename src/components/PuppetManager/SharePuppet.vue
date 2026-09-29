@@ -195,6 +195,7 @@ import { computed, ref } from 'vue'
 import { exportPuppetsApi } from '@/services/api.js'
 import { PUPPET_DEFAULT_MAX_REQUEST_COUNT } from '@/utils/constants.js'
 import { icons } from '@/utils/icons.js'
+import { downloadBlob } from '@/utils/downloadBlob.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import {
   buildPuppetTransferBundle,
@@ -320,14 +321,7 @@ const copyToClipboard = async () => {
 const downloadFile = () => {
   if (!output.value) return
   const blob = new Blob([output.value], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${puppet.value.puppetName || 'puppet'}_bundle.txt`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  downloadBlob(blob, `${puppet.value.puppetName || 'puppet'}_bundle.txt`)
   showSuccess('文件下载成功')
 }
 

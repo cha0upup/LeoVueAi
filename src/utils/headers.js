@@ -1,10 +1,6 @@
 function parseHeadersToObject(headers) {
   if (!headers) return {}
 
-  if (typeof headers === 'object' && !Array.isArray(headers)) {
-    return Object.fromEntries(Object.entries(headers).filter(([key]) => String(key || '').trim()))
-  }
-
   const raw = String(headers).trim()
   if (!raw) return {}
 

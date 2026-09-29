@@ -65,14 +65,6 @@ class SqlEngine {
     }
   }
 
-  _buildObjectRequest(params = {}) {
-    const request = this._buildRequestWithConnection(params)
-    delete request.database
-    delete request.table
-    delete request.tables
-    return request
-  }
-
   _buildRequestConfig(params = {}) {
     return params.signal ? { signal: params.signal } : undefined
   }
@@ -119,30 +111,24 @@ class SqlEngine {
     const configs = {}
     const aliases = {}
     for (const item of catalog) {
-      const type = String(item?.type || '').trim().toLowerCase()
-      if (!type || !item?.name || !Array.isArray(item?.variants)) continue
+      const type = item.type
       configs[type] = {
-        name: String(item.name),
-        defaultPort: item.defaultPort ?? null,
+        name: item.name,
+        defaultPort: item.defaultPort,
         variants: item.variants.map((variant) => ({
-          key: String(variant?.key || ''),
-          name: String(variant?.name || variant?.key || ''),
-          fields: Array.isArray(variant?.fields) ? [...variant.fields] : []
+          key: variant.key,
+          name: variant.name,
+          fields: [...variant.fields]
         })),
-        dataTypes: Array.isArray(item.dataTypes) ? item.dataTypes.map((dataType) => ({ ...dataType })) : [],
-        aliases: Array.isArray(item.aliases) ? [...item.aliases] : [],
-        connectionModes: Array.isArray(item.connectionModes) ? [...item.connectionModes] : [],
-        namespaceLevels: Array.isArray(item.namespaceLevels) ? [...item.namespaceLevels] : [],
-        runtimeSupport: item.runtimeSupport || {},
-        capabilities: item.capabilities || {}
+        dataTypes: item.dataTypes.map((dataType) => ({ ...dataType })),
+        aliases: [...item.aliases],
+        connectionModes: [...item.connectionModes],
+        runtimeSupport: item.runtimeSupport,
+        capabilities: item.capabilities
       }
       aliases[type] = type
-      for (const alias of configs[type].aliases) {
-        const normalized = String(alias || '').trim().toLowerCase()
-        if (normalized) aliases[normalized] = type
-      }
+      for (const alias of item.aliases) aliases[alias] = type
     }
-    if (Object.keys(configs).length === 0) return false
     this.dbConfigs = configs
     this.dialectAliases = aliases
     return true
@@ -157,21 +143,21 @@ class SqlEngine {
 
   getTables(params) {
     return getSqlTablesApi(
-      this._buildObjectRequest(params),
+      this._buildRequestWithConnection(params),
       this._buildRequestConfig(params)
     )
   }
 
   getTableColumns(params) {
     return getSqlTableColumnsApi(
-      this._buildObjectRequest(params),
+      this._buildRequestWithConnection(params),
       this._buildRequestConfig(params)
     )
   }
 
   queryTable(params) {
     return querySqlTableApi(
-      this._buildObjectRequest(params),
+      this._buildRequestWithConnection(params),
       this._buildRequestConfig(params)
     )
   }
@@ -188,27 +174,27 @@ class SqlEngine {
   }
 
   createTable(params) {
-    return createSqlTableApi(this._buildObjectRequest(params))
+    return createSqlTableApi(this._buildRequestWithConnection(params))
   }
 
   insertRow(params) {
-    return insertSqlRowApi(this._buildObjectRequest(params))
+    return insertSqlRowApi(this._buildRequestWithConnection(params))
   }
 
   updateRows(params) {
-    return updateSqlRowsApi(this._buildObjectRequest(params))
+    return updateSqlRowsApi(this._buildRequestWithConnection(params))
   }
 
   deleteRows(params) {
-    return deleteSqlRowsApi(this._buildObjectRequest(params))
+    return deleteSqlRowsApi(this._buildRequestWithConnection(params))
   }
 
   exportTable(params) {
-    return exportSqlTableApi(this._buildObjectRequest(params))
+    return exportSqlTableApi(this._buildRequestWithConnection(params))
   }
 
   exportDatabase(params) {
-    return exportSqlDatabaseApi(this._buildObjectRequest(params))
+    return exportSqlDatabaseApi(this._buildRequestWithConnection(params))
   }
 
   // ===== 配置工具 =====
@@ -243,12 +229,7 @@ class SqlEngine {
   }
 
   hasCapability(dialect, capability) {
-    return this.getCapabilities(dialect)?.[capability] === true
-  }
-
-  getNamespaceLevels(dialect) {
-    const levels = this.getDatabaseConfig(dialect)?.namespaceLevels
-    return Array.isArray(levels) ? [...levels] : []
+    return this.getCapabilities(dialect)[capability] === true
   }
 
   getDataTypeOptions(dialect) {
@@ -291,11 +272,11 @@ class SqlEngine {
    */
   getVariants(dialect) {
     const cfg = this.getDatabaseConfig(dialect)
-    if (!cfg || !Array.isArray(cfg.variants)) return []
+    if (!cfg) return []
     return cfg.variants.map((v) => ({
       key: v.key,
       name: v.name,
-      fields: Array.isArray(v.fields) ? [...v.fields] : []
+      fields: [...v.fields]
     }))
   }
   /**
@@ -305,8 +286,7 @@ class SqlEngine {
    */
   normalizeDialect(dialect) {
     const type = String(dialect || '').trim().toLowerCase()
-    if (!type) return ''
-    return this.dialectAliases[type] || (this.dbConfigs[type] ? type : '')
+    return this.dialectAliases[type] || ''
   }
 }
 

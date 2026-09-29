@@ -393,6 +393,7 @@ import {
   deleteScheduledTaskApi
 } from '@/services/api.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { exportTsv } from '@/utils/exportUtils.js'
 
 const props = defineProps({
   sessionId: {
@@ -542,25 +543,14 @@ function handleSortChange({ prop, order }) {
 }
 
 function handleExport() {
-  if (filteredTasks.value.length === 0) return
-  const header = 'TaskName\tType\tStatus\tSchedule\tCommand\tSource\n'
-  const rows = filteredTasks.value.map(t =>
-    [
-      t.taskName || '',
-      t.type || t.scheduleType || '',
-      t.status || '',
-      t.schedule || t.cronExpression || t.nextRun || '',
-      t.command || '',
-      t.source || t.author || ''
-    ].join('\t')
-  ).join('\n')
-  const blob = new Blob([header + rows], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'scheduled-tasks.tsv'
-  a.click()
-  URL.revokeObjectURL(url)
+  exportTsv(filteredTasks.value, 'scheduled-tasks', [
+    { label: 'TaskName', key: 'taskName' },
+    { label: 'Type', key: task => task.type || task.scheduleType || '' },
+    { label: 'Status', key: 'status' },
+    { label: 'Schedule', key: task => task.schedule || task.cronExpression || task.nextRun || '' },
+    { label: 'Command', key: 'command' },
+    { label: 'Source', key: task => task.source || task.author || '' }
+  ])
 }
 
 function typeColor(type) {

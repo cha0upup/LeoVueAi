@@ -209,7 +209,8 @@ import { confirmAction } from '@/utils/confirmUtils.js'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
 import { formatFilePath } from '@/utils/format.js'
-import { validateForm, handleFormSubmit } from '@/utils/formUtils.js'
+import { validateForm } from '@/utils/formUtils.js'
+import { executeRequest } from '@/utils/apiUtils.js'
 import { newDirApi, newFileApi } from '@/services/api.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
@@ -462,7 +463,7 @@ const handleSave = async ({ openAfterCreate = false } = {}) => {
   saveIntent.value = shouldOpen ? 'open' : 'create'
 
   try {
-    await handleFormSubmit(
+    await executeRequest(
       async () => {
         const isFolder = createType.value === 'folder'
         const params = {

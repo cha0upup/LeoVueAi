@@ -42,15 +42,3 @@ export const TASK_STATUS_TEXT = {
   [TaskStatus.FAILED]: '失败',
   [TaskStatus.CANCELLED]: '已取消'
 }
-
-export const TASK_STATUS_TONE = {
-  [TaskStatus.PENDING]: 'info',
-  [TaskStatus.UPLOADING]: 'warning',
-  [TaskStatus.DOWNLOADING]: 'warning',
-  [TaskStatus.DB_EXPORTING]: 'warning',
-  [TaskStatus.SCANNING]: 'primary',
-  [TaskStatus.PAUSED]: 'warning',
-  [TaskStatus.COMPLETED]: 'success',
-  [TaskStatus.FAILED]: 'danger',
-  [TaskStatus.CANCELLED]: 'info'
-}

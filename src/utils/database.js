@@ -51,10 +51,8 @@ export const DATABASE_MESSAGES = {
   NO_DATA_EXPORT: '没有数据可导出',
   CREATE_SUCCESS: '创建成功',
   DELETE_SUCCESS: '删除成功',
-  UPDATE_SUCCESS: '更新成功',
   GET_DATA_FAILED: '获取表数据失败',
   DELETE_FAILED: '删除数据失败',
-  UPDATE_FAILED: '更新数据失败',
   EXPORT_FAILED: '导出数据失败',
   DATABASE_INFO_FAILED: '无法获取数据库信息',
   NO_TABLES: '该数据库中没有表',
@@ -70,27 +68,13 @@ export const DATABASE_DIALOG_CONFIG = {
     cancelButtonText: '取消',
     inputPattern: /^[A-Za-z0-9_]+$/,
     inputErrorMessage: '只允许字母、数字与下划线'
-  },
-  EXPORT_DB: {
-    confirmButtonText: '确定导出',
-    cancelButtonText: '取消',
-    type: 'warning'
-  },
-  CREATE_TABLE: {
-    confirmButtonText: '创建',
-    cancelButtonText: '取消',
-    type: 'info'
   }
 }
 
 // 标签页相关常量
 export const DATABASE_TAB_CONSTANTS = {
   HOME_TAB_ID: '首页',
-  HOME_TAB_TITLE: '连接管理',
-  UNCONFIGURED_CONNECTION: '未配置连接',
-  URL_MAX_LENGTH: 36,
-  URL_PREFIX_LENGTH: 18,
-  URL_SUFFIX_LENGTH: 12
+  HOME_TAB_TITLE: '连接管理'
 }
 
 // ==================== 数据格式化函数 ====================
@@ -115,17 +99,6 @@ export function formatCellValue(cell, column) {
     return value
   }
 
-  // 精确数值保持原始文本，避免 BIGINT、DECIMAL 和 NUMBER 被 JS Number 截断。
-  if (
-    type.includes('int') ||
-    type.includes('decimal') ||
-    type.includes('float') ||
-    type.includes('double') ||
-    type.includes('numeric')
-  ) {
-    return value
-  }
-
   // 处理日期时间类型
   if (type.includes('date') || type.includes('time') || type.includes('timestamp')) {
     if (value && !INVALID_DATETIME_VALUES.includes(value)) {
@@ -134,11 +107,7 @@ export function formatCellValue(cell, column) {
     return ''
   }
 
-  // 字符串保持原值，不再根据字段名猜测布尔语义。
-  if (type.includes('char') || type.includes('text') || type.includes('varchar')) {
-    return value
-  }
-
+  // 非布尔、非日期值保持文本形式，避免精确数值被 JS Number 截断。
   return value
 }
 
@@ -153,9 +122,6 @@ export function getInputComponentByType(columnType) {
 
   const type = String(columnType).toLowerCase()
 
-  if (type.includes('int') || type.includes('decimal') || type.includes('numeric')) {
-    return 'el-input'
-  }
   if (type.includes('float') || type.includes('double')) {
     return 'el-input-number'
   }
@@ -172,17 +138,13 @@ export function getInputComponentByType(columnType) {
  * 根据列类型和元数据获取输入组件的属性
  * @param {string} columnType - 列类型
  * @param {Object} columnMeta - 列元数据
- * @param {string} mode - 模式 ('insert' | 'update')
  * @returns {Object} 组件属性
  */
 export function getInputPropsByType(columnType, columnMeta = {}) {
   if (!columnType) return { size: 'default' }
 
   const type = String(columnType).toLowerCase()
-  const meta = {
-    nullable: columnMeta.nullable === 'YES' || columnMeta.nullable === true,
-    maxLength: columnMeta.length || columnMeta.maxLength
-  }
+  const maxLength = columnMeta.length || columnMeta.maxLength
 
   const baseProps = { size: 'default' }
 
@@ -206,12 +168,12 @@ export function getInputPropsByType(columnType, columnMeta = {}) {
       ...baseProps,
       type: 'textarea',
       autosize: { minRows: 2, maxRows: 4 },
-      maxlength: meta.maxLength
+      maxlength: maxLength
     }
   }
   return {
     ...baseProps,
-    maxlength: meta.maxLength
+    maxlength: maxLength
   }
 }
 
@@ -238,28 +200,19 @@ export function getColumnMetaInfo(column) {
  * @returns {Array} 数据库模板列表
  */
 export function getAllDatabaseTemplates(sqlEngine) {
-  try {
-    const supportedList = sqlEngine.getSupportedDatabases()
-    const templateList = []
-
-    for (const dialect of supportedList) {
-      templateList.push({
-        value: dialect.type,
-        name: dialect.name,
-        dialect: dialect.type,
-        defaultPort: dialect.defaultPort,
-        variants: sqlEngine.getVariants(dialect.type),
-        connectionModes: sqlEngine.getDatabaseConfig(dialect.type)?.connectionModes || [],
-        namespaceLevels: sqlEngine.getDatabaseConfig(dialect.type)?.namespaceLevels || [],
-        runtimeSupport: sqlEngine.getDatabaseConfig(dialect.type)?.runtimeSupport || {},
-        capabilities: sqlEngine.getDatabaseConfig(dialect.type)?.capabilities || {}
-      })
+  return sqlEngine.getSupportedDatabases().map((dialect) => {
+    const config = sqlEngine.getDatabaseConfig(dialect.type)
+    return {
+      value: dialect.type,
+      name: dialect.name,
+      dialect: dialect.type,
+      defaultPort: dialect.defaultPort,
+      variants: sqlEngine.getVariants(dialect.type),
+      connectionModes: config.connectionModes,
+      runtimeSupport: config.runtimeSupport,
+      capabilities: config.capabilities
     }
-
-    return templateList
-  } catch {
-    return []
-  }
+  })
 }
 
 /**
@@ -359,34 +312,6 @@ export function isStatusEnabled(status) {
 
 // ==================== 数据操作函数 ====================
 /**
- * 从行数据构建筛选条件
- * @param {Array} headers - 表头
- * @param {Object} rowData - 具名对象行
- * @returns {Array} 筛选条件
- */
-function buildRowFiltersFromRow(headers, rowData) {
-  if (!headers || !rowData) {
-    return []
-  }
-
-  return headers.map((header) => {
-    const value = rowData[header]
-    if (value === null || value === undefined) {
-      return {
-        field: header,
-        operator: 'is_null'
-      }
-    }
-
-    return {
-      field: header,
-      operator: 'eq',
-      value
-    }
-  })
-}
-
-/**
  * 从行数据构建 WHERE 条件
  * @param {Array} headers - 表头
  * @param {Object} rowData - 具名对象行
@@ -398,9 +323,7 @@ export function buildWherePayloadFromRow(headers, rowData, columnsMeta = []) {
     return null
   }
 
-  const primaryKeyColumns = Array.isArray(columnsMeta)
-    ? columnsMeta.filter((column) => column?.primaryKey && column?.name)
-    : []
+  const primaryKeyColumns = columnsMeta.filter((column) => column.primaryKey && column.name)
 
   if (primaryKeyColumns.length > 0) {
     const values = {}
@@ -418,9 +341,11 @@ export function buildWherePayloadFromRow(headers, rowData, columnsMeta = []) {
     }
   }
 
-  return {
-    filters: buildRowFiltersFromRow(headers, rowData)
-  }
+  const filters = headers.map((field) => {
+    const value = rowData[field]
+    return value == null ? { field, operator: 'is_null' } : { field, operator: 'eq', value }
+  })
+  return { filters }
 }
 
 /**
@@ -504,22 +429,18 @@ export async function deleteRowsData({
 export async function exportTableData({
   sessionId,
   connection,
-  databaseName,
-  tableName,
   objectRef = null,
   tableRows = null,
-  tableData = null,
   sqlEngine,
   onSuccess,
   onError
 }) {
-  if (!databaseName || !tableName) {
+  if (!objectRef?.name) {
     onError && onError(new Error('请先选择要导出的表'))
     return
   }
 
-  const rows = Array.isArray(tableRows) ? tableRows : tableData
-  if (!Array.isArray(rows) || rows.length === 0) {
+  if (!Array.isArray(tableRows) || tableRows.length === 0) {
     onError && onError(new Error('没有数据可导出'))
     return
   }

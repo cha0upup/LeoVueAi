@@ -21,7 +21,7 @@ describe('useDatabaseMetadataExplorer', () => {
     const explorer = useDatabaseMetadataExplorer({
       sessionId: 'session-1',
       connection: reactive({ connectionId: 'connection-1', dialect: 'postgresql' }),
-      sqlEngine: { getDatabases, getTables, getNamespaceLevels: () => ['schema'] }
+      sqlEngine: { getDatabases, getTables }
     })
 
     const namespaces = await explorer.loadNamespaces()
@@ -43,12 +43,16 @@ describe('useDatabaseMetadataExplorer', () => {
   it('refreshes one namespace without keeping its previous table cache', async () => {
     const getTables = vi
       .fn()
-      .mockResolvedValueOnce({ data: { tables: [{ name: 'orders' }] } })
-      .mockResolvedValueOnce({ data: { tables: [{ name: 'invoices' }] } })
+      .mockResolvedValueOnce({ data: { tables: [{
+        name: 'orders', ref: { catalog: 'sales', name: 'orders', kind: 'table' }
+      }] } })
+      .mockResolvedValueOnce({ data: { tables: [{
+        name: 'invoices', ref: { catalog: 'sales', name: 'invoices', kind: 'table' }
+      }] } })
     const explorer = useDatabaseMetadataExplorer({
       sessionId: 'session-1',
       connection: reactive({ connectionId: 'connection-1', dialect: 'mysql' }),
-      sqlEngine: { getDatabases: vi.fn(), getTables, getNamespaceLevels: () => ['catalog'] }
+      sqlEngine: { getDatabases: vi.fn(), getTables }
     })
     const namespaceRef = { kind: 'catalog', catalog: 'sales' }
 
@@ -59,5 +63,35 @@ describe('useDatabaseMetadataExplorer', () => {
     expect(getTables).toHaveBeenCalledTimes(2)
     expect(refreshed[0].name).toBe('invoices')
     expect(explorer.treeRevision.value).toBe(revision + 1)
+  })
+
+  it('preserves same-named SQL Server tables in different schemas through export', async () => {
+    const { performDatabaseExport } = await import('@/utils/database.js')
+    const namespaceRef = { kind: 'catalog', catalog: 'warehouse' }
+    const tableRefs = ['sales', 'audit'].map((schema) => ({
+      ...namespaceRef, schema, name: 'orders', kind: 'table'
+    }))
+    const connection = reactive({ connectionId: 'connection-1', dialect: 'sqlserver' })
+    const sqlEngine = {
+      getTables: vi.fn().mockResolvedValue({
+        data: { tables: tableRefs.map((ref) => ({ name: ref.name, schema: ref.schema, ref })) }
+      }),
+      exportDatabase: vi.fn().mockResolvedValue({ data: { taskId: 'export-1' } })
+    }
+    const explorer = useDatabaseMetadataExplorer({ sessionId: 'session-1', connection, sqlEngine })
+
+    const tables = await explorer.loadTables(namespaceRef)
+    await performDatabaseExport({
+      sessionId: 'session-1',
+      connection,
+      objectRef: namespaceRef,
+      tableRefs: tables.map((table) => table.objectRef),
+      sqlEngine
+    })
+
+    expect(sqlEngine.exportDatabase).toHaveBeenCalledWith(expect.objectContaining({
+      objectRef: namespaceRef,
+      tableRefs
+    }))
   })
 })

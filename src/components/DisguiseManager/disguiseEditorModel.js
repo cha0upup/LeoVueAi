@@ -6,29 +6,14 @@ export const DEFAULT_PHP_TRAFFIC_ENCODE = `if (!is_string($payload)) { throw new
 export const DEFAULT_PHP_TRAFFIC_DECODE = `if (!is_string($body)) { throw new InvalidArgumentException('Body must be binary'); }\n$token = strtr($body, '-_', '+/');\n$remainder = strlen($token) % 4;\nif ($remainder !== 0) { $token .= str_repeat('=', 4 - $remainder); }\n$decoded = base64_decode($token, true);\nif ($decoded === false) { throw new InvalidArgumentException('Invalid base64 body'); }\nreturn $decoded;`
 
 export function normalizeDisguiseRuntimes(runtimes) {
-  const normalized = new Set(['java'])
+  const normalized = new Set()
   if (Array.isArray(runtimes)) {
     runtimes.forEach(runtime => {
       const value = String(runtime || '').trim().toLowerCase()
-      if (value === 'php') normalized.add(value)
+      if (value === 'java' || value === 'php') normalized.add(value)
     })
   }
   return [...normalized]
-}
-
-export function stringifyDisguiseHeaders(headers) {
-  if (!headers) return DEFAULT_DISGUISE_HEADERS
-  if (typeof headers === 'string') {
-    try {
-      return JSON.stringify(JSON.parse(headers), null, 2)
-    } catch {
-      return headers
-    }
-  }
-  if (typeof headers === 'object' && !Array.isArray(headers)) {
-    return JSON.stringify(headers, null, 2)
-  }
-  return DEFAULT_DISGUISE_HEADERS
 }
 
 export function resolveDisguiseHeadersStatus(text) {
@@ -48,22 +33,23 @@ export function resolveDisguiseHeadersStatus(text) {
 }
 
 export function createDisguiseEditorForm(disguise = null) {
-  const runtimes = normalizeDisguiseRuntimes(disguise?.supportedRuntimes)
-  const phpEnabled = runtimes.includes('php')
+  const runtimes = normalizeDisguiseRuntimes(disguise ? disguise.supportedRuntimes : ['java'])
   return {
     disguiseId: disguise?.disguiseId || '',
     disguiseName: disguise?.disguiseName || '',
-    version: disguise?.version || DEFAULT_DISGUISE_VERSION,
-    headersText: stringifyDisguiseHeaders(disguise?.headers),
+    version: disguise ? disguise.version : DEFAULT_DISGUISE_VERSION,
+    headersText: disguise?.headers
+      ? JSON.stringify(disguise.headers, null, 2)
+      : DEFAULT_DISGUISE_HEADERS,
     description: disguise?.description || '',
     remark: disguise?.remark || '',
-    trafficEncodeBody: disguise?.trafficEncodeBody || DEFAULT_TRAFFIC_ENCODE,
-    trafficDecodeBody: disguise?.trafficDecodeBody || DEFAULT_TRAFFIC_DECODE,
-    schemaVersion: disguise?.schemaVersion || 3,
-    protocolVersion: disguise?.protocolVersion || 3,
+    trafficEncodeBody: disguise ? disguise.trafficEncodeBody : DEFAULT_TRAFFIC_ENCODE,
+    trafficDecodeBody: disguise ? disguise.trafficDecodeBody : DEFAULT_TRAFFIC_DECODE,
+    schemaVersion: disguise ? disguise.schemaVersion : 3,
+    protocolVersion: disguise ? disguise.protocolVersion : 3,
     supportedRuntimes: runtimes,
-    phpTrafficEncodeBody: disguise?.phpTrafficEncodeBody || (phpEnabled ? DEFAULT_PHP_TRAFFIC_ENCODE : ''),
-    phpTrafficDecodeBody: disguise?.phpTrafficDecodeBody || (phpEnabled ? DEFAULT_PHP_TRAFFIC_DECODE : '')
+    phpTrafficEncodeBody: disguise ? disguise.phpTrafficEncodeBody : '',
+    phpTrafficDecodeBody: disguise ? disguise.phpTrafficDecodeBody : ''
   }
 }
 
@@ -116,7 +102,5 @@ export function buildDisguisePreviewPayload(form) {
 
 export function filterSystemDisguiseTemplates(disguises) {
   if (!Array.isArray(disguises)) return []
-  return disguises.filter(disguise =>
-    disguise?.createUserId === 'system' || disguise?.disguiseId?.includes('_1.0.0')
-  )
+  return disguises.filter(disguise => disguise?.createUserId === 'system')
 }

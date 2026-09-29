@@ -57,6 +57,9 @@ export const decodeBytecodeBase64 = rawValue => {
   return analyzeBytecode(bytes)
 }
 
+export const decodePluginScript = bytecode =>
+  new TextDecoder().decode(Uint8Array.from(atob(bytecode), character => character.charCodeAt(0)))
+
 export const formatByteSize = value => {
   const bytes = Number(value)
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'

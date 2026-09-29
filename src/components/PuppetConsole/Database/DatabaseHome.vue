@@ -102,7 +102,7 @@
         >
           <article
             v-for="row in filteredConfigs"
-            :key="row.connectionId || getDatabaseConnectionName(row)"
+            :key="row.connectionId"
             class="config-card"
           >
             <button
@@ -282,7 +282,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { confirmDelete } from '@/utils/confirmUtils.js'
-import { v4 as uuidV4 } from 'uuid'
 import { icons } from '@/utils/icons.js'
 import DatabaseConfigDialog from '@/components/PuppetConsole/Database/DatabaseConfigDialog.vue'
 import {
@@ -441,12 +440,11 @@ const connectToDatabase = (row) => {
   const savedConnection = row.connection
 
   const payload = {
-    connectionId: row.connectionId || uuidV4(),
+    connectionId: row.connectionId,
     connectionName: getDatabaseConnectionName(row),
-    url: getDatabaseConnectionTarget(row),
     connection: {
       ...savedConnection,
-      connectionId: row.connectionId || ''
+      connectionId: row.connectionId
     }
   }
 

@@ -141,10 +141,10 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import { ElMessageBox } from 'element-plus'
 
 import { addProjectApi, archiveProjectApi, deleteProjectApi, updateProjectApi } from '@/services/api.js'
-import { showSuccess } from '@/utils/messageUtils.js'
+import { executeRequest } from '@/utils/apiUtils.js'
+import { confirmAction } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
 
 const emit = defineEmits(['saved'])
@@ -153,7 +153,7 @@ const visible = ref(false)
 const editing = ref(false)
 const saving = ref(false)
 const formRef = ref(null)
-const form = reactive({
+const createForm = () => ({
   projectId: '',
   projectName: '',
   projectCode: '',
@@ -162,18 +162,11 @@ const form = reactive({
   status: 'active',
   teamId: ''
 })
+const form = reactive(createForm())
 const rules = { projectName: [{ required: true, message: '请输入项目名称', trigger: 'blur' }] }
 
 const reset = () => {
-  Object.assign(form, {
-    projectId: '',
-    projectName: '',
-    projectCode: '',
-    description: '',
-    permission: 'private',
-    status: 'active',
-    teamId: ''
-  })
+  Object.assign(form, createForm())
   editing.value = false
   formRef.value?.clearValidate?.()
 }
@@ -187,72 +180,47 @@ const open = (project = null) => {
   visible.value = true
 }
 
+const handleSaved = (response) => {
+  visible.value = false
+  if (response) emit('saved', response.data)
+  else emit('saved')
+}
+
+const submit = (request, successMessage, onSuccess = handleSaved) =>
+  executeRequest(request, { loadingRef: saving, successMessage, errorMessage: null, onSuccess })
+
 const save = async () => {
   await formRef.value?.validate?.()
-  saving.value = true
-  try {
-    const response = editing.value ? await updateProjectApi(form) : await addProjectApi(form)
-    showSuccess(editing.value ? '项目已更新' : '项目已创建')
-    visible.value = false
-    emit('saved', response.data)
-  } finally {
-    saving.value = false
-  }
+  await submit(
+    () => editing.value ? updateProjectApi(form) : addProjectApi(form),
+    editing.value ? '项目已更新' : '项目已创建'
+  )
 }
 
 const archive = async () => {
-  try {
-    await ElMessageBox.confirm(
-      '归档后保留项目数据，但项目会停止接收新主机和新会话。',
-      '归档项目',
-      { confirmButtonText: '确认归档', cancelButtonText: '取消', type: 'warning' }
-    )
-  } catch {
-    return
-  }
-  saving.value = true
-  try {
-    const response = await archiveProjectApi(form.projectId)
-    showSuccess('项目已归档')
-    visible.value = false
-    emit('saved', response.data)
-  } finally {
-    saving.value = false
-  }
+  const confirmed = await confirmAction({
+    title: '归档项目',
+    message: '归档后保留项目数据，但项目会停止接收新主机和新会话。',
+    confirmButtonText: '确认归档'
+  })
+  if (confirmed) await submit(() => archiveProjectApi(form.projectId), '项目已归档')
 }
 
 const remove = async () => {
-  try {
-    await ElMessageBox.confirm(
-      `删除项目“${form.projectName}”后，主机资产和会话仍会保留，但项目归属将被解除。此操作不可恢复。`,
-      '删除项目',
-      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'error' }
-    )
-  } catch {
-    return
-  }
-  saving.value = true
-  try {
-    await deleteProjectApi(form.projectId)
-    showSuccess('项目已删除')
-    visible.value = false
-    emit('saved')
-  } finally {
-    saving.value = false
-  }
+  const confirmed = await confirmAction({
+    title: '删除项目',
+    message: `删除项目“${form.projectName}”后，主机资产和会话仍会保留，但项目归属将被解除。此操作不可恢复。`,
+    confirmButtonText: '确认删除',
+    type: 'error'
+  })
+  if (confirmed) await submit(() => deleteProjectApi(form.projectId), '项目已删除', () => handleSaved())
 }
 
 const restore = async () => {
-  saving.value = true
-  try {
+  await submit(() => {
     form.status = 'active'
-    const response = await updateProjectApi(form)
-    showSuccess('项目已恢复')
-    visible.value = false
-    emit('saved', response.data)
-  } finally {
-    saving.value = false
-  }
+    return updateProjectApi(form)
+  }, '项目已恢复')
 }
 
 defineExpose({ open })

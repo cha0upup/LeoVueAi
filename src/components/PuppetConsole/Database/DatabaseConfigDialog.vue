@@ -358,7 +358,7 @@
 import { computed, ref, reactive, watch } from 'vue'
 import { ElNotification } from 'element-plus'
 import { executeRequest } from '@/utils/apiUtils.js'
-import { validateForm, handleFormSubmit } from '@/utils/formUtils.js'
+import { validateForm } from '@/utils/formUtils.js'
 import {
   buildDatabaseConnection,
   createDatabaseConfigForm,
@@ -502,7 +502,7 @@ const handleTestConnection = async () => {
 }
 
 const doSaveConnection = async () => {
-  await handleFormSubmit(
+  await executeRequest(
     async () => {
       const requestData = {
         sessionId: props.sessionId,

@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { usePuppetStrategies } from './usePuppetStrategies.js'
+import { parsePuppetStrategy, usePuppetStrategies } from './usePuppetStrategies.js'
 
 describe('usePuppetStrategies', () => {
-  it('loads strategy objects and JSON strings into a shared form model', () => {
+  it('accepts current JSON strings and disables invalid strategy values', () => {
+    expect(parsePuppetStrategy('{"enabled":true}')).toEqual({ enabled: true })
+    expect(parsePuppetStrategy({ enabled: true })).toEqual({ enabled: false })
+    expect(parsePuppetStrategy('{broken')).toEqual({ enabled: false })
+  })
+
+  it('loads current strategy JSON strings into a shared form model', () => {
     const strategies = usePuppetStrategies()
 
     strategies.loadStrategies({
@@ -14,12 +20,12 @@ describe('usePuppetStrategies', () => {
         urlPool: ['/one', '/two'],
         extensions: ['json', 'html']
       }),
-      paddingStrategy: {
+      paddingStrategy: JSON.stringify({
         enabled: true,
         lengthDistribution: 'GAUSSIAN',
         minBytes: 128,
         maxBytes: 2048
-      },
+      }),
       tlsFingerprintStrategy: JSON.stringify({
         enabled: true,
         profile: 'FIREFOX_MODERN',
@@ -30,6 +36,7 @@ describe('usePuppetStrategies', () => {
     expect(strategies.urlStrategyEnabled.value).toBe(true)
     expect(strategies.urlStrategyForm.urlPoolText).toBe('/one\n/two')
     expect(strategies.urlStrategyForm.extensionsText).toBe('json,html')
+    expect(strategies.paddingEnabled.value).toBe(true)
     expect(strategies.paddingForm.lengthDistribution).toBe('GAUSSIAN')
     expect(strategies.tlsFingerprintForm).toMatchObject({
       profile: 'FIREFOX_MODERN',

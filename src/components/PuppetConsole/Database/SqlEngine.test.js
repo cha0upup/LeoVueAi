@@ -63,14 +63,37 @@ describe('shared connection dialog edit state', () => {
     expect(original.runtimeOptions.java?.driverClass).not.toBe('changed.Driver')
   })
 
-  it('opens legacy Generic SQL configurations in custom runtime mode', () => {
+  it('uses the saved connection instead of top-level connection fields', () => {
     const form = createEditingDatabaseConfigForm({
-      dialect: 'generic',
-      runtimeOptions: { java: { jdbcUrl: 'jdbc:vendor:db', driverClass: 'vendor.Driver' } },
-      dialectOptions: { testSql: 'VALUES 1' }
+      dialect: 'mysql',
+      host: 'old-host',
+      port: 3306,
+      databaseName: 'old-database',
+      username: 'old-user',
+      timeoutSeconds: 300,
+      connection: {
+        dialect: 'generic',
+        connectionMode: 'custom',
+        variant: 'custom',
+        host: null,
+        port: null,
+        database: null,
+        username: '',
+        runtimeOptions: { java: { jdbcUrl: 'jdbc:vendor:db', driverClass: 'vendor.Driver' } },
+        dialectOptions: { testSql: 'VALUES 1' }
+      }
     })
 
-    expect(form.connectionMode).toBe('custom')
+    expect(form).toMatchObject({
+      dialect: 'generic',
+      connectionMode: 'custom',
+      variant: 'custom',
+      host: 'localhost',
+      database: '',
+      file: '',
+      username: '',
+      timeoutSeconds: 30
+    })
     expect(form.testSql).toBe('VALUES 1')
     expect(form.runtimeOptions.java.driverClass).toBe('vendor.Driver')
   })
@@ -208,7 +231,9 @@ describe('SqlEngine runtime-neutral connections', () => {
               fields: ['username', 'password', 'runtimeOptions']
             }
           ],
-          capabilities: { structuredQuery: false }
+          capabilities: { structuredQuery: false },
+          runtimeSupport: { java: true, php: true },
+          dataTypes: []
         }
       ]
     })
@@ -256,6 +281,7 @@ describe('SqlEngine runtime-neutral connections', () => {
           connectionModes: ['standard', 'custom'],
           variants: [{ key: 'default', name: '达梦 DM', fields: ['host', 'port'] }],
           runtimeSupport: { java: true, php: false },
+          capabilities: {},
           dataTypes: [{ type: 'VARCHAR2', defaultLength: 255 }]
         },
         {
@@ -266,6 +292,7 @@ describe('SqlEngine runtime-neutral connections', () => {
           connectionModes: ['standard', 'custom'],
           variants: [{ key: 'default', name: 'KingbaseES', fields: ['host', 'port'] }],
           runtimeSupport: { java: true, php: false },
+          capabilities: {},
           dataTypes: [{ type: 'VARCHAR', defaultLength: 255 }]
         }
       ]
@@ -311,6 +338,7 @@ describe('SqlEngine runtime-neutral connections', () => {
         value: 'dm',
         defaultPort: 5236,
         variants: sqlEngine.getVariants('dm'),
+        connectionModes: ['standard', 'custom'],
         runtimeSupport: { java: true, php: false }
       }
     ])
@@ -330,8 +358,13 @@ describe('SqlEngine runtime-neutral connections', () => {
       {
         type: 'mysql',
         name: 'MySQL',
+        defaultPort: 3306,
         aliases: [],
-        variants: [{ key: 'default', name: 'MySQL', fields: ['host', 'port'] }]
+        connectionModes: ['standard', 'custom'],
+        variants: [{ key: 'default', name: 'MySQL', fields: ['host', 'port'] }],
+        dataTypes: [],
+        runtimeSupport: { java: true, php: true },
+        capabilities: {}
       }
     ])
     apiMocks.getSqlDialectsApi.mockRejectedValueOnce(new Error('方言目录服务不可用'))
@@ -366,7 +399,10 @@ describe('SqlEngine runtime-neutral connections', () => {
             name: 'SID',
             fields: ['host', 'port', 'sid', 'username', 'password', 'options']
           }
-        ]
+        ],
+        dataTypes: [],
+        runtimeSupport: { java: true, php: true },
+        capabilities: {}
       }
     ])
     expect(sqlEngine.getVariants('oracle')).toEqual([
@@ -549,6 +585,7 @@ describe('SqlEngine runtime-neutral connections', () => {
         {
           value: 'generic',
           variants: [{ key: 'custom', name: '自定义运行时连接', fields: ['runtimeOptions'] }],
+          connectionModes: ['custom'],
           runtimeSupport: { java: true, php: true }
         }
       ]),

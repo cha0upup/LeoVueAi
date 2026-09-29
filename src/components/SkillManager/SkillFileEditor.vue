@@ -167,6 +167,7 @@ import { Icon } from '@iconify/vue'
 import { monaco } from '@/utils/monaco.js'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { icons } from '@/utils/icons.js'
+import { downloadBlob } from '@/utils/downloadBlob.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { saveSkillFileApi } from '@/services/api.js'
 import { useTheme } from '@/stores/theme'
@@ -368,12 +369,7 @@ const handleDownload = () => {
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
     blob = new Blob([bytes], { type: 'application/octet-stream' })
   }
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = props.filePath.split('/').pop()
-  a.click()
-  URL.revokeObjectURL(url)
+  downloadBlob(blob, props.filePath.split('/').pop())
 }
 
 defineExpose({

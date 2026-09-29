@@ -159,8 +159,8 @@ const showHeaderGate = computed(() => {
 const isJspPackerSelected = computed(() => {
   const pt = form.value.packerType
   if (!pt) return false
-  for (const group of (props.packerTypesStructure.groups || [])) {
-    if (group.groupName === 'Jsp' && Array.isArray(group.packers) && group.packers.includes(pt)) {
+  for (const group of props.packerTypesStructure.groups) {
+    if (group.groupName === 'Jsp' && group.packers.includes(pt)) {
       return true
     }
   }

@@ -167,6 +167,7 @@
 
 <script setup>
 import { useFingerprintDetails } from './useFingerprintDetails.js'
+import { downloadBlob } from '@/utils/downloadBlob.js'
 const props = defineProps({
   sessionId: { type: String, required: true },
   taskId: { type: String, required: true },
@@ -198,14 +199,10 @@ const statusType = (status) =>
   ({ MATCHED: 'success', ERROR: 'danger', INCONCLUSIVE: 'warning' })[status] || 'info'
 const formatJson = (value) => JSON.stringify(value, null, 2)
 function downloadEvidence() {
-  const url = URL.createObjectURL(
-    new Blob([formatJson(evidence.value)], { type: 'application/json' })
+  downloadBlob(
+    new Blob([formatJson(evidence.value)], { type: 'application/json' }),
+    `fingerprint-${evidence.value.match.matchKey}.json`
   )
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `fingerprint-${evidence.value.match.matchKey}.json`
-  link.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 </script>
 

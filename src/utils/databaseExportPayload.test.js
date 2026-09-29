@@ -10,10 +10,8 @@ describe('database export payloads', () => {
     await exportTableData({
       sessionId: 'session-1',
       connection: { dialect: 'sqlserver' },
-      databaseName: 'app',
-      tableName: 'orders',
       objectRef,
-      tableData: [['id'], [1]],
+      tableRows: [{ id: 1 }],
       sqlEngine: { exportTable }
     })
 
@@ -45,5 +43,16 @@ describe('database export payloads', () => {
     )
     expect(exportDatabase.mock.calls[0][0]).not.toHaveProperty('database')
     expect(exportDatabase.mock.calls[0][0]).not.toHaveProperty('tables')
+  })
+
+  it.each([
+    { objectRef: null, tableRows: [{ id: 1 }] },
+    { objectRef: { catalog: 'app', name: 'orders', kind: 'table' }, tableRows: [] }
+  ])('does not export without a selected table and rows', async (selection) => {
+    const exportTable = vi.fn()
+    const onError = vi.fn()
+    await exportTableData({ ...selection, sqlEngine: { exportTable }, onError })
+    expect(exportTable).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledOnce()
   })
 })

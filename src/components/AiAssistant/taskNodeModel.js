@@ -42,49 +42,39 @@ export const getToolKindIcon = name => {
 }
 
 export const formatToolValue = (value, maxLength = Infinity) => {
-  if (value == null || value === '') return ''
+  if (typeof value !== 'string' || !value) return ''
   let text
-  if (typeof value === 'string') {
-    try {
-      text = JSON.stringify(JSON.parse(value), null, 2)
-    } catch {
-      text = value
-    }
-  } else {
-    try {
-      text = JSON.stringify(value, null, 2)
-    } catch {
-      text = String(value)
-    }
+  try {
+    text = JSON.stringify(JSON.parse(value), null, 2)
+  } catch {
+    text = value
   }
   return text.length > maxLength ? `${text.slice(0, maxLength)}\n…（已截断）` : text
 }
 
-export const getShellResultId = result => {
-  if (!result) return null
+const parseToolResult = result => {
+  if (typeof result !== 'string' || !result) return null
   try {
-    const value = typeof result === 'string' ? JSON.parse(result) : result
-    const resultId = value?.resultId
-    return typeof resultId === 'string' && resultId.trim() ? resultId.trim() : null
+    return JSON.parse(result)
   } catch {
     return null
   }
 }
 
+export const getShellResultId = result => {
+  const resultId = parseToolResult(result)?.resultId
+  return typeof resultId === 'string' && resultId.trim() ? resultId.trim() : null
+}
+
 export const getWorkspaceFileRef = result => {
-  if (!result) return null
-  try {
-    const value = typeof result === 'string' ? JSON.parse(result) : result
-    const path = value?.userWorkspacePath
-    if (typeof path !== 'string' || !path.trim()) return null
-    const normalized = path.trim()
-    return {
-      path: normalized,
-      filename: normalized.split('/').filter(Boolean).at(-1) || 'workspace-file',
-      sha256: typeof value?.sha256 === 'string' ? value.sha256 : null,
-      size: Number.isFinite(Number(value?.size)) ? Number(value.size) : null
-    }
-  } catch {
-    return null
+  const value = parseToolResult(result)
+  const path = value?.userWorkspacePath
+  if (typeof path !== 'string' || !path.trim()) return null
+  const normalized = path.trim()
+  return {
+    path: normalized,
+    filename: normalized.split('/').filter(Boolean).at(-1) || 'workspace-file',
+    sha256: typeof value?.sha256 === 'string' ? value.sha256 : null,
+    size: Number.isFinite(Number(value?.size)) ? Number(value.size) : null
   }
 }

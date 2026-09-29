@@ -3,6 +3,7 @@ import {
   analyzeBytecode,
   buildPluginPayload,
   decodeBytecodeBase64,
+  decodePluginScript,
   formatByteSize,
   formatExecutionResult,
   getScriptLanguageOptions
@@ -19,8 +20,17 @@ describe('scriptEditorModel', () => {
   it('formats result envelopes and byte sizes', () => {
     expect(formatExecutionResult({ result: { ok: true } })).toBe('{\n  "ok": true\n}')
     expect(formatExecutionResult({ output: 'done' })).toBe('done')
+    expect(formatExecutionResult({ data: [1, 2] })).toBe('[\n  1,\n  2\n]')
+    expect(formatExecutionResult('done')).toBe('done')
     expect(formatByteSize(1536)).toBe('1.5 KB')
     expect(getScriptLanguageOptions('php')).toEqual([{ value: 'php', label: 'PHP' }])
+  })
+
+  it('decodes the current plugin bytecode into UTF-8 source', () => {
+    const source = 'return "你好";'
+    const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(source)))
+    expect(decodePluginScript(encoded)).toBe(source)
+    expect(() => decodePluginScript('not-base64!')).toThrow()
   })
 
   it('builds runtime-aware script and class plugin payloads', () => {

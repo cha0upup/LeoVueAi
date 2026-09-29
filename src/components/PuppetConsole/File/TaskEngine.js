@@ -9,8 +9,6 @@ import {
   stopSqlExportTaskApi
 } from '@/services/api.js'
 import {
-  TASK_STATUS_TEXT,
-  TASK_STATUS_TONE,
   TERMINAL_TASK_STATUSES,
   TaskStatus,
   TaskType
@@ -62,18 +60,6 @@ class TaskEngine {
   getTasksBySession(sessionId) {
     const sessionTaskMap = this.getSessionTasks(sessionId)
     return Array.from(sessionTaskMap.values())
-  }
-
-  getAllTasks() {
-    const allTasks = []
-    for (const sessionTaskMap of this.sessionTasks.values()) {
-      allTasks.push(...Array.from(sessionTaskMap.values()))
-    }
-    return allTasks
-  }
-
-  getAllSessionIds() {
-    return Array.from(this.sessionTasks.keys())
   }
 
   getTaskById(taskId) {
@@ -145,14 +131,12 @@ class TaskEngine {
   }
 
   // 创建扫描任务
-  createScanTask(sessionId, scanKind, targetLabel, totalCount = 0, options = {}) {
+  createScanTask(sessionId, targetLabel, options = {}) {
     const taskId = this.generateTaskId()
     const task = createScanTask({
       taskId,
       sessionId,
-      scanKind,
       targetLabel,
-      totalCount,
       options
     })
 
@@ -441,62 +425,6 @@ class TaskEngine {
     }
   }
 
-  getTask(taskId) {
-    return this.getTaskById(taskId)
-  }
-
-  // 获取任务列表（用于显示）
-  getTaskList() {
-    return this.getAllTasks().map((task) => ({
-      id: task.id,
-      type: task.type,
-      fileName: task.fileName,
-      fileSize: task.fileSize,
-      status: task.status,
-      progress: task.progress,
-      downloadedSize: task.type === TaskType.DOWNLOAD ? task.downloadedSize : 0,
-      uploadedSize: task.type === TaskType.UPLOAD ? task.uploadedSize : 0,
-      speed: task.speed,
-      startTime: task.startTime,
-      endTime: task.endTime,
-      retryCount: task.retryCount,
-      error: task.error,
-      scanKind: task.scanKind,
-      targetLabel: task.targetLabel,
-      backendTaskId: task.backendTaskId
-    }))
-  }
-
-  // 获取任务统计信息
-  getTaskStats() {
-    const tasks = this.getAllTasks()
-    return {
-      total: tasks.length,
-      pending: tasks.filter((t) => t.status === TaskStatus.PENDING).length,
-      downloading: tasks.filter((t) => t.status === TaskStatus.DOWNLOADING).length,
-      uploading: tasks.filter((t) => t.status === TaskStatus.UPLOADING).length,
-      paused: tasks.filter((t) => t.status === TaskStatus.PAUSED).length,
-      scanning: tasks.filter((t) => t.status === TaskStatus.SCANNING).length,
-      completed: tasks.filter((t) => t.status === TaskStatus.COMPLETED).length,
-      failed: tasks.filter((t) => t.status === TaskStatus.FAILED).length,
-      cancelled: tasks.filter((t) => t.status === TaskStatus.CANCELLED).length
-    }
-  }
-
-  // 清理已完成的任务
-  cleanupCompletedTasks() {
-    const completedTasks = this.getAllTasks().filter(
-      (task) =>
-        task.status === TaskStatus.COMPLETED ||
-        task.status === TaskStatus.FAILED ||
-        task.status === TaskStatus.CANCELLED
-    )
-
-    completedTasks.forEach((task) => {
-      this.removeTaskById(task.id)
-    })
-  }
-
   // ========================================================================
   // PART 10: 事件系统 - 观察者模式
   // ========================================================================
@@ -532,19 +460,6 @@ class TaskEngine {
     }
   }
 
-  // ========================================================================
-  // PART 11: UI 辅助函数
-  // ========================================================================
-
-  // 获取状态类型（用于UI显示）
-  getStatusType(status) {
-    return TASK_STATUS_TONE[status] || 'info'
-  }
-
-  // 获取状态文本
-  getStatusText(status) {
-    return TASK_STATUS_TEXT[status] || status
-  }
 }
 
 applyDownloadExecutor(TaskEngine)

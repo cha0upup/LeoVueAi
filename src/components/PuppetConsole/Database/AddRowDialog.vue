@@ -126,7 +126,7 @@ import { reactive, ref, watch } from 'vue'
 import sqlEngine from './SqlEngine.js'
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
-import { handleFormSubmit } from '@/utils/formUtils.js'
+import { executeRequest } from '@/utils/apiUtils.js'
 import { resetDatabaseRowFormData, useDatabaseRowDialog } from './database-row-dialog-shared.js'
 import { showWarning } from '@/utils/messageUtils.js'
 
@@ -147,8 +147,7 @@ const formData = reactive({})
 const submitting = ref(false)
 const { getColumnMeta, tableRows } = useDatabaseRowDialog({
   props,
-  formData,
-  mode: 'insert'
+  formData
 })
 
 watch(
@@ -179,15 +178,14 @@ const validateFormData = () => {
 const handleConfirm = async () => {
   if (!validateFormData()) return
 
-  await handleFormSubmit(
-    async () => {
-      await sqlEngine.insertRow({
+  await executeRequest(
+    () =>
+      sqlEngine.insertRow({
         sessionId: props.sessionId,
         connection: props.connection,
         objectRef: props.objectRef,
         row: { ...formData }
-      })
-    },
+      }),
     {
       loadingRef: submitting,
       successMessage: '插入成功',

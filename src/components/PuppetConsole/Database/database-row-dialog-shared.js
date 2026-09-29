@@ -10,47 +10,25 @@ export function resetDatabaseRowFormData(formData, data = {}) {
   Object.assign(formData, data)
 }
 
-export function useDatabaseRowDialog({ props, formData, mode }) {
-  const getColumn = (columnIndex) => props.tableColumns?.[columnIndex] || null
-
-  const getInputComponent = (columnIndex) => {
-    const column = getColumn(columnIndex)
-    return getInputComponentByType(column?.type) || 'el-input'
-  }
-
-  const getInputProps = (columnIndex) => {
-    const column = getColumn(columnIndex)
-    return getInputPropsByType(column?.type, column, mode) || { size: 'default' }
-  }
-
-  const getColumnMeta = (columnIndex) => {
-    const column = getColumn(columnIndex)
-    return getColumnMetaInfo(column)
-  }
+export function useDatabaseRowDialog({ props, formData }) {
+  const getColumnMeta = (columnIndex) => getColumnMetaInfo(props.tableColumns[columnIndex])
 
   const tableRows = computed(() => {
-    if (!Array.isArray(props.tableColumns) || props.tableColumns.length === 0) {
-      return []
-    }
-
-    return props.tableColumns.map((column, index) => {
+    return props.tableColumns.map((column) => {
       const header = column?.name || ''
-      const meta = getColumnMeta(index)
+      const meta = getColumnMetaInfo(column)
       return {
         fieldName: header,
-        type: meta.type || '',
+        type: meta.type,
         nullable: meta.nullable,
-        inputComponent: getInputComponent(index),
-        inputProps: getInputProps(index),
+        inputComponent: getInputComponentByType(column?.type),
+        inputProps: getInputPropsByType(column?.type, column),
         value: formData[header]
       }
     })
   })
 
   return {
-    getColumn,
-    getInputComponent,
-    getInputProps,
     getColumnMeta,
     tableRows
   }

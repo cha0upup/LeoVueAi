@@ -3,7 +3,6 @@ import {
   buildFingerprintPayload,
   createEmptyFingerprintForm,
   loadFingerprintForm,
-  normalizeRequests,
   parseFingerprintTags
 } from './saveFingerprintModel.js'
 
@@ -26,10 +25,33 @@ describe('saveFingerprintModel', () => {
   })
 
   it('normalizes HTTP requests', () => {
-    expect(normalizeRequests([{ body: 'PING', timeout: -1 }])).toEqual([
+    const form = loadFingerprintForm({ rule: { requests: [{ body: 'PING', timeout: -1 }] } })
+    expect(form.requestList).toEqual([
       { method: 'GET', path: '/', timeout: 0, headers: [], body: 'PING' }
     ])
     expect(createEmptyFingerprintForm()).not.toHaveProperty('protocol')
+  })
+
+  it('starts with one editable request but keeps an intentionally emptied list empty on save', () => {
+    const form = loadFingerprintForm({ rule: { requests: [] } })
+    expect(form.requestList).toEqual(createEmptyFingerprintForm().requestList)
+    form.requestList.splice(0)
+    expect(buildFingerprintPayload(form).rule.requests).toEqual([])
+  })
+
+  it.each([
+    [null, 3000],
+    ['', 3000],
+    ['invalid', 3000],
+    [-10, 0],
+    [0, 0],
+    [12.6, 13],
+    [70000, 60000]
+  ])('preserves timeout limits when loading and saving %s', (timeout, expected) => {
+    const form = loadFingerprintForm({ rule: { requests: [{ timeout }] } })
+    expect(form.requestList[0].timeout).toBe(expected)
+    form.requestList[0].timeout = timeout
+    expect(buildFingerprintPayload(form).rule.requests[0].timeout).toBe(expected)
   })
 
   it('loads request and header data without sharing references', () => {
@@ -47,6 +69,39 @@ describe('saveFingerprintModel', () => {
     form.requestList[0].headers[0].value = 'changed'
     expect(source.rule.requests[0].headers.A).toBe(1)
     expect(JSON.parse(form.matchText)).toEqual(source.rule.match)
+  })
+
+  it('loads current tag arrays for editing and leaves missing tags empty', () => {
+    expect(loadFingerprintForm({ tags: ['web', 'java'] }).tagsStr).toBe('web, java')
+    expect(loadFingerprintForm({}).tagsStr).toBe('')
+    expect(loadFingerprintForm({ tags: 'web,java' }).tagsStr).toBe('')
+  })
+
+  it('saves headers and HTTP bodies without mutating the editable request rows', () => {
+    const form = loadFingerprintForm({
+      rule: {
+        requests: [
+          { method: 'GET', body: 'ignored', headers: { Accept: ' text/plain ' } },
+          { method: 'HEAD', body: 'ignored', headers: {} },
+          { method: 'POST', body: ' body ', charset: 'GBK', maxBodyBytes: 0 }
+        ]
+      }
+    })
+    form.requestList[2].headers.push(
+      { key: ' X ', value: 'first' },
+      { key: 'X', value: ' last ' },
+      { key: ' ', value: 'ignored' }
+    )
+    const before = globalThis.structuredClone(form)
+    expect(buildFingerprintPayload(form).rule.requests).toEqual([
+      { method: 'GET', path: '/', timeout: 3000, headers: { Accept: 'text/plain' } },
+      { method: 'HEAD', path: '/', timeout: 3000 },
+      {
+        method: 'POST', path: '/', timeout: 3000, headers: { X: 'last' },
+        body: 'body', charset: 'GBK', maxBodyBytes: 0
+      }
+    ])
+    expect(form).toEqual(before)
   })
 
   it('deduplicates tags and produces a trimmed submission payload', () => {

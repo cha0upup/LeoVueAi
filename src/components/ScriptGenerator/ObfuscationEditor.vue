@@ -249,8 +249,7 @@ const blockedByEnabled = computed(() => {
   const blocked = new Set()
   localSteps.value.forEach(s => {
     if (!s.enabled) return
-    const inc = Array.isArray(s.incompatibleWith) ? s.incompatibleWith : [...(s.incompatibleWith || [])]
-    inc.forEach(id => blocked.add(id))
+    s.incompatibleWith.forEach(id => blocked.add(id))
   })
   return blocked
 })
@@ -260,7 +259,7 @@ const blockedByEnabled = computed(() => {
 const mutexGroups = computed(() => {
   const groups = new Map()
   localSteps.value.forEach(s => {
-    const inc = Array.isArray(s.incompatibleWith) ? s.incompatibleWith : []
+    const inc = s.incompatibleWith
     if (!inc.length) return
     let found = null
     for (const [, ids] of groups) { if (ids.has(s.id)) { found = ids; break } }
@@ -301,15 +300,13 @@ const orderViolations = computed(() => {
   localSteps.value.forEach((s, i) => { idxMap[s.id] = i })
   localSteps.value.forEach(s => {
     if (!s.enabled) return
-    const mp = Array.isArray(s.mustPrecede) ? s.mustPrecede : [...(s.mustPrecede || [])]
-    mp.forEach(afterId => { if (idxMap[afterId] !== undefined && idxMap[afterId] < idxMap[s.id]) v.add(s.id) })
+    s.mustPrecede.forEach(afterId => { if (idxMap[afterId] !== undefined && idxMap[afterId] < idxMap[s.id]) v.add(s.id) })
   })
   return v
 })
 
 const orderViolationHint = (step) => {
-  const ids = Array.isArray(step.mustPrecede) ? step.mustPrecede : [...(step.mustPrecede || [])]
-  const names = ids.map(id => localSteps.value.find(s => s.id === id)?.nameZh || id).join('、')
+  const names = step.mustPrecede.map(id => localSteps.value.find(s => s.id === id)?.nameZh || id).join('、')
   return `建议在「${names}」之前执行`
 }
 
@@ -321,12 +318,11 @@ const emitSteps = () => {
 
 const onStepToggle = (step) => {
   if (step.enabled) {
-    const inc = new Set(Array.isArray(step.incompatibleWith) ? step.incompatibleWith : [...(step.incompatibleWith || [])])
+    const inc = new Set(step.incompatibleWith)
     localSteps.value.forEach(s => {
       if (s.id === step.id) return
       if (inc.has(s.id)) { s.enabled = false; return }
-      const si = Array.isArray(s.incompatibleWith) ? s.incompatibleWith : [...(s.incompatibleWith || [])]
-      if (si.includes(step.id)) s.enabled = false
+      if (s.incompatibleWith.includes(step.id)) s.enabled = false
     })
   }
   emitSteps()
@@ -343,8 +339,7 @@ const enableAll = () => {
   localSteps.value.forEach(s => {
     if (skipped.has(s.id)) { s.enabled = false; return }
     s.enabled = true
-    const inc = Array.isArray(s.incompatibleWith) ? s.incompatibleWith : [...(s.incompatibleWith || [])]
-    inc.forEach(id => skipped.add(id))
+    s.incompatibleWith.forEach(id => skipped.add(id))
   })
   emitSteps()
 }
@@ -360,8 +355,7 @@ const fixOrder = () => {
     for (let i = 0; i < steps.length; i++) {
       const s = steps[i]
       if (!s.enabled) continue
-      const mp = Array.isArray(s.mustPrecede) ? s.mustPrecede : []
-      for (const afterId of mp) {
+      for (const afterId of s.mustPrecede) {
         const ai = idxOf(afterId)
         if (ai !== -1 && ai < i) { steps.splice(i, 1); steps.splice(ai, 0, s); changed = true; break }
       }

@@ -271,6 +271,7 @@ import { getPluginsApi } from '@/services/api/plugins.js'
 import { invokePluginApi } from '@/services/api/puppet-tools.js'
 import { useResponsiveDialogWidth } from '@/composables/useResponsiveDialogWidth.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { formatExecutionResult } from './scriptEditorModel.js'
 
 const iconMap = icons
 const puppetRuntime = inject('puppetRuntime', ref('java'))
@@ -315,7 +316,7 @@ const { dialogWidth } = useResponsiveDialogWidth({
 
 // ── 类型工具 ─────────────────────────────────────────────────
 
-const normalizeType = (type) => (type || TYPE_JAVA).toLowerCase()
+const normalizeType = (type) => String(type ?? '').toLowerCase()
 const isScript = (type) => SCRIPT_TYPES.includes(normalizeType(type))
 
 const typeLabelFor = (type) => {
@@ -372,7 +373,7 @@ const getPlugins = async () => {
     const response = await getPluginsApi()
     const list = Array.isArray(response.data) ? response.data : []
     plugins.value = list
-      .filter((item) => (item.runtime || (item.pluginType === 'php' ? 'php' : 'java')) === puppetRuntime.value)
+      .filter((item) => item.runtime === puppetRuntime.value)
       .slice()
       .sort((a, b) => (a.pluginName || a.pluginId).localeCompare(b.pluginName || b.pluginId))
     emit('plugin-count-updated', plugins.value.length)
@@ -409,33 +410,13 @@ const invokePlugin = async () => {
   }
   try {
     const response = await invokePluginApi(payload)
-    executionResult.value = formatInvokeResult(response.data)
+    executionResult.value = formatExecutionResult(response.data)
     showSuccess('插件调用成功')
   } catch (error) {
     executionResult.value = '调用失败：' + error.message
     showError('插件调用失败: ' + error.message)
   } finally {
     isInvoking.value = false
-  }
-}
-
-// java 插件返回 { result: ... }；脚本插件返回 ExecScriptComponent 的 Map（通常带 output/result/data）
-const formatInvokeResult = (data) => {
-  if (data == null) return ''
-  if (typeof data === 'string') return data
-  if (data.result != null) {
-    return typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2)
-  }
-  for (const key of ['output', 'data']) {
-    if (data[key] != null) {
-      const v = data[key]
-      return typeof v === 'string' ? v : JSON.stringify(v, null, 2)
-    }
-  }
-  try {
-    return JSON.stringify(data, null, 2)
-  } catch {
-    return String(data)
   }
 }
 

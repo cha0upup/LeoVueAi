@@ -114,6 +114,7 @@
 import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
 
 import { icons } from '@/utils/icons.js'
+import { downloadBlob } from '@/utils/downloadBlob.js'
 import { getClassBytecodeApi } from '@/services/api.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
@@ -247,15 +248,7 @@ const downloadClassFile = () => {
     const className = bytecodeData.value.className || 'UnknownClass'
     const fileName = className.split('.').pop() + '.class'
 
-    // 创建下载链接
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, fileName)
 
     showSuccess('class文件下载成功')
   } catch (error) {

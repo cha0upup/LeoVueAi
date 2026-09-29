@@ -99,7 +99,7 @@ import DatabaseConsoleWorkspace from './DatabaseConsoleWorkspace.vue'
 import EditRowDialog from './EditRowDialog.vue'
 import CreateTableDialog from './CreateTableDialog.vue'
 import { getTableColumnNames } from './database-table-model.js'
-import { createTableRef, DATABASE_OBJECT_KINDS } from './database-domain.js'
+import { DATABASE_OBJECT_KINDS } from './database-domain.js'
 import { useDatabaseTableLoader } from './useDatabaseTableLoader.js'
 import { useDatabaseWorkspaceSelection } from './useDatabaseWorkspaceSelection.js'
 import { useDatabaseMetadataExplorer } from './useDatabaseMetadataExplorer.js'
@@ -477,15 +477,9 @@ const exportData = async () => {
     await exportTableDataUtil({
       sessionId: props.sessionId,
       connection,
-      databaseName: currentDatabase.value,
-      tableName: currentTable.value,
       objectRef: currentTableRef.value,
       tableRows: tableRows.value,
-      pagination,
       sqlEngine,
-      onProgress: (message) => {
-        exportLoading.message = message
-      },
       onSuccess: (task) => {
         registerSqlExportTask(task)
         exportLoading.close()
@@ -504,7 +498,7 @@ const exportData = async () => {
 
 const exportDatabase = async (
   databaseName,
-  selectedTables = null,
+  tableRefs = [],
   objectRef = currentNamespaceRef.value
 ) => {
   if (!databaseName || !connection.dialect) {
@@ -512,19 +506,7 @@ const exportDatabase = async (
     return
   }
 
-  let tableRefs
-
-  if (selectedTables && selectedTables.length > 0) {
-    tableRefs = selectedTables
-      .map((table) => {
-        if (typeof table === 'object' && (table?.objectRef || table?.ref)) {
-          return table.objectRef || table.ref
-        }
-        const name = typeof table === 'string' ? table : table?.name
-        return name ? createTableRef({ namespaceRef: objectRef, table: name }) : null
-      })
-      .filter((ref) => ref?.name)
-  } else {
+  if (!tableRefs.length) {
     try {
       let tableItems = getCachedNamespaceTables(objectRef)
       if (!tableItems.length) tableItems = await loadNamespaceTables(objectRef)

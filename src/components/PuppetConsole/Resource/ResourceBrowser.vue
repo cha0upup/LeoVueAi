@@ -208,6 +208,7 @@ import { computed, ref } from 'vue'
 import { icons } from '@/utils/icons.js'
 import { fetchResourceApi } from '@/services/api/resource.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { downloadBlob } from '@/utils/downloadBlob.js'
 import CodePreview from '@/components/PuppetConsole/Common/CodePreview.vue'
 
 const iconMap = icons
@@ -384,16 +385,9 @@ const onDownload = () => {
     const bytes = new Uint8Array(raw.length)
     for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
     const blob = new Blob([bytes], { type: 'application/octet-stream' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
     // 用资源路径最后一段作为文件名
     const path = result.value.resourcePath || 'resource'
-    link.download = path.split('/').pop()
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, path.split('/').pop())
   } catch (err) {
     showError('下载失败：' + (err?.message || err))
   }

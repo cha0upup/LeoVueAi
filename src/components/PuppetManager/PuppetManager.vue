@@ -261,6 +261,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
+import { downloadBlob } from '@/utils/downloadBlob.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { executeDeleteWithConfirm, executeBatchDelete } from '@/utils/confirmUtils.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
@@ -570,8 +571,6 @@ const deleteLiveSession = async (session) => {
   deletingSessionIds.value = [...deletingSessionIds.value, session.sessionId]
   try {
     await executeDeleteWithConfirm(() => deleteSessionApi({ sessionId: session.sessionId }), {
-      itemName: '存活会话',
-      itemIdentifier: session.sessionId,
       successMessage: '会话已关闭',
       errorMessage: '关闭会话失败',
       onSuccess: () => getLiveSessions()
@@ -1016,13 +1015,7 @@ const handleCreateCommand = (command) => {
 }
 
 const downloadBase64Config = (base64, filename) => {
-  const blob = new Blob([base64], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
+  downloadBlob(new Blob([base64], { type: 'text/plain' }), filename)
 }
 
 const batchExportPuppets = async () => {

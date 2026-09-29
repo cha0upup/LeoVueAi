@@ -1138,11 +1138,11 @@
 
 <script setup>
 import { computed, defineComponent, h, nextTick, ref, watch } from 'vue'
-import { ElMessageBox, ElTag } from 'element-plus'
+import { ElTag } from 'element-plus'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
 import { executeRequest } from '@/utils/apiUtils.js'
-import { executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
+import { confirmAction, executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import {
   deleteSkillApi,
@@ -1168,8 +1168,9 @@ import SkillManifestEditorDialog from './SkillManifestEditorDialog.vue'
 import BatchActionBar from '@/components/common/BatchActionBar.vue'
 import SplitterBar from '@/components/common/SplitterBar.vue'
 import { useSkillUiState } from './useSkillUiState.js'
-import { downloadBlob } from '@/utils/downloadBlob.js'
+import { executeBlobDownload } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
+import { useBatchSelection } from '@/composables/useBatchSelection.js'
 import { buildSkillManifest, buildSkillMarkdown } from './skillManifestSerializer.js'
 import {
   filterSkills,
@@ -1281,7 +1282,6 @@ const emptyFilters = () => ({
 const filters = ref(emptyFilters())
 
 const tableRef = ref(null)
-const selectedNames = ref(new Set())
 
 const skillFiles = ref([])
 const filesLoading = ref(false)
@@ -1360,18 +1360,16 @@ const activeFilterEntries = computed(() =>
     }))
 )
 
+const {
+  selectedIds: selectedNames,
+  allFilteredSelected,
+  someFilteredSelected,
+  clearBatchSelection: clearSelectionState
+} = useBatchSelection(filteredSkills, (skill) => skill?.name)
+
 const selectedSkills = computed(() =>
   filteredSkills.value.filter((skill) => selectedNames.value.has(skill.name))
 )
-const allFilteredSelected = computed(
-  () =>
-    filteredSkills.value.length > 0 &&
-    filteredSkills.value.every((skill) => selectedNames.value.has(skill.name))
-)
-const someFilteredSelected = computed(() => {
-  const count = selectedSkills.value.length
-  return count > 0 && count < filteredSkills.value.length
-})
 const hasBatchEnableTarget = computed(() => selectedSkills.value.some((skill) => !skill.enabled))
 const hasBatchDisableTarget = computed(() => selectedSkills.value.some((skill) => skill.enabled))
 
@@ -1537,23 +1535,14 @@ const onScopeChange = async (scope) => {
   clearBatchSelection()
 }
 
-const hasUnsavedChanges = () => dirtyFilePaths.value.length > 0
 const confirmLeaveEdit = async () => {
-  if (!hasUnsavedChanges()) return true
-  try {
-    await ElMessageBox.confirm(
-      `有 ${dirtyFilePaths.value.length} 个文件未保存，离开后将丢失修改。`,
-      '存在未保存内容',
-      {
-        confirmButtonText: '放弃并离开',
-        cancelButtonText: '继续编辑',
-        type: 'warning'
-      }
-    )
-    return true
-  } catch {
-    return false
-  }
+  if (!dirtyFilePaths.value.length) return true
+  return confirmAction({
+    title: '存在未保存内容',
+    message: `有 ${dirtyFilePaths.value.length} 个文件未保存，离开后将丢失修改。`,
+    confirmButtonText: '放弃并离开',
+    cancelButtonText: '继续编辑'
+  })
 }
 
 const clearWorkspace = () => {
@@ -1631,16 +1620,13 @@ const reloadFiles = async () => {
 const openFile = async (path, force = false) => {
   if (!path || !selectedSkillName.value) return
   if (!force && path === currentFilePath.value) return
-  if (fileEditorRef.value?.hasUnsavedChanges?.()) {
-    try {
-      await ElMessageBox.confirm('当前文件有未保存修改，切换后将丢失。', '存在未保存内容', {
-        confirmButtonText: '放弃并切换',
-        cancelButtonText: '继续编辑',
-        type: 'warning'
-      })
-    } catch {
-      return
-    }
+  if (fileEditorRef.value?.hasUnsavedChanges?.() && !(await confirmAction({
+    title: '存在未保存内容',
+    message: '当前文件有未保存修改，切换后将丢失。',
+    confirmButtonText: '放弃并切换',
+    cancelButtonText: '继续编辑'
+  }))) {
+    return
   }
   fileLoading.value = true
   try {
@@ -1761,20 +1747,11 @@ const confirmRiskyEnable = async (targets) => {
     `主动登录 ${summary.activeLogin} 个`,
     `具备写入或破坏能力 ${summary.writeCapable} 个`
   ]
-  try {
-    await ElMessageBox.confirm(
-      `本次启用包含受控能力：${lines.join('，')}。启用只代表进入运行目录，每次执行仍必须绑定精确目标、ROE 和必要确认。`,
-      '确认启用受控能力',
-      {
-        type: 'warning',
-        confirmButtonText: '确认启用',
-        cancelButtonText: '取消'
-      }
-    )
-    return true
-  } catch {
-    return false
-  }
+  return confirmAction({
+    title: '确认启用受控能力',
+    message: `本次启用包含受控能力：${lines.join('，')}。启用只代表进入运行目录，每次执行仍必须绑定精确目标、ROE 和必要确认。`,
+    confirmButtonText: '确认启用'
+  })
 }
 
 const handleToggleForSkill = async (skill) => {
@@ -1785,16 +1762,15 @@ const handleToggleForSkill = async (skill) => {
   }
   const enabled = !skill.enabled
   if (enabled && !(await confirmRiskyEnable([skill]))) return
-  toggleLoading.value = true
-  try {
-    await toggleSkillApi({ scope: activeScope.value, name: skill.name, enabled })
-    showSuccess(enabled ? 'Skill 已启用' : 'Skill 已禁用')
-    await loadSkills()
-  } catch (error) {
-    showError(error?.response?.data?.msg || '操作失败')
-  } finally {
-    toggleLoading.value = false
-  }
+  await executeRequest(
+    () => toggleSkillApi({ scope: activeScope.value, name: skill.name, enabled }),
+    {
+      loadingRef: toggleLoading,
+      successMessage: enabled ? 'Skill 已启用' : 'Skill 已禁用',
+      errorMessage: '操作失败',
+      onSuccess: loadSkills
+    }
+  ).catch(() => false)
 }
 
 const handleDetailCommand = async (command) => {
@@ -1828,24 +1804,14 @@ const handleDelete = async (skill) => {
 const handleExport = async () => {
   if (selectedSkill.value) await downloadSkill(activeScope.value, selectedSkill.value.name)
 }
-const downloadSkill = async (scope, name) => {
-  try {
-    const response = await exportSkillApi(scope, name)
-    const blob =
-      response.data instanceof Blob
-        ? response.data
-        : new Blob([response.data], { type: 'application/zip' })
-    downloadBlob(blob, `${name}.skill`)
-  } catch (error) {
-    showError(error?.response?.data?.msg || error?.message || '导出失败')
-  }
-}
+const downloadSkill = (scope, name) =>
+  executeBlobDownload(() => exportSkillApi(scope, name), `${name}.skill`).catch(() => false)
 
 const onTableSelectionChange = (rows) => {
   selectedNames.value = new Set((rows || []).map((row) => row.name))
 }
 const clearBatchSelection = () => {
-  selectedNames.value = new Set()
+  clearSelectionState()
   tableRef.value?.clearSelection?.()
 }
 const toggleSelectAll = (selected) => {
@@ -1873,6 +1839,16 @@ const showBatchResults = (title, data) => {
   showBatchResultDialog.value = true
 }
 
+const applyBatchResult = async (title, { data }) => {
+  await loadSkills()
+  showBatchResults(title, data)
+  const failedNames = new Set(
+    (data?.results || []).filter((item) => item.status === 'failed').map((item) => item.name)
+  )
+  selectedNames.value = failedNames
+  await restoreTableSelection(failedNames)
+}
+
 const handleBatchToggle = async (enabled) => {
   const targets = selectedSkills.value
   if (!targets.length) return
@@ -1881,118 +1857,70 @@ const handleBatchToggle = async (enabled) => {
     return
   }
   if (enabled && !(await confirmRiskyEnable(targets))) return
-  if (!enabled) {
-    try {
-      await ElMessageBox.confirm(`确认禁用选中的 ${targets.length} 个 Skill？`, '批量禁用', {
-        type: 'info',
-        confirmButtonText: '禁用',
-        cancelButtonText: '取消'
-      })
-    } catch {
-      return
-    }
-  } else {
-    const hasControlledTarget = targets.some(
-      (skill) => skill.requiresExplicitApproval || ['high', 'critical'].includes(skill.risk)
-    )
-    if (!hasControlledTarget) {
-      try {
-        await ElMessageBox.confirm(
-          `确认启用选中的 ${targets.length} 个 Skill？只有已发布且校验通过的条目会被启用。`,
-          '批量启用',
-          {
-            type: 'warning',
-            confirmButtonText: '启用',
-            cancelButtonText: '取消'
-          }
-        )
-      } catch {
-        return
-      }
-    }
+  const action = enabled ? '启用' : '禁用'
+  const needsConfirmation = !enabled || !targets.some(
+    (skill) => skill.requiresExplicitApproval || ['high', 'critical'].includes(skill.risk)
+  )
+  if (needsConfirmation && !(await confirmAction({
+    title: `批量${action}`,
+    message: enabled
+      ? `确认启用选中的 ${targets.length} 个 Skill？只有已发布且校验通过的条目会被启用。`
+      : `确认禁用选中的 ${targets.length} 个 Skill？`,
+    type: enabled ? 'warning' : 'info',
+    confirmButtonText: action
+  }))) {
+    return
   }
 
-  batchToggleLoading.value = true
-  try {
-    const response = await toggleSkillsBatchApi({
+  await executeRequest(
+    () => toggleSkillsBatchApi({
       scope: activeScope.value,
       names: targets.map((skill) => skill.name),
       enabled
-    })
-    const data = response.data || {}
-    await loadSkills()
-    showBatchResults(`批量${enabled ? '启用' : '禁用'}结果`, data)
-    const failedNames = new Set(
-      (data.results || []).filter((item) => item.status === 'failed').map((item) => item.name)
-    )
-    selectedNames.value = failedNames
-    await restoreTableSelection(failedNames)
-  } catch (error) {
-    showError(error?.response?.data?.msg || error?.message || '批量操作失败')
-  } finally {
-    batchToggleLoading.value = false
-  }
+    }),
+    {
+      loadingRef: batchToggleLoading,
+      errorMessage: '批量操作失败',
+      onSuccess: (response) => applyBatchResult(`批量${action}结果`, response)
+    }
+  ).catch(() => false)
 }
 
 const handleBatchExport = async () => {
-  const targets = selectedSkills.value
-  if (!targets.length) return
-  batchExportLoading.value = true
-  try {
-    const response = await exportSkillsBatchApi({
-      scope: activeScope.value,
-      names: targets.map((skill) => skill.name)
-    })
-    const blob =
-      response.data instanceof Blob
-        ? response.data
-        : new Blob([response.data], { type: 'application/zip' })
-    const date = new Date().toISOString().slice(0, 10)
-    downloadBlob(blob, `skills_${activeScope.value}_${date}.zip`)
-    clearBatchSelection()
-  } catch (error) {
-    showError(error?.response?.data?.msg || error?.message || '批量导出失败')
-  } finally {
-    batchExportLoading.value = false
-  }
+  const names = selectedSkills.value.map((skill) => skill.name)
+  if (!names.length) return
+  const scope = activeScope.value
+  const date = new Date().toISOString().slice(0, 10)
+  await executeBlobDownload(
+    () => exportSkillsBatchApi({ scope, names }),
+    `skills_${scope}_${date}.zip`,
+    {
+      loadingRef: batchExportLoading,
+      errorMessage: '批量导出失败',
+      onSuccess: clearBatchSelection
+    }
+  ).catch(() => false)
 }
 
 const handleBatchDelete = async () => {
   const targets = selectedSkills.value
   if (!targets.length) return
-  try {
-    await ElMessageBox.confirm(
-      `确认删除选中的 ${targets.length} 个 Skill？删除后无法恢复。`,
-      '批量删除确认',
-      {
-        type: 'warning',
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
-        confirmButtonClass: 'el-button--danger'
-      }
-    )
-  } catch {
-    return
-  }
-  batchDeleteLoading.value = true
-  try {
-    const response = await deleteSkillsBatchApi({
+  await executeDeleteWithConfirm(
+    () => deleteSkillsBatchApi({
       scope: activeScope.value,
       names: targets.map((skill) => skill.name)
-    })
-    const data = response.data || {}
-    await loadSkills()
-    showBatchResults('批量删除结果', data)
-    const failedNames = new Set(
-      (data.results || []).filter((item) => item.status === 'failed').map((item) => item.name)
-    )
-    selectedNames.value = failedNames
-    await restoreTableSelection(failedNames)
-  } catch (error) {
-    showError(error?.response?.data?.msg || error?.message || '批量删除失败')
-  } finally {
-    batchDeleteLoading.value = false
-  }
+    }),
+    {
+      title: '批量删除确认',
+      message: `确认删除选中的 ${targets.length} 个 Skill？删除后无法恢复。`,
+      confirmButtonText: '删除',
+      confirmButtonClass: 'el-button--danger',
+      loadingRef: batchDeleteLoading,
+      successMessage: null,
+      errorMessage: '批量删除失败',
+      onSuccess: (response) => applyBatchResult('批量删除结果', response)
+    }
+  ).catch(() => false)
 }
 
 const batchResultType = (status) =>

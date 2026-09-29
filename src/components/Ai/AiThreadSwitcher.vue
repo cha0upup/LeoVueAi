@@ -90,6 +90,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { confirmAction } from '@/utils/confirmUtils.js'
 import { formatDate } from '@/utils/format.js'
 import { getThreadStatus, getThreadTitle } from '@/utils/aiRuntime.js'
 
@@ -130,14 +131,14 @@ const rename = async thread => {
 
 const confirmDelete = async thread => {
   opened.value = false
-  try {
-    await ElMessageBox.confirm(`删除“${getThreadTitle(thread)}”？对话记录删除后无法恢复。`, '删除对话', {
-      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
-    })
-    if (props.threads.some(item => item.threadId === thread.threadId)) {
-      emit('delete', thread.threadId)
-    }
-  } catch { /* 用户取消删除 */ }
+  const confirmed = await confirmAction({
+    title: '删除对话',
+    message: `删除“${getThreadTitle(thread)}”？对话记录删除后无法恢复。`,
+    confirmButtonText: '删除'
+  })
+  if (confirmed && props.threads.some(item => item.threadId === thread.threadId)) {
+    emit('delete', thread.threadId)
+  }
 }
 </script>
 

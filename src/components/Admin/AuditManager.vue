@@ -424,7 +424,7 @@ import { icons } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
-import { confirmDelete } from '@/utils/confirmUtils.js'
+import { executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
 import {
   getAuditLogsApi,
   getAuditLogDetailApi,
@@ -715,15 +715,12 @@ const refreshAfterDelete = async (deleted = 1) => {
 
 const handleDeleteOne = async (row) => {
   if (!row?.logId) return
-  const confirmed = await confirmDelete({
-    title: '删除审计日志',
-    message: `确定删除日志 ${row.logId} 吗？此操作不可恢复。`,
-    confirmButtonText: '删除'
-  })
-  if (!confirmed) return
-  await executeHandled(
-    async () => deleteAuditLogsApi({ logIds: [row.logId] }),
+  await executeDeleteWithConfirm(
+    () => deleteAuditLogsApi({ logIds: [row.logId] }),
     {
+      title: '删除审计日志',
+      message: `确定删除日志 ${row.logId} 吗？此操作不可恢复。`,
+      confirmButtonText: '删除',
       loadingRef: deleteLoading,
       successMessage: null,
       errorMessage: '删除失败',
@@ -732,20 +729,17 @@ const handleDeleteOne = async (row) => {
         await refreshAfterDelete(res.data?.deleted || 1)
       }
     }
-  )
+  ).catch(() => false)
 }
 
 const handleDeleteSelected = async () => {
   if (selectedLogIds.value.length === 0) return
-  const confirmed = await confirmDelete({
-    title: '删除选中日志',
-    message: `确定删除选中的 ${selectedLogIds.value.length} 条审计日志吗？此操作不可恢复。`,
-    confirmButtonText: '删除'
-  })
-  if (!confirmed) return
-  await executeHandled(
-    async () => deleteAuditLogsApi({ logIds: selectedLogIds.value }),
+  await executeDeleteWithConfirm(
+    () => deleteAuditLogsApi({ logIds: selectedLogIds.value }),
     {
+      title: '删除选中日志',
+      message: `确定删除选中的 ${selectedLogIds.value.length} 条审计日志吗？此操作不可恢复。`,
+      confirmButtonText: '删除',
       loadingRef: deleteLoading,
       successMessage: null,
       errorMessage: '删除失败',
@@ -754,23 +748,20 @@ const handleDeleteSelected = async () => {
         await refreshAfterDelete(res.data?.deleted || selectedLogIds.value.length)
       }
     }
-  )
+  ).catch(() => false)
 }
 
 const handleDeleteFiltered = async () => {
   if (!hasActiveFilter.value) return
-  const confirmed = await confirmDelete({
-    title: '删除筛选结果',
-    message: `确定删除当前筛选条件命中的 ${totalCount.value} 条审计日志吗？此操作不可恢复。`,
-    confirmButtonText: '删除'
-  })
-  if (!confirmed) return
-  await executeHandled(
-    async () => deleteFilteredAuditLogsApi({
+  await executeDeleteWithConfirm(
+    () => deleteFilteredAuditLogsApi({
       ...buildFilterParams(),
       confirm: 'DELETE'
     }),
     {
+      title: '删除筛选结果',
+      message: `确定删除当前筛选条件命中的 ${totalCount.value} 条审计日志吗？此操作不可恢复。`,
+      confirmButtonText: '删除',
       loadingRef: deleteLoading,
       successMessage: null,
       errorMessage: '删除筛选结果失败',
@@ -780,7 +771,7 @@ const handleDeleteFiltered = async () => {
         await refreshAfterDelete(res.data?.deleted || totalCount.value)
       }
     }
-  )
+  ).catch(() => false)
 }
 
 const handleCleanup = () => {
