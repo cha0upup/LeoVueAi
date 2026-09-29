@@ -49,7 +49,6 @@ export function createTerminalSessionController({
     const params = { ...identity, type, cmd }
     const mutating = type === 'init' || type === 'write' || type === 'write-line'
     if (type === 'init' && session.terminalMode) params.terminalMode = session.terminalMode
-    if (type === 'read' && !cmd && session.batchRead) params.batchRead = true
     // While waiting for an earlier output response, keep input flowing without consuming more output.
     if (mutating && !outputStream.waiting) params.includeOutput = true
     const outputRequest = type === 'read' || params.includeOutput

@@ -53,7 +53,7 @@ const outputModes = computed(() => Array.isArray(props.metadata.outputModes) && 
   ? props.metadata.outputModes
   : Object.keys(PHP_OUTPUT_MODES))
 const defaultOutputMode = computed(() => props.metadata.defaultOutputMode || 'compact')
-const coreProtocol = computed(() => props.metadata.coreProtocol || 'M0-M3')
+const coreProtocol = computed(() => props.metadata.coreProtocol || 'Envelope')
 const componentCount = computed(() => Array.isArray(props.metadata.components) ? props.metadata.components.length : 0)
 const modeDefinition = mode => PHP_OUTPUT_MODES[mode] || {
   label: mode, title: '自定义输出', description: '由运行时模块提供', tone: 'readable'

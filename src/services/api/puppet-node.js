@@ -52,10 +52,8 @@ const readTerminalBatch = createTerminalReadBatcher({
 })
 
 export function execCommandApi(params) {
-  const { batchRead, ...command } = params
-  if (batchRead === true && command.type === 'read' && !command.cmd)
-    return readTerminalBatch(command)
-  return sendTerminalCommand(command)
+  if (params.type === 'read' && !params.cmd) return readTerminalBatch(params)
+  return sendTerminalCommand(params)
 }
 
 export function getBasicInfoApi(params) {

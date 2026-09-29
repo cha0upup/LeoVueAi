@@ -23,7 +23,6 @@ export function createTerminalSession({
     backend: 'detecting',
     backendFailures: [],
     longPolling: false,
-    batchRead: false,
     lineInput: false,
     processExited: false,
     ended: false,
@@ -102,7 +101,7 @@ export function applyTerminalMetadata(session, payload, fromRead = false) {
   }
   if (instanceId) session.instanceId = instanceId
   session.routingMismatch = false
-  for (const key of ['pty', 'resizable', 'longPolling', 'lineInput', 'batchRead']) {
+  for (const key of ['pty', 'resizable', 'longPolling', 'lineInput']) {
     if (typeof payload[key] === 'boolean') session[key] = payload[key]
   }
   if (typeof payload.backend === 'string' && payload.backend) session.backend = payload.backend

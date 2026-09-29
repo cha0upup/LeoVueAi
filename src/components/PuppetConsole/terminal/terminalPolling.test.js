@@ -94,18 +94,13 @@ describe('adaptive terminal polling', () => {
     await expectNextReadAfter(controller, read, 3000)
   })
 
-  it('offers only negotiated nonblocking reads to the batch transport', async () => {
-    const { controller, session, read, visibility } = setup({ longPolling: true })
-    session.batchRead = true
+  it('keeps foreground long polls separate from background idle reads', async () => {
+    const { controller, read, visibility } = setup({ longPolling: true })
     await controller.poll()
     expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ cmd: '10000' }))
-    expect(read.mock.lastCall[0].batchRead).toBeUndefined()
     visibility.foreground = false
     await expectNextReadAfter(controller, read, 5000)
-    expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ cmd: '', batchRead: true }))
-    session.batchRead = false
-    await expectNextReadAfter(controller, read, 5000)
-    expect(read.mock.lastCall[0].batchRead).toBeUndefined()
+    expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ cmd: '' }))
   })
 
   it('does not let a late empty response undo new local input activity', async () => {

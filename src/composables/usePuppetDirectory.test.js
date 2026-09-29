@@ -40,7 +40,7 @@ describe('proxy quick-toggle update payload', () => {
     }
 
     const payload = buildPuppetUpdatePayload({
-      id: 'legacy-host-id',
+      id: 'client-only-row-id',
       ...host,
       hasChildren: true,
       level: 0,

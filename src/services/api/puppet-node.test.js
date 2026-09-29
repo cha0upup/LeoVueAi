@@ -11,7 +11,6 @@ describe('terminal request timeouts', () => {
   it.each([
     ['read', '10000', { timeout: 30000 }],
     ['read', '750', { timeout: 30000 }],
-    ['read', '', undefined],
     ['read', '0', undefined],
     ['init', '', { timeout: 45000 }],
     ['write', 'init', { timeout: 45000 }],
@@ -24,7 +23,7 @@ describe('terminal request timeouts', () => {
     expect(post).toHaveBeenCalledWith('/puppet-node/command/exec-command', params, config)
   })
 
-  it('batches negotiated reads while sending long polls and input immediately', async () => {
+  it('batches simultaneous idle reads while sending long polls and input immediately', async () => {
     post.mockImplementation(async (url, params) => ({
       data: url.endsWith('read-batch')
         ? {
@@ -33,7 +32,7 @@ describe('terminal request timeouts', () => {
           }
         : { code: 200 }
     }))
-    const base = { sessionId: 'host', type: 'read', cmd: '', batchRead: true }
+    const base = { sessionId: 'host', type: 'read', cmd: '' }
     const first = execCommandApi({ ...base, processId: 'a' })
     const second = execCommandApi({ ...base, processId: 'b' })
     execCommandApi({ ...base, processId: 'c', cmd: '10000' })
@@ -46,7 +45,6 @@ describe('terminal request timeouts', () => {
     })
     expect(post).toHaveBeenCalledTimes(2)
     expect(post.mock.calls[1][1].includeOutput).toBe(true)
-    expect(post.mock.calls.every(([, params]) => params.batchRead === undefined)).toBe(true)
     await Promise.all([first, second])
     expect(post).toHaveBeenCalledWith('/puppet-node/command/read-batch', {
       sessionId: 'host',
@@ -54,9 +52,9 @@ describe('terminal request timeouts', () => {
     })
   })
 
-  it('retains individual reads when the node has not advertised batching', () => {
+  it('uses the single-read route when only one terminal is pending', async () => {
     for (const id of ['a', 'b'])
-      execCommandApi({ sessionId: 'legacy', processId: id, type: 'read', cmd: '' })
+      await execCommandApi({ sessionId: 'host', processId: id, type: 'read', cmd: '' })
     expect(post).toHaveBeenCalledTimes(2)
     expect(post.mock.calls.every(([url]) => url.endsWith('exec-command'))).toBe(true)
   })
