@@ -75,7 +75,7 @@
                 >
                   <component
                     :is="component"
-                    @add-puppet-entity="addPuppetEntity"
+                    @open-agent-console="openAgentConsole"
                   />
                 </div>
               </template>
@@ -105,15 +105,15 @@ const FingerprintManager = defineAsyncComponent(
 const DisguiseManager = defineAsyncComponent(
   () => import('@/components/DisguiseManager/DisguiseManager.vue')
 )
-const PuppetManager = defineAsyncComponent(
-  () => import('@/components/PuppetManager/PuppetManager.vue')
+const AgentManager = defineAsyncComponent(
+  () => import('@/components/AgentManager/AgentManager.vue')
 )
 const UserSpace = defineAsyncComponent(() => import('@/components/UserSpace/UserSpace.vue'))
 const SkillManager = defineAsyncComponent(
   () => import('@/components/SkillManager/SkillManager.vue')
 )
 
-const emit = defineEmits(['addPuppetEntity'])
+const emit = defineEmits(['open-agent-console'])
 const selectedMenu = ref(DEFAULT_HOME_MENU_KEY)
 const SIDEBAR_COLLAPSED_KEY = 'leovue-home-sidebar-collapsed'
 const sidebarCollapsed = ref(false)
@@ -123,9 +123,9 @@ const initializedModules = reactive({ [DEFAULT_HOME_MENU_KEY]: true })
 const menuGroups = HOME_MENU_GROUPS
 
 const componentMap = {
-  puppet: PuppetManager,
+  agent: AgentManager,
   'user-space': UserSpace,
-  hostgen: ScriptGenerator,
+  'script-generator': ScriptGenerator,
   disguise: DisguiseManager,
   plugin: PluginManager,
   fingerprint: FingerprintManager,
@@ -144,8 +144,8 @@ const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
-const addPuppetEntity = (puppetEntityParams) => {
-  emit('addPuppetEntity', puppetEntityParams)
+const openAgentConsole = (agentConsoleParams) => {
+  emit('open-agent-console', agentConsoleParams)
 }
 
 onMounted(() => {

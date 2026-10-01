@@ -48,9 +48,9 @@ defineEmits(['pick-prompt'])
 const prompts = [
   {
     title: '查看在线节点',
-    desc: '查看在线 Puppet 的名称和连接协议',
+    desc: '查看在线 Agent 的名称和连接协议',
     icon: 'lucide:server',
-    value: '列出平台上当前在线的 Puppet，包括名称、协议和在线状态。'
+    value: '列出平台上当前在线的 Agent，包括名称、协议和在线状态。'
   },
   {
     title: '查看流量伪装配置',
@@ -62,7 +62,7 @@ const prompts = [
     title: '汇总平台资源',
     desc: '统计节点、用户、团队和配置数量',
     icon: 'lucide:chart-no-axes-combined',
-    value: '帮我汇总平台当前的整体情况：Puppet 数量、用户数量、团队数量和 Disguise 数量。'
+    value: '帮我汇总平台当前的整体情况：Agent 数量、用户数量、团队数量和 Disguise 数量。'
   },
   {
     title: '查看用户与团队',

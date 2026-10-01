@@ -4,7 +4,7 @@ import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 import { isCurrentSession, registerSessionCleanup, sessionGeneration } from '@/services/sessionLifecycle.js'
 import {
-  getPuppetTabPath,
+  getAgentTabPath,
   LOAD_DELAYS,
   MAIN_HOME_TAB_ID,
   MAIN_TAB_STORAGE_KEYS,
@@ -78,7 +78,7 @@ export function useMainTabs({ confirmAction, iconMap }) {
     saveTabsToStorage()
   }
 
-  const loadPuppetEntity = (tab) => {
+  const loadAgentConsoleTab = (tab) => {
     if (tab.isLoaded) {
       return
     }
@@ -98,7 +98,7 @@ export function useMainTabs({ confirmAction, iconMap }) {
     const savedTabs = safeLocalStorage
       .getJSON(MAIN_TAB_STORAGE_KEYS.tabs, [], Array.isArray)
       .filter((tab) => typeof tab?.tabKey === 'string' && tab.tabKey &&
-        tab.id === 'puppet-tab-' + tab.tabKey)
+        tab.id === 'agent-tab-' + tab.tabKey)
     const savedCurrentTab = safeLocalStorage.getItem(MAIN_TAB_STORAGE_KEYS.currentTab)
 
     tabs.value = savedTabs.map((tab) => ({ ...tab, icon: iconMap.server }))
@@ -111,7 +111,7 @@ export function useMainTabs({ confirmAction, iconMap }) {
 
     tabs.value.forEach((tab) => {
       if (tab.sessionId && !tab.isLoaded && currentTab.value === tab.id) {
-        loadPuppetEntity(tab)
+        loadAgentConsoleTab(tab)
       }
     })
 
@@ -129,7 +129,7 @@ export function useMainTabs({ confirmAction, iconMap }) {
     saveTabsToStorage()
 
     if (tab?.sessionId && !tab.isLoaded) {
-      loadPuppetEntity(tab)
+      loadAgentConsoleTab(tab)
     }
 
     return tab
@@ -151,7 +151,7 @@ export function useMainTabs({ confirmAction, iconMap }) {
   }
 
   const getTabRoute = (tab) => {
-    return tab?.tabKey ? getPuppetTabPath(tab.tabKey) : ROUTE_PATHS.main
+    return tab?.tabKey ? getAgentTabPath(tab.tabKey) : ROUTE_PATHS.main
   }
 
   const closeTab = async (tabId, index) => {
@@ -187,47 +187,47 @@ export function useMainTabs({ confirmAction, iconMap }) {
     }
   }
 
-  const addPuppetEntity = (puppetEntityParams) => {
+  const addAgentConsoleTab = (agentConsoleParams) => {
     restoreTabsFromStorage()
-    const existingTab = tabs.value.find((tab) => tab.sessionId === puppetEntityParams.sessionId)
+    const existingTab = tabs.value.find((tab) => tab.sessionId === agentConsoleParams.sessionId)
     if (existingTab) {
       existingTab.initialPrompt =
-        puppetEntityParams.initialPrompt || existingTab.initialPrompt || ''
-      existingTab.projectId = puppetEntityParams.projectId || existingTab.projectId || ''
-      existingTab.projectName = puppetEntityParams.projectName || existingTab.projectName || ''
-      existingTab.capabilities = Array.isArray(puppetEntityParams.capabilities)
-        ? puppetEntityParams.capabilities
+        agentConsoleParams.initialPrompt || existingTab.initialPrompt || ''
+      existingTab.projectId = agentConsoleParams.projectId || existingTab.projectId || ''
+      existingTab.projectName = agentConsoleParams.projectName || existingTab.projectName || ''
+      existingTab.capabilities = Array.isArray(agentConsoleParams.capabilities)
+        ? agentConsoleParams.capabilities
         : existingTab.capabilities || []
       currentTab.value = existingTab.id
       saveTabsToStorage()
       if (existingTab.sessionId && !existingTab.isLoaded) {
-        loadPuppetEntity(existingTab)
+        loadAgentConsoleTab(existingTab)
       }
       return existingTab
     }
 
     const tabKey = createTabKey()
     const newTab = {
-      id: `puppet-tab-${tabKey}`,
+      id: `agent-tab-${tabKey}`,
       tabKey,
-      title: puppetEntityParams.puppetName,
+      title: agentConsoleParams.agentName,
       icon: iconMap.server,
-      sessionId: puppetEntityParams.sessionId,
-      connLink: puppetEntityParams.connLink,
-      projectId: puppetEntityParams.projectId || '',
-      projectName: puppetEntityParams.projectName || '',
-      cacheMode: puppetEntityParams.cacheMode || false,
-      capabilities: Array.isArray(puppetEntityParams.capabilities)
-        ? puppetEntityParams.capabilities
+      sessionId: agentConsoleParams.sessionId,
+      connLink: agentConsoleParams.connLink,
+      projectId: agentConsoleParams.projectId || '',
+      projectName: agentConsoleParams.projectName || '',
+      cacheMode: agentConsoleParams.cacheMode || false,
+      capabilities: Array.isArray(agentConsoleParams.capabilities)
+        ? agentConsoleParams.capabilities
         : [],
-      initialPrompt: puppetEntityParams.initialPrompt || '',
+      initialPrompt: agentConsoleParams.initialPrompt || '',
       isLoaded: false
     }
 
     tabs.value.push(newTab)
     currentTab.value = newTab.id
     saveTabsToStorage()
-    loadPuppetEntity(newTab)
+    loadAgentConsoleTab(newTab)
     return newTab
   }
 
@@ -239,7 +239,7 @@ export function useMainTabs({ confirmAction, iconMap }) {
     HOME_TAB_ID: MAIN_HOME_TAB_ID,
     currentTab,
     tabs,
-    addPuppetEntity,
+    addAgentConsoleTab,
     closeTab,
     getTabRoute,
     goToHome,

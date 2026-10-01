@@ -1,7 +1,7 @@
 import { unref } from 'vue'
 
 /**
- * 统一构造带 sessionId 的 puppet API 请求体。
+ * 统一构造带 sessionId 的 agent API 请求体。
  *
  * 替代每个组件重复的:
  *   function buildParams(extra = {}) {

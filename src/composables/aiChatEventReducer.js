@@ -137,7 +137,7 @@ function nodeAdaptTool(msg, name, data, seq) {
   node.updatedAt = Date.now()
 }
 
-/** 平台 AI → Puppet AI 派发节点的生命周期更新。 */
+/** 平台 AI → Node AI 派发节点的生命周期更新。 */
 function nodeAdaptSubtask(msg, data, seq) {
   if (!msg || !data?.subagentInvocationId) return null
   const nodes = ensureNodes(msg)
@@ -148,7 +148,7 @@ function nodeAdaptSubtask(msg, data, seq) {
       invocationId: data.subagentInvocationId,
       childThreadId: data.childThreadId,
       sessionId: data.sessionId,
-      puppetId: data.puppetId,
+      agentId: data.agentId,
       task: data.task,
       status: data.status,
       summary: data.summary,
@@ -159,7 +159,7 @@ function nodeAdaptSubtask(msg, data, seq) {
   } else {
     if (data.childThreadId) node.childThreadId = data.childThreadId
     if (data.sessionId) node.sessionId = data.sessionId
-    if (data.puppetId) node.puppetId = data.puppetId
+    if (data.agentId) node.agentId = data.agentId
     if (data.task) node.task = data.task
     if (data.status) node.status = data.status
     if (data.summary != null) node.summary = data.summary

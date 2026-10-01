@@ -1227,13 +1227,13 @@ const catalogMode = computed({
 })
 
 const scopes = [
-  { value: 'puppet-node', label: 'puppet-node' },
+  { value: 'agent-node', label: 'agent-node' },
   { value: 'platform', label: 'platform' }
 ]
-const activeScope = ref(uiState.value.activeScope || 'puppet-node')
+const activeScope = ref(uiState.value.activeScope || 'agent-node')
 const viewMode = ref('catalog')
 const workspaceTab = ref('overview')
-const scopeCatalog = ref({ 'puppet-node': [], platform: [] })
+const scopeCatalog = ref({ 'agent-node': [], platform: [] })
 const selectedSkill = ref(null)
 const selectedSkillName = ref('')
 const searchKeyword = ref('')

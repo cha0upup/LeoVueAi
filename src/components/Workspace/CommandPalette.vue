@@ -125,7 +125,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { icons } from '@/utils/icons.js'
-import { ATTACK_PHASES } from '@/composables/usePuppetConsoleModules.js'
+import { ATTACK_PHASES } from '@/composables/useAgentConsoleModules.js'
 
 const iconMap = icons
 

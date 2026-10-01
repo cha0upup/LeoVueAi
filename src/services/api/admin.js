@@ -52,8 +52,8 @@ export function getAuditTeamStatisticsApi(params) {
   return http.get('/platform/admin/audit-logs/statistics/team', { params })
 }
 
-export function getAuditPuppetStatisticsApi(params) {
-  return http.get('/platform/admin/audit-logs/statistics/puppet', { params })
+export function getAuditAgentStatisticsApi(params) {
+  return http.get('/platform/admin/audit-logs/statistics/agent', { params })
 }
 
 export function getAuditOperationStatisticsApi() {

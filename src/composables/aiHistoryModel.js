@@ -69,7 +69,7 @@ const mapAssistantNodes = (message, includeSubtasks) => {
         invocationId: item.subagentInvocationId,
         childThreadId: item.childThreadId,
         sessionId: item.sessionId,
-        puppetId: item.puppetId,
+        agentId: item.agentId,
         task: item.task,
         status: item.status,
         summary: item.summary,

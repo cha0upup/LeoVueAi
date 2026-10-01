@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { parseAiSseStream } from './ai-sse.js'
 
 describe('parseAiSseStream subagent events', () => {
-  it('dispatches nested Puppet AI events with the SSE sequence', async () => {
+  it('dispatches nested Node AI events with the SSE sequence', async () => {
     const onSubagentEvent = vi.fn()
     const body = [
       'event: subagent_event',

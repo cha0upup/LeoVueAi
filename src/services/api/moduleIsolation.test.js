@@ -35,7 +35,7 @@ describe('business API module boundaries', () => {
   })
 
   it('initializes the terminal batcher only when its own node API is loaded', async () => {
-    await import('./puppet-node.js')
+    await import('./agent-node.js')
 
     expect(mocks.createTerminalReadBatcher).toHaveBeenCalledTimes(1)
     expect(mocks.post).not.toHaveBeenCalled()

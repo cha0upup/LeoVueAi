@@ -1,9 +1,9 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { previewFileChunkApi } from '@/services/api/puppet-files.js'
+import { previewFileChunkApi } from '@/services/api/agent-files.js'
 import { useLargeFile } from './useLargeFile.js'
 
-vi.mock('@/services/api/puppet-files.js', () => ({
+vi.mock('@/services/api/agent-files.js', () => ({
   previewFileChunkApi: vi.fn()
 }))
 

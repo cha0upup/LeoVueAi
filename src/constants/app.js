@@ -3,8 +3,8 @@ import { icons } from '@/utils/icons.js'
 export const ROUTE_PATHS = {
   root: '/',
   main: '/main',
-  mainPuppetBase: '/main/puppet',
-  mainPuppet: '/main/puppet/:tabKey',
+  mainAgentBase: '/main/agent',
+  mainAgent: '/main/agent/:tabKey',
   login: '/login',
   changePassword: '/change-password',
   admin: '/admin'
@@ -12,21 +12,21 @@ export const ROUTE_PATHS = {
 
 export const ROUTE_NAMES = {
   main: 'Main',
-  mainPuppet: 'MainPuppet',
+  mainAgent: 'MainAgent',
   login: 'Login',
   changePassword: 'ChangePassword',
   admin: 'AdminConsole'
 }
 
-export const getPuppetTabPath = (tabKey) => {
-  return `${ROUTE_PATHS.mainPuppetBase}/${encodeURIComponent(tabKey)}`
+export const getAgentTabPath = (tabKey) => {
+  return `${ROUTE_PATHS.mainAgentBase}/${encodeURIComponent(tabKey)}`
 }
 
 export const DEFAULT_USERNAME = '管理员'
-export const DEFAULT_HOME_MENU_KEY = 'puppet'
+export const DEFAULT_HOME_MENU_KEY = 'agent'
 export const MAIN_HOME_TAB_ID = 'HOME'
 export const THEME_STORAGE_KEY = 'leovue-theme'
-export const PUPPET_CONSOLE_SETTINGS_STORAGE_KEY = 'puppet-console-settings'
+export const AGENT_CONSOLE_SETTINGS_STORAGE_KEY = 'agent-console-settings'
 
 export const MAIN_TAB_STORAGE_KEYS = {
   tabs: 'leovue-tabs',
@@ -52,7 +52,7 @@ export const HOME_MENU_GROUPS = [
     kicker: 'Operations',
     title: '运行工作台',
     items: [
-      { key: 'puppet', title: '主机资产', icon: icons.server }
+      { key: 'agent', title: '主机资产', icon: icons.server }
     ]
   },
   {
@@ -60,7 +60,7 @@ export const HOME_MENU_GROUPS = [
     kicker: 'Build',
     title: '构建与交付',
     items: [
-      { key: 'hostgen', title: '脚本构建', icon: icons.codeGenerator },
+      { key: 'script-generator', title: '脚本构建', icon: icons.codeGenerator },
       { key: 'user-space', title: '成果库', icon: icons.folderOpened }
     ]
   },

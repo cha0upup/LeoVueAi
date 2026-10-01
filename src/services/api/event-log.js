@@ -1,23 +1,23 @@
 import http from '../http.js'
 
 export function listEventLogSourcesApi(params) {
-  return http.post('/puppet-node/event-log/list-sources', params)
+  return http.post('/agent-node/event-log/list-sources', params)
 }
 
 export function queryEventLogApi(params) {
-  return http.post('/puppet-node/event-log/query', params)
+  return http.post('/agent-node/event-log/query', params)
 }
 
 export function getEventLogStatsApi(params) {
-  return http.post('/puppet-node/event-log/stats', params)
+  return http.post('/agent-node/event-log/stats', params)
 }
 
 export function aggregateEventLogApi(params) {
-  return http.post('/puppet-node/event-log/aggregate', params)
+  return http.post('/agent-node/event-log/aggregate', params)
 }
 
 export function metaEventLogApi(params) {
-  return http.post('/puppet-node/event-log/meta', params)
+  return http.post('/agent-node/event-log/meta', params)
 }
 
 /**
@@ -31,6 +31,6 @@ export function followEventLogSse(params) {
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null) qs.append(k, String(v))
   })
-  const url = `${base}/puppet-node/event-log/follow?${qs.toString()}`
+  const url = `${base}/agent-node/event-log/follow?${qs.toString()}`
   return new EventSource(url, { withCredentials: true })
 }

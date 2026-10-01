@@ -27,10 +27,10 @@
           {{ log.userName || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="主机ID">
-          {{ log.puppetId || '-' }}
+          {{ log.agentId || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="主机名">
-          {{ log.puppetName || '-' }}
+          {{ log.agentName || '-' }}
         </el-descriptions-item>
         <el-descriptions-item
           label="会话ID"

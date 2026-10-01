@@ -10,7 +10,7 @@
 
 ### 1.1 list + detail（左侧列表 + 右侧详情）
 
-**适用模块**：DisguiseManager、FingerprintManager、PluginManager、SessionManager、PuppetManager、SkillManager
+**适用模块**：DisguiseManager、FingerprintManager、PluginManager、SessionManager、AgentManager、SkillManager
 
 **结构骨架**
 

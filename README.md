@@ -32,7 +32,7 @@ LeoVueAI 是 LeoAI 的前端控制台，基于 Vue 3 + Vite 构建，负责平�
 ```text
 src/
   components/          业务组件
-    PuppetConsole/     节点控制台工具集
+    AgentConsole/     节点控制台工具集
     Workspace/         主工作台与标签页
     AiAssistant/       通用 AI 对话组件
     Admin/             管理后台
@@ -134,20 +134,20 @@ npm run format
 ## 开发约定
 
 - 新的后端接口优先在 `src/services/api/` 下按领域拆分，不直接在组件内散写 URL。
-- 节点控制台功能优先放在 `src/components/PuppetConsole/<Feature>/`，并通过 `usePuppetConsoleModules.js` 注册。
+- 节点控制台功能优先放在 `src/components/AgentConsole/<Feature>/`，并通过 `useAgentConsoleModules.js` 注册。
 - 长对话、SSE、轮询、任务状态这类跨组件逻辑优先沉到 `composables/`。
 - Monaco 和 xterm 属于重型依赖，构建分包规则在 `vite.config.js` 中维护。
 - 页面样式优先复用全局主题变量，避免单页面硬编码大量孤立颜色。
 
 ## 虚拟终端说明
 
-虚拟终端位于 `src/components/PuppetConsole/terminal/`：
+虚拟终端位于 `src/components/AgentConsole/terminal/`：
 
 - `TerminalConsole.vue`：会话管理、输入写入、输出轮询、搜索、清屏、中断和关闭。
 - `TerminalSessionRail.vue`：多终端会话列表和会话级快捷操作。
 - `TerminalViewport.vue`：`@xterm/xterm` 实例、尺寸自适应、搜索和链接识别。
 
-终端通过后端 `/puppet-node/command` 接口按 `processId` 维护远端进程。关闭会话、重置工作台或卸载组件时会发送 `stop`，避免远端 shell 残留。
+终端通过后端 `/agent-node/command` 接口按 `processId` 维护远端进程。关闭会话、重置工作台或卸载组件时会发送 `stop`，避免远端 shell 残留。
 
 ## License
 

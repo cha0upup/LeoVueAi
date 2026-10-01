@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { previewFileApi } from '@/services/api/puppet-files.js'
+import { previewFileApi } from '@/services/api/agent-files.js'
 import { showWarning } from '@/utils/messageUtils.js'
 
 // 图片扩展名

@@ -1,11 +1,11 @@
 import { ref, computed } from 'vue'
 import {
-  puppetNodeAiThreadListApi,
-  puppetNodeAiThreadCreateApi,
-  puppetNodeAiThreadDeleteApi,
-  puppetNodeAiThreadRenameApi,
-  puppetNodeAiThreadMessagesApi
-} from '@/services/api/puppet-ai.js'
+  nodeAiThreadListApi,
+  nodeAiThreadCreateApi,
+  nodeAiThreadDeleteApi,
+  nodeAiThreadRenameApi,
+  nodeAiThreadMessagesApi
+} from '@/services/api/node-ai.js'
 import { showError } from '@/utils/messageUtils.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 
@@ -16,7 +16,7 @@ import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
  * 与 useAiChat 配合使用：useAiThreads 管理线程元数据，useAiChat 管理当前线程的消息流。
  *
  * @param {object} opts
- * @param {import('vue').Ref<string>} opts.sessionId - PuppetNode 会话 ID
+ * @param {import('vue').Ref<string>} opts.sessionId - AgentNode 会话 ID
  */
 export function useAiThreads({ sessionId }) {
   const threads        = ref([])   // AiThreadMeta[]
@@ -42,7 +42,7 @@ export function useAiThreads({ sessionId }) {
     const currentLoadingSequence = silent ? null : ++loadingSequence
     if (!silent) loading.value = true
     try {
-      const res = await puppetNodeAiThreadListApi({ sessionId: requestSessionId })
+      const res = await nodeAiThreadListApi({ sessionId: requestSessionId })
       if (!requestGuard.isCurrent('threads', sequence) || requestSessionId !== sessionId.value) return
       const serverThreads = Array.isArray(res.data?.threads) ? res.data.threads : []
       threads.value = preserveActive ? mergeThreadList(serverThreads) : serverThreads
@@ -80,7 +80,7 @@ export function useAiThreads({ sessionId }) {
     if (!sessionId.value) return null
     const requestSessionId = sessionId.value
     try {
-      const res = await puppetNodeAiThreadCreateApi({
+      const res = await nodeAiThreadCreateApi({
         sessionId: requestSessionId,
         title,
         configId
@@ -115,7 +115,7 @@ export function useAiThreads({ sessionId }) {
     if (!sessionId.value || !threadId) return
     const requestSessionId = sessionId.value
     try {
-      await puppetNodeAiThreadDeleteApi({ sessionId: requestSessionId, threadId })
+      await nodeAiThreadDeleteApi({ sessionId: requestSessionId, threadId })
       if (requestSessionId !== sessionId.value) return
       requestGuard.invalidate(['threads'])
       threads.value = threads.value.filter(t => t.threadId !== threadId)
@@ -136,7 +136,7 @@ export function useAiThreads({ sessionId }) {
     if (!sessionId.value || !threadId || !title?.trim()) return
     const requestSessionId = sessionId.value
     try {
-      await puppetNodeAiThreadRenameApi({ sessionId: requestSessionId, threadId, title: title.trim() })
+      await nodeAiThreadRenameApi({ sessionId: requestSessionId, threadId, title: title.trim() })
       if (requestSessionId !== sessionId.value) return
       requestGuard.invalidate(['threads'])
       const t = threads.value.find(t => t.threadId === threadId)
@@ -169,7 +169,7 @@ export function useAiThreads({ sessionId }) {
     if (!sessionId.value || !threadId) return { messages: [], total: 0 }
     const requestSessionId = sessionId.value
     try {
-      const res = await puppetNodeAiThreadMessagesApi({
+      const res = await nodeAiThreadMessagesApi({
         sessionId: requestSessionId,
         threadId,
         offset,

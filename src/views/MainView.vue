@@ -6,14 +6,14 @@
     >
       <el-main
         class="main-content"
-        :class="{ 'is-puppet-console': currentTab !== HOME_TAB_ID }"
+        :class="{ 'is-agent-console': currentTab !== HOME_TAB_ID }"
       >
         <div class="content-wrapper">
           <div
             v-show="currentTab === HOME_TAB_ID"
             class="content-page"
           >
-            <Home @add-puppet-entity="openPuppetEntity" />
+            <Home @open-agent-console="openAgentConsole" />
           </div>
 
           <div
@@ -22,11 +22,11 @@
             :key="tab.id"
             class="content-page"
           >
-            <PuppetEntity
+            <AgentConsoleView
               v-if="tab.isLoaded"
               :conn-link="tab.connLink"
               :session-id="tab.sessionId"
-              :puppet-name="tab.title"
+              :agent-name="tab.title"
               :cache-mode="tab.cacheMode"
               :capabilities="tab.capabilities || []"
               :initial-prompt="tab.initialPrompt || ''"
@@ -68,8 +68,8 @@ defineOptions({
 })
 
 const Home = defineAsyncComponent(() => import('@/components/Home.vue'))
-const PuppetEntity = defineAsyncComponent(
-  () => import('@/components/PuppetConsole/PuppetEntity.vue')
+const AgentConsoleView = defineAsyncComponent(
+  () => import('@/components/AgentConsole/AgentConsoleView.vue')
 )
 const iconMap = icons
 const route = useRoute()
@@ -79,7 +79,7 @@ const {
   HOME_TAB_ID,
   currentTab,
   tabs,
-  addPuppetEntity,
+  addAgentConsoleTab,
   getTabRoute,
   goToHome,
   switchTabByKey
@@ -93,8 +93,8 @@ const readRouteTabKey = () => {
   return Array.isArray(rawTabKey) ? rawTabKey[0] : rawTabKey
 }
 
-const openPuppetEntity = (puppetEntityParams) => {
-  const tab = addPuppetEntity(puppetEntityParams)
+const openAgentConsole = (agentConsoleParams) => {
+  const tab = addAgentConsoleTab(agentConsoleParams)
   const targetRoute = getTabRoute(tab)
 
   if (route.fullPath !== targetRoute) {
@@ -103,7 +103,7 @@ const openPuppetEntity = (puppetEntityParams) => {
 }
 
 const syncTabFromRoute = () => {
-  if (route.name === ROUTE_NAMES.mainPuppet) {
+  if (route.name === ROUTE_NAMES.mainAgent) {
     const tabKey = readRouteTabKey()
     const tab = tabKey ? switchTabByKey(tabKey) : null
 
@@ -146,7 +146,7 @@ watch(
   overflow: hidden;
 }
 
-.main-content.is-puppet-console {
+.main-content.is-agent-console {
   padding: 0;
 }
 

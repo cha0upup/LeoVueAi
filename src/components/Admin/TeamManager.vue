@@ -232,7 +232,7 @@ const filteredTeams = computed(() => {
 const assignedLeaderCount = computed(() => teamData.value.filter((item) => item.leaderId).length)
 const unassignedLeaderCount = computed(() => teamData.value.filter((item) => !item.leaderId).length)
 
-const getAllTeam = async () => {
+const getAllTeams = async () => {
   loading.value = true
   try {
     const resp = await getAllTeamsApi()
@@ -242,7 +242,7 @@ const getAllTeam = async () => {
   }
 }
 
-const getAllUser = async () => {
+const getAllUsers = async () => {
   if (isAdmin.value) {
     const [noTeamResp, allResp] = await Promise.all([getUsersNoTeamApi(), getAllUsersApi()])
     users.value = noTeamResp.data || []
@@ -256,7 +256,7 @@ const getAllUser = async () => {
 
 const openAddTeamDialog = async () => {
   addTeamDialog.value = true
-  await getAllUser()
+  await getAllUsers()
 }
 
 const addTeam = async () => {
@@ -313,7 +313,7 @@ const delTeam = async (id) => {
 
 const refreshData = async () => {
   try {
-    await Promise.all([getAllTeam(), getAllUser()])
+    await Promise.all([getAllTeams(), getAllUsers()])
   } catch {
     ElNotification({ title: '错误', message: '刷新数据失败！', type: 'error' })
   }
@@ -331,8 +331,8 @@ const isBuiltInTeam = (item) => {
 
 onMounted(async () => {
   await fetchAuth()
-  getAllTeam()
-  getAllUser()
+  getAllTeams()
+  getAllUsers()
 })
 </script>
 

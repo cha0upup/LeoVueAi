@@ -97,7 +97,7 @@ import { useDialogVisible } from '@/composables/useDialogVisible.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
-  defaultScope: { type: String, default: 'puppet-node' }
+  defaultScope: { type: String, default: 'agent-node' }
 })
 
 const emit = defineEmits(['update:modelValue', 'confirm'])
@@ -105,7 +105,7 @@ const visible = useDialogVisible(props, emit)
 const formRef = ref(null)
 
 const templates = {
-  'puppet-node': [
+  'agent-node': [
     {
       value: 'host-readonly',
       label: '主机只读能力',
@@ -189,7 +189,7 @@ const templates = {
   ]
 }
 
-const templateOptions = computed(() => templates[props.defaultScope] || templates['puppet-node'])
+const templateOptions = computed(() => templates[props.defaultScope] || templates['agent-node'])
 const defaults = () => ({
   name: '',
   description: '',

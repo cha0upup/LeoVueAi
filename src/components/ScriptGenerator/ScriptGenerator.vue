@@ -35,7 +35,7 @@
           :is-result-stale="isResultStale"
           :is-saving-artifact="isSavingArtifact"
           @copy="copyToClipboard"
-          @generate="GenShell"
+          @generate="generateArtifact"
           @save-artifact="saveArtifact"
           @copy-summary="copyConfigSummary"
           @download-class-artifact="downloadGeneratedClass"
@@ -121,7 +121,7 @@ const form = reactive({
 })
 
 // 数据
-const Disguises = ref([])
+const allDisguises = ref([])
 const supportedTypes = ref({
   serverProtocolInjectorTypes: {},
   injectorCapabilities: [],
@@ -158,8 +158,8 @@ const isPhpRuntime = computed(() => form.runtime === 'php')
 const runtimeGenerators = computed(() => supportedTypes.value.runtimeGenerators)
 const phpGeneratorMetadata = computed(() => runtimeGenerators.value.php || {})
 const availableDisguises = computed(() => {
-  if (!isPhpRuntime.value) return Disguises.value
-  return Disguises.value.filter((item) =>
+  if (!isPhpRuntime.value) return allDisguises.value
+  return allDisguises.value.filter((item) =>
     item.supportedRuntimes?.includes('php')
   )
 })
@@ -285,7 +285,7 @@ const isFormValid = computed(() =>
 
 const findDisguiseLabel = (id) => {
   if (!id) return '-'
-  const item = Disguises.value.find((disguise) => disguise.disguiseId === id)
+  const item = allDisguises.value.find((disguise) => disguise.disguiseId === id)
   return item ? `${item.disguiseName}(${item.version})` : id
 }
 
@@ -430,11 +430,11 @@ const resultMeta = computed(() => {
 const getAllDisguises = async () => {
   try {
     const resp = await getDisguisesApi()
-    Disguises.value = resp.data || []
+    allDisguises.value = resp.data || []
     // 设置默认值
-    if (Disguises.value.length > 0) {
+    if (allDisguises.value.length > 0) {
       const defaultDisguise =
-        Disguises.value.find((d) => d.disguiseId === 'inner_Java_Base64_1.0.0') || Disguises.value[0]
+        allDisguises.value.find((d) => d.disguiseId === 'inner_Java_Base64_1.0.0') || allDisguises.value[0]
       form.reqDisguiseId = defaultDisguise.disguiseId
       form.respDisguiseId = defaultDisguise.disguiseId
     }
@@ -523,7 +523,7 @@ const setRuntime = (runtime) => {
   if (runtime === 'php') {
     form.shellType = 'PHP'
     generateRandomHeader()
-    const portable = Disguises.value.find((item) => item.disguiseId === 'inner_PHP_JSON_API_1.0.0')
+    const portable = allDisguises.value.find((item) => item.disguiseId === 'inner_PHP_JSON_API_1.0.0')
       || availableDisguises.value[0]
     form.reqDisguiseId = portable?.disguiseId || ''
     form.respDisguiseId = portable?.disguiseId || ''
@@ -533,8 +533,8 @@ const setRuntime = (runtime) => {
   } else {
     form.shellType = 'JSP'
     generateRandomHeader()
-    const javaDisguise = Disguises.value.find((item) => item.disguiseId === 'inner_Java_Base64_1.0.0')
-      || Disguises.value[0]
+    const javaDisguise = allDisguises.value.find((item) => item.disguiseId === 'inner_Java_Base64_1.0.0')
+      || allDisguises.value[0]
     form.reqDisguiseId = javaDisguise?.disguiseId || ''
     form.respDisguiseId = javaDisguise?.disguiseId || ''
   }
@@ -654,7 +654,7 @@ const handleEditorContainerReady = (container) => {
   }
 }
 
-const GenShell = async () => {
+const generateArtifact = async () => {
   if (!isFormValid.value || isGenerating.value) return
   const buildForm = snapshotBuildForm(form)
   isGenerating.value = true
@@ -800,7 +800,7 @@ const handleKeydown = (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     if (isFormValid.value) {
       e.preventDefault()
-      GenShell()
+      generateArtifact()
     }
   }
 }

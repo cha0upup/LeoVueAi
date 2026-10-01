@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createAiChatEventReducer } from './aiChatEventReducer.js'
 import { createAssistantMessage } from './aiMessageFactory.js'
 
-describe('aiChatEventReducer Puppet AI subtask', () => {
+describe('aiChatEventReducer Node AI subtask', () => {
   it('groups child tool events under the delegated subtask', () => {
     const state = {
       messages: [createAssistantMessage()],
@@ -19,7 +19,7 @@ describe('aiChatEventReducer Puppet AI subtask', () => {
     handlers.onNode({
       kind: 'subtask',
       subagentInvocationId: 'inv-1',
-      puppetId: 'puppet-1',
+      agentId: 'agent-1',
       task: '执行 whoami',
       status: 'pending'
     }, 1)

@@ -21,7 +21,7 @@
       />
 
       <el-input
-        v-model="filterForm.puppetId"
+        v-model="filterForm.agentId"
         placeholder="主机ID"
         clearable
         class="toolbar-field"
@@ -98,7 +98,7 @@
         class="toolbar-field"
       />
       <el-input
-        v-model="filterForm.puppetName"
+        v-model="filterForm.agentName"
         placeholder="主机名"
         clearable
         class="toolbar-field"
@@ -293,13 +293,13 @@
           </template>
         </el-table-column>
         <el-table-column
-          prop="puppetName"
+          prop="agentName"
           label="主机"
           width="150"
           show-overflow-tooltip
         >
           <template #default="{ row }">
-            {{ row.puppetName || row.puppetId || '-' }}
+            {{ row.agentName || row.agentId || '-' }}
           </template>
         </el-table-column>
         <el-table-column

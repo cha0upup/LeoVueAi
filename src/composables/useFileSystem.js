@@ -8,7 +8,7 @@
  */
 
 import { ref } from 'vue'
-import { getFileSystemProfileApi } from '@/services/api/puppet-files.js'
+import { getFileSystemProfileApi } from '@/services/api/agent-files.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import {
   isWindowsDisk,

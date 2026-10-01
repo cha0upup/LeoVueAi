@@ -1,10 +1,10 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useFileSave } from './useFileSave.js'
-import { editFileApi } from '@/services/api/puppet-files.js'
+import { editFileApi } from '@/services/api/agent-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
-vi.mock('@/services/api/puppet-files.js', () => ({
+vi.mock('@/services/api/agent-files.js', () => ({
   editFileApi: vi.fn()
 }))
 vi.mock('@/utils/messageUtils.js', () => ({

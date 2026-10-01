@@ -293,7 +293,7 @@ import { icons } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import {
   getAuditOperationStatisticsApi,
-  getAuditPuppetStatisticsApi,
+  getAuditAgentStatisticsApi,
   getAuditTeamStatisticsApi,
   getAuditTrendStatisticsApi,
   getAuditUserStatisticsApi
@@ -392,7 +392,7 @@ const getHostStats = async () => {
 
   hostStatsLoading.value = true
   try {
-    const response = await getAuditPuppetStatisticsApi({ puppetId: hostStatsForm.hostId })
+    const response = await getAuditAgentStatisticsApi({ agentId: hostStatsForm.hostId })
     hostStats.value = response.data
     showSuccess('主机统计查询成功')
   } catch {
@@ -444,9 +444,9 @@ const getOperationTagType = (operation) => {
     命令执行: 'primary',
     文件上传: 'success',
     文件下载: 'info',
-    新增Puppet: 'success',
-    修改Puppet: 'warning',
-    删除Puppet: 'danger',
+    新增Agent: 'success',
+    修改Agent: 'warning',
+    删除Agent: 'danger',
     初始化: 'info',
     基础信息: 'info',
     加载插件: 'primary'
@@ -459,9 +459,9 @@ const getOperationColor = (operation) => {
     命令执行: 'var(--el-color-primary)',
     文件上传: 'var(--el-color-success)',
     文件下载: 'var(--el-color-info)',
-    新增Puppet: 'var(--el-color-success)',
-    修改Puppet: 'var(--el-color-warning)',
-    删除Puppet: 'var(--el-color-danger)',
+    新增Agent: 'var(--el-color-success)',
+    修改Agent: 'var(--el-color-warning)',
+    删除Agent: 'var(--el-color-danger)',
     初始化: 'var(--el-color-info)',
     基础信息: 'var(--el-color-info)',
     加载插件: 'var(--el-color-primary)'

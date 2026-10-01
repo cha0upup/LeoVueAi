@@ -35,7 +35,7 @@
         v-show="visible"
         class="dock-body"
       >
-        <PuppetAiAssistant
+        <NodeAiAssistant
           v-if="aiAvailable"
           :session-id="sessionId"
           :initial-prompt="initialPrompt"
@@ -58,8 +58,8 @@ import AiNotConfiguredEmpty from '@/components/common/AiNotConfiguredEmpty.vue'
 import { useAiAvailability } from '@/composables/useAiAvailability.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 
-const PuppetAiAssistant = defineAsyncComponent(
-  () => import('@/components/PuppetConsole/Ai/PuppetAiAssistant.vue')
+const NodeAiAssistant = defineAsyncComponent(
+  () => import('@/components/AgentConsole/Ai/NodeAiAssistant.vue')
 )
 
 defineProps({
@@ -81,7 +81,7 @@ const {
 } = useAiAvailability()
 
 // ── Width persistence ─────────────────────────────────────────────────────
-const STORAGE_KEY_WIDTH = 'puppet-ai-dock-width'
+const STORAGE_KEY_WIDTH = 'node-ai-dock-width'
 const MIN_WIDTH = 380
 const MAX_WIDTH = 840
 const DEFAULT_WIDTH = 500
@@ -255,7 +255,7 @@ onBeforeUnmount(() => {
   background: var(--ai-dock-background);
 }
 
-.dock-body :deep(.puppet-ai-assistant),
+.dock-body :deep(.node-ai-assistant),
 .dock-body > * {
   height: 100%;
   flex: 1;

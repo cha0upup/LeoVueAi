@@ -152,7 +152,7 @@
     />
   </div>
 
-  <!-- ── subtask（平台 AI 委派给 Puppet AI）────────────────────── -->
+  <!-- ── subtask（平台 AI 委派给 Node AI）────────────────────── -->
   <div
     v-else-if="node.kind === 'subtask'"
     class="task-node task-node--subtask"
@@ -169,8 +169,8 @@
         <Icon icon="mdi:robot-outline" />
       </span>
       <span class="process-main">
-        <span class="process-title">Puppet AI 子任务</span>
-        <span class="process-caption">{{ node.puppetId || node.task }}</span>
+        <span class="process-title">Node AI 子任务</span>
+        <span class="process-caption">{{ node.agentId || node.task }}</span>
       </span>
       <span
         class="process-status"
@@ -214,7 +214,7 @@
     class="task-node task-node--subtask-input"
   >
     <Icon icon="mdi:shield-alert-outline" />
-    <span>{{ node.type === 'CONFIRMATION' ? '子 Puppet AI 正在等待操作确认' : '子 Puppet AI 正在等待补充信息' }}</span>
+    <span>{{ node.type === 'CONFIRMATION' ? '子 Node AI 正在等待操作确认' : '子 Node AI 正在等待补充信息' }}</span>
   </div>
 </template>
 
@@ -518,7 +518,7 @@ const visibleChildren = computed(() => (
   line-height: 1.72;
 }
 
-/* ══ Puppet AI 子任务 ═══════════════════════════════════════════════ */
+/* ══ Node AI 子任务 ═══════════════════════════════════════════════ */
 .task-node--subtask {
   border: 0;
   border-radius: 12px;

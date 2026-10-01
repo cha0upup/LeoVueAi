@@ -17,7 +17,7 @@
             v-for="session in sessions"
             :key="session.sessionId"
             :value="session.sessionId"
-            :label="`${session.puppetName || '会话'} · ${session.sessionId}`"
+            :label="`${session.agentName || '会话'} · ${session.sessionId}`"
           />
         </el-select>
         <el-button
@@ -93,7 +93,7 @@
 <script setup>
 import { computed, onMounted, onScopeDispose, ref } from 'vue'
 import { getSessionsApi } from '@/services/api/sessions.js'
-import FingerprintResults from '@/components/PuppetConsole/Scan/FingerprintResults.vue'
+import FingerprintResults from '@/components/AgentConsole/Scan/FingerprintResults.vue'
 import { useFingerprintDebug } from './useFingerprintDebug.js'
 
 const props = defineProps({ fingerprint: { type: Object, required: true } })

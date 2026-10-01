@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { buildSkillManifest, buildSkillMarkdown } from './skillManifestSerializer.js'
 
 const manifestData = (overrides = {}) => ({
-  id: 'leo.custom.puppet-node.demo',
+  id: 'leo.custom.agent-node.demo',
   name: 'demo',
   version: '0.1.0',
-  scope: 'puppet-node',
+  scope: 'agent-node',
   domain: 'operation',
   category: 'discovery',
   mode: 'assess',

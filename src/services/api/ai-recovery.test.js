@@ -5,11 +5,11 @@ const { post } = vi.hoisted(() => ({ post: vi.fn() }))
 vi.mock('../http.js', () => ({ default: { post } }))
 
 import { platformAiEventsApi } from './platform-ai.js'
-import { puppetNodeAiThreadEventsApi } from './puppet-ai.js'
+import { nodeAiThreadEventsApi } from './node-ai.js'
 
 describe.each([
   ['platform', platformAiEventsApi, '/platform/ai/events', {}],
-  ['puppet', puppetNodeAiThreadEventsApi, '/puppet-node/ai/thread/events', { sessionId: 'session-1' }]
+  ['agent', nodeAiThreadEventsApi, '/agent-node/ai/thread/events', { sessionId: 'session-1' }]
 ])('%s AI event recovery', (_scope, recoverEventsApi, endpoint, extraParams) => {
   beforeEach(() => vi.resetAllMocks())
 

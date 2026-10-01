@@ -203,7 +203,7 @@ export const icons = {
 
   // 层级/关系相关
   child: 'mdi:account-plus',
-  parasite: 'mdi:link-plus',
+  childAgent: 'mdi:link-plus',
 
   // 视图/显示相关
   fullScreen: 'mdi:fullscreen',

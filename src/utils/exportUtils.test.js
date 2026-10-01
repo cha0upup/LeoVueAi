@@ -12,7 +12,7 @@ vi.mock('./errorHandler.js', () => ({ handleError: mocks.handleError }))
 vi.mock('./messageUtils.js', () => ({ showSuccess: mocks.showSuccess }))
 
 import { executeBlobDownload, exportTsv } from './exportUtils.js'
-import { getDockerExportConfig } from '../components/PuppetConsole/Docker/dockerManagerModel.js'
+import { getDockerExportConfig } from '../components/AgentConsole/Docker/dockerManagerModel.js'
 
 beforeEach(() => vi.resetAllMocks())
 

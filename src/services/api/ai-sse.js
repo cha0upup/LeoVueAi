@@ -22,7 +22,7 @@ const logger = createLogger('AiSse')
  *   - `turn/started`   — 控制协议 Turn 已开始
  *   - `turn/completed` — 控制协议 Turn 进入 completed / interrupted / failed 终态
  *   - `trace`     — 本轮统一关联信息：traceId + turnId? + runId?
- *   - `subagent_event` — Puppet AI 子任务的嵌套流式事件
+ *   - `subagent_event` — Node AI 子任务的嵌套流式事件
  *
  * @param {Response} response  - fetch() 返回的 Response 对象（Content-Type: text/event-stream）
  * @param {object}   handlers

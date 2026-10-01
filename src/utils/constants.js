@@ -22,25 +22,25 @@ export const PROTOCOLS = [
 ]
 
 /**
- * Puppet 节点类型列表
+ * Agent 节点类型列表
  */
-export const PUPPET_TYPES = [
+export const AGENT_TYPES = [
   { value: 'java', label: 'Java' },
   { value: 'php', label: 'PHP' }
 ]
 
 /** 最大请求数表示一次操作的请求总数，包含首次请求。 */
-export const PUPPET_MIN_REQUEST_COUNT = 1
-export const PUPPET_MAX_REQUEST_COUNT = 10
-export const PUPPET_DEFAULT_MAX_REQUEST_COUNT = PUPPET_MIN_REQUEST_COUNT
+export const AGENT_MIN_REQUEST_COUNT = 1
+export const AGENT_MAX_REQUEST_COUNT = 10
+export const AGENT_DEFAULT_MAX_REQUEST_COUNT = AGENT_MIN_REQUEST_COUNT
 
 /**
- * Puppet 对象的默认值
+ * Agent 对象的默认值
  */
-const DEFAULT_PUPPET = {
-  puppetId: '',
-  parentPuppetId: 'root',
-  puppetName: '',
+const DEFAULT_AGENT = {
+  agentId: '',
+  parentAgentId: 'root',
+  agentName: '',
   createByUserId: '',
   connLink: '',
   reqDisguiseId: '',
@@ -49,7 +49,7 @@ const DEFAULT_PUPPET = {
   headers: '',
   permission: 'private',
   proxyEnabled: 0,
-  maxReqCount: PUPPET_DEFAULT_MAX_REQUEST_COUNT,
+  maxReqCount: AGENT_DEFAULT_MAX_REQUEST_COUNT,
   proxyType: 'direct',
   proxyHost: '127.0.0.1',
   proxyPort: 8080,
@@ -64,23 +64,23 @@ const DEFAULT_PUPPET = {
 }
 
 /**
- * 创建新的 Puppet 对象（深拷贝默认值）
+ * 创建新的 Agent 对象（深拷贝默认值）
  * @param {Object} overrides - 覆盖默认值的属性
- * @returns {Object} 新的 Puppet 对象
+ * @returns {Object} 新的 Agent 对象
  */
-export function createDefaultPuppet(overrides = {}) {
+export function createDefaultAgent(overrides = {}) {
   return {
-    ...DEFAULT_PUPPET,
+    ...DEFAULT_AGENT,
     ...overrides
   }
 }
 
 /**
- * Puppet 表单验证规则
- * 统一管理所有 Puppet 相关表单的验证规则
+ * Agent 表单验证规则
+ * 统一管理所有 Agent 相关表单的验证规则
  */
-export const PUPPET_FORM_RULES = {
-  puppetName: [
+export const AGENT_FORM_RULES = {
+  agentName: [
     { required: true, message: '请输入主机名称', trigger: 'blur' },
     { min: 2, max: 50, message: '主机名称长度在 2 到 50 个字符', trigger: 'blur' }
   ],
@@ -92,9 +92,9 @@ export const PUPPET_FORM_RULES = {
     { required: true, message: '请输入最大请求数', trigger: 'blur' },
     {
       type: 'number',
-      min: PUPPET_MIN_REQUEST_COUNT,
-      max: PUPPET_MAX_REQUEST_COUNT,
-      message: `最大请求数在 ${PUPPET_MIN_REQUEST_COUNT} 到 ${PUPPET_MAX_REQUEST_COUNT} 之间`,
+      min: AGENT_MIN_REQUEST_COUNT,
+      max: AGENT_MAX_REQUEST_COUNT,
+      message: `最大请求数在 ${AGENT_MIN_REQUEST_COUNT} 到 ${AGENT_MAX_REQUEST_COUNT} 之间`,
       trigger: 'blur'
     }
   ],

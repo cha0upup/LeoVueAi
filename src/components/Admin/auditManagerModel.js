@@ -1,8 +1,8 @@
 const FILTER_FIELDS = [
   'userId',
   'userName',
-  'puppetId',
-  'puppetName',
+  'agentId',
+  'agentName',
   'sessionId',
   'operationType',
   'status',
@@ -13,8 +13,8 @@ const FILTER_FIELDS = [
 const FILTER_LABEL_TO_FIELD = Object.freeze({
   用户ID: 'userId',
   用户名: 'userName',
-  主机ID: 'puppetId',
-  主机名: 'puppetName',
+  主机ID: 'agentId',
+  主机名: 'agentName',
   会话ID: 'sessionId',
   操作类型: 'operationType',
   状态: 'status',
@@ -27,8 +27,8 @@ export function createAuditFilter() {
   return {
     userId: '',
     userName: '',
-    puppetId: '',
-    puppetName: '',
+    agentId: '',
+    agentName: '',
     sessionId: '',
     operationType: '',
     status: '',
@@ -195,8 +195,8 @@ export function getActiveAuditFilterSummary(filter) {
   }
   addText('用户ID', filter?.userId)
   addText('用户名', filter?.userName)
-  addText('主机ID', filter?.puppetId)
-  addText('主机名', filter?.puppetName)
+  addText('主机ID', filter?.agentId)
+  addText('主机名', filter?.agentName)
   addText('会话ID', filter?.sessionId)
   addText('操作类型', filter?.operationType, getOperationTypeLabel)
   addText('状态', filter?.status, getStatusLabel)

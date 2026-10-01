@@ -56,8 +56,8 @@
             v-model="targetScope"
             size="small"
           >
-            <el-radio-button value="puppet-node">
-              puppet-node
+            <el-radio-button value="agent-node">
+              agent-node
             </el-radio-button>
             <el-radio-button value="platform">
               platform
@@ -191,7 +191,7 @@ const iconMap = icons
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
-  defaultScope: { type: String, default: 'puppet-node' }
+  defaultScope: { type: String, default: 'agent-node' }
 })
 
 const emit = defineEmits(['update:modelValue', 'imported'])

@@ -4,10 +4,10 @@ import { safeSessionStorage } from '@/utils/browserStorage.js'
 const MAX_TABS = 6
 
 /**
- * LRU tab management for PuppetConsole workspace.
+ * LRU tab management for AgentConsole workspace.
  * AI is a separate dock — not a tab. Default first tab is 'info'.
  *
- * @param {Array} moduleDefinitions - from usePuppetConsoleModules
+ * @param {Array} moduleDefinitions - from useAgentConsoleModules
  * @param {Object} [options]
  * @param {() => string} [options.getSessionId] - returns current session ID for storage scoping
  * @param {(key: string, module: Object) => boolean} [options.isModuleAvailable]
@@ -37,7 +37,7 @@ export function useToolTabs(moduleDefinitions, { getSessionId = () => '', isModu
   // ── Storage helpers ───────────────────────────────────────────────────────
   const _storageKey = () => {
     const sid = getSessionId()
-    return sid ? `puppet-tabs-${sid}` : null
+    return sid ? `agent-tabs-${sid}` : null
   }
 
   const _loadFromStorage = () => {

@@ -33,7 +33,7 @@ describe('main workspace login scope', () => {
 
   it('clears both memory and stored tabs and cancels delayed writes', () => {
     const tabs = workspace(vi.fn())
-    tabs.addPuppetEntity({ sessionId: 'old-session', puppetName: 'old user' })
+    tabs.addAgentConsoleTab({ sessionId: 'old-session', agentName: 'old user' })
     expect(tabs.tabs.value).toHaveLength(1)
     expect(vi.getTimerCount()).toBe(1)
     resetSessionState()
@@ -50,7 +50,7 @@ describe('main workspace login scope', () => {
     tabs.goToHome()
     resetSessionState()
     storage.set(MAIN_TAB_STORAGE_KEYS.tabs, JSON.stringify([
-      { id: 'puppet-tab-new', tabKey: 'new', sessionId: 'new-session', isLoaded: true }
+      { id: 'agent-tab-new', tabKey: 'new', sessionId: 'new-session', isLoaded: true }
     ]))
     tabs.goToHome()
     expect(tabs.tabs.value).toHaveLength(1)
@@ -60,10 +60,10 @@ describe('main workspace login scope', () => {
   it('ignores an old close confirmation after the account changes', async () => {
     const confirmation = deferred()
     const tabs = workspace(() => confirmation.promise)
-    const oldTab = tabs.addPuppetEntity({ sessionId: 'old-session' })
+    const oldTab = tabs.addAgentConsoleTab({ sessionId: 'old-session' })
     const closing = tabs.closeTab(oldTab.id, 0)
     resetSessionState()
-    const newTab = tabs.addPuppetEntity({ sessionId: 'new-session' })
+    const newTab = tabs.addAgentConsoleTab({ sessionId: 'new-session' })
     confirmation.resolve(true)
     await expect(closing).resolves.toEqual({ closed: false, nextTab: null })
     expect(tabs.tabs.value.map(tab => tab.id)).toEqual([newTab.id])

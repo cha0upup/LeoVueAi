@@ -51,35 +51,35 @@
 
         <nav
           v-if="openedTabs.length"
-          class="puppet-tab-strip"
-          aria-label="Puppet 控制台"
+          class="agent-tab-strip"
+          aria-label="Agent 控制台"
         >
           <button
             v-for="(tab, index) in openedTabs"
             :key="tab.id"
             type="button"
-            class="puppet-tab"
+            class="agent-tab"
             :class="{
               'is-active': activeKey === tab.id,
               'is-loading': tab.sessionId && !tab.isLoaded
             }"
             :data-tab="tab.id"
             :aria-current="activeKey === tab.id ? 'page' : undefined"
-            @click="openPuppetTab(tab.id)"
+            @click="openAgentTab(tab.id)"
           >
-            <el-icon class="puppet-tab__icon">
+            <el-icon class="agent-tab__icon">
               <Icon :icon="tab.icon || iconMap.server" />
             </el-icon>
-            <span class="puppet-tab__text">{{ tab.title }}</span>
+            <span class="agent-tab__text">{{ tab.title }}</span>
             <el-icon
               v-if="tab.sessionId && !tab.isLoaded"
-              class="puppet-tab__loading"
+              class="agent-tab__loading"
             >
               <Icon :icon="iconMap.loading" />
             </el-icon>
             <el-icon
-              class="puppet-tab__close"
-              @click.stop="handleClosePuppetTab(tab.id, index)"
+              class="agent-tab__close"
+              @click.stop="handleCloseAgentTab(tab.id, index)"
             >
               <Icon :icon="iconMap.close" />
             </el-icon>
@@ -160,7 +160,7 @@ const openAdmin = () => {
   goToAdmin()
 }
 
-const openPuppetTab = (tabId) => {
+const openAgentTab = (tabId) => {
   if (route.path === ROUTE_PATHS.admin) {
     rememberAdminRoute()
   }
@@ -175,7 +175,7 @@ const openPuppetTab = (tabId) => {
   }
 }
 
-const handleClosePuppetTab = async (tabId, index) => {
+const handleCloseAgentTab = async (tabId, index) => {
   const wasActiveWorkspaceTab = isWorkspacePath(route.path) && currentTab.value === tabId
   const result = await closeTab(tabId, index)
 
@@ -262,7 +262,7 @@ const handleClosePuppetTab = async (tabId, index) => {
   background: var(--app-surface-border-subtle);
 }
 
-.puppet-tab-strip {
+.agent-tab-strip {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -273,20 +273,20 @@ const handleClosePuppetTab = async (tabId, index) => {
   padding: 4px 0 5px;
 }
 
-.puppet-tab-strip::-webkit-scrollbar {
+.agent-tab-strip::-webkit-scrollbar {
   height: 4px;
 }
 
-.puppet-tab-strip::-webkit-scrollbar-track {
+.agent-tab-strip::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.puppet-tab-strip::-webkit-scrollbar-thumb {
+.agent-tab-strip::-webkit-scrollbar-thumb {
   background: var(--el-border-color);
   border-radius: 999px;
 }
 
-.puppet-tab {
+.agent-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -309,7 +309,7 @@ const handleClosePuppetTab = async (tabId, index) => {
     box-shadow 0.16s ease;
 }
 
-.puppet-tab::after {
+.agent-tab::after {
   position: absolute;
   left: 10px;
   right: 10px;
@@ -320,13 +320,13 @@ const handleClosePuppetTab = async (tabId, index) => {
   content: '';
 }
 
-.puppet-tab:hover {
+.agent-tab:hover {
   border-color: color-mix(in srgb, var(--el-color-primary) 28%, var(--el-border-color));
   background: color-mix(in srgb, var(--el-color-primary) 6%, var(--el-fill-color-light));
   color: var(--el-text-color-primary);
 }
 
-.puppet-tab.is-active {
+.agent-tab.is-active {
   border-color: color-mix(in srgb, var(--el-color-primary) 34%, var(--el-border-color));
   border-bottom-color: color-mix(in srgb, var(--el-color-primary) 34%, var(--el-border-color));
   background: var(--app-selected-background);
@@ -335,22 +335,22 @@ const handleClosePuppetTab = async (tabId, index) => {
   box-shadow: none;
 }
 
-.puppet-tab.is-active::after {
+.agent-tab.is-active::after {
   background: var(--el-color-primary);
 }
 
-.puppet-tab.is-loading {
+.agent-tab.is-loading {
   border-color: color-mix(in srgb, var(--el-color-warning) 38%, var(--el-border-color));
   background: color-mix(in srgb, var(--el-color-warning) 10%, var(--el-bg-color));
   color: var(--el-color-warning);
 }
 
-.puppet-tab__icon {
+.agent-tab__icon {
   font-size: 16px;
   flex-shrink: 0;
 }
 
-.puppet-tab__text {
+.agent-tab__text {
   font-size: 13px;
   font-weight: 600;
   overflow: hidden;
@@ -359,20 +359,20 @@ const handleClosePuppetTab = async (tabId, index) => {
   flex: 1;
 }
 
-.puppet-tab__loading {
+.agent-tab__loading {
   font-size: 12px;
   color: var(--el-color-warning);
   animation: global-spin 1s linear infinite;
 }
 
-.puppet-tab__close {
+.agent-tab__close {
   font-size: 14px;
   opacity: 0.55;
   transition: all 0.2s ease;
   flex-shrink: 0;
 }
 
-.puppet-tab__close:hover {
+.agent-tab__close:hover {
   opacity: 1;
   color: var(--el-color-danger);
   transform: scale(1.08);
@@ -393,7 +393,7 @@ const handleClosePuppetTab = async (tabId, index) => {
     display: none;
   }
 
-  .puppet-tab-strip {
+  .agent-tab-strip {
     width: 100%;
     padding-top: 0;
   }

@@ -20,36 +20,36 @@ export function deleteProjectApi(projectId) {
   return http.post('/platform/projects/delete', { projectId })
 }
 
-export function getProjectPuppetsApi(projectId) {
-  return http.get(`/platform/projects/${encodeURIComponent(projectId)}/puppets`)
+export function getProjectAgentsApi(projectId) {
+  return http.get(`/platform/projects/${encodeURIComponent(projectId)}/agents`)
 }
 
-export function getUnassignedPuppetsApi() {
-  return http.get('/platform/projects/unassigned/puppets')
+export function getUnassignedAgentsApi() {
+  return http.get('/platform/projects/unassigned/agents')
 }
 
-function getProjectPuppetChildrenApi(projectId, parentPuppetId) {
+function getProjectAgentChildrenApi(projectId, parentAgentId) {
   return http.post(`/platform/projects/${encodeURIComponent(projectId)}/children`, {
-    parentPuppetId
+    parentAgentId
   })
 }
 
-export function getWorkspacePuppetChildrenApi(projectId, parentPuppetId) {
+export function getWorkspaceAgentChildrenApi(projectId, parentAgentId) {
   const normalizedProjectId = String(projectId || '').trim()
   if (!normalizedProjectId) {
-    return http.post('/platform/puppet-manage/children', { parentPuppetId })
+    return http.post('/platform/agent-manage/children', { parentAgentId })
   }
-  return getProjectPuppetChildrenApi(normalizedProjectId, parentPuppetId)
+  return getProjectAgentChildrenApi(normalizedProjectId, parentAgentId)
 }
 
-export function attachProjectPuppetsApi(projectId, puppetIds, options = {}) {
-  return http.post('/platform/projects/hosts/attach', { projectId, puppetIds, ...options })
+export function attachProjectAgentsApi(projectId, agentIds, options = {}) {
+  return http.post('/platform/projects/hosts/attach', { projectId, agentIds, ...options })
 }
 
-export function detachProjectPuppetsApi(projectId, puppetIds) {
-  return http.post('/platform/projects/hosts/detach', { projectId, puppetIds })
+export function detachProjectAgentsApi(projectId, agentIds) {
+  return http.post('/platform/projects/hosts/detach', { projectId, agentIds })
 }
 
-export function getPuppetProjectMembershipsApi(puppetIds) {
-  return http.post('/platform/projects/hosts/memberships', { puppetIds })
+export function getAgentProjectMembershipsApi(agentIds) {
+  return http.post('/platform/projects/hosts/memberships', { agentIds })
 }

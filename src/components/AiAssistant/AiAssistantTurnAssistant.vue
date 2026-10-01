@@ -244,7 +244,7 @@ const props = defineProps({
     type: Object,
     required: true
   },
-  /** puppet sessionId — 工具结果旁"追加到摘要"按钮需要；平台 AI 不传。 */
+  /** agent sessionId — 工具结果旁"追加到摘要"按钮需要；平台 AI 不传。 */
   sessionId: {
     type: String,
     default: null

@@ -16,7 +16,7 @@ function createClientUserMessageId() {
 }
 
 /**
- * 通用 AI 对话 composable，供 PlatformAiAssistant 和 PuppetAiAssistant 共用。
+ * 通用 AI 对话 composable，供 PlatformAiAssistant 和 NodeAiAssistant 共用。
  *
  * @param {object} opts
  * @param {Function} [opts.enqueueApi]

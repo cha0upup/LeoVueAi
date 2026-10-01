@@ -22,8 +22,8 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: ROUTE_PATHS.mainPuppet,
-    name: ROUTE_NAMES.mainPuppet,
+    path: ROUTE_PATHS.mainAgent,
+    name: ROUTE_NAMES.mainAgent,
     component: Main,
     meta: { requiresAuth: true }
   },

@@ -126,7 +126,7 @@ describe('useArchiveImport', () => {
     })
     importer.handleFileChange({ raw: createFile('test-skill.skill') })
     const submission = importer.submit()
-    scope = 'puppet-node'
+    scope = 'agent-node'
     pending.resolve({ data: { results: [] } })
     await submission
 

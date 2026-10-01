@@ -1,7 +1,7 @@
 import http from '../http.js'
 
 /**
- * 读取 puppet 进程 classpath 资源（jar 内 .class、application.yml、xml 等）。
+ * 读取 agent 进程 classpath 资源（jar 内 .class、application.yml、xml 等）。
  *
  * @param {Object} params
  * @param {string} params.sessionId
@@ -10,5 +10,5 @@ import http from '../http.js'
  * @param {string} [params.resourcePath]  - mode=path 时必填，例如 application.yml
  */
 export function fetchResourceApi(params) {
-  return http.post('/puppet-node/resource/get', params)
+  return http.post('/agent-node/resource/get', params)
 }

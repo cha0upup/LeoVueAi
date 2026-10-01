@@ -4,7 +4,7 @@ import { safeLocalStorage } from '@/utils/browserStorage.js'
 const STORAGE_KEY = 'skill-manager-ui-state-v2'
 
 const DEFAULT_STATE = {
-  activeScope: 'puppet-node',
+  activeScope: 'agent-node',
   catalogMode: 'simple',
   lastFilePath: '',
   treePanelWidth: 240

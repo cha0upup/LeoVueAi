@@ -1,7 +1,7 @@
 import { ref } from 'vue'
-import { editFileApi } from '@/services/api/puppet-files.js'
+import { editFileApi } from '@/services/api/agent-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
-import { normalizeFileLineEndings } from '@/components/PuppetConsole/File/filePreviewModel.js'
+import { normalizeFileLineEndings } from '@/components/AgentConsole/File/filePreviewModel.js'
 import { encodeFileText } from './useFileEncoding.js'
 
 // 调用方提供编辑快照并更新保存基线；此处负责请求生命周期。
