@@ -385,7 +385,7 @@
 import { ref, reactive, computed, nextTick, onUnmounted, watch } from 'vue'
 import { Search, Filter, Download, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { queryNetworkProbeWorkflowResultsApi } from '@/services/api.js'
+import { queryNetworkProbeWorkflowResultsApi } from '@/services/api/scan.js'
 import FingerprintResults from './FingerprintResults.vue'
 import { exportTsv } from '@/utils/exportUtils.js'
 

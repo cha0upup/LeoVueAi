@@ -209,7 +209,7 @@ import {
   startLocalForwardApi,
   stopAllLocalForwardsApi,
   stopLocalForwardApi
-} from '@/services/api.js'
+} from '@/services/api/puppet-tools.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { Icon } from '@iconify/vue'
 import { showWarning } from '@/utils/messageUtils.js'

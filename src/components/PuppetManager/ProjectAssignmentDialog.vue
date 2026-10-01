@@ -142,7 +142,7 @@
 import { computed, nextTick, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
-import { attachProjectPuppetsApi } from '@/services/api.js'
+import { attachProjectPuppetsApi } from '@/services/api/projects.js'
 import { icons } from '@/utils/icons.js'
 import { showSuccess } from '@/utils/messageUtils.js'
 

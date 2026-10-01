@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 
-import { getProjectsApi } from '@/services/api.js'
+import { getProjectsApi } from '@/services/api/projects.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 
 export const UNASSIGNED_PROJECT_ID = '__unassigned__'

@@ -57,8 +57,7 @@ const router = createRouter({
 
 configureHttpErrorHandling({
   getCurrentRoute: () => router.currentRoute.value,
-  replaceRoute: target => router.replace(target),
-  resetAuth: () => useAuth().resetAuth()
+  replaceRoute: target => router.replace(target)
 })
 
 /**

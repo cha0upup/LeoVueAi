@@ -2,7 +2,7 @@ import {
   downloadEngineStartApi,
   downloadEngineProgressApi,
   downloadEngineCancelApi
-} from '@/services/api.js'
+} from '@/services/api/puppet-files.js'
 import { formatFilePath } from '@/utils/format.js'
 import { TaskStatus } from '@/constants/task.js'
 
@@ -27,6 +27,7 @@ function applyDownloadSnapshot(task, payload = {}) {
 
 export function applyDownloadExecutor(TaskEngine) {
   TaskEngine.prototype.executeDownloadTask = async function (task) {
+    if (task.isDetached) return
     // 新逻辑：使用后端 Download Engine（断点续传 + 服务端落盘）
     const { chunkSize, concurrency } = task.options
 
@@ -41,6 +42,7 @@ export function applyDownloadExecutor(TaskEngine) {
         chunkSize: Number(chunkSize) || 1048576
       })
 
+      if (task.isDetached) return
       applyDownloadSnapshot(task, startRes.data || {})
       this.emit('taskProgress', task)
     }
@@ -55,6 +57,7 @@ export function applyDownloadExecutor(TaskEngine) {
     const begin = Date.now()
 
     while (true) {
+      if (task.isDetached) return
       // 超时保护，避免前端永远挂起
       if (Date.now() - begin > maxExecutionTime) {
         throw new Error('下载超时，请稍后重试或检查网络连接')
@@ -81,6 +84,7 @@ export function applyDownloadExecutor(TaskEngine) {
 
       const progressRes = await downloadEngineProgressApi({ taskId: task.engineTaskId })
 
+      if (task.isDetached) return
       const snap = applyDownloadSnapshot(task, progressRes.data || {})
       const state = snap.state
 

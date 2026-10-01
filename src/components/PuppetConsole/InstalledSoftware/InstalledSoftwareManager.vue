@@ -165,7 +165,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import { listAllSoftwareApi } from '@/services/api.js'
+import { listAllSoftwareApi } from '@/services/api/installed-software.js'
 import { showError, showWarning, showSuccess } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 

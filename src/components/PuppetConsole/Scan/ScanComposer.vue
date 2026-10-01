@@ -168,7 +168,7 @@ import TargetInput from './TargetInput.vue'
 import PortPolicySelector from './PortPolicySelector.vue'
 import FingerprintRuleSelector from './FingerprintRuleSelector.vue'
 import { SCAN_STAGES, DEFAULT_SCAN_STAGES, toggleScanStage } from './scanStages.js'
-import { previewNetworkProbeWorkflowApi, startNetworkProbeWorkflowApi } from '@/services/api.js'
+import { previewNetworkProbeWorkflowApi, startNetworkProbeWorkflowApi } from '@/services/api/scan.js'
 
 const props = defineProps({
   sessionId: {

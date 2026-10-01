@@ -4,7 +4,7 @@ import {
   stopNetworkProbeWorkflowApi,
   queryNetworkProbeWorkflowApi,
   listNetworkProbeWorkflowTasksApi
-} from '@/services/api.js'
+} from '@/services/api/scan.js'
 import { TERMINAL_TASK_STATUSES, TaskStatus, TaskType } from '@/constants/task.js'
 
 export function applyScanExecutor(TaskEngine) {

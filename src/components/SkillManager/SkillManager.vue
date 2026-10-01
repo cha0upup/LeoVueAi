@@ -1158,7 +1158,7 @@ import {
   searchSkillsApi,
   toggleSkillApi,
   toggleSkillsBatchApi
-} from '@/services/api.js'
+} from '@/services/api/skills.js'
 import SkillEditorDialog from './SkillEditorDialog.vue'
 import SkillFileTree from './SkillFileTree.vue'
 import SkillFileEditor from './SkillFileEditor.vue'

@@ -100,7 +100,7 @@ import { usePuppetUrlProbe } from '@/composables/usePuppetUrlProbe.js'
 import { usePuppetConfigTest } from '@/composables/usePuppetConfigTest.js'
 import PuppetFormFields from './PuppetFormFields.vue'
 import PuppetConnectionResultBanner from './PuppetConnectionResultBanner.vue'
-import { addPuppetApi } from '@/services/api.js'
+import { addPuppetApi } from '@/services/api/puppet-manage.js'
 import { createPuppetDialogRules } from '@/components/PuppetManager/puppetFormShared.js'
 
 const iconMap = icons

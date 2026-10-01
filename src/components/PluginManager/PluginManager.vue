@@ -247,7 +247,7 @@ import {
   getPluginsApi,
   exportPluginApi,
   exportPluginsBatchApi
-} from '@/services/api.js'
+} from '@/services/api/plugins.js'
 import AddPluginDialog from './AddPluginDialog.vue'
 import EditPluginDialog from './EditPluginDialog.vue'
 import PluginDetail from './PluginDetail.vue'

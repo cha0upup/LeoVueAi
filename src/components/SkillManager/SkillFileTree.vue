@@ -220,7 +220,7 @@ import { icons } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
-import { saveSkillFileApi, deleteSkillFileApi, moveSkillFileApi } from '@/services/api.js'
+import { saveSkillFileApi, deleteSkillFileApi, moveSkillFileApi } from '@/services/api/skills.js'
 
 const iconMap = icons
 

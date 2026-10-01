@@ -142,7 +142,12 @@
 import { reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
-import { addProjectApi, archiveProjectApi, deleteProjectApi, updateProjectApi } from '@/services/api.js'
+import {
+  addProjectApi,
+  archiveProjectApi,
+  deleteProjectApi,
+  updateProjectApi
+} from '@/services/api/projects.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'

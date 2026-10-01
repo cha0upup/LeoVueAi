@@ -5,7 +5,7 @@ import {
   puppetNodeAiThreadDeleteApi,
   puppetNodeAiThreadRenameApi,
   puppetNodeAiThreadMessagesApi
-} from '@/services/api.js'
+} from '@/services/api/puppet-ai.js'
 import { showError } from '@/utils/messageUtils.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 

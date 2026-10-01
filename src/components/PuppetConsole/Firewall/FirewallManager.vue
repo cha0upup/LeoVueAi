@@ -407,7 +407,7 @@ import {
   addFirewallRuleApi,
   deleteFirewallRuleApi,
   toggleFirewallApi
-} from '@/services/api.js'
+} from '@/services/api/firewall.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 

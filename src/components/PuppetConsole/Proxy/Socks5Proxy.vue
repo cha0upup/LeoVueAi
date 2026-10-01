@@ -22,7 +22,7 @@ import {
   getSocks5StatusApi,
   startSocks5ProxyApi,
   stopSocks5ProxyApi
-} from '@/services/api.js'
+} from '@/services/api/puppet-tools.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { showWarning } from '@/utils/messageUtils.js'
 

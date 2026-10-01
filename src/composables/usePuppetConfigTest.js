@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-import { testPuppetConfigApi } from '@/services/api.js'
+import { testPuppetConfigApi } from '@/services/api/puppet-node.js'
 import { showError } from '@/utils/messageUtils.js'
 
 export function usePuppetConfigTest({ validate, buildPayload }) {

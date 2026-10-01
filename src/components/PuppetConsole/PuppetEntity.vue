@@ -161,7 +161,8 @@
 import { computed, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue'
 
 import { icons } from '@/utils/icons.js'
-import { getConnLinkChainApi, getCurrentHostIdApi, getPuppetNodeCapabilitiesApi } from '@/services/api.js'
+import { getConnLinkChainApi, getCurrentHostIdApi } from '@/services/api/sessions.js'
+import { getPuppetNodeCapabilitiesApi } from '@/services/api/puppet-node.js'
 import {
   supportsCapabilityRequirements,
   usePuppetConsoleModules

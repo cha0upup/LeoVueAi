@@ -21,7 +21,7 @@ import {
   getHttpProxyStatusApi,
   startHttpProxyApi,
   stopHttpProxyApi
-} from '@/services/api.js'
+} from '@/services/api/puppet-tools.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { showWarning } from '@/utils/messageUtils.js'
 

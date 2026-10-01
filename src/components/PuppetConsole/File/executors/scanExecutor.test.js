@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TaskStatus } from '@/constants/task.js'
 import { createScanTask } from '../taskFactories.js'
 
-vi.mock('@/services/api.js', () => ({
+vi.mock('@/services/http.js', () => ({ default: { post: vi.fn() } }))
+vi.mock('@/services/api/scan.js', () => ({
   pauseNetworkProbeWorkflowApi: vi.fn(),
   resumeNetworkProbeWorkflowApi: vi.fn(),
   stopNetworkProbeWorkflowApi: vi.fn(),
@@ -11,7 +12,11 @@ vi.mock('@/services/api.js', () => ({
 }))
 
 import { applyScanExecutor } from './scanExecutor.js'
-import { queryNetworkProbeWorkflowApi, stopNetworkProbeWorkflowApi, listNetworkProbeWorkflowTasksApi } from '@/services/api.js'
+import {
+  queryNetworkProbeWorkflowApi,
+  stopNetworkProbeWorkflowApi,
+  listNetworkProbeWorkflowTasksApi
+} from '@/services/api/scan.js'
 
 describe('scan executor request lifecycle', () => {
   beforeEach(() => { vi.clearAllMocks(); vi.stubGlobal('window', {}) })

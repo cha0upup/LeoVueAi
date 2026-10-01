@@ -4,6 +4,7 @@ import { confirmAction } from '@/utils/confirmUtils.js'
 import { useAppModeNavigation } from '@/composables/useAppModeNavigation.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { platformAiAvailabilityApi } from '@/services/api/platform-ai.js'
+import { isCurrentSession, registerSessionCleanup, sessionGeneration } from '@/services/sessionLifecycle.js'
 
 /**
  * AI 可用性检测（模块级单例）。
@@ -38,12 +39,22 @@ const loading = ref(false)
 const fetched = ref(false)
 let inflight = null
 
+const unregister = registerSessionCleanup('ai-availability', () => {
+  availabilityState.value = { available: false, enabledCount: 0 }
+  loading.value = false
+  fetched.value = false
+  inflight = null
+})
+if (import.meta.hot) import.meta.hot.dispose(unregister)
+
 const fetchAvailability = async () => {
   if (inflight) return inflight
   loading.value = true
+  const requestGeneration = sessionGeneration.value
   inflight = (async () => {
     try {
       const res = await platformAiAvailabilityApi()
+      if (!isCurrentSession(requestGeneration)) return
       const data = res?.data ?? {}
       availabilityState.value = {
         available: !!data.available,
@@ -51,12 +62,15 @@ const fetchAvailability = async () => {
       }
       fetched.value = true
     } catch (err) {
+      if (!isCurrentSession(requestGeneration)) return
       // 维持上一次状态，避免临时 API 失败导致入口被永久禁用；记录原因方便排查。
       // eslint-disable-next-line no-console
       console.warn('[useAiAvailability] 加载 AI 可用性失败：', err?.message || err)
     } finally {
-      loading.value = false
-      inflight = null
+      if (isCurrentSession(requestGeneration)) {
+        loading.value = false
+        inflight = null
+      }
     }
   })()
   return inflight

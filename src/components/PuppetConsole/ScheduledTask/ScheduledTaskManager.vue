@@ -391,7 +391,7 @@ import {
   queryScheduledTaskApi,
   createScheduledTaskApi,
   deleteScheduledTaskApi
-} from '@/services/api.js'
+} from '@/services/api/scheduled-task.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 

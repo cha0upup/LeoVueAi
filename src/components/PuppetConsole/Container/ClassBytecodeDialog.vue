@@ -115,7 +115,7 @@ import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
 
 import { icons } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
-import { getClassBytecodeApi } from '@/services/api.js'
+import { getClassBytecodeApi } from '@/services/api/container.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'

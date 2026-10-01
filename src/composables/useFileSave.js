@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { editFileApi } from '@/services/api.js'
+import { editFileApi } from '@/services/api/puppet-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { normalizeFileLineEndings } from '@/components/PuppetConsole/File/filePreviewModel.js'
 import { encodeFileText } from './useFileEncoding.js'

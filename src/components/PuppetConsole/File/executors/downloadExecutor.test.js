@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyDownloadExecutor } from './downloadExecutor.js'
-import { downloadEngineProgressApi, downloadEngineStartApi } from '@/services/api.js'
+import {
+  downloadEngineCancelApi,
+  downloadEngineProgressApi,
+  downloadEngineStartApi
+} from '@/services/api/puppet-files.js'
+import { deferred } from '@/test-support/deferred.js'
 import { TaskStatus } from '@/constants/task.js'
 
-vi.mock('@/services/api.js', () => ({
+vi.mock('@/services/api/puppet-files.js', () => ({
   downloadEngineStartApi: vi.fn(),
   downloadEngineProgressApi: vi.fn(),
   downloadEngineCancelApi: vi.fn()
@@ -19,6 +24,20 @@ afterEach(() => {
 })
 
 describe('download finalization', () => {
+  it('detaches during start without polling or cancelling the backend task', async () => {
+    const engine = new Engine()
+    const task = { options: {}, sessionId: 's', filePath: '/tmp/', fileName: 'file' }
+    const response = deferred()
+    downloadEngineStartApi.mockReturnValue(response.promise)
+    const running = engine.executeDownloadTask(task)
+    task.isDetached = true
+    response.resolve({ data: { taskId: 'backend-download' } })
+    await running
+    expect(downloadEngineProgressApi).not.toHaveBeenCalled()
+    expect(downloadEngineCancelApi).not.toHaveBeenCalled()
+    expect(engine.emit).not.toHaveBeenCalled()
+  })
+
   it('applies zero progress and cleared errors from snapshots', async () => {
       const response = (snapshot) => ({
         data: snapshot

@@ -48,7 +48,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
-import { getFileListApi } from '@/services/api.js'
+import { getFileListApi } from '@/services/api/puppet-files.js'
 import { normalizePathForTree, buildChildPath } from '@/composables/useFilePath.js'
 import { sortFileEntries } from './fileTableModel.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'

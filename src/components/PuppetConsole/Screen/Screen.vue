@@ -72,7 +72,7 @@
 import { ref } from 'vue'
 
 import { icons } from '@/utils/icons.js'
-import { startScreenCaptureApi } from '@/services/api.js'
+import { startScreenCaptureApi } from '@/services/api/puppet-tools.js'
 import { showError } from '@/utils/messageUtils.js'
 
 const iconMap = icons

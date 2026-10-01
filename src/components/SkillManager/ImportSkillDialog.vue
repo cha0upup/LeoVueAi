@@ -183,7 +183,7 @@ import { ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
 import { formatFileSize } from '@/utils/format.js'
-import { importSkillsApi } from '@/services/api.js'
+import { importSkillsApi } from '@/services/api/skills.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { useArchiveImport } from '@/composables/useArchiveImport.js'
 

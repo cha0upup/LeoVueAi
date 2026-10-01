@@ -265,7 +265,7 @@ import {
   userFileCreateDirApi,
   userFilePreviewApi,
   userFileDeleteApi
-} from '@/services/api.js'
+} from '@/services/api/user-space.js'
 import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import UserSpaceCreateDialog from './UserSpaceCreateDialog.vue'
 import UserSpaceFileTree from './UserSpaceFileTree.vue'

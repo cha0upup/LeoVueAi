@@ -105,7 +105,7 @@ import {
   testAiModelConfigConnectionApi,
   probeAiModelCapabilitiesApi,
   listAiModelHealthApi
-} from '@/services/api.js'
+} from '@/services/api/admin.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import AiCapabilityRegistryDialogs from './AiCapabilityRegistryDialogs.vue'
 import AiCapabilityProbeDialog from './AiCapabilityProbeDialog.vue'

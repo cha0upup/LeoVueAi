@@ -435,7 +435,7 @@ import {
   getAuditLogOperationTypesApi,
   getAuditModeApi,
   updateAuditModeApi
-} from '@/services/api.js'
+} from '@/services/api/admin.js'
 import AdminToolbar from '@/components/Admin/shared/AdminToolbar.vue'
 import AdminStatsGrid from '@/components/Admin/shared/AdminStatsGrid.vue'
 import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'

@@ -187,7 +187,7 @@
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
 import { formatFileSize } from '@/utils/format.js'
-import { importFingerprintsApi } from '@/services/api.js'
+import { importFingerprintsApi } from '@/services/api/fingerprints.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { useArchiveImport } from '@/composables/useArchiveImport.js'
 

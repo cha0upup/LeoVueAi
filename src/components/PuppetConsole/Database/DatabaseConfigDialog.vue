@@ -368,7 +368,7 @@ import {
   useDatabaseConfigDialogBase,
   verifySavedDatabaseConnection
 } from './database-config-dialog-shared.js'
-import { saveDatabaseConnectionApi } from '@/services/api.js'
+import { saveDatabaseConnectionApi } from '@/services/api/puppet-manage.js'
 import { showWarning } from '@/utils/messageUtils.js'
 import DatabaseConnectionDiagnostics from './DatabaseConnectionDiagnostics.vue'
 import DatabaseRuntimeOverrides from './DatabaseRuntimeOverrides.vue'

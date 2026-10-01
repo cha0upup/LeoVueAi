@@ -381,7 +381,6 @@ import { computed, reactive, ref, toRef, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
   getDockerContainerLogsApi,
-  execCommandApi,
   inspectDockerContainerApi,
   listDockerContainersApi,
   listDockerImagesApi,
@@ -393,7 +392,8 @@ import {
   startDockerContainerApi,
   stopDockerContainerApi,
   unpauseDockerContainerApi
-} from '@/services/api.js'
+} from '@/services/api/docker.js'
+import { execCommandApi } from '@/services/api/puppet-node.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'

@@ -2,10 +2,17 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { ROUTE_PATHS } from '@/constants/app.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
+import { registerSessionCleanup } from '@/services/sessionLifecycle.js'
 
 const LAST_WORKSPACE_ROUTE_KEY = 'leovue-last-workspace-route'
 const LAST_ADMIN_ROUTE_KEY = 'leovue-last-admin-route'
 const DEFAULT_ADMIN_ROUTE = `${ROUTE_PATHS.admin}?tab=users`
+
+const unregister = registerSessionCleanup('app-navigation', () => {
+  safeLocalStorage.removeItem(LAST_WORKSPACE_ROUTE_KEY)
+  safeLocalStorage.removeItem(LAST_ADMIN_ROUTE_KEY)
+})
+if (import.meta.hot) import.meta.hot.dispose(unregister)
 
 const isSafeInternalRoute = (value) => {
   return typeof value === 'string'

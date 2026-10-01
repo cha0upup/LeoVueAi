@@ -310,7 +310,14 @@ import { executeDeleteWithConfirm, confirmAction } from '@/utils/confirmUtils.js
 import { omitFields } from '@/utils/dataUtils.js'
 import { useEditDialog, useDialog } from '@/utils/dialogUtils.js'
 import { validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
-import { addUserApi, deleteUserApi, getAllUsersApi, getAllTeamsApi, updateUserApi, resetUserPasswordApi } from '@/services/api.js'
+import {
+  addUserApi,
+  deleteUserApi,
+  getAllUsersApi,
+  getAllTeamsApi,
+  updateUserApi,
+  resetUserPasswordApi
+} from '@/services/api/admin.js'
 import { showError } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'

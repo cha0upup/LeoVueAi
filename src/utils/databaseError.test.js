@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   formatDatabaseError,
-  getDatabaseErrorPayload,
-  isRetryableDatabaseError
+  getDatabaseErrorPayload
 } from './databaseError.js'
 
 describe('database errors', () => {
@@ -23,7 +22,6 @@ describe('database errors', () => {
     expect(formatDatabaseError(error)).toBe(
       '数据库查询超时，请缩小查询范围或调整超时设置：statement exceeded 30 seconds（SQLState: HYT00）'
     )
-    expect(isRetryableDatabaseError(error)).toBe(true)
     expect(getDatabaseErrorPayload(error).code).toBe(504)
   })
 

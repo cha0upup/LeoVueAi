@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   showSuccess: vi.fn()
 }))
 
-vi.mock('@/services/api.js', () => ({
+vi.mock('@/services/api/admin.js', () => ({
   createAiModelCapabilityApi: mocks.create,
   deleteAiModelCapabilityApi: mocks.remove,
   listAiModelCapabilitiesApi: mocks.list,

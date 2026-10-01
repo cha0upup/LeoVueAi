@@ -1,5 +1,5 @@
 import { onScopeDispose, ref } from 'vue'
-import { removeWebRuntimeComponentApi } from '@/services/api.js'
+import { removeWebRuntimeComponentApi } from '@/services/api/container.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { normalizeRuntimeOperation } from './containerManageModel.js'

@@ -324,7 +324,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import { listNetworkConnectionsApi, networkConnectionSummaryApi } from '@/services/api.js'
+import { listNetworkConnectionsApi, networkConnectionSummaryApi } from '@/services/api/network-connection.js'
 import { showWarning, handleApiError } from '@/utils/messageUtils.js'
 import { useSessionParams } from '@/composables/useSessionParams.js'
 import { exportTsv } from '@/utils/exportUtils.js'

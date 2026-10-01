@@ -1,12 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, reactive } from 'vue'
 import { useFingerprintDetails } from './useFingerprintDetails.js'
-import {
-  queryNetworkFingerprintMatchesApi,
-  queryNetworkFingerprintEvidenceApi
-} from '@/services/api.js'
+import { queryNetworkFingerprintMatchesApi, queryNetworkFingerprintEvidenceApi } from '@/services/api/scan.js'
 
-vi.mock('@/services/api.js', () => ({
+vi.mock('@/services/api/scan.js', () => ({
   queryNetworkFingerprintMatchesApi: vi.fn(),
   queryNetworkFingerprintEvidenceApi: vi.fn()
 }))

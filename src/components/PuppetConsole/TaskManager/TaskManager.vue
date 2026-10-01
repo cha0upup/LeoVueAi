@@ -158,15 +158,15 @@ import {
   downloadEngineRetryApi,
   downloadEngineTasksApi,
   downloadLocalFileApi,
-  deleteNetworkProbeWorkflowApi,
-  getSqlExportTasksApi,
   uploadEngineCancelApi,
   uploadEnginePauseApi,
   uploadEngineRemoveApi,
   uploadEngineResumeApi,
   uploadEngineRetryApi,
   uploadEngineTasksApi
-} from '@/services/api.js'
+} from '@/services/api/puppet-files.js'
+import { deleteNetworkProbeWorkflowApi } from '@/services/api/scan.js'
+import { getSqlExportTasksApi } from '@/services/api/sql.js'
 import { useTaskCenterView } from '@/composables/useTaskCenterView.js'
 import { showError, showInfo, showSuccess } from '@/utils/messageUtils.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'

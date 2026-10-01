@@ -1,11 +1,11 @@
-import { deleteFileApi, getFileMd5Api, moveFileApi, newFileApi } from '@/services/api.js'
+import { deleteFileApi, getFileMd5Api, moveFileApi, newFileApi } from '@/services/api/puppet-files.js'
 import { formatFilePath } from '@/utils/format.js'
 import { createMd5Hasher } from '@/utils/md5.js'
 import { TaskStatus } from '@/constants/task.js'
 
 export function applyUploadExecutor(TaskEngine) {
   TaskEngine.prototype.executeUploadTask = async function (task) {
-    if (task.status !== TaskStatus.UPLOADING) {
+    if (task.isDetached || task.status !== TaskStatus.UPLOADING) {
       return
     }
 
@@ -26,6 +26,7 @@ export function applyUploadExecutor(TaskEngine) {
     const tempPath = `${parentPrefix}.leo-upload-${task.id.slice(-12)}.part`
     task.uploadPath = tempPath
     const checkCancelled = () => {
+      if (task.isDetached) throw new Error('浏览器任务观察已结束')
       if (task.isCancelled || task.isPaused) {
         throw new Error(task.isCancelled ? '任务已取消' : '任务已暂停')
       }
@@ -61,6 +62,7 @@ export function applyUploadExecutor(TaskEngine) {
           checkCancelled()
           const result = await this.uploadChunk(task, offset, arrayBuffer)
 
+          checkCancelled()
           if (result && !task.isCancelled) {
             task.chunks[chunkIndex] = {
               offset: offset,
@@ -78,7 +80,7 @@ export function applyUploadExecutor(TaskEngine) {
             this.emit('taskProgress', task)
           }
         } catch (error) {
-          if (task.isCancelled || task.isPaused) {
+          if (task.isDetached || task.isCancelled || task.isPaused) {
             throw error
           }
           if (retryAttempt < task.options.maxRetries) {
@@ -137,6 +139,7 @@ export function applyUploadExecutor(TaskEngine) {
         newPath: finalPath,
         conflictStrategy: 'overwrite'
       })
+      if (task.isDetached) return
       task.uploadPath = null
       task.serverMD5 = serverMD5
 
@@ -153,6 +156,8 @@ export function applyUploadExecutor(TaskEngine) {
 
       this.emit('taskCompleted', task)
     } catch (error) {
+      // The old identity must not issue cleanup requests using a new login.
+      if (task.isDetached) return
       if (task.uploadPath) {
         try {
           await deleteFileApi({

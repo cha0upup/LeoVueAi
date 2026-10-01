@@ -125,7 +125,7 @@
 import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
-import { discoverPuppetHostsApi, getPuppetCacheHostsApi } from '@/services/api.js'
+import { discoverPuppetHostsApi, getPuppetCacheHostsApi } from '@/services/api/puppet-node.js'
 import { icons } from '@/utils/icons.js'
 
 const emit = defineEmits(['cancel'])

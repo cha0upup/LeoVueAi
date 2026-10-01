@@ -1,10 +1,12 @@
 import { effectScope } from 'vue'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { getBasicInfoApi } from '@/services/api.js'
+import { getBasicInfoApi } from '@/services/api/puppet-node.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { useBasicInfo } from './useBasicInfo.js'
 
-vi.mock('@/services/api.js', () => ({ getBasicInfoApi: vi.fn() }))
+vi.mock('@/services/api/puppet-node.js', () => ({
+  getBasicInfoApi: vi.fn()
+}))
 vi.mock('@/utils/errorHandler.js', () => ({ handleError: vi.fn() }))
 
 let scope, info

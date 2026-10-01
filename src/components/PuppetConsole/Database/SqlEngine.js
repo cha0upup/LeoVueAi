@@ -14,7 +14,7 @@ import {
   querySqlTableApi,
   testSqlConnectionApi,
   updateSqlRowsApi
-} from '@/services/api.js'
+} from '@/services/api/sql.js'
 
 /**
  * SQL引擎

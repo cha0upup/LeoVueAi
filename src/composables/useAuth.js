@@ -9,6 +9,7 @@
  */
 import { ref, computed } from 'vue'
 import { getLoginStatusApi } from '@/services/api/auth.js'
+import { isCurrentSession, registerSessionCleanup, resetSessionState, sessionGeneration } from '@/services/sessionLifecycle.js'
 
 const currentUser = ref(null)
 const authLoading = ref(false)
@@ -24,33 +25,38 @@ async function fetchAuth({ force = false } = {}) {
   if (authFetched.value && !force) return currentUser.value
 
   authLoading.value = true
+  const requestGeneration = sessionGeneration.value
   authInflight = (async () => {
     try {
       const res = await getLoginStatusApi()
       const data = res?.data
+      if (!isCurrentSession(requestGeneration)) return null
       if (data?.isLoggedIn) {
         currentUser.value = data
       } else {
         currentUser.value = null
       }
     } catch {
-      currentUser.value = null
+      if (isCurrentSession(requestGeneration)) currentUser.value = null
     } finally {
-      authFetched.value = true
-      authLoading.value = false
-      authInflight = null
+      if (isCurrentSession(requestGeneration)) {
+        authFetched.value = true
+        authLoading.value = false
+        authInflight = null
+      }
     }
-    return currentUser.value
+    return isCurrentSession(requestGeneration) ? currentUser.value : null
   })()
   return authInflight
 }
 
-function resetAuth() {
+const unregister = registerSessionCleanup('auth', () => {
   currentUser.value = null
   authLoading.value = false
   authFetched.value = false
   authInflight = null
-}
+})
+if (import.meta.hot) import.meta.hot.dispose(unregister)
 
 export function useAuth() {
   const isAdmin = computed(() => currentUser.value?.privilege === 'admin')
@@ -65,6 +71,6 @@ export function useAuth() {
     authLoading,
     authFetched,
     fetchAuth,
-    resetAuth
+    resetAuth: resetSessionState
   }
 }

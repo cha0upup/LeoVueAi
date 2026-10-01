@@ -221,7 +221,7 @@ import { computed, reactive, ref, watch } from 'vue'
 
 import { Icon } from '@iconify/vue'
 import { executeRequest } from '@/utils/apiUtils.js'
-import { getLoadedComponentsApi, reloadComponentApi, loadComponentApi } from '@/services/api.js'
+import { getLoadedComponentsApi, reloadComponentApi, loadComponentApi } from '@/services/api/container.js'
 import { icons } from '@/utils/icons.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'

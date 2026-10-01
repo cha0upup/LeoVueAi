@@ -211,7 +211,7 @@ import { ref, computed } from 'vue'
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { formatFilePath, formatFileSize as formatSize } from '@/utils/format.js'
-import { copyFileApi, moveFileApi } from '@/services/api.js'
+import { copyFileApi, moveFileApi } from '@/services/api/puppet-files.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { getFileIconPresentation } from '@/utils/fileIcons.js'
 import {

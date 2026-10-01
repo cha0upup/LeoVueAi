@@ -318,7 +318,7 @@ import {
   clearReconSummaryApi,
   organizeReconSummaryApi,
   generateReconReportApi
-} from '@/services/api.js'
+} from '@/services/api/sessions.js'
 
 const props = defineProps({
   sessionId: { type: String, required: true }

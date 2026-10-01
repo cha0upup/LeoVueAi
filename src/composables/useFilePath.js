@@ -38,7 +38,7 @@ export function extractDriveName(text) {
  * @param {string} path - 路径
  * @returns {boolean}
  */
-export function isWindowsPath(path) {
+function isWindowsPath(path) {
   return path?.includes(':') || /^[A-Za-z]:/.test(path || '') || /^(?:\\\\|\/\/)/.test(path || '')
 }
 

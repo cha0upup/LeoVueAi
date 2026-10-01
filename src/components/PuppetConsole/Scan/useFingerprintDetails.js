@@ -1,8 +1,5 @@
 import { ref, watch, onScopeDispose } from 'vue'
-import {
-  queryNetworkFingerprintMatchesApi,
-  queryNetworkFingerprintEvidenceApi
-} from '@/services/api.js'
+import { queryNetworkFingerprintMatchesApi, queryNetworkFingerprintEvidenceApi } from '@/services/api/scan.js'
 
 export function useFingerprintDetails(props) {
   const matches = ref([])

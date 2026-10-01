@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/services/api.js', () => ({ probeUrlPathsApi: vi.fn() }))
+vi.mock('@/services/api/puppet-manage.js', () => ({
+  probeUrlPathsApi: vi.fn()
+}))
 
 import { usePuppetUrlProbe } from './usePuppetUrlProbe.js'
 

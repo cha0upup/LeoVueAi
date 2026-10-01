@@ -190,7 +190,13 @@ import { ElNotification } from 'element-plus'
 import { confirmDelete } from '@/utils/confirmUtils.js'
 import { v4 as uuidV4 } from 'uuid'
 import { icons } from '@/utils/icons.js'
-import { addTeamApi, deleteTeamApi, getAllTeamsApi, getUsersNoTeamApi, getAllUsersApi } from '@/services/api.js'
+import {
+  addTeamApi,
+  deleteTeamApi,
+  getAllTeamsApi,
+  getUsersNoTeamApi,
+  getAllUsersApi
+} from '@/services/api/admin.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import { useAuth } from '@/composables/useAuth.js'
 import AdminToolbar from '@/components/Admin/shared/AdminToolbar.vue'

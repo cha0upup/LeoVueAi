@@ -372,7 +372,7 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } 
 import { Icon } from '@iconify/vue'
 import { monaco } from '@/utils/monaco.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
-import { sendRawHttpApi, startFuzzApi, queryFuzzApi, stopFuzzApi } from '@/services/api.js'
+import { sendRawHttpApi, startFuzzApi, queryFuzzApi, stopFuzzApi } from '@/services/api/http-sender.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import HttpFuzzResults from './HttpFuzzResults.vue'

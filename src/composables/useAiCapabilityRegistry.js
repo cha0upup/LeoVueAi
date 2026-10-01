@@ -5,7 +5,7 @@ import {
   deleteAiModelCapabilityApi,
   listAiModelCapabilitiesApi,
   updateAiModelCapabilityApi
-} from '@/services/api.js'
+} from '@/services/api/admin.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import {
   buildCapabilityBody,

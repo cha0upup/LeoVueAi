@@ -153,11 +153,10 @@ import {
   puppetNodeAiStopApi,
   puppetNodeAiThreadStreamApi,
   puppetNodeAiThreadEventsApi,
-  puppetNodeAiSwitchChannelApi,
-  listAvailableAiModelsApi,
-  getReconSummaryApi,
-  generateReconSummaryDigestApi
-} from '@/services/api.js'
+  puppetNodeAiSwitchChannelApi
+} from '@/services/api/puppet-ai.js'
+import { listAvailableAiModelsApi } from '@/services/api/platform-ai.js'
+import { getReconSummaryApi, generateReconSummaryDigestApi } from '@/services/api/sessions.js'
 
 import { useAiChat } from '@/composables/useAiChat.js'
 import { useAiThreads } from '@/composables/useAiThreads.js'

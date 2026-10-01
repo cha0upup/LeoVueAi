@@ -427,7 +427,7 @@ import {
   toggleServiceAutoStartApi,
   createServiceApi,
   deleteServiceApi
-} from '@/services/api.js'
+} from '@/services/api/service-manager.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 

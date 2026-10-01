@@ -92,7 +92,7 @@
 
 <script setup>
 import { computed, onMounted, onScopeDispose, ref } from 'vue'
-import { getSessionsApi } from '@/services/api.js'
+import { getSessionsApi } from '@/services/api/sessions.js'
 import FingerprintResults from '@/components/PuppetConsole/Scan/FingerprintResults.vue'
 import { useFingerprintDebug } from './useFingerprintDebug.js'
 

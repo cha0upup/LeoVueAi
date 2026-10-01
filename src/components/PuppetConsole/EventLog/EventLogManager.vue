@@ -80,7 +80,7 @@ import {
   aggregateEventLogApi,
   metaEventLogApi,
   followEventLogSse
-} from '@/services/api'
+} from '@/services/api/event-log.js'
 import { showWarning, showInfo, handleApiError } from '@/utils/messageUtils.js'
 import { useSessionParams } from '@/composables/useSessionParams.js'
 import { exportTsv } from '@/utils/exportUtils.js'

@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { probeUrlPathsApi } from '@/services/api.js'
+import { probeUrlPathsApi } from '@/services/api/puppet-manage.js'
 import { showError, showInfo, showSuccess, showWarning } from '@/utils/messageUtils.js'
 
 export function usePuppetUrlProbe(options) {

@@ -1,4 +1,4 @@
-import { userFileCreateDirApi, userFileUploadApi } from '@/services/api.js'
+import { userFileCreateDirApi, userFileUploadApi } from '@/services/api/user-space.js'
 
 export const ARTIFACT_CATEGORY = Object.freeze({
   SCRIPT_BUILDS: 'script-builds',

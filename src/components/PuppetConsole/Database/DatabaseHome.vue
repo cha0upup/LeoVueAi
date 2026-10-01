@@ -288,7 +288,7 @@ import {
   getDatabaseConnectionsApi,
   deleteDatabaseConnectionApi,
   updateDatabaseConnectionStatusApi
-} from '@/services/api.js'
+} from '@/services/api/puppet-manage.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { formatDate } from '@/utils/format.js'
 import sqlEngine from './SqlEngine.js'

@@ -32,7 +32,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { formatFilePath } from '@/utils/format.js'
-import { getFileListApi, deleteFileApi } from '@/services/api.js'
+import { getFileListApi, deleteFileApi } from '@/services/api/puppet-files.js'
 import { parseAbsolutePath } from '@/composables/useFilePath.js'
 import { showSuccess, showError } from '@/utils/messageUtils.js'
 import { confirmAction } from '@/utils/confirmUtils.js'

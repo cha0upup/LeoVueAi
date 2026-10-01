@@ -322,7 +322,7 @@ import { validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { getAllDisguises } from '@/utils/puppetUtils.js'
 import { stringifyHeadersForSubmit } from '@/utils/headers.js'
-import { addPuppetApi } from '@/services/api.js'
+import { addPuppetApi } from '@/services/api/puppet-manage.js'
 import ParentHostSummary from './ParentHostSummary.vue'
 import {
   createPuppetDialogRules,

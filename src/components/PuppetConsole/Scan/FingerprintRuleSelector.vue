@@ -85,7 +85,7 @@
 
 <script setup>
 import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
-import { getFingerprintsApi } from '@/services/api.js'
+import { getFingerprintsApi } from '@/services/api/fingerprints.js'
 
 const props = defineProps({ modelValue: { type: Object, required: true } })
 const emit = defineEmits(['update:modelValue', 'validity-change'])

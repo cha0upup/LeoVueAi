@@ -104,7 +104,7 @@ import { FILE_CAPABILITIES_KEY, archiveFormat, stripArchiveExtension } from './f
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { formatFilePath } from '@/utils/format.js'
-import { decompressFileApi } from '@/services/api.js'
+import { decompressFileApi } from '@/services/api/puppet-files.js'
 import { showError, showInfo, showSuccess } from '@/utils/messageUtils.js'
 import FileOperationSummary from '@/components/PuppetConsole/File/FileOperationSummary.vue'
 

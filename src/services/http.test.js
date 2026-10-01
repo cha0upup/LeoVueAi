@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { registerSessionCleanup, resetSessionState, sessionGeneration } from './sessionLifecycle.js'
 
 const mocks = vi.hoisted(() => {
   const handlers = {}
   const http = {
     interceptors: {
+      request: {
+        use: vi.fn(handler => { handlers.request = handler })
+      },
       response: {
         use: vi.fn((fulfilled, rejected) => {
           handlers.fulfilled = fulfilled
@@ -36,14 +40,43 @@ globalThis.window = { location: { origin: 'http://localhost' } }
 const { configureHttpErrorHandling } = await import('./http.js')
 configureHttpErrorHandling({
   getCurrentRoute: () => mocks.currentRoute.value,
-  replaceRoute: mocks.replace,
-  resetAuth: mocks.resetAuth
+  replaceRoute: mocks.replace
 })
+registerSessionCleanup('http-test', mocks.resetAuth)
 
 describe('HTTP response redirect handling', () => {
   beforeEach(() => {
+    resetSessionState()
     vi.clearAllMocks()
     mocks.currentRoute.value = { path: '/admin', fullPath: '/admin?tab=users' }
+  })
+
+  it('stamps requests with their login generation', () => {
+    expect(mocks.handlers.request({ url: '/test' })).toMatchObject({
+      url: '/test', sessionGeneration: sessionGeneration.value
+    })
+  })
+
+  it('rejects a late success from the previous login before unwrapping its data', async () => {
+    const config = mocks.handlers.request({})
+    resetSessionState()
+    vi.clearAllMocks()
+
+    await expect(mocks.handlers.fulfilled({ config, data: { code: 200, data: 'old user data' } }))
+      .rejects.toMatchObject({ code: 'SESSION_CHANGED' })
+    expect(mocks.resetAuth).not.toHaveBeenCalled()
+    expect(mocks.replace).not.toHaveBeenCalled()
+  })
+
+  it('does not log the new user out when an old request returns 401', async () => {
+    const config = mocks.handlers.request({})
+    resetSessionState()
+    vi.clearAllMocks()
+
+    await expect(mocks.handlers.rejected({ config, response: { status: 401, data: { code: 401 } } }))
+      .rejects.toMatchObject({ code: 'SESSION_CHANGED' })
+    expect(mocks.resetAuth).not.toHaveBeenCalled()
+    expect(mocks.replace).not.toHaveBeenCalled()
   })
 
   it('replaces an expired protected route and preserves its return path', async () => {

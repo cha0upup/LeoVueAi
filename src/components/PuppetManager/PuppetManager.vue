@@ -270,20 +270,23 @@ import { safeLocalStorage } from '@/utils/browserStorage.js'
 import {
   getPuppetsApi,
   deletePuppetApi,
+  updatePuppetApi,
+  exportPuppetsApi
+} from '@/services/api/puppet-manage.js'
+import {
   initPuppetApi,
   checkPuppetCacheApi,
   initPuppetCacheApi,
-  testPuppetConnApi,
-  updatePuppetApi,
-  deleteSessionApi,
-  getSessionsApi,
-  exportPuppetsApi,
+  testPuppetConnApi
+} from '@/services/api/puppet-node.js'
+import { deleteSessionApi, getSessionsApi } from '@/services/api/sessions.js'
+import {
   getProjectPuppetsApi,
   getWorkspacePuppetChildrenApi,
   getUnassignedPuppetsApi,
   detachProjectPuppetsApi,
   getPuppetProjectMembershipsApi
-} from '@/services/api.js'
+} from '@/services/api/projects.js'
 import AddChildPuppet from './AddChildPuppet.vue'
 import AddPuppet from './AddPuppet.vue'
 import EditPuppet from './EditPuppet.vue'

@@ -12,7 +12,7 @@ const apiMocks = vi.hoisted(() => ({
   executeSqlQueryApi: vi.fn()
 }))
 
-vi.mock('@/services/api.js', () => apiMocks)
+vi.mock('@/services/api/sql.js', () => apiMocks)
 
 const { default: sqlEngine } = await import('./SqlEngine.js')
 const {

@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ testConfig: vi.fn(), showError: vi.fn() }))
 
-vi.mock('@/services/api.js', () => ({ testPuppetConfigApi: mocks.testConfig }))
+vi.mock('@/services/api/puppet-node.js', () => ({
+  testPuppetConfigApi: mocks.testConfig
+}))
 vi.mock('@/utils/messageUtils.js', () => ({ showError: mocks.showError }))
 
 import { usePuppetConfigTest } from './usePuppetConfigTest.js'

@@ -9,7 +9,7 @@ import {
   getAiModelProvidersApi,
   listAiProvidersApi,
   updateAiProviderApi
-} from '@/services/api.js'
+} from '@/services/api/admin.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import {
   AI_PROTOCOL,

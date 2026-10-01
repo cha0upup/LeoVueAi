@@ -28,7 +28,7 @@
 
 <script setup>
 import { ref, onScopeDispose } from 'vue'
-import { startNetworkFingerprintScanApi } from '@/services/api.js'
+import { startNetworkFingerprintScanApi } from '@/services/api/scan.js'
 import FingerprintRuleSelector from './FingerprintRuleSelector.vue'
 
 const props = defineProps({

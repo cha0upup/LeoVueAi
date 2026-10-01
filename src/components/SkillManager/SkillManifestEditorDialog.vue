@@ -246,7 +246,7 @@
 <script setup>
 import { computed, defineComponent, h, ref } from 'vue'
 import { ElOption, ElSelect } from 'element-plus'
-import { saveSkillFileApi } from '@/services/api.js'
+import { saveSkillFileApi } from '@/services/api/skills.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { buildSkillManifest } from './skillManifestSerializer.js'

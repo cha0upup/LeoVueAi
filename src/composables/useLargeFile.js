@@ -1,5 +1,5 @@
 import { ref, toRaw } from 'vue'
-import { previewFileChunkApi } from '@/services/api.js'
+import { previewFileChunkApi } from '@/services/api/puppet-files.js'
 import { formatFileSize } from '@/utils/format.js'
 import { createBase64StreamDecoder } from './useFileEncoding.js'
 

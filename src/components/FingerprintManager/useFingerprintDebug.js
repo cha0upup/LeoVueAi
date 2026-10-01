@@ -3,7 +3,7 @@ import {
   debugNetworkFingerprintApi,
   queryNetworkProbeWorkflowApi,
   stopNetworkProbeWorkflowApi
-} from '@/services/api.js'
+} from '@/services/api/scan.js'
 
 export function useFingerprintDebug() {
   const taskId = ref('')

@@ -180,7 +180,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import { listProcessesApi, findProcessesApi, killProcessApi } from '@/services/api.js'
+import { listProcessesApi, findProcessesApi, killProcessApi } from '@/services/api/process.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 

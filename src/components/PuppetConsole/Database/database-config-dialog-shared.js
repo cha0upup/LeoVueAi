@@ -28,7 +28,7 @@ function parseJsonObject(text) {
   }
 }
 
-export function createRuntimeOptions(source = {}) {
+function createRuntimeOptions(source = {}) {
   return {
     java: {
       jdbcUrl: source?.java?.jdbcUrl || '',

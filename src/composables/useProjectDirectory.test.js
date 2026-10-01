@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ getProjects: vi.fn() }))
 
-vi.mock('@/services/api.js', () => ({ getProjectsApi: mocks.getProjects }))
+vi.mock('@/services/api/projects.js', () => ({
+  getProjectsApi: mocks.getProjects
+}))
 
 import {
   ALL_PROJECTS_ID,

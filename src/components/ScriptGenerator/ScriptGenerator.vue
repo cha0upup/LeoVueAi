@@ -56,14 +56,14 @@ import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { generatePayloadKey } from '@/utils/payloadKey.js'
+import { getDisguisesApi } from '@/services/api/disguises.js'
 import {
-  getDisguisesApi,
   getShellGeneratorSupportedTypesApi,
   generateWebShellApi,
   generateMemoryShellApi,
   generateRuntimeScriptApi,
   getObfuscationStepsApi
-} from '@/services/api.js'
+} from '@/services/api/shell-generator.js'
 import {
   ARTIFACT_CATEGORY,
   archiveTextArtifact,

@@ -1,11 +1,13 @@
 import { deferred } from '@/test-support/deferred.js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { previewFileApi } from '@/services/api.js'
+import { previewFileApi } from '@/services/api/puppet-files.js'
 import { useFileLoader } from './useFileLoader.js'
 import { useFileEncoding } from './useFileEncoding.js'
 import { useFilePreviewRequest } from './useFilePreviewRequest.js'
 
-vi.mock('@/services/api.js', () => ({ previewFileApi: vi.fn() }))
+vi.mock('@/services/api/puppet-files.js', () => ({
+  previewFileApi: vi.fn()
+}))
 vi.mock('@/utils/messageUtils.js', () => ({ showWarning: vi.fn() }))
 
 const response = (text) => ({ data: { data: btoa(text), size: text.length } })

@@ -234,7 +234,7 @@ import {
   deleteFingerprintApi,
   exportFingerprintApi,
   exportFingerprintsBatchApi
-} from '@/services/api.js'
+} from '@/services/api/fingerprints.js'
 import FingerprintDetail from './FingerprintDetail.vue'
 import FingerprintDebugPanel from './FingerprintDebugPanel.vue'
 import SaveFingerprintDialog from './SaveFingerprintDialog.vue'

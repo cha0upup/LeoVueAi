@@ -1,4 +1,4 @@
-import { getDisguisesApi } from '@/services/api.js'
+import { getDisguisesApi } from '@/services/api/disguises.js'
 
 import { showError } from './messageUtils.js'
 

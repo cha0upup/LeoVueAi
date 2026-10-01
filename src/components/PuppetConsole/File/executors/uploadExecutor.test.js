@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TaskStatus } from '@/constants/task.js'
 import { applyUploadExecutor } from './uploadExecutor.js'
 import { createUploadTask } from '../taskFactories.js'
-import { deleteFileApi, getFileMd5Api, moveFileApi, newFileApi } from '@/services/api.js'
+import { deleteFileApi, getFileMd5Api, moveFileApi, newFileApi } from '@/services/api/puppet-files.js'
 
-vi.mock('@/services/api.js', () => ({
+vi.mock('@/services/api/puppet-files.js', () => ({
   deleteFileApi: vi.fn(),
   getFileMd5Api: vi.fn(),
   moveFileApi: vi.fn(),
@@ -32,6 +32,21 @@ function fixture(content = 'abc') {
 }
 beforeEach(() => vi.resetAllMocks())
 describe('upload commit lifecycle', () => {
+  it('detaches an old upload without committing, retrying or deleting through a new login', async () => {
+    const { engine, task } = fixture()
+    const preparing = deferred()
+    newFileApi.mockReturnValue(preparing.promise)
+    const running = engine.executeUploadTask(task)
+    task.isDetached = true
+    preparing.resolve({ data: true })
+    await running
+    expect(engine.uploadChunk).not.toHaveBeenCalled()
+    expect(getFileMd5Api).not.toHaveBeenCalled()
+    expect(moveFileApi).not.toHaveBeenCalled()
+    expect(deleteFileApi).not.toHaveBeenCalled()
+    expect(engine.emit).not.toHaveBeenCalled()
+  })
+
   it('does not commit when cancelled during checksum verification', async () => {
     const { engine, task } = fixture()
     const checksum = deferred()

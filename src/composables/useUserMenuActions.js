@@ -1,12 +1,12 @@
 import { computed } from 'vue'
 
-import { DEFAULT_USERNAME, MAIN_TAB_STORAGE_KEYS, ROUTE_PATHS } from '@/constants/app.js'
+import { DEFAULT_USERNAME, ROUTE_PATHS } from '@/constants/app.js'
 import { logoutApi } from '@/services/api/auth.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
-import { safeLocalStorage } from '@/utils/browserStorage.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 
 const ROLE_LABELS = {
   admin: '管理员',
@@ -14,17 +14,8 @@ const ROLE_LABELS = {
   normal: '普通用户'
 }
 
-const clearMainTabCache = () => {
-  safeLocalStorage.removeItem(MAIN_TAB_STORAGE_KEYS.tabs)
-  safeLocalStorage.removeItem(MAIN_TAB_STORAGE_KEYS.currentTab)
-}
-
-const defaultAfterLogout = () => {
-  clearMainTabCache()
-}
-
 export function useUserMenuActions({
-  afterLogout = defaultAfterLogout,
+  afterLogout,
   profileDialog,
   changePasswordDialog,
   router
@@ -63,16 +54,18 @@ export function useUserMenuActions({
   })
 
   const handleLogout = async () => {
+    const requestGeneration = sessionGeneration.value
     const confirmed = await confirmAction({
       title: '确认退出',
       message: '确定要退出登录吗？',
       type: 'warning'
     })
 
-    if (!confirmed) return
+    if (!confirmed || !isCurrentSession(requestGeneration)) return
 
     try {
       await logoutApi()
+      if (!isCurrentSession(requestGeneration)) return
       resetAuth()
       afterLogout?.()
       showSuccess('已退出登录')

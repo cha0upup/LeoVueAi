@@ -1,4 +1,8 @@
 import { createLogger } from '@/utils/logger.js'
+import { createHttpError } from '../httpError.js'
+import { handleHttpError } from '../httpErrorHandling.js'
+import { createSessionChangedError, isCurrentSession, registerSessionCleanup, sessionGeneration } from '../sessionLifecycle.js'
+import { createSseFrameDecoder } from './sseFrameDecoder.js'
 
 const logger = createLogger('AiSse')
 
@@ -62,14 +66,11 @@ export async function parseAiSseStream(response, {
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
 
-  let buffer = ''
-  let currentEvent = ''
-  let currentData = ''
-  let currentId = ''
   let replyText = ''
   let errorMeta = null
   let receivedTurnStarted = false
   let receivedTurnCompleted = false
+  let streamEnded = false
 
   const jsonHandlers = new Map([
     ['tool_delta', onToolDelta],
@@ -83,12 +84,6 @@ export async function parseAiSseStream(response, {
     ['turn/completed', onTurnCompleted],
     ['trace', onTrace]
   ])
-
-  const parseDataLine = (line) => {
-    let value = line.slice(5)
-    if (value.startsWith(' ')) value = value.slice(1)
-    return value
-  }
 
   const parseEventId = (eventId) => {
     const [seqText = '0', turnId = '', itemId = '', runId = '', subagentInvocationId = ''] =
@@ -108,7 +103,7 @@ export async function parseAiSseStream(response, {
     if (!eventName) return
     const eventMeta = parseEventId(eventId)
     const seq = eventMeta.seq
-    let shouldAdvanceCursor = eventName !== 'turn/completed'
+    let shouldAdvanceCursor = eventName !== 'turn/started' && eventName !== 'turn/completed'
 
     try {
       if (eventName === 'delta') {
@@ -125,19 +120,35 @@ export async function parseAiSseStream(response, {
       } else if (eventName === 'error') {
         onError?.(payload, errorMeta, seq, eventMeta)
       } else if (jsonHandlers.has(eventName)) {
+        let entry
         try {
-          const entry = JSON.parse(payload)
-          if (eventName === 'error_meta') errorMeta = entry
-          if (eventName === 'turn') replyText = String(entry?.content ?? '')
-          jsonHandlers.get(eventName)?.(entry, seq, eventMeta)
-          // turn 仅聚合模型结果，控制协议终态由 turn/completed 决定。
-          if (eventName === 'turn/started') receivedTurnStarted = true
-          if (eventName === 'turn/completed') receivedTurnCompleted = true
-          shouldAdvanceCursor = true
+          entry = JSON.parse(payload)
         } catch {
           shouldAdvanceCursor = eventName !== 'turn/started' && eventName !== 'turn/completed'
+          logger.warn('忽略格式错误的 AI 事件', eventName, seq)
+          return
         }
+        if (eventName === 'error_meta') errorMeta = entry
+        if (eventName === 'turn') replyText = String(entry?.content ?? '')
+        // A new started event invalidates the preceding turn's terminal marker.
+        if (eventName === 'turn/started') {
+          receivedTurnStarted = true
+          receivedTurnCompleted = false
+        }
+        try {
+          jsonHandlers.get(eventName)?.(entry, seq, eventMeta)
+        } catch (error) {
+          shouldAdvanceCursor = false
+          if (eventName !== 'turn/started' && eventName !== 'turn/completed') throw error
+          logger.warn('AI 控制事件应用失败', eventName, seq, error)
+          return
+        }
+        if (eventName === 'turn/completed') receivedTurnCompleted = true
+        shouldAdvanceCursor = true
       }
+    } catch (error) {
+      shouldAdvanceCursor = false
+      throw error
     } finally {
       if (shouldAdvanceCursor && seq > 0) {
         onEventSeq?.(seq, eventMeta)
@@ -145,37 +156,20 @@ export async function parseAiSseStream(response, {
     }
   }
 
+  const frames = createSseFrameDecoder(dispatchEvent)
   try {
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      // 最后一段可能不完整，留在 buffer 中
-      buffer = lines.pop() ?? ''
-
-      for (const line of lines) {
-        if (line.startsWith('event:')) {
-          currentEvent = line.slice(6).trim()
-        } else if (line.startsWith('id:')) {
-          currentId = line.slice(3).trim()
-        } else if (line.startsWith('data:')) {
-          currentData += (currentData ? '\n' : '') + parseDataLine(line)
-        } else if (line === '') {
-          // 空行表示一个事件结束
-          dispatchEvent(currentEvent, currentData, currentId)
-          currentEvent = ''
-          currentData = ''
-          currentId = ''
-        }
+      if (done) {
+        streamEnded = true
+        break
       }
+
+      frames.push(decoder.decode(value, { stream: true }))
     }
 
-    // 处理末尾残留（无结尾空行时）
-    if (currentEvent || currentData) {
-      dispatchEvent(currentEvent, currentData, currentId)
-    }
+    frames.push(decoder.decode())
+    frames.finish()
     if (receivedTurnCompleted) return replyText
     if (receivedTurnStarted) {
       const error = new Error('SSE 流在 Turn 终态到达前结束')
@@ -183,6 +177,9 @@ export async function parseAiSseStream(response, {
       throw error
     }
   } finally {
+    if (!streamEnded) {
+      try { await reader.cancel() } catch { /* The transport may already have aborted. */ }
+    }
     reader.releaseLock()
   }
 
@@ -201,6 +198,24 @@ export async function parseAiSseStream(response, {
 export async function fetchAiSse(url, body, signal, handlers = {}) {
   const startedAt = Date.now()
   const tag = `[fetchAiSse ${url}]`
+  const requestGeneration = sessionGeneration.value
+  const controller = new AbortController()
+  const forwardAbort = () => controller.abort(signal?.reason)
+  if (signal?.aborted) forwardAbort()
+  else signal?.addEventListener('abort', forwardAbort, { once: true })
+  const unregister = registerSessionCleanup(Symbol('ai-stream'), () => controller.abort())
+  try {
+    return await readAiSse(url, body, controller.signal, handlers, requestGeneration, startedAt, tag)
+  } catch (error) {
+    if (!isCurrentSession(requestGeneration)) throw createSessionChangedError()
+    throw error?.response ? handleHttpError(error, requestGeneration) : error
+  } finally {
+    unregister()
+    signal?.removeEventListener('abort', forwardAbort)
+  }
+}
+
+async function readAiSse(url, body, signal, handlers, requestGeneration, startedAt, tag) {
   let res
   try {
     res = await fetch(url, {
@@ -217,20 +232,37 @@ export async function fetchAiSse(url, body, signal, handlers = {}) {
 
   logger.info(`${tag} 响应 status=${res.status} ok=${res.ok} contentType=${res.headers.get('content-type')} 耗时=${Date.now() - startedAt}ms`)
 
-  if (!res.ok) {
+  if (!isCurrentSession(requestGeneration)) throw createSessionChangedError()
+  if (!res.ok || res.headers.get('content-type')?.includes('application/json')) {
     let detail = res.statusText || '请求失败'
+    let payload = null
     try {
       const t = await res.text()
       if (t?.trim()) detail = t.length > 600 ? `${t.slice(0, 600)}…` : t
+      try { payload = JSON.parse(t) } catch { /* Retain the text fallback for non-JSON errors. */ }
     } catch {
       // ignore
     }
-    logger.error(`${tag} 非 2xx 响应 status=${res.status} detail=${detail}`)
-    throw new Error(detail)
+    if (res.ok && Number(payload?.code) === 200) {
+      throw new Error('预期 SSE 事件流，收到普通 JSON 响应')
+    }
+    const error = createHttpError({ status: res.status, statusText: res.statusText, data: payload }, detail)
+    logger.error(`${tag} 事件流请求失败 status=${res.status} code=${error.code}`)
+    throw error
   }
 
   try {
-    const reply = await parseAiSseStream(res, handlers)
+    const guardedHandlers = Object.fromEntries(Object.entries(handlers).map(([name, callback]) => [
+      name,
+      typeof callback === 'function'
+        ? (...args) => {
+            if (!isCurrentSession(requestGeneration)) throw createSessionChangedError()
+            return callback(...args)
+          }
+        : callback
+    ]))
+    const reply = await parseAiSseStream(res, guardedHandlers)
+    if (!isCurrentSession(requestGeneration)) throw createSessionChangedError()
     logger.info(`${tag} SSE 流正常结束 replyLen=${(reply || '').length} 总耗时=${Date.now() - startedAt}ms`)
     return reply
   } catch (streamErr) {

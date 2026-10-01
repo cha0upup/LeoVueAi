@@ -377,7 +377,7 @@ import {
   addRegistryApi,
   deleteRegistryApi,
   exportRegistryApi
-} from '@/services/api.js'
+} from '@/services/api/registry.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 

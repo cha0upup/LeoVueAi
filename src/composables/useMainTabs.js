@@ -2,6 +2,7 @@ import { onMounted, ref } from 'vue'
 
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
+import { isCurrentSession, registerSessionCleanup, sessionGeneration } from '@/services/sessionLifecycle.js'
 import {
   getPuppetTabPath,
   LOAD_DELAYS,
@@ -13,6 +14,18 @@ import {
 const currentTab = ref(MAIN_HOME_TAB_ID)
 const tabs = ref([])
 let tabsRestored = false
+const loadTimers = new Set()
+
+const unregister = registerSessionCleanup('main-tabs', () => {
+  for (const timer of loadTimers) window.clearTimeout(timer)
+  loadTimers.clear()
+  tabs.value = []
+  currentTab.value = MAIN_HOME_TAB_ID
+  tabsRestored = false
+  safeLocalStorage.removeItem(MAIN_TAB_STORAGE_KEYS.tabs)
+  safeLocalStorage.removeItem(MAIN_TAB_STORAGE_KEYS.currentTab)
+})
+if (import.meta.hot) import.meta.hot.dispose(unregister)
 
 const createTabKey = () => {
   if (window.crypto?.randomUUID) {
@@ -70,9 +83,12 @@ export function useMainTabs({ confirmAction, iconMap }) {
       return
     }
 
-    window.setTimeout(() => {
-      markTabAsLoaded(tab.id)
+    const requestGeneration = sessionGeneration.value
+    const timer = window.setTimeout(() => {
+      loadTimers.delete(timer)
+      if (isCurrentSession(requestGeneration)) markTabAsLoaded(tab.id)
     }, LOAD_DELAYS.tabContent)
+    loadTimers.add(timer)
   }
 
   const restoreTabsFromStorage = () => {
@@ -139,13 +155,14 @@ export function useMainTabs({ confirmAction, iconMap }) {
   }
 
   const closeTab = async (tabId, index) => {
+    const requestGeneration = sessionGeneration.value
     const confirmed = await confirmAction({
       title: '确认关闭',
       message: '确定要关闭这个主机连接吗？',
       type: 'warning'
     })
 
-    if (!confirmed) {
+    if (!confirmed || !isCurrentSession(requestGeneration)) {
       return { closed: false, nextTab: null }
     }
 

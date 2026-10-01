@@ -114,15 +114,14 @@ import { version as appVersion } from '../../package.json'
 import {
   AUTH_FIELD_LIMITS,
   LOAD_DELAYS,
-  MAIN_TAB_STORAGE_KEYS,
   ROUTE_PATHS
 } from '@/constants/app.js'
 import { icons } from '@/utils/icons.js'
 import { validateForm } from '@/utils/formUtils.js'
-import { loginApi } from '@/services/api.js'
+import { loginApi } from '@/services/api/auth.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
-import { safeLocalStorage } from '@/utils/browserStorage.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 
 // ==================== 常量 ====================
 const iconMap = icons
@@ -131,7 +130,7 @@ const iconMap = icons
 const loginFormRef = ref(null)
 const router = useRouter()
 const route = useRoute()
-const { fetchAuth } = useAuth()
+const { fetchAuth, resetAuth } = useAuth()
 
 // ==================== 响应式数据 ====================
 const loading = ref(false)
@@ -176,14 +175,6 @@ const getErrorMessage = (error) => {
   return '网络错误，请稍后重试'
 }
 
-/**
- * 清除浏览器保持的tab缓存
- */
-const clearTabCache = () => {
-  safeLocalStorage.removeItem(MAIN_TAB_STORAGE_KEYS.tabs)
-  safeLocalStorage.removeItem(MAIN_TAB_STORAGE_KEYS.currentTab)
-}
-
 const getLoginRedirectTarget = (user) => {
   const rawRedirect = Array.isArray(route.query.redirect)
     ? route.query.redirect[0]
@@ -220,15 +211,16 @@ const handleLogin = async () => {
       username: loginForm.username,
       password: loginForm.password
     })
+    resetAuth()
+    const loginGeneration = sessionGeneration.value
     const user = await fetchAuth({ force: true })
-
-    // 清除tab缓存
-    clearTabCache()
+    if (!isCurrentSession(loginGeneration)) return
+    if (!user) throw new Error('登录状态校验失败，请重试')
 
     showSuccess('登录成功')
 
     setTimeout(() => {
-      router.push(getLoginRedirectTarget(user))
+      if (isCurrentSession(loginGeneration)) router.push(getLoginRedirectTarget(user))
     }, LOAD_DELAYS.loginRedirect)
   } catch (error) {
     showError(getErrorMessage(error))

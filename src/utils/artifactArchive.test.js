@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/services/api.js', () => ({
+vi.mock('@/services/api/user-space.js', () => ({
   userFileCreateDirApi: vi.fn(),
   userFileUploadApi: vi.fn()
 }))

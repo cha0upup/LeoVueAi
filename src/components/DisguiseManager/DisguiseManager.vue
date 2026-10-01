@@ -238,7 +238,7 @@ import {
   updateDisguiseApi,
   exportDisguiseApi,
   exportDisguisesBatchApi
-} from '@/services/api.js'
+} from '@/services/api/disguises.js'
 import { showSuccess, showWarning } from '@/utils/messageUtils.js'
 import DisguiseDetail from './DisguiseDetail.vue'
 import DisguiseEditorDialog from './DisguiseEditorDialog.vue'

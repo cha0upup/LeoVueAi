@@ -41,4 +41,17 @@ describe('normalizeHttpError', () => {
       message: 'Service unavailable'
     })
   })
+
+  it('falls back to the transport status for JSON errors without a business code', () => {
+    const error = new Error('Unauthorized')
+    error.response = { status: 401, data: { msg: 'session expired' } }
+    expect(normalizeHttpError(error)).toEqual({ code: 401, message: 'session expired' })
+  })
+
+  it('preserves a local cancellation code without a transport response', () => {
+    const error = new Error('Login changed')
+    error.code = 'SESSION_CHANGED'
+    expect(normalizeHttpError(error)).toEqual({ code: undefined, message: 'Login changed' })
+    expect(error.code).toBe('SESSION_CHANGED')
+  })
 })

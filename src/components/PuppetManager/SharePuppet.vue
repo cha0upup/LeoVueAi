@@ -192,7 +192,7 @@
 import { Link, Monitor } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
 
-import { exportPuppetsApi } from '@/services/api.js'
+import { exportPuppetsApi } from '@/services/api/puppet-manage.js'
 import { PUPPET_DEFAULT_MAX_REQUEST_COUNT } from '@/utils/constants.js'
 import { icons } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'

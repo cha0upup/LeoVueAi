@@ -118,7 +118,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { AUTH_FIELD_LIMITS, ROUTE_PATHS } from '@/constants/app.js'
 import { useAuth } from '@/composables/useAuth.js'
-import { changePasswordApi, logoutApi } from '@/services/api.js'
+import { changePasswordApi, logoutApi } from '@/services/api/auth.js'
 import { validateForm } from '@/utils/formUtils.js'
 import { icons } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'

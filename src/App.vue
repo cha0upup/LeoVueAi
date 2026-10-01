@@ -3,14 +3,25 @@
     id="app"
     :class="{ 'app-shell': showAppHeader }"
   >
-    <GlobalAppHeader v-if="showAppHeader" />
+    <GlobalAppHeader
+      v-if="showAppHeader"
+      :key="sessionGeneration"
+    />
     <router-view v-slot="{ Component }">
-      <KeepAlive include="MainView">
+      <KeepAlive
+        v-if="currentUser && route.meta.requiresAuth"
+        :key="sessionGeneration"
+        include="MainView"
+      >
         <component
           :is="Component"
           :class="{ 'app-shell__view': showAppHeader }"
         />
       </KeepAlive>
+      <component
+        :is="Component"
+        v-else-if="!route.meta.requiresAuth"
+      />
     </router-view>
   </div>
 </template>
@@ -22,12 +33,15 @@ import { useRoute } from 'vue-router'
 import GlobalAppHeader from '@/components/common/GlobalAppHeader.vue'
 import { ROUTE_PATHS } from '@/constants/app.js'
 import { useTheme } from '@/stores/theme'
+import { sessionGeneration } from '@/services/sessionLifecycle.js'
+import { useAuth } from '@/composables/useAuth.js'
 
 const { initTheme } = useTheme()
+const { currentUser } = useAuth()
 const route = useRoute()
 
 const showAppHeader = computed(() =>
-  route.meta.requiresAuth &&
+  currentUser.value && route.meta.requiresAuth &&
   route.meta.showAppHeader !== false &&
   route.path !== ROUTE_PATHS.login
 )

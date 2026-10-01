@@ -1,5 +1,5 @@
 import { onScopeDispose, ref } from 'vue'
-import { getBasicInfoApi } from '@/services/api.js'
+import { getBasicInfoApi } from '@/services/api/puppet-node.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 

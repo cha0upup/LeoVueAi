@@ -153,7 +153,12 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import { listAllSuidCapsApi, listSuidFilesApi, listSgidFilesApi, listCapabilitiesApi } from '@/services/api.js'
+import {
+  listAllSuidCapsApi,
+  listSuidFilesApi,
+  listSgidFilesApi,
+  listCapabilitiesApi
+} from '@/services/api/suid-caps.js'
 import { showError, showWarning } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 

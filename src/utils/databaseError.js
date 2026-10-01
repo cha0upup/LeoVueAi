@@ -32,7 +32,3 @@ export function formatDatabaseError(error, fallback = '数据库操作失败') {
   if (payload.sqlState) message += `（SQLState: ${payload.sqlState}）`
   return message
 }
-
-export function isRetryableDatabaseError(error) {
-  return getDatabaseErrorPayload(error).retryable === true
-}

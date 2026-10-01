@@ -7,13 +7,12 @@ const MANUAL_CHUNK_RULES = [
   { name: 'vendor-element-plus', test: /node_modules\/(element-plus|@element-plus)\// },
   {
     name: 'vendor-icons',
-    test: /node_modules\/(@iconify|@iconify-icons|@element-plus\/icons-vue)\//
+    test: /node_modules\/@iconify\//
   },
   // Monaco 内部模块存在复杂的相互依赖；按 base/platform/core/contrib 细拆
   // 会在生产环境触发 chunk 初始化顺序问题，统一收敛到单个 vendor chunk 更稳妥。
   { name: 'vendor-editor', test: /node_modules\/monaco-editor\// },
   { name: 'vendor-terminal', test: /node_modules\/@xterm\// },
-  { name: 'vendor-charts', test: /node_modules\/(echarts|vue-echarts)\// },
   { name: 'vendor-export', test: /node_modules\/xlsx\// }
 ]
 

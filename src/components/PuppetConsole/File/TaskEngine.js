@@ -3,11 +3,9 @@ import {
   downloadEngineCancelApi,
   downloadEnginePauseApi,
   downloadEngineResumeApi,
-  downloadEngineRetryApi,
-  pauseSqlExportTaskApi,
-  resumeSqlExportTaskApi,
-  stopSqlExportTaskApi
-} from '@/services/api.js'
+  downloadEngineRetryApi
+} from '@/services/api/puppet-files.js'
+import { pauseSqlExportTaskApi, resumeSqlExportTaskApi, stopSqlExportTaskApi } from '@/services/api/sql.js'
 import {
   TERMINAL_TASK_STATUSES,
   TaskStatus,
@@ -23,6 +21,7 @@ import { applyDownloadExecutor } from './executors/downloadExecutor.js'
 import { applyUploadExecutor } from './executors/uploadExecutor.js'
 import { applyScanExecutor } from './executors/scanExecutor.js'
 import { applyDbExportExecutor } from './executors/dbExportExecutor.js'
+import { registerSessionCleanup } from '@/services/sessionLifecycle.js'
 
 // ============================================================================
 // PART 2: 任务管理引擎 - 核心类
@@ -40,6 +39,20 @@ class TaskEngine {
     this.activeTasks = new Set() // 活跃任务集合
     this.taskIdCounter = 0 // 任务ID计数器
     this.eventListeners = new Map() // 事件监听器
+  }
+
+  // Detach browser observers without cancelling durable backend tasks.
+  detach() {
+    for (const tasks of this.sessionTasks.values()) {
+      for (const task of tasks.values()) {
+        task.isDetached = true
+        task.fileData = null
+      }
+    }
+    this.sessionTasks.clear()
+    this.activeTasks.clear()
+    this.eventListeners.clear()
+    this.scanQueryRequests?.clear()
   }
 
   // ========================================================================
@@ -203,6 +216,7 @@ class TaskEngine {
       // 因为executeDownloadTask和executeUploadTask内部会处理任务完成
       // 只有在任务执行失败时才会到达这里
     } catch (error) {
+      if (task.isDetached) return
       task.status = TaskStatus.FAILED
       task.error = error.message
       task.endTime = Date.now()
@@ -227,6 +241,7 @@ class TaskEngine {
   // ========================================================================
 
   async uploadChunk(task, offset, arrayBuffer) {
+    if (task.isDetached) return null
     try {
       // 将Uint8Array转换为Base64字符串
       const base64Data = this.arrayBufferToBase64(arrayBuffer)
@@ -447,6 +462,7 @@ class TaskEngine {
   }
 
   emit(event, ...args) {
+    if (args[0]?.isDetached) return
     if (this.eventListeners.has(event)) {
       const listeners = this.eventListeners.get(event)
 
@@ -480,5 +496,8 @@ if (!globalTaskEngine) {
 }
 
 export const taskEngine = globalTaskEngine
+
+const unregister = registerSessionCleanup('tasks', () => TaskEngine.prototype.detach.call(taskEngine))
+if (import.meta.hot) import.meta.hot.dispose(unregister)
 
 // 导出任务引擎实例

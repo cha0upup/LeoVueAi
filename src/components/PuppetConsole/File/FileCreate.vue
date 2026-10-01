@@ -211,7 +211,7 @@ import { icons } from '@/utils/icons.js'
 import { formatFilePath } from '@/utils/format.js'
 import { validateForm } from '@/utils/formUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
-import { newDirApi, newFileApi } from '@/services/api.js'
+import { newDirApi, newFileApi } from '@/services/api/puppet-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
 const iconMap = icons

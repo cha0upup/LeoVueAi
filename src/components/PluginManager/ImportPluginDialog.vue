@@ -176,7 +176,7 @@
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
 import { formatFileSize } from '@/utils/format.js'
-import { importPluginsApi } from '@/services/api.js'
+import { importPluginsApi } from '@/services/api/plugins.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { useArchiveImport } from '@/composables/useArchiveImport.js'
 

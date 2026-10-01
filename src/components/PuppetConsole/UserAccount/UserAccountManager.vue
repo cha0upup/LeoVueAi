@@ -321,7 +321,7 @@ import {
   queryUserApi,
   queryGroupApi,
   whoamiApi
-} from '@/services/api'
+} from '@/services/api/user-account.js'
 import { showWarning, handleApiError } from '@/utils/messageUtils.js'
 import { useSessionParams } from '@/composables/useSessionParams.js'
 import { exportTsv } from '@/utils/exportUtils.js'
