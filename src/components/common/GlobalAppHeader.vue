@@ -34,7 +34,7 @@
             :class="{ 'is-active': activeKey === ADMIN_TAB_ID }"
             data-tab="admin"
             :aria-current="activeKey === ADMIN_TAB_ID ? 'page' : undefined"
-            @click="openAdmin"
+            @click="goToAdmin()"
           >
             <el-icon class="platform-switcher__icon">
               <Icon :icon="iconMap.shield" />
@@ -151,13 +151,6 @@ const openWorkspace = () => {
   if (route.path !== ROUTE_PATHS.main) {
     router.push(ROUTE_PATHS.main)
   }
-}
-
-const openAdmin = () => {
-  if (isWorkspacePath(route.path)) {
-    rememberWorkspaceRoute()
-  }
-  goToAdmin()
 }
 
 const openAgentTab = (tabId) => {

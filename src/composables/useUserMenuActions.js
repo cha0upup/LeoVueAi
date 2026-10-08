@@ -23,35 +23,12 @@ export function useUserMenuActions({
   const { currentUser, resetAuth } = useAuth()
 
   const username = computed(() => currentUser.value?.userName || DEFAULT_USERNAME)
-  const userRoleLabel = computed(() => {
-    if (!currentUser.value) return '当前用户'
-    return ROLE_LABELS[currentUser.value.privilege] || '当前用户'
-  })
-  const userMenuItems = computed(() => {
-    const items = [
-      {
-        command: 'profile',
-        label: '个人信息',
-        icon: icons.user
-      }
-    ]
-
-    items.push(
-      {
-        command: 'changePassword',
-        label: '修改密码',
-        icon: icons.key
-      },
-      {
-        command: 'logout',
-        label: '退出登录',
-        icon: icons.switchButton,
-        divided: true
-      }
-    )
-
-    return items
-  })
+  const userRoleLabel = computed(() => ROLE_LABELS[currentUser.value?.privilege] || '当前用户')
+  const userMenuItems = computed(() => [
+    { command: 'profile', label: '个人信息', icon: icons.user },
+    { command: 'changePassword', label: '修改密码', icon: icons.key },
+    { command: 'logout', label: '退出登录', icon: icons.switchButton, divided: true }
+  ])
 
   const handleLogout = async () => {
     const requestGeneration = sessionGeneration.value

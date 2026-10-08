@@ -9,7 +9,7 @@
     append-to-body
     :before-close="handleBeforeClose"
     @opened="handleOpened"
-    @closed="handleClosed"
+    @closed="emit('close')"
   >
     <div class="compress-content file-dialog-content">
       <FileOperationSummary
@@ -112,7 +112,7 @@
                   text
                   size="small"
                   class="clear-exclude-btn"
-                  @click="clearExclude"
+                  @click="form.exclude = ''"
                 >
                   <el-icon><Icon :icon="iconMap.close" /></el-icon>
                   清除
@@ -169,7 +169,7 @@ import { ref, computed, reactive, nextTick } from 'vue'
 
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
-import { formatFilePath } from '@/utils/format.js'
+import { formatFilePath, joinFilePath, normalizeDirectoryPath } from '@/utils/format.js'
 import { compressFileApi } from '@/services/api/agent-files.js'
 import { showError, showInfo, showSuccess } from '@/utils/messageUtils.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
@@ -218,24 +218,10 @@ const fileName = computed(() => {
   return props.file.name || '未知文件'
 })
 
-const normalizeDirectoryPath = (path) => {
-  const formatted = formatFilePath(path || '/').replace(/\/\.$/, '')
-  if (formatted === '/' || /^[A-Za-z]:\/?$/.test(formatted)) {
-    return formatted.endsWith('/') ? formatted : `${formatted}/`
-  }
-  return formatted.replace(/\/+$/, '')
-}
-
-const joinPath = (basePath, name) => {
-  const base = normalizeDirectoryPath(basePath)
-  if (base === '/') return formatFilePath(`/${name}`)
-  return formatFilePath(`${base}${base.endsWith('/') ? '' : '/'}${name}`)
-}
-
 const targetDirectory = computed(() => normalizeDirectoryPath(`${props.disk}${props.currentPath}`))
 
 const filePath = computed(() => (
-  props.file.path ? formatFilePath(props.file.path) : joinPath(targetDirectory.value, fileName.value)
+  props.file.path ? formatFilePath(props.file.path) : joinFilePath(targetDirectory.value, fileName.value)
 ))
 
 const normalizedArchiveName = computed(() => form.archiveName.trim())
@@ -251,7 +237,7 @@ const summaryBadges = computed(() => [
 
 const outputPath = computed(() => {
   if (!effectiveArchiveName.value) return targetDirectory.value
-  return joinPath(targetDirectory.value, `${effectiveArchiveName.value}.zip`)
+  return joinFilePath(targetDirectory.value, `${effectiveArchiveName.value}.zip`)
 })
 
 const outputPathPreview = computed(() => (
@@ -336,10 +322,6 @@ const requestClose = () => {
   dialogVisible.value = false
 }
 
-const handleClosed = () => {
-  emit('close')
-}
-
 const resetForm = () => {
   // 生成默认压缩包名称（移除原扩展名，添加_compressed）
   const baseName = props.file.name.replace(/\.[^.]*$/, '') || props.file.name
@@ -363,10 +345,6 @@ const handleArchiveNameInput = () => {
   if (!showArchiveValidation.value) {
     formRef.value?.clearValidate?.('archiveName')
   }
-}
-
-const clearExclude = () => {
-  form.exclude = ''
 }
 
 const copyOutputPath = () => {

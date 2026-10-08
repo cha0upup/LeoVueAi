@@ -31,11 +31,7 @@ async function fetchAuth({ force = false } = {}) {
       const res = await getLoginStatusApi()
       const data = res?.data
       if (!isCurrentSession(requestGeneration)) return null
-      if (data?.isLoggedIn) {
-        currentUser.value = data
-      } else {
-        currentUser.value = null
-      }
+      currentUser.value = data?.isLoggedIn ? data : null
     } catch {
       if (isCurrentSession(requestGeneration)) currentUser.value = null
     } finally {

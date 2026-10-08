@@ -456,56 +456,35 @@ const currentFilteredList = computed(() =>
 
 // ==================== 方法 ====================
 
-async function handleListShares() {
+async function loadList(tab) {
+  const isShares = tab === 'shares'
+  const list = isShares ? shares : mounts
+  const loaded = isShares ? sharesLoaded : mountsLoaded
+  const fetchList = isShares ? listNetworkSharesApi : listNetworkMountsApi
   isLoading.value = true
-  activeTab.value = 'shares'
+  activeTab.value = tab
   try {
-    const res = await listNetworkSharesApi({ sessionId: props.sessionId })
-    const data = res.data
-    shares.value = data.shares || []
-    sharesLoaded.value = true
-    if (shares.value.length === 0) {
-      showWarning('未发现本机共享资源')
+    const res = await fetchList({ sessionId: props.sessionId })
+    list.value = res.data[tab] || []
+    loaded.value = true
+    if (list.value.length === 0) {
+      showWarning(isShares ? '未发现本机共享资源' : '未发现已挂载的远程共享')
     }
   } catch (err) {
-    showError('获取共享列表失败: ' + (err.message || err))
-  } finally {
-    isLoading.value = false
-  }
-}
-
-async function handleListMounts() {
-  isLoading.value = true
-  activeTab.value = 'mounts'
-  try {
-    const res = await listNetworkMountsApi({ sessionId: props.sessionId })
-    const data = res.data
-    mounts.value = data.mounts || []
-    mountsLoaded.value = true
-    if (mounts.value.length === 0) {
-      showWarning('未发现已挂载的远程共享')
-    }
-  } catch (err) {
-    showError('获取挂载列表失败: ' + (err.message || err))
+    showError((isShares ? '获取共享列表失败: ' : '获取挂载列表失败: ') + (err.message || err))
   } finally {
     isLoading.value = false
   }
 }
 
 async function handleRefresh() {
-  if (activeTab.value === 'shares') {
-    await handleListShares()
-  } else {
-    await handleListMounts()
-  }
+  await loadList(activeTab.value === 'shares' ? 'shares' : 'mounts')
 }
 
 async function handleTabChange(tab) {
   searchText.value = ''
-  if (tab === 'shares' && !sharesLoaded.value) {
-    await handleListShares()
-  } else if (tab === 'mounts' && !mountsLoaded.value) {
-    await handleListMounts()
+  if ((tab === 'shares' && !sharesLoaded.value) || (tab === 'mounts' && !mountsLoaded.value)) {
+    await loadList(tab)
   }
 }
 
@@ -545,7 +524,7 @@ async function handleConnect() {
     connectForm.username = ''
     connectForm.password = ''
     // 刷新挂载列表
-    await handleListMounts()
+    await loadList('mounts')
   } catch (err) {
     showError('连接共享失败: ' + (err.message || err))
   } finally {

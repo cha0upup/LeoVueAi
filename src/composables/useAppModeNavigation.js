@@ -28,7 +28,8 @@ const isRouteInSpace = (value, basePath) => {
     || value.startsWith(`${basePath}/`)
 }
 
-const normalizeStoredRoute = (value, fallback, basePath) => {
+const readStoredRoute = (storageKey, basePath, fallback = basePath) => {
+  const value = safeLocalStorage.getItem(storageKey)
   return isSafeInternalRoute(value) && isRouteInSpace(value, basePath)
     ? value
     : fallback
@@ -50,22 +51,6 @@ export function useAppModeNavigation() {
     }
   }
 
-  const getWorkspaceRoute = () => {
-    return normalizeStoredRoute(
-      safeLocalStorage.getItem(LAST_WORKSPACE_ROUTE_KEY),
-      ROUTE_PATHS.main,
-      ROUTE_PATHS.main
-    )
-  }
-
-  const getAdminRoute = () => {
-    return normalizeStoredRoute(
-      safeLocalStorage.getItem(LAST_ADMIN_ROUTE_KEY),
-      DEFAULT_ADMIN_ROUTE,
-      ROUTE_PATHS.admin
-    )
-  }
-
   const goToAdmin = ({ tab } = {}) => {
     rememberWorkspaceRoute()
     if (tab) {
@@ -74,12 +59,12 @@ export function useAppModeNavigation() {
         query: { tab }
       })
     }
-    return router.push(getAdminRoute())
+    return router.push(readStoredRoute(LAST_ADMIN_ROUTE_KEY, ROUTE_PATHS.admin, DEFAULT_ADMIN_ROUTE))
   }
 
   const goToWorkspace = () => {
     rememberAdminRoute()
-    return router.push(getWorkspaceRoute())
+    return router.push(readStoredRoute(LAST_WORKSPACE_ROUTE_KEY, ROUTE_PATHS.main))
   }
 
   return {

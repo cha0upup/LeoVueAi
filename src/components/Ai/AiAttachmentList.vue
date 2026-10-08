@@ -47,7 +47,7 @@
 
 <script setup>
 import { formatFileSize } from '@/utils/format.js'
-import { getFileIconPresentation } from '@/utils/fileIcons.js'
+import { getFileIconPresentation as iconFor } from '@/utils/fileIcons.js'
 
 defineProps({
   files: { type: Array, default: () => [] },
@@ -56,8 +56,6 @@ defineProps({
 })
 
 const emit = defineEmits(['remove'])
-
-const iconFor = (file) => getFileIconPresentation(file)
 
 const extensionFor = (file) => {
   const name = String(file?.name || '')

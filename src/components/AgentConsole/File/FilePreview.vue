@@ -44,7 +44,7 @@
         :word-wrap="wordWrap"
         @action="handleHeaderAction"
         @encoding-change="changeDisplayEncoding"
-        @line-ending-change="handleLineEndingChange"
+        @line-ending-change="updateModifiedState()"
       />
     </template>
 
@@ -264,10 +264,6 @@ const updateStatsFromContent = (content) => {
   editorCharCount.value = stats.charCount
 }
 
-const syncPreviewMetadata = (responseData) => {
-  fileSize.value = resolvePreviewFileSize(responseData)
-}
-
 const resetPreviewMetadata = () => {
   fileSize.value = 0
   editorLineCount.value = 0
@@ -332,23 +328,15 @@ const handleStatsChange = (state) => {
   editorCharCount.value = Number(state?.charCount) || 0
 }
 
-const handleLineEndingChange = () => {
-  updateModifiedState()
-}
-
 const formatCode = () => {
   if (textPreviewRef.value) {
     textPreviewRef.value.formatCode()
   }
 }
 
-const getEditorContent = () => {
-  return textPreviewRef.value?.getContent?.() ?? fileContent.value
-}
+const getEditorContent = () => textPreviewRef.value?.getContent?.() ?? fileContent.value
 
-const getEditorInstance = () => {
-  return textPreviewRef.value?.getEditorInstance?.()
-}
+const getEditorInstance = () => textPreviewRef.value?.getEditorInstance?.()
 
 const currentPreviewTarget = () => ({
   sessionId: sessionId.value,
@@ -378,7 +366,7 @@ const switchPreviewEncoding = async (encoding, confirmation, successMessage) => 
         isCurrent
       })
       if (!result || !isCurrent()) return false
-      syncPreviewMetadata(result.responseData)
+      fileSize.value = resolvePreviewFileSize(result.responseData)
       syncTextPreview()
       showSuccess(successMessage)
       return true
@@ -525,7 +513,7 @@ const preView = async (
         isCurrent
       })
       if (!result || !isCurrent()) return false
-      syncPreviewMetadata(result.responseData)
+      fileSize.value = resolvePreviewFileSize(result.responseData)
 
       if (result.truncated) {
         setFileType(target.filePath)

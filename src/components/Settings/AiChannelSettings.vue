@@ -46,7 +46,7 @@
       :save-loading="saveLoading"
       @apply-provider="applySelectedProvider"
       @submit="submit"
-      @form-ready="setModelFormRef"
+      @form-ready="formRef = $event"
     />
 
     <AiProviderDialog
@@ -66,7 +66,7 @@
       @fetch-models="fetchProviderFormModels"
       @add-model="addManualProviderModel"
       @submit="submitProvider"
-      @form-ready="setProviderFormRef"
+      @form-ready="providerFormRef = $event"
     />
 
     <AiCapabilityRegistryDialogs
@@ -84,7 +84,7 @@
       @edit="openCapabilityEdit"
       @remove="removeCapability"
       @submit="submitCapability"
-      @form-ready="setCapabilityFormRef"
+      @form-ready="capabilityFormRef = $event"
     />
 
     <AiCapabilityProbeDialog
@@ -116,21 +116,16 @@ import AiProviderDialog from './AiProviderDialog.vue'
 import { useAiCapabilityRegistry } from '@/composables/useAiCapabilityRegistry.js'
 import { useAiProviderManager } from '@/composables/useAiProviderManager.js'
 import {
-  AI_PROTOCOL_OPTIONS,
-  DEFAULT_COMPLETIONS_PATH,
-  REASONING_EFFORT_OPTIONS,
-  REASONING_MODE_OPTIONS,
+  AI_PROTOCOL_OPTIONS as protocolOptions,
+  DEFAULT_COMPLETIONS_PATH as DEFAULT_PATH,
+  REASONING_EFFORT_OPTIONS as reasoningOptions,
+  REASONING_MODE_OPTIONS as reasoningModeOptions,
   createModelForm,
   defaultPathForProtocol,
   normalizeProtocol,
   probeSummary,
   resetReactiveForm
 } from './aiChannelSettingsModel.js'
-
-const DEFAULT_PATH = DEFAULT_COMPLETIONS_PATH
-const protocolOptions = AI_PROTOCOL_OPTIONS
-const reasoningModeOptions = REASONING_MODE_OPTIONS
-const reasoningOptions = REASONING_EFFORT_OPTIONS
 
 // ── List state ─────────────────────────────────────────────────────────
 const rows = ref([])
@@ -162,11 +157,7 @@ const {
   submitCapability,
   removeCapability,
   findCapabilityByModelName
-} = useAiCapabilityRegistry({ onChanged: () => loadList() })
-
-const setCapabilityFormRef = (instance) => {
-  capabilityFormRef.value = instance
-}
+} = useAiCapabilityRegistry({ onChanged: loadList })
 
 const {
   providers,
@@ -196,30 +187,28 @@ const {
   syncProviderModels
 } = useAiProviderManager({
   modelRows: rows,
-  loadModels: () => loadList(),
+  loadModels: loadList,
   ensureCapabilitiesLoaded,
   findCapabilityByModelName,
-  testConnection: (model) => testConnection(model)
+  testConnection
 })
-
-const setProviderFormRef = (instance) => {
-  providerFormRef.value = instance
-}
 
 const selectedModel = computed(() => rows.value.find((item) => item.id === selectedModelId.value) || rows.value.find((item) => item.isActive === 1) || rows.value[0] || null)
 const inheritedEndpointLabel = computed(() => {
-  const baseUrl = form.baseUrl || savedProviders.value.find((p) => p.id === form.providerId)?.baseUrl || ''
-  const path = form.completionsPath || savedProviders.value.find((p) => p.id === form.providerId)?.completionsPath || DEFAULT_PATH
+  const provider = form.baseUrl && form.completionsPath
+    ? null
+    : savedProviders.value.find((p) => p.id === form.providerId)
+  const baseUrl = form.baseUrl || provider?.baseUrl || ''
+  const path = form.completionsPath || provider?.completionsPath || DEFAULT_PATH
   if (!baseUrl) return '选择供应商后自动继承'
-  return `${baseUrl}${path || ''}`
+  return `${baseUrl}${path}`
 })
 const modelLimitHint = computed(() => {
   const hasCustomContext = Number(form.contextWindowTokens || 0) > 0
   const hasCustomOutput = Number(form.maxOutputTokens || 0) > 0
-  if (!hasCustomContext && !hasCustomOutput) {
-    return '默认使用系统能力库识别出的模型上限'
-  }
-  return '自定义值会在后端按模型真实能力上限自动裁剪'
+  return hasCustomContext || hasCustomOutput
+    ? '自定义值会在后端按模型真实能力上限自动裁剪'
+    : '默认使用系统能力库识别出的模型上限'
 })
 const reasoningCapabilityHint = computed(() => {
   if (form.thinkingEnabled === 1 && editing.value && !editing.value.supportsReasoning) {
@@ -288,23 +277,14 @@ const rules = {
   model: [{ required: true, message: '请输入模型名称', trigger: 'blur' }]
 }
 
-const setModelFormRef = (instance) => {
-  formRef.value = instance
-}
-
-function resetForm(initial = createModelForm()) {
-  resetReactiveForm(form, initial)
-}
-
 function openEdit(row) {
   editing.value = row
-  resetForm({
+  resetReactiveForm(form, {
     name: row.name || '',
     providerId: row.providerId || null,
     providerKey: row.providerKey || 'custom',
     providerName: row.providerName || '',
     baseUrl: row.baseUrl || '',
-    apiKey: '',
     model: row.model || '',
     protocol: normalizeProtocol(row.protocol),
     completionsPath: row.completionsPath || defaultPathForProtocol(row.protocol),
@@ -314,7 +294,6 @@ function openEdit(row) {
     contextWindowTokens: row.contextWindowTokens ?? null,
     temperature: row.temperature ?? null,
     fallbackModelId: row.fallbackModelId ?? null,
-    headersJson: '',
     remark: row.remark || '',
     enabledBool: row.enabled !== 0,
     isActiveBool: row.isActive === 1
@@ -331,11 +310,10 @@ function applySelectedProvider() {
   form.baseUrl = provider.baseUrl || ''
   form.protocol = normalizeProtocol(provider.protocol)
   form.completionsPath = provider.completionsPath || defaultPathForProtocol(provider.protocol)
-  form.headersJson = ''
 }
 
 function buildBody() {
-  const body = {
+  return {
     name: form.name.trim(),
     providerId: form.providerId,
     providerKey: form.providerKey || 'custom',
@@ -354,7 +332,6 @@ function buildBody() {
     enabled: form.enabledBool ? 1 : 0,
     isActive: form.isActiveBool ? 1 : 0
   }
-  return body
 }
 
 async function submit() {

@@ -349,30 +349,6 @@ export function buildWherePayloadFromRow(headers, rowData, columnsMeta = []) {
 }
 
 /**
- * 删除单行数据
- * @param {Object} params - 删除参数
- * @returns {Promise<void>}
- */
-async function deleteRowData({
-  sessionId,
-  connection,
-  objectRef = null,
-  where,
-  sqlEngine
-}) {
-  if (!where) {
-    throw new Error('删除条件不能为空')
-  }
-
-  await sqlEngine.deleteRows({
-    sessionId,
-    connection,
-    objectRef,
-    where
-  })
-}
-
-/**
  * 批量删除多行数据
  * @param {Object} params - 删除参数
  * @returns {Promise<number>} 成功删除的行数
@@ -399,12 +375,11 @@ export async function deleteRowsData({
       }
 
       try {
-        await deleteRowData({
+        await sqlEngine.deleteRows({
           sessionId,
           connection,
           objectRef,
-          where,
-          sqlEngine
+          where
         })
 
         if (onProgress) {

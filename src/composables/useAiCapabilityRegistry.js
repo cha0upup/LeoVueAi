@@ -75,19 +75,15 @@ export function useAiCapabilityRegistry({ onChanged = async () => {} } = {}) {
     await ensureCapabilitiesLoaded()
   }
 
-  const resetCapabilityForm = (initial = createCapabilityForm()) => {
-    resetReactiveForm(capabilityForm, initial)
-  }
-
   const openCapabilityCreate = () => {
     capabilityEditing.value = null
-    resetCapabilityForm()
+    resetReactiveForm(capabilityForm, createCapabilityForm())
     capabilityFormVisible.value = true
   }
 
   const openCapabilityEdit = (row) => {
     capabilityEditing.value = row
-    resetCapabilityForm(capabilityToForm(row))
+    resetReactiveForm(capabilityForm, capabilityToForm(row))
     capabilityFormVisible.value = true
   }
 

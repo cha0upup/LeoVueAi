@@ -220,7 +220,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 
 import { icons } from '@/utils/icons.js'
 import { createDefaultAgent } from '@/utils/constants.js'
@@ -268,18 +268,6 @@ const {
 const fileInput = ref(null)
 let activeFileReader = null
 let fileReadSequence = 0
-
-const canProceed = computed(() => fileContent.value.trim().length > 0)
-
-const getTransferDepth = (record, byId) => {
-  let depth = 0
-  let parentId = record.parentTransferId
-  while (parentId) {
-    depth += 1
-    parentId = byId.get(parentId).parentTransferId
-  }
-  return depth
-}
 
 const selectFile = () => {
   if (fileInput.value) fileInput.value.value = ''
@@ -343,18 +331,23 @@ const parseContent = () => {
     const parsed = decodeAgentTransferPayload(fileContent.value)
     const transfer = parseAgentTransferPayload(parsed)
 
-    const byId = new Map(transfer.records.map((record) => [record.transferId, record]))
-    const importedAgents = transfer.records.map((record) => ({
-      ...createDefaultAgent({
-        ...record.config,
-        parentAgentId: record.parentTransferId || 'root'
-      }),
-      __transferId: record.transferId,
-      __parentTransferId: record.parentTransferId,
-      __depth: getTransferDepth(record, byId)
-    }))
+    // 解析器已按父节点优先排序，层级只需顺序计算一次。
+    const depths = new Map()
+    const importedAgents = transfer.records.map((record) => {
+      const depth = record.parentTransferId ? depths.get(record.parentTransferId) + 1 : 0
+      depths.set(record.transferId, depth)
+      return {
+        ...createDefaultAgent({
+          ...record.config,
+          parentAgentId: record.parentTransferId || 'root'
+        }),
+        __transferId: record.transferId,
+        __parentTransferId: record.parentTransferId,
+        __depth: depth
+      }
+    })
     loadBundle(importedAgents, transfer.targetIds)
-    nextStep()
+    currentStep.value = 2
     showSuccess(
       `配置包解析成功：${transfer.targetIds.size} 台目标主机，${importedAgents.length - transfer.targetIds.size} 台祖先依赖`
     )
@@ -367,12 +360,6 @@ const clearContent = () => {
   cancelFileRead()
   fileContent.value = ''
   if (fileInput.value) fileInput.value.value = ''
-}
-
-const nextStep = () => {
-  if (canProceed.value) {
-    currentStep.value = 2
-  }
 }
 
 const handleBatchSubmit = async () => {
@@ -422,7 +409,7 @@ const handleBatchSubmit = async () => {
       showError('配置包导入失败，未创建任何主机')
       return
     }
-    refresh()
+    emit('refresh')
     close()
   } finally {
     isSubmitting.value = false
@@ -443,16 +430,8 @@ const resetForm = () => {
   resetBatch()
 }
 
-const refresh = () => {
-  emit('refresh')
-}
-
-const openImportAgent = () => {
-  dialog.open()
-}
-
 defineExpose({
-  openImportAgent,
+  openImportAgent: dialog.open,
   close
 })
 </script>

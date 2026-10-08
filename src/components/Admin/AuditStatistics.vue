@@ -2,148 +2,57 @@
   <div class="audit-statistics">
     <section class="query-grid">
       <article
-        v-loading="userStatsLoading"
+        v-for="card in queryCards"
+        :key="card.idField"
+        v-loading="card.loading"
         class="query-card surface"
       >
         <header class="query-card__header">
           <div class="query-card__title">
-            <el-icon><Icon :icon="iconMap.user" /></el-icon>
-            <span>用户统计</span>
+            <el-icon><Icon :icon="card.icon" /></el-icon>
+            <span>{{ card.label }}统计</span>
           </div>
           <el-button
             text
-            :loading="userStatsLoading"
-            @click="refreshUserStats"
+            :loading="card.loading"
+            @click="card.refresh"
           >
             刷新
           </el-button>
         </header>
         <div class="query-card__form">
           <el-input
-            v-model="userStatsForm.userId"
-            placeholder="输入用户ID"
+            v-model="card.form[card.idField]"
+            :placeholder="`输入${card.label}ID`"
             clearable
-            @keyup.enter="getUserStats"
+            @keyup.enter="card.query"
           />
           <el-button
             type="primary"
-            :loading="userStatsLoading"
-            @click="getUserStats"
+            :loading="card.loading"
+            @click="card.query"
           >
             查询
           </el-button>
         </div>
         <div
-          v-if="userStats"
+          v-if="card.result"
           class="query-result"
         >
           <div class="result-item">
-            <span>用户ID</span><strong>{{ userStats.userId }}</strong>
+            <span>{{ card.label }}ID</span><strong>{{ card.result[card.idField] }}</strong>
           </div>
           <div class="result-item">
-            <span>总操作数</span><strong>{{ userStats.totalOperations }}</strong>
+            <span>总操作数</span><strong>{{ card.result.totalOperations }}</strong>
           </div>
           <div class="result-item">
-            <span>最近操作</span><strong>{{ userStats.recentOperations }}</strong>
+            <span>最近操作</span><strong>{{ card.result.recentOperations }}</strong>
           </div>
-          <div class="result-item">
-            <span>最后操作</span><strong>{{ formatDateTime(userStats.lastOperation) }}</strong>
-          </div>
-        </div>
-      </article>
-
-      <article
-        v-loading="teamStatsLoading"
-        class="query-card surface"
-      >
-        <header class="query-card__header">
-          <div class="query-card__title">
-            <el-icon><Icon :icon="iconMap.userFilled" /></el-icon>
-            <span>团队统计</span>
-          </div>
-          <el-button
-            text
-            :loading="teamStatsLoading"
-            @click="refreshTeamStats"
+          <div
+            v-if="card.idField === 'userId'"
+            class="result-item"
           >
-            刷新
-          </el-button>
-        </header>
-        <div class="query-card__form">
-          <el-input
-            v-model="teamStatsForm.teamId"
-            placeholder="输入团队ID"
-            clearable
-            @keyup.enter="getTeamStats"
-          />
-          <el-button
-            type="primary"
-            :loading="teamStatsLoading"
-            @click="getTeamStats"
-          >
-            查询
-          </el-button>
-        </div>
-        <div
-          v-if="teamStats"
-          class="query-result"
-        >
-          <div class="result-item">
-            <span>团队ID</span><strong>{{ teamStats.teamId }}</strong>
-          </div>
-          <div class="result-item">
-            <span>总操作数</span><strong>{{ teamStats.totalOperations }}</strong>
-          </div>
-          <div class="result-item">
-            <span>最近操作</span><strong>{{ teamStats.recentOperations }}</strong>
-          </div>
-        </div>
-      </article>
-
-      <article
-        v-loading="hostStatsLoading"
-        class="query-card surface"
-      >
-        <header class="query-card__header">
-          <div class="query-card__title">
-            <el-icon><Icon :icon="iconMap.server" /></el-icon>
-            <span>主机统计</span>
-          </div>
-          <el-button
-            text
-            :loading="hostStatsLoading"
-            @click="refreshHostStats"
-          >
-            刷新
-          </el-button>
-        </header>
-        <div class="query-card__form">
-          <el-input
-            v-model="hostStatsForm.hostId"
-            placeholder="输入主机ID"
-            clearable
-            @keyup.enter="getHostStats"
-          />
-          <el-button
-            type="primary"
-            :loading="hostStatsLoading"
-            @click="getHostStats"
-          >
-            查询
-          </el-button>
-        </div>
-        <div
-          v-if="hostStats"
-          class="query-result"
-        >
-          <div class="result-item">
-            <span>主机ID</span><strong>{{ hostStats.hostId }}</strong>
-          </div>
-          <div class="result-item">
-            <span>总操作数</span><strong>{{ hostStats.totalOperations }}</strong>
-          </div>
-          <div class="result-item">
-            <span>最近操作</span><strong>{{ hostStats.recentOperations }}</strong>
+            <span>最后操作</span><strong>{{ formatDateTime(card.result.lastOperation) }}</strong>
           </div>
         </div>
       </article>
@@ -191,7 +100,7 @@
                 <strong class="operation-count">{{ stat.count }} 次</strong>
               </div>
               <el-progress
-                :percentage="getOperationPercentage(stat.count)"
+                :percentage="stat.percentage"
                 :color="getOperationColor(stat.operation)"
                 :stroke-width="8"
               />
@@ -219,16 +128,10 @@
               @change="refreshTrendStats"
             >
               <el-option
-                label="最近7天"
-                value="7"
-              />
-              <el-option
-                label="最近30天"
-                value="30"
-              />
-              <el-option
-                label="最近90天"
-                value="90"
+                v-for="days in ['7', '30', '90']"
+                :key="days"
+                :label="`最近${days}天`"
+                :value="days"
               />
             </el-select>
             <el-button
@@ -251,13 +154,13 @@
           >
             <div class="trend-summary">
               <div class="trend-item">
-                <span>总操作数</span><strong>{{ getTotalTrendCount() }}</strong>
+                <span>总操作数</span><strong>{{ totalTrendCount }}</strong>
               </div>
               <div class="trend-item">
-                <span>平均每日</span><strong>{{ getAverageDailyCount() }}</strong>
+                <span>平均每日</span><strong>{{ averageDailyCount }}</strong>
               </div>
               <div class="trend-item">
-                <span>最高单日</span><strong>{{ getMaxDailyCount() }}</strong>
+                <span>最高单日</span><strong>{{ maxDailyCount }}</strong>
               </div>
             </div>
 
@@ -287,9 +190,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import {
   getAuditOperationStatisticsApi,
@@ -301,32 +204,15 @@ import {
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
 
-const iconMap = icons
-
 // 响应式数据
-const userStatsLoading = ref(false)
-const teamStatsLoading = ref(false)
-const hostStatsLoading = ref(false)
 const operationStatsLoading = ref(false)
 const trendStatsLoading = ref(false)
 
-// 用户统计
-const userStatsForm = reactive({
-  userId: ''
-})
-const userStats = ref(null)
-
-// 团队统计
-const teamStatsForm = reactive({
-  teamId: ''
-})
-const teamStats = ref(null)
-
-// 主机统计
-const hostStatsForm = reactive({
-  hostId: ''
-})
-const hostStats = ref(null)
+const queryCards = reactive([
+  createStatsCard('用户', 'userId', params => getAuditUserStatisticsApi(params), iconMap.user),
+  createStatsCard('团队', 'teamId', params => getAuditTeamStatisticsApi(params), iconMap.userFilled),
+  createStatsCard('主机', 'hostId', params => getAuditAgentStatisticsApi(params), iconMap.server, 'agentId')
+])
 
 // 操作类型统计
 const operationStats = ref([])
@@ -334,78 +220,42 @@ const operationStats = ref([])
 // 趋势统计
 const trendTimeRange = ref('7')
 const trendStats = ref([])
+const totalTrendCount = computed(() => trendStats.value.reduce((sum, item) => sum + item.count, 0))
+const averageDailyCount = computed(() =>
+  trendStats.value.length > 0 ? Math.round(totalTrendCount.value / trendStats.value.length) : 0
+)
+const maxDailyCount = computed(() =>
+  trendStats.value.length > 0 ? Math.max(...trendStats.value.map((item) => item.count)) : 0
+)
 
 // 方法
-const getUserStats = async () => {
-  if (!userStatsForm.userId) {
-    showWarning('请输入用户ID')
-    return
+function createStatsCard(label, idField, request, icon, requestField = idField) {
+  const form = reactive({ [idField]: '' })
+  const loading = ref(false)
+  const result = ref(null)
+
+  const query = async () => {
+    if (!form[idField]) {
+      showWarning(`请输入${label}ID`)
+      return
+    }
+    loading.value = true
+    try {
+      const response = await request({ [requestField]: form[idField] })
+      result.value = response.data
+      showSuccess(`${label}统计查询成功`)
+    } catch {
+      showError(`获取${label}统计失败`)
+    } finally {
+      loading.value = false
+    }
   }
 
-  userStatsLoading.value = true
-  try {
-    const response = await getAuditUserStatisticsApi({ userId: userStatsForm.userId })
-    userStats.value = response.data
-    showSuccess('用户统计查询成功')
-  } catch {
-    showError('获取用户统计失败')
-  } finally {
-    userStatsLoading.value = false
-  }
-}
-
-const refreshUserStats = () => {
-  if (userStatsForm.userId) {
-    getUserStats()
-  }
-}
-
-const getTeamStats = async () => {
-  if (!teamStatsForm.teamId) {
-    showWarning('请输入团队ID')
-    return
+  const refresh = () => {
+    if (form[idField]) query()
   }
 
-  teamStatsLoading.value = true
-  try {
-    const response = await getAuditTeamStatisticsApi({ teamId: teamStatsForm.teamId })
-    teamStats.value = response.data
-    showSuccess('团队统计查询成功')
-  } catch {
-    showError('获取团队统计失败')
-  } finally {
-    teamStatsLoading.value = false
-  }
-}
-
-const refreshTeamStats = () => {
-  if (teamStatsForm.teamId) {
-    getTeamStats()
-  }
-}
-
-const getHostStats = async () => {
-  if (!hostStatsForm.hostId) {
-    showWarning('请输入主机ID')
-    return
-  }
-
-  hostStatsLoading.value = true
-  try {
-    const response = await getAuditAgentStatisticsApi({ agentId: hostStatsForm.hostId })
-    hostStats.value = response.data
-    showSuccess('主机统计查询成功')
-  } catch {
-    showError('获取主机统计失败')
-  } finally {
-    hostStatsLoading.value = false
-  }
-}
-
-const refreshHostStats = () => {
-  if (hostStatsForm.hostId) {
-    getHostStats()
-  }
+  return { label, idField, icon, form, loading, result, query, refresh }
 }
 
 const refreshOperationStats = async () => {
@@ -439,56 +289,26 @@ const refreshTrendStats = async () => {
   }
 }
 
-const getOperationTagType = (operation) => {
-  const typeMap = {
-    命令执行: 'primary',
-    文件上传: 'success',
-    文件下载: 'info',
-    新增Agent: 'success',
-    修改Agent: 'warning',
-    删除Agent: 'danger',
-    初始化: 'info',
-    基础信息: 'info',
-    加载插件: 'primary'
-  }
-  return typeMap[operation]
+const operationTagTypes = {
+  命令执行: 'primary',
+  文件上传: 'success',
+  文件下载: 'info',
+  新增Agent: 'success',
+  修改Agent: 'warning',
+  删除Agent: 'danger',
+  初始化: 'info',
+  基础信息: 'info',
+  加载插件: 'primary'
 }
+const operationColors = Object.fromEntries(
+  Object.entries(operationTagTypes).map(([operation, type]) => [operation, `var(--el-color-${type})`])
+)
 
-const getOperationColor = (operation) => {
-  const colorMap = {
-    命令执行: 'var(--el-color-primary)',
-    文件上传: 'var(--el-color-success)',
-    文件下载: 'var(--el-color-info)',
-    新增Agent: 'var(--el-color-success)',
-    修改Agent: 'var(--el-color-warning)',
-    删除Agent: 'var(--el-color-danger)',
-    初始化: 'var(--el-color-info)',
-    基础信息: 'var(--el-color-info)',
-    加载插件: 'var(--el-color-primary)'
-  }
-  return colorMap[operation] || 'var(--el-color-info)'
-}
-
-const getOperationPercentage = (count) => {
-  const total = operationStats.value.reduce((sum, item) => sum + item.count, 0)
-  return total > 0 ? Math.round((count / total) * 100) : 0
-}
-
-const getTotalTrendCount = () => {
-  return trendStats.value.reduce((sum, item) => sum + item.count, 0)
-}
-
-const getAverageDailyCount = () => {
-  const total = getTotalTrendCount()
-  return trendStats.value.length > 0 ? Math.round(total / trendStats.value.length) : 0
-}
-
-const getMaxDailyCount = () => {
-  return trendStats.value.length > 0 ? Math.max(...trendStats.value.map((item) => item.count)) : 0
-}
+const getOperationTagType = (operation) => operationTagTypes[operation]
+const getOperationColor = (operation) => operationColors[operation] || 'var(--el-color-info)'
 
 const getTrendBarHeight = (count) => {
-  const maxCount = getMaxDailyCount()
+  const maxCount = maxDailyCount.value
   return maxCount > 0 ? Math.round((count / maxCount) * 100) : 0
 }
 
@@ -661,10 +481,6 @@ onMounted(() => {
   color: var(--el-text-color-placeholder);
   writing-mode: vertical-rl;
   transform: rotate(180deg);
-}
-
-.header-actions {
-  margin-left: auto;
 }
 
 @media (max-width: 768px) {

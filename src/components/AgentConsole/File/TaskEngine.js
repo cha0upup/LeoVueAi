@@ -23,15 +23,7 @@ import { applyScanExecutor } from './executors/scanExecutor.js'
 import { applyDbExportExecutor } from './executors/dbExportExecutor.js'
 import { registerSessionCleanup } from '@/services/sessionLifecycle.js'
 
-// ============================================================================
-// PART 2: 任务管理引擎 - 核心类
-// ============================================================================
-// 职责：
-// - 按 sessionId 分组管理所有任务
-// - 控制任务生命周期（创建、删除、查询）
-// - 事件系统
-// - 与各任务执行器协调
-
+/** 按会话管理任务，协调执行器并分发生命周期事件。 */
 class TaskEngine {
   constructor() {
     this.sessionTasks = new Map() // 按sessionId分组的任务存储: Map<sessionId, Map<taskId, task>>
@@ -55,9 +47,7 @@ class TaskEngine {
     this.scanQueryRequests?.clear()
   }
 
-  // ========================================================================
   // 任务存储与查询
-  // ========================================================================
 
   generateTaskId() {
     return `task_${Date.now()}_${++this.taskIdCounter}`
@@ -94,27 +84,25 @@ class TaskEngine {
     return false
   }
 
-  // ========================================================================
-  // PART 3: 任务创建器 - 支持多种任务类型
-  // ========================================================================
-  // 创建 DOWNLOAD | UPLOAD | DB_EXPORT | SCAN 任务
+  // 任务创建
+
+  registerTask(task) {
+    const taskId = task.id
+    this.getSessionTasks(task.sessionId).set(taskId, task)
+    this.emit('taskCreated', task)
+    return taskId
+  }
 
   // 创建下载任务
   createDownloadTask(sessionId, filePath, fileName, fileSize, options = {}) {
     const taskId = this.generateTaskId()
-    const task = createDownloadTask({ taskId, sessionId, filePath, fileName, fileSize, options })
-
-    const sessionTaskMap = this.getSessionTasks(sessionId)
-    sessionTaskMap.set(taskId, task)
-    this.emit('taskCreated', task)
-
-    return taskId
+    return this.registerTask(createDownloadTask({ taskId, sessionId, filePath, fileName, fileSize, options }))
   }
 
   // 创建上传任务
   createUploadTask(sessionId, serverPath, fileName, fileSize, fileData, options = {}) {
     const taskId = this.generateTaskId()
-    const task = createUploadTask({
+    return this.registerTask(createUploadTask({
       taskId,
       sessionId,
       serverPath,
@@ -122,48 +110,25 @@ class TaskEngine {
       fileSize,
       fileData,
       options
-    })
-
-    const sessionTaskMap = this.getSessionTasks(sessionId)
-    sessionTaskMap.set(taskId, task)
-    this.emit('taskCreated', task)
-
-    return taskId
+    }))
   }
 
   // 创建数据库导出任务
   createDbExportTask(sessionId, databaseName, tableCount, options = {}) {
     const taskId = this.generateTaskId()
-    const task = createDbExportTask({ taskId, sessionId, databaseName, tableCount, options })
-
-    const sessionTaskMap = this.getSessionTasks(sessionId)
-    sessionTaskMap.set(taskId, task)
-    this.emit('taskCreated', task)
-
-    return taskId
+    return this.registerTask(createDbExportTask({ taskId, sessionId, databaseName, tableCount, options }))
   }
 
   // 创建扫描任务
   createScanTask(sessionId, targetLabel, options = {}) {
     const taskId = this.generateTaskId()
-    const task = createScanTask({
+    return this.registerTask(createScanTask({
       taskId,
       sessionId,
       targetLabel,
       options
-    })
-
-    const sessionTaskMap = this.getSessionTasks(sessionId)
-    sessionTaskMap.set(taskId, task)
-    this.emit('taskCreated', task)
-
-    return taskId
+    }))
   }
-
-  // ========================================================================
-  // PART 4: 任务生命周期管理
-  // ========================================================================
-  // 启动、暂停、恢复、停止、删除任务
 
   // 开始任务
   async startTask(taskId) {
@@ -212,9 +177,7 @@ class TaskEngine {
         await this.executeScanTask(task)
       }
 
-      // 注意：这里不应该直接发出taskCompleted事件
-      // 因为executeDownloadTask和executeUploadTask内部会处理任务完成
-      // 只有在任务执行失败时才会到达这里
+      // 任务完成事件由执行器发出，避免重复通知。
     } catch (error) {
       if (task.isDetached) return
       task.status = TaskStatus.FAILED
@@ -227,18 +190,7 @@ class TaskEngine {
     }
   }
 
-  // ========================================================================
-  // PART 5: 任务执行器 - 各任务类型的实现
-  // ========================================================================
-  // 每个 execute*Task() 方法是独立的任务执行逻辑
-  // 由 startTask() 分发调用
-
-  // ---- 5.1 下载任务执行器（已抽取到 executors/downloadExecutor.js）----
-  // ---- 5.2 上传任务执行器（已抽取到 executors/uploadExecutor.js）----
-
-  // ========================================================================
-  // PART 6: 上传任务辅助函数
-  // ========================================================================
+  // 文件分块上传
 
   async uploadChunk(task, offset, arrayBuffer) {
     if (task.isDetached) return null
@@ -259,18 +211,7 @@ class TaskEngine {
     }
   }
 
-  // ========================================================================
-  // PART 7: 公共工具函数 - MD5、文件读取、格式化等
-  // ========================================================================
-
-  hasFileInfo(taskId) {
-    const task = this.getTaskById(taskId)
-    return task && task.fileSize > 0 && task.serverMD5
-  }
-
-  // ========================================================================
-  // PART 8: 任务控制操作 - 暂停、继续、停止
-  // ========================================================================
+  // 任务控制
 
   async pauseTask(taskId) {
     const task = this.getTaskById(taskId)
@@ -278,38 +219,26 @@ class TaskEngine {
 
     if (task.type === TaskType.SCAN) {
       await this.pauseScanTask(task)
-      task.isPaused = true
-      task.status = TaskStatus.PAUSED
-      this.emit('taskPaused', task)
-      return
-    }
-
-    // 下载任务：调用后端 pause，保留进度并允许恢复
-    if (
+    } else if (
       task.type === TaskType.DOWNLOAD &&
       task.engineTaskId &&
       task.status === TaskStatus.DOWNLOADING
     ) {
+      // 下载任务：调用后端 pause，保留进度并允许恢复
       await downloadEnginePauseApi({ taskId: task.engineTaskId })
-      task.isPaused = true
-      task.status = TaskStatus.PAUSED
-      this.emit('taskPaused', task)
-      return
-    }
-
-    if (task.type === TaskType.DB_EXPORT && task.serverTaskId) {
+    } else if (task.type === TaskType.DB_EXPORT && task.serverTaskId) {
       task.isPaused = true
       task.status = TaskStatus.PAUSED
       await pauseSqlExportTaskApi({ taskId: task.serverTaskId })
       this.emit('taskPaused', task)
       return
+    } else if (task.status !== TaskStatus.DOWNLOADING) {
+      return
     }
 
-    if (task.status === TaskStatus.DOWNLOADING) {
-      task.isPaused = true
-      task.status = TaskStatus.PAUSED
-      this.emit('taskPaused', task)
-    }
+    task.isPaused = true
+    task.status = TaskStatus.PAUSED
+    this.emit('taskPaused', task)
   }
 
   // 继续任务
@@ -317,25 +246,17 @@ class TaskEngine {
     const task = this.getTaskById(taskId)
     if (!task) return
 
+    let resumedStatus = TaskStatus.DOWNLOADING
+    let restartDownload = false
     if (task.type === TaskType.SCAN) {
       await this.resumeScanTask(task)
-      task.isPaused = false
-      task.status = TaskStatus.SCANNING
-      this.emit('taskResumed', task)
-      return
-    }
-
-    // 下载任务：调用后端 resume，然后让轮询继续
-    if (task.type === TaskType.DOWNLOAD && task.engineTaskId && task.status === TaskStatus.PAUSED) {
+      resumedStatus = TaskStatus.SCANNING
+    } else if (task.type === TaskType.DOWNLOAD && task.engineTaskId && task.status === TaskStatus.PAUSED) {
+      // 下载任务：调用后端 resume，然后让轮询继续
       await downloadEngineResumeApi({ sessionId: task.sessionId, taskId: task.engineTaskId })
-      task.isPaused = false
-      task.status = TaskStatus.PENDING
-      this.emit('taskResumed', task)
-      this.startTask(taskId).catch(() => {})
-      return
-    }
-
-    if (
+      resumedStatus = TaskStatus.PENDING
+      restartDownload = true
+    } else if (
       task.type === TaskType.DB_EXPORT &&
       task.serverTaskId &&
       task.status === TaskStatus.PAUSED
@@ -348,17 +269,15 @@ class TaskEngine {
         taskId: task.serverTaskId,
         connection: task.connection
       })
-      task.isPaused = false
-      task.status = TaskStatus.PENDING
-      this.emit('taskResumed', task)
+      resumedStatus = TaskStatus.PENDING
+    } else if (task.status !== TaskStatus.PAUSED) {
       return
     }
 
-    if (task.status === TaskStatus.PAUSED) {
-      task.isPaused = false
-      task.status = TaskStatus.DOWNLOADING
-      this.emit('taskResumed', task)
-    }
+    task.isPaused = false
+    task.status = resumedStatus
+    this.emit('taskResumed', task)
+    if (restartDownload) this.startTask(taskId).catch(() => {})
   }
 
   // 停止任务
@@ -369,29 +288,23 @@ class TaskEngine {
       throw new Error('文件正在提交，请等待提交结果')
     }
 
-    if (task.type === TaskType.SCAN) {
+    const isScanTask = task.type === TaskType.SCAN
+    if (isScanTask) {
       await this.stopScanTask(task)
-      task.isCancelled = true
-      task.isPaused = false
-      task.status = TaskStatus.CANCELLED
-      task.endTime = Date.now()
-      task.canControl = false
-      this.emit('taskCancelled', task)
-      return
-    }
-
-    if (task.type === TaskType.DOWNLOAD && task.engineTaskId) {
-      await downloadEngineCancelApi({ taskId: task.engineTaskId })
-    }
-
-    if (task.type === TaskType.DB_EXPORT && task.serverTaskId) {
-      await stopSqlExportTaskApi({ taskId: task.serverTaskId })
+    } else {
+      if (task.type === TaskType.DOWNLOAD && task.engineTaskId) {
+        await downloadEngineCancelApi({ taskId: task.engineTaskId })
+      }
+      if (task.type === TaskType.DB_EXPORT && task.serverTaskId) {
+        await stopSqlExportTaskApi({ taskId: task.serverTaskId })
+      }
     }
 
     task.isCancelled = true
     task.isPaused = false
     task.status = TaskStatus.CANCELLED
     task.endTime = Date.now()
+    if (isScanTask) task.canControl = false
     this.emit('taskCancelled', task)
   }
 
@@ -423,10 +336,6 @@ class TaskEngine {
     this.startTask(taskId).catch(() => {})
   }
 
-  // ========================================================================
-  // PART 9: 任务查询与监控接口
-  // ========================================================================
-
   removeTask(taskId) {
     const task = this.getTaskById(taskId)
     if (task) {
@@ -440,9 +349,7 @@ class TaskEngine {
     }
   }
 
-  // ========================================================================
-  // PART 10: 事件系统 - 观察者模式
-  // ========================================================================
+  // 任务事件
 
   on(event, callback) {
     if (!this.eventListeners.has(event)) {
@@ -483,9 +390,6 @@ applyUploadExecutor(TaskEngine)
 applyScanExecutor(TaskEngine)
 applyDbExportExecutor(TaskEngine)
 
-// ============================================================================
-// PART 14: 全局单例初始化
-// ============================================================================
 // 创建全局任务引擎实例，确保在热重载时保持单例
 
 let globalTaskEngine = window.__globalTaskEngine
@@ -499,5 +403,3 @@ export const taskEngine = globalTaskEngine
 
 const unregister = registerSessionCleanup('tasks', () => TaskEngine.prototype.detach.call(taskEngine))
 if (import.meta.hot) import.meta.hot.dispose(unregister)
-
-// 导出任务引擎实例

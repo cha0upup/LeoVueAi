@@ -13,13 +13,9 @@ export function useMonacoTheme() {
   const watchMonacoTheme = (getEditors) =>
     watch(monacoTheme, () => {
       const editors = typeof getEditors === 'function' ? getEditors() : getEditors
-      const activeEditors = (Array.isArray(editors) ? editors : [editors]).filter(Boolean)
-
-      if (!activeEditors.length) {
-        return
+      if ((Array.isArray(editors) ? editors : [editors]).some(Boolean)) {
+        syncTheme()
       }
-
-      syncTheme()
     })
 
   const disposeMonacoEditors = (...editorRefs) => {

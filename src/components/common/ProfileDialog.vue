@@ -160,18 +160,14 @@ const rules = {
   remark: [{ max: 500, message: '备注不能超过 500 个字符', trigger: 'blur' }]
 }
 
-const fillProfile = (data = {}) => {
+const fillProfile = (data) => {
+  if (!data || typeof data !== 'object' || Array.isArray(data) || !data.userId) {
+    throw new Error('个人信息接口返回异常')
+  }
   Object.assign(profile, data)
   form.email = data.email || ''
   form.phone = data.phone || ''
   form.remark = data.remark || ''
-}
-
-const requireProfileData = (data) => {
-  if (!data || typeof data !== 'object' || Array.isArray(data) || !data.userId) {
-    throw new Error('个人信息接口返回异常')
-  }
-  return data
 }
 
 const openProfileDialog = async () => {
@@ -179,7 +175,7 @@ const openProfileDialog = async () => {
   loading.value = true
   try {
     const response = await getProfileApi()
-    fillProfile(requireProfileData(response.data))
+    fillProfile(response.data)
     await nextTick()
     formRef.value?.clearValidate()
   } catch (error) {
@@ -205,7 +201,7 @@ const submitProfile = async () => {
       phone: form.phone,
       remark: form.remark
     })
-    fillProfile(requireProfileData(response.data))
+    fillProfile(response.data)
     showSuccess('个人资料已更新')
     visible.value = false
   } catch (error) {

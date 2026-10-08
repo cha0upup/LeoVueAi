@@ -92,7 +92,7 @@
             <el-radio-group
               v-model="form.variant"
               class="connection-variant-options"
-              @change="onVariantChange"
+              @change="refreshRuntime"
             >
               <el-radio-button
                 v-for="variant in variants"
@@ -145,7 +145,7 @@
           </div>
           <el-radio-group
             v-model="form.connectionMode"
-            @change="onConnectionModeChange"
+            @change="refreshRuntime"
           >
             <el-radio-button
               v-for="option in connectionModeOptions"
@@ -459,9 +459,6 @@ const onDialectChange = () => {
   refreshRuntime(['dialect', 'variant'])
 }
 
-const onVariantChange = refreshRuntime
-const onConnectionModeChange = refreshRuntime
-
 const runConnectionTest = async () => {
   const result = await testConnectionOnly()
   if (result.success) {
@@ -480,11 +477,10 @@ const runConnectionTest = async () => {
 const executeConnectionTest = (save = false) =>
   executeRequest(
     async () => {
-      const result = await runConnectionTest()
-      if (!result) {
+      if (!(await runConnectionTest())) {
         throw new Error(save ? '连接测试失败，请检查配置后重试' : '连接测试失败')
       }
-      return result
+      return true
     },
     {
       loadingRef: testing,
@@ -543,12 +539,7 @@ const handleSaveConnection = async () => {
   const isValid = await validateForm(formRef, {
     errorMessage: '请填写完整的连接信息'
   })
-  if (!isValid) return
-
-  if (!isComplete.value) {
-    // ElMessage已经在validateForm中显示
-    return
-  }
+  if (!isValid || !isComplete.value) return
 
   // 编辑时空密码沿用服务端凭据，保存后通过连接 ID 复检。
   if (keepsSavedPassword.value) {
@@ -556,14 +547,12 @@ const handleSaveConnection = async () => {
     return
   }
 
-  await executeConnectionTest(true)
-    .then(async () => {
-      // 测试成功后保存
-      await doSaveConnection()
-    })
-    .catch(() => {
-      // 测试失败，不执行保存
-    })
+  try {
+    await executeConnectionTest(true)
+    await doSaveConnection()
+  } catch {
+    // 测试或保存失败已由 executeRequest 提示。
+  }
 }
 
 const resetDialog = () => {

@@ -111,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
+import { ref, nextTick, onUnmounted, watch } from 'vue'
 
 import { icons } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
@@ -121,6 +121,7 @@ import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.j
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { useResponsiveDialogWidth } from '@/composables/useResponsiveDialogWidth.js'
+import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 
 const iconMap = icons
@@ -145,10 +146,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'close'])
 
 // 响应式数据
-const dialogVisible = computed({
-  get: () => props.modelValue,
-  set: (val) => emit('update:modelValue', val)
-})
+const dialogVisible = useDialogVisible(props, emit)
 
 const requestGuard = createLatestRequestGuard(['bytecode'])
 const loading = ref(false)

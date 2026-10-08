@@ -5,7 +5,7 @@
         <el-button
           size="small"
           :loading="loading"
-          @click="handleRefresh"
+          @click="emit('refresh')"
         >
           <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
           刷新
@@ -148,10 +148,6 @@ const formatDefaultValue = (value) => {
     return '-'
   }
   return String(value)
-}
-
-const handleRefresh = () => {
-  emit('refresh')
 }
 
 </script>

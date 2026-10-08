@@ -87,38 +87,29 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, watch } from 'vue'
+import { ref } from 'vue'
 import { icons } from '@/utils/icons.js'
-import { createDefaultAgent } from '@/utils/constants.js'
 import { useDialog } from '@/utils/dialogUtils.js'
-import { validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
-import { getAllDisguises } from '@/utils/agentUtils.js'
-import { stringifyHeadersForSubmit } from '@/utils/headers.js'
-import { useAgentStrategies } from '@/composables/useAgentStrategies.js'
-import { useAgentUrlProbe } from '@/composables/useAgentUrlProbe.js'
-import { useAgentConnectionTest } from '@/composables/useAgentConnectionTest.js'
+import { useAgentForm } from '@/composables/useAgentForm.js'
 import AgentFormFields from './AgentFormFields.vue'
 import AgentConnectionResultBanner from './AgentConnectionResultBanner.vue'
 import { addAgentApi } from '@/services/api/agent-manage.js'
-import { createAgentDialogRules } from '@/components/AgentManager/agentFormShared.js'
 
 const iconMap = icons
-
 const props = defineProps({
   projectId: { type: String, default: '' }
 })
-
 const emit = defineEmits(['refresh'])
-
-// 使用对话框工具
 const dialog = useDialog()
 const addAgentDialog = dialog.visible
-
-const proxyEnabled = ref(false)
 const loading = ref(false)
-const allDisguises = ref([])
 const {
+  agent,
+  proxyEnabled,
+  formRef,
+  rules,
+  allDisguises,
   urlStrategyEnabled,
   urlStrategyForm,
   paddingEnabled,
@@ -128,96 +119,26 @@ const {
   headerNoiseForm,
   tlsFingerprintEnabled,
   tlsFingerprintForm,
-  resetStrategies,
   applyPaddingPreset,
-  mergeUrlPoolPaths,
-  buildUrlStrategyJson,
-  buildPaddingStrategyJson,
-  buildHeaderNoiseStrategyJson,
-  buildTlsFingerprintStrategyJson
-} = useAgentStrategies()
-
-// 使用默认值创建agent对象
-const agent = reactive(createDefaultAgent())
-
-const rules = createAgentDialogRules({
-  requireDisguises: true,
-  requirePayloadKeyForJava: () => agent.type === 'java'
-})
-
-const formRef = ref(null)
-const scrollFormToTop = () => formRef.value?.scrollToTop?.()
-
-const buildAgentPayload = () => ({
-  ...agent,
-  proxyEnabled: proxyEnabled.value ? 1 : 0,
-  headers: stringifyHeadersForSubmit(agent.headers),
-  urlStrategy: buildUrlStrategyJson(),
-  paddingStrategy: buildPaddingStrategyJson(),
-  headerNoiseStrategy: buildHeaderNoiseStrategyJson(),
-  tlsFingerprintStrategy: buildTlsFingerprintStrategyJson()
-})
-
-const validateCurrentForm = () =>
-  validateForm(formRef, { errorMessage: '表单验证失败，请检查输入' })
-
-const {
-  testing: testingConnection,
-  result: testResult,
-  reset: resetConnectionTest,
-  testConnection
-} = useAgentConnectionTest({ validate: validateCurrentForm, buildPayload: buildAgentPayload })
-
-watch(
-  [
-    agent,
-    proxyEnabled,
-    urlStrategyEnabled,
-    urlStrategyForm,
-    paddingEnabled,
-    paddingPreset,
-    paddingForm,
-    headerNoiseEnabled,
-    headerNoiseForm,
-    tlsFingerprintEnabled,
-    tlsFingerprintForm
-  ],
-  resetConnectionTest,
-  { deep: true }
-)
-
-const loadDisguises = async () => {
-  allDisguises.value = await getAllDisguises()
-}
-
-const resetForm = () => {
-  resetFormUtil(formRef, agent, createDefaultAgent())
-  proxyEnabled.value = false
-  resetStrategies()
-  cancelProbe()
-  resetConnectionTest()
-}
+  scrollFormToTop,
+  buildAgentPayload,
+  validateCurrentForm,
+  testingConnection,
+  testResult,
+  testConnection,
+  probing,
+  handleProbe,
+  resetForm
+} = useAgentForm()
 
 const close = () => {
   dialog.close()
   resetForm()
 }
 
-const {
-  probing,
-  probePaths: handleProbe,
-  cancelProbe
-} = useAgentUrlProbe({
-  getBaseUrl: () => agent.connLink,
-  mergePaths: mergeUrlPoolPaths
-})
-
 const handleSubmit = async () => {
-  // 验证表单
-  const isValid = await validateCurrentForm()
-  if (!isValid) return
+  if (!await validateCurrentForm()) return
 
-  // 处理表单提交
   await executeRequest(
     () => addAgentApi(buildAgentPayload(), { projectId: props.projectId }),
     {
@@ -237,14 +158,7 @@ const openAddAgent = () => {
   resetForm()
 }
 
-onMounted(() => {
-  loadDisguises()
-})
-
-defineExpose({
-  openAddAgent,
-  close
-})
+defineExpose({ openAddAgent, close })
 </script>
 
 <style scoped>

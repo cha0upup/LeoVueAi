@@ -247,7 +247,7 @@ import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import EntityCard from '@/components/common/EntityCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import BatchActionBar from '@/components/common/BatchActionBar.vue'
-import { executeBlobDownload } from '@/utils/exportUtils.js'
+import { executeBlobDownload, exportSelectedArchive } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { useBatchSelection } from '@/composables/useBatchSelection.js'
 import { createDisguiseIdPreview } from './disguiseEditorModel.js'
@@ -475,22 +475,10 @@ function handleQuickExport(item, loadingRef) {
 
 const handleDetailExport = (disguise) => handleQuickExport(disguise, detailExportLoading)
 
-async function handleBatchExport() {
-  const ids = Array.from(selectedIds.value)
-  if (!ids.length) return
-  const date = new Date().toISOString().slice(0, 10)
-  await executeBlobDownload(
-    () => exportDisguisesBatchApi({ disguiseIds: ids }),
-    `disguises_${date}.zip`,
-    {
-      loadingRef: batchExportLoading,
-      successMessage: `已导出 ${ids.length} 条伪装`,
-      onSuccess: () => {
-        for (const id of ids) selectedIds.value.delete(id)
-      }
-    }
-  ).catch(() => false)
-}
+const handleBatchExport = () => exportSelectedArchive(
+  selectedIds, ids => exportDisguisesBatchApi({ disguiseIds: ids }),
+  'disguises', '条伪装', batchExportLoading
+)
 
 // ── 导入回调 ──────────────────────────────────────────────────────────────
 

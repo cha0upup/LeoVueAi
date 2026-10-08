@@ -15,9 +15,7 @@
           <div class="list-title-line">
             <h2>主机与会话</h2>
             <span class="directory-summary">
-              <span
-                ><strong>{{ totalCount }}</strong> 主机</span
-              >
+              <span><strong>{{ totalCount }}</strong> 主机</span>
               <i />
               <span :class="{ 'has-live': liveSessions.length }">
                 <strong>{{ liveSessions.length }}</strong> 会话
@@ -53,12 +51,16 @@
         :projects="projects"
         :active-project="activeProject"
         :loading="projectsLoading"
+        :disabled="batchBusy || loading"
         @update:model-value="handleProjectChange"
         @create="projectEditor?.open()"
         @edit="projectEditor?.open($event)"
       />
 
-      <div v-if="activeProject?.status === 'archived'" class="project-context-notice">
+      <div
+        v-if="activeProject?.status === 'archived'"
+        class="project-context-notice"
+      >
         <el-icon><Icon icon="mdi:archive-outline" /></el-icon>
         <span>归档项目保留主机与会话视图，不再创建新归属或新会话。</span>
         <button
@@ -83,17 +85,31 @@
           </template>
         </el-input>
 
-        <el-select v-model="sortMode" class="sort-select" size="small" aria-label="排序方式">
-          <el-option label="按更新时间" value="updateTime" />
-          <el-option label="按名称" value="name" />
+        <el-select
+          v-model="sortMode"
+          class="sort-select"
+          size="small"
+          aria-label="排序方式"
+        >
+          <el-option
+            label="按更新时间"
+            value="updateTime"
+          />
+          <el-option
+            label="按名称"
+            value="name"
+          />
         </el-select>
 
-        <el-tooltip content="刷新列表" placement="top">
+        <el-tooltip
+          content="刷新列表"
+          placement="top"
+        >
           <button
             class="u-icon-btn"
             type="button"
             aria-label="刷新主机列表"
-            :disabled="loading || sessionsLoading"
+            :disabled="loading || sessionsLoading || batchBusy"
             @click="refresh"
           >
             <el-icon :class="{ 'u-spin': loading || sessionsLoading }">
@@ -101,17 +117,29 @@
             </el-icon>
           </button>
         </el-tooltip>
-
-        <button
-          class="batch-toggle-btn"
-          :class="{ active: batchMode }"
-          type="button"
-          @click="toggleBatchMode"
-        >
-          <el-icon><Icon :icon="checkIcon" /></el-icon>
-          批量
-        </button>
       </div>
+
+      <AgentBatchToolbar
+        :selected-count="selectedCount"
+        :visible-count="visibleAgents.length"
+        :all-selected="allVisibleSelected"
+        :indeterminate="someVisibleSelected"
+        :hidden-count="hiddenSelectedCount"
+        :busy="batchBusy"
+        :loading="loading || projectsLoading"
+        :test-disabled="connectionTestLoading"
+        :can-assign="assignableProjects.length > 0"
+        :can-detach="Boolean(activeProject?.contentEditable)"
+        :action="batchAction"
+        :progress="batchTestProgress"
+        @toggle-all="selectAllAgents"
+        @clear="!batchBusy && clearAgentSelection()"
+        @test="batchTestConnections"
+        @export="batchExportAgents"
+        @assign="openProjectAssignment"
+        @detach="detachFromCurrentProject"
+        @delete="batchDeleteAgents"
+      />
 
       <div class="table-panel">
         <AgentTable
@@ -124,74 +152,18 @@
           :current-agent-id="currentAgent?.agentId || ''"
           :connection-results="connectionTestResults"
           :testing-agent-ids="testingAgentIds"
-          :batch-mode="batchMode"
+          :checked-agent-ids="selectedAgentIds"
+          :selection-disabled="selectionDisabled"
           :sessions-by-agent-id="sessionsByAgentId"
           :project-memberships="projectMemberships"
           :empty-title="emptyDirectoryCopy.title"
           :empty-description="emptyDirectoryCopy.description"
           @enter-console="openAgentConsole"
-          @row-click="handleRowClick"
-          @selection-change="handleAgentSelectionChange"
+          @row-click="selectAgent"
+          @toggle-selection="handleAgentSelectionChange"
+          @visible-agents-change="visibleAgents = $event"
         />
       </div>
-
-      <Transition name="batch-bar">
-        <div v-if="batchMode" class="batch-action-bar">
-          <span class="batch-bar-count">已选 {{ selectedCount }} 台</span>
-          <div class="batch-bar-actions">
-            <el-tooltip content="批量测试连接" placement="top">
-              <button
-                class="bar-btn"
-                type="button"
-                :disabled="batchTestLoading || selectedCount === 0"
-                @click="batchTestConnections"
-              >
-                <el-icon><Icon :icon="iconMap.test" /></el-icon>
-                <span>测试</span>
-              </button>
-            </el-tooltip>
-            <button
-              class="bar-btn bar-btn--primary"
-              type="button"
-              :disabled="selectedCount === 0 || !assignableProjects.length"
-              @click="openProjectAssignment"
-            >
-              <el-icon><Icon :icon="iconMap.folderAdd" /></el-icon>
-              加入项目
-            </button>
-            <el-dropdown trigger="click" placement="top-end" @command="handleBatchCommand">
-              <button class="bar-btn bar-btn--icon" type="button" aria-label="更多批量操作">
-                <el-icon><Icon :icon="iconMap.more" /></el-icon>
-              </button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="toggle-all">
-                    <el-icon><Icon :icon="allSelected ? iconMap.cancel : checkIcon" /></el-icon>
-                    {{ allSelected ? '取消全选' : '选择当前列表' }}
-                  </el-dropdown-item>
-                  <el-dropdown-item command="export" :disabled="batchExportLoading">
-                    <el-icon><Icon :icon="iconMap.download" /></el-icon>导出选中主机
-                  </el-dropdown-item>
-                  <el-dropdown-item v-if="activeProject?.contentEditable" command="detach" divided>
-                    <el-icon><Icon :icon="iconMap.close" /></el-icon>从当前项目移出
-                  </el-dropdown-item>
-                  <el-dropdown-item command="delete" divided class="batch-danger-item">
-                    <el-icon><Icon :icon="iconMap.delete" /></el-icon>删除主机资产
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-            <button
-              class="bar-btn bar-btn--muted"
-              type="button"
-              aria-label="退出批量操作"
-              @click="toggleBatchMode"
-            >
-              <el-icon><Icon :icon="iconMap.cancel" /></el-icon>
-            </button>
-          </div>
-        </div>
-      </Transition>
     </template>
 
     <template #detail>
@@ -216,36 +188,50 @@
         :empty-description="emptyDirectoryCopy.description"
         @enter-console="openAgentConsole"
         @new-session="createNewSession"
-        @enter-cache="enterCacheForAgent"
+        @enter-cache="enterCacheMode($event, true)"
         @refresh-cache-availability="loadCacheAvailability"
         @test-conn="doTestConn"
         @edit="openEditAgentDialog"
-        @share="openShareAgentDialog"
+        @share="shareAgent?.openShareAgent($event)"
         @add-child-agent="openAddChildAgent"
         @delete="deleteAgent"
         @toggle-quick-config="toggleQuickConfig"
-        @enter-cache-mode="enterCacheMode"
+        @enter-cache-mode="enterCacheMode(cacheCheckResult?.agent)"
         @add="openAddAgentDialog"
         @import="openImportAgentDialog"
         @dismiss-test-result="testConnResult = null"
         @dismiss-cache-result="cacheCheckResult = null"
-        @select-session="selectSession"
+        @select-session="activeSessionId = $event?.sessionId || ''"
         @open-session="openExistingSession"
         @delete-session="deleteLiveSession"
       />
     </template>
 
-    <AddAgent ref="addAgent" :project-id="activeProjectId" @refresh="refresh" />
-    <ImportAgent ref="importAgent" :project-id="activeProjectId" @refresh="refresh" />
-    <EditAgent ref="editAgent" @refresh="refresh" />
+    <AddAgent
+      ref="addAgent"
+      :project-id="activeProjectId"
+      @refresh="refresh"
+    />
+    <ImportAgent
+      ref="importAgent"
+      :project-id="activeProjectId"
+      @refresh="refresh"
+    />
+    <EditAgent
+      ref="editAgent"
+      @refresh="refresh"
+    />
     <ShareAgent ref="shareAgent" />
     <AddChildAgent ref="addChildAgent" />
-    <ProjectEditorDialog ref="projectEditor" @saved="handleProjectSaved" />
+    <ProjectEditorDialog
+      ref="projectEditor"
+      @saved="handleProjectSaved"
+    />
     <ProjectAssignmentDialog
       ref="projectAssignment"
       :projects="projects"
       :current-project-id="activeProjectId"
-      @saved="handleProjectAssignmentSaved"
+      @saved="refreshAfterProjectMembershipChange"
     />
     <SessionPickerDialog
       ref="sessionPicker"
@@ -293,6 +279,8 @@ import EditAgent from './EditAgent.vue'
 import ImportAgent from './ImportAgent.vue'
 import AgentDetailPanel from './AgentDetailPanel.vue'
 import AgentTable from './AgentTable.vue'
+import AgentBatchToolbar from './AgentBatchToolbar.vue'
+import { useAgentSelection } from '@/composables/useAgentSelection.js'
 import ShareAgent from './ShareAgent.vue'
 import ProjectAssignmentDialog from './ProjectAssignmentDialog.vue'
 import ProjectEditorDialog from './ProjectEditorDialog.vue'
@@ -305,15 +293,14 @@ import { resolveAgentRuntimeStatus } from './agentRuntimeStatus.js'
 import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import { buildAgentTransferBundle, encodeAgentTransferPayload } from '@/utils/agentTransfer.js'
 
-const logger = createLogger('AgentManager')
 import {
   buildAgentUpdatePayload,
-  dedupeAgents,
   normalizeAgentList,
   useAgentDirectory
 } from '@/composables/useAgentDirectory.js'
 import { useProjectDirectory } from '@/composables/useProjectDirectory.js'
 
+const logger = createLogger('AgentManager')
 const INVALID_SESSION_ID = 0
 const BATCH_TEST_CONCURRENCY = 4
 
@@ -336,18 +323,30 @@ const loading = ref(false)
 const quickSavingKey = ref('')
 const searchKeyword = ref('')
 const currentAgent = ref(null)
-const selectedAgents = ref([])
 const sortMode = ref('updateTime')
-const batchMode = ref(false)
-const prioritizeOnlineNodes = ref(false)
-const batchTestLoading = ref(false)
-const batchExportLoading = ref(false)
+const batchAction = ref('')
+const batchBusy = computed(() => Boolean(batchAction.value))
+const batchTestLoading = computed(() => batchAction.value === 'test')
+const batchTestProgress = ref(null)
+const visibleAgents = ref([])
+const {
+  selectedAgents,
+  selectedAgentIds,
+  selectedCount,
+  allVisibleSelected,
+  someVisibleSelected,
+  hiddenSelectedCount,
+  toggleAgent,
+  toggleVisible,
+  clearSelection
+} = useAgentSelection(visibleAgents)
 const testingAgentIds = ref([])
 const liveSessions = ref([])
 const sessionsLoading = ref(false)
 const activeSessionId = ref('')
 const deletingSessionIds = ref([])
 const projectMemberships = ref({})
+const loadedAgentsById = new Map()
 let sessionRefreshTimer = null
 let agentLoadToken = 0
 let sessionLoadToken = 0
@@ -365,6 +364,7 @@ const {
   loadProjects,
   selectProject
 } = useProjectDirectory()
+const selectionDisabled = computed(() => batchBusy.value || loading.value || projectsLoading.value)
 const hostSelection = useHostSelection(hostSelectionDialog, activeProjectId)
 const assignableProjects = computed(() =>
   projects.value.filter(
@@ -402,7 +402,6 @@ const cacheAvailability = ref({
 let cacheAvailabilityRequestToken = 0
 
 const iconMap = icons
-const checkIcon = iconMap.check || 'ep:finished'
 const sessionsByAgentId = computed(() => {
   return liveSessions.value.reduce((groups, session) => {
     const agentId = session?.agentId
@@ -417,14 +416,7 @@ const { filteredAgents, totalCount, sortAgents } = useAgentDirectory({
   allAgents,
   searchKeyword,
   sortMode,
-  prioritizeOnlineNodes,
-  connectionTestResults,
   sessionsByAgentId
-})
-const selectedCount = computed(() => selectedAgents.value.length)
-const allSelected = computed(() => {
-  const total = filteredAgents.value.length
-  return total > 0 && selectedCount.value === total
 })
 const isCurrentAgentTesting = computed(() =>
   Boolean(
@@ -466,24 +458,25 @@ const emptyDirectoryCopy = computed(() => {
   return { title: '项目暂无主机', description: '新增或导入第一台入口主机开始工作' }
 })
 
-const loadCacheAvailability = async (row, { showErrorMessage = false } = {}) => {
+const buildCacheAvailability = (row, response) => ({
+  agentId: row.agentId,
+  checked: true,
+  hasCache: Boolean(response.data?.hasCache),
+  saveTime: response.data?.saveTime || null
+})
+
+const loadCacheAvailability = async (row) => {
   if (!row?.agentId) return null
   const requestToken = ++cacheAvailabilityRequestToken
   cacheAvailabilityLoading.value = true
   try {
     const response = await checkAgentCacheApi(row.agentId)
-    const status = {
-      agentId: row.agentId,
-      checked: true,
-      hasCache: Boolean(response.data?.hasCache),
-      saveTime: response.data?.saveTime || null
-    }
+    const status = buildCacheAvailability(row, response)
     if (requestToken === cacheAvailabilityRequestToken) {
       cacheAvailability.value = status
     }
     return status
   } catch {
-    if (showErrorMessage) showError('检查主机缓存失败')
     return null
   } finally {
     if (requestToken === cacheAvailabilityRequestToken) {
@@ -500,14 +493,6 @@ const selectAgent = (row) => {
   }
   testConnResult.value = null
   loadCacheAvailability(row)
-}
-
-const handleRowClick = (row) => {
-  selectAgent(row)
-}
-
-const selectSession = (session) => {
-  activeSessionId.value = session?.sessionId || ''
 }
 
 const openExistingSession = (session) => {
@@ -634,23 +619,16 @@ const testAgentConnection = async (row) => {
 }
 
 const runWithConcurrency = async (items, worker, concurrency = BATCH_TEST_CONCURRENCY) => {
-  const results = []
   let cursor = 0
-  const runnerCount = Math.min(concurrency, items.length)
-  const runners = Array.from({ length: runnerCount }, async () => {
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, async () => {
     while (cursor < items.length) {
-      const index = cursor
-      cursor += 1
-      results[index] = await worker(items[index], index)
+      await worker(items[cursor++])
     }
-  })
-
-  await Promise.all(runners)
-  return results
+  }))
 }
 
 const doTestConn = async (row) => {
-  if (!row?.agentId || connectionTestLoading.value || batchTestLoading.value) return
+  if (!row?.agentId || connectionTestLoading.value || batchBusy.value) return
   testConnResult.value = null
   connectionTestLoading.value = true
   markAgentsTesting([row.agentId], true)
@@ -664,59 +642,54 @@ const doTestConn = async (row) => {
   }
 }
 
-const handleAgentSelectionChange = (selection = []) => {
-  selectedAgents.value = dedupeAgents(selection)
+const handleAgentSelectionChange = (agent, checked) => {
+  if (!selectionDisabled.value) toggleAgent(agent, checked)
 }
 
 const clearAgentSelection = () => {
-  selectedAgents.value = []
-  agentTable.value?.clearChecked?.()
+  clearSelection()
+  batchTestProgress.value = null
 }
 
-const toggleBatchMode = () => {
-  batchMode.value = !batchMode.value
-  if (!batchMode.value) {
-    clearAgentSelection()
+// Freeze one batch at a time, including the confirmation phase.
+const runBatchAction = async (action, callback) => {
+  if (selectionDisabled.value || !selectedCount.value) return
+  batchAction.value = action
+  batchTestProgress.value = null
+  try {
+    return await callback()
+  } catch (error) {
+    // Request/confirmation helpers already present the operation's error message.
+    logger.warn('批量操作失败', error)
+    return null
+  } finally {
+    batchAction.value = ''
   }
 }
 
 const batchTestConnections = async () => {
-  const targets = dedupeAgents(selectedAgents.value).filter((item) => item?.agentId)
-
-  if (!targets.length) {
-    showWarning('请先勾选要测试的主机')
-    return
-  }
-
-  batchTestLoading.value = true
-  const agentIds = targets.map((item) => item.agentId)
-  markAgentsTesting(agentIds, true)
-
-  try {
-    const results = await runWithConcurrency(targets, async (row) => {
-      const result = await testAgentConnection(row)
-      setConnectionTestResult(result)
-      if (currentAgent.value?.agentId === row.agentId) {
-        testConnResult.value = result
-      }
-      return result
-    })
-
-    const successCount = results.filter((item) => item.success).length
-    const failCount = results.length - successCount
-    prioritizeOnlineNodes.value = true
-
-    if (failCount === 0) {
-      showSuccess(`批量测试完成，${successCount} 个连接成功`)
-    } else if (successCount > 0) {
-      showWarning(`批量测试完成：成功 ${successCount} 个，失败 ${failCount} 个`)
-    } else {
-      showError(`批量测试失败，${failCount} 个连接无响应`)
+  if (connectionTestLoading.value) return
+  await runBatchAction('test', async () => {
+    const targets = selectedAgents.value.slice()
+    const agentIds = targets.map((item) => item.agentId)
+    batchTestProgress.value = { total: targets.length, completed: 0, succeeded: 0, failed: 0 }
+    markAgentsTesting(agentIds, true)
+    try {
+      await runWithConcurrency(targets, async (row) => {
+        const result = await testAgentConnection(row)
+        setConnectionTestResult(result)
+        if (currentAgent.value?.agentId === row.agentId) testConnResult.value = result
+        batchTestProgress.value.completed += 1
+        batchTestProgress.value[result.success ? 'succeeded' : 'failed'] += 1
+      })
+      const { succeeded: successCount, failed: failCount } = batchTestProgress.value
+      if (failCount === 0) showSuccess(`批量测试完成，${successCount} 个连接成功`)
+      else if (successCount > 0) showWarning(`批量测试完成：成功 ${successCount} 个，失败 ${failCount} 个`)
+      else showError(`批量测试失败，${failCount} 个连接无响应`)
+    } finally {
+      markAgentsTesting(agentIds, false)
     }
-  } finally {
-    markAgentsTesting(agentIds, false)
-    batchTestLoading.value = false
-  }
+  })
 }
 
 const updateAgentInDirectory = (updatedAgent) => {
@@ -835,9 +808,9 @@ const openAgentConsole = (row) => {
   createNewSession(row)
 }
 
-const openCacheSession = async (row, selected = null) => {
-  const chosen = selected || (await hostSelection.open(row, 'cache'))
-  if (!chosen?.selectedHostId) return false
+const openCacheSession = async (row) => {
+  const chosen = await hostSelection.open(row, 'cache')
+  if (!chosen?.selectedHostId) return
   const resp = await initAgentCacheApi(row.agentId, activeProjectId.value, chosen.selectedHostId)
   const sessionId = resp.data.sessionId
   emit('open-agent-console', {
@@ -851,37 +824,20 @@ const openCacheSession = async (row, selected = null) => {
   })
   cacheCheckResult.value = null
   showSuccess('已进入缓存模式')
-  return true
 }
 
-const enterCacheMode = async () => {
-  const row = cacheCheckResult.value?.agent
-  if (!row || cacheCheckLoading.value) return
+const enterCacheMode = async (row, checkCache = false) => {
+  if ((checkCache ? !row?.agentId : !row) || cacheCheckLoading.value) return
+  if (checkCache) cacheCheckResult.value = null
   cacheCheckLoading.value = true
   try {
-    await openCacheSession(row)
-  } catch {
-    showError('进入缓存模式失败')
-  } finally {
-    cacheCheckLoading.value = false
-  }
-}
-
-const enterCacheForAgent = async (row) => {
-  if (!row?.agentId || cacheCheckLoading.value) return
-  cacheCheckResult.value = null
-  cacheCheckLoading.value = true
-  try {
-    const cacheResponse = await checkAgentCacheApi(row.agentId)
-    cacheAvailability.value = {
-      agentId: row.agentId,
-      checked: true,
-      hasCache: Boolean(cacheResponse.data?.hasCache),
-      saveTime: cacheResponse.data?.saveTime || null
-    }
-    if (!cacheAvailability.value.hasCache) {
-      showWarning('该主机暂无可用缓存，请先成功进入一次实时控制台并完成数据采集')
-      return
+    if (checkCache) {
+      const cacheResponse = await checkAgentCacheApi(row.agentId)
+      cacheAvailability.value = buildCacheAvailability(row, cacheResponse)
+      if (!cacheAvailability.value.hasCache) {
+        showWarning('该主机暂无可用缓存，请先成功进入一次实时控制台并完成数据采集')
+        return
+      }
     }
     await openCacheSession(row)
   } catch {
@@ -927,6 +883,7 @@ const getAgents = async () => {
         return resp
       }
       allAgents.value = normalizeAgentList(resp.data || [])
+      loadedAgentsById.clear()
       currentAgent.value =
         allAgents.value.find((item) => item.agentId === currentAgent.value?.agentId) ||
         allAgents.value[0] ||
@@ -948,13 +905,16 @@ const getAgents = async () => {
 }
 
 const loadChildren = async (tree, treeNode, resolve) => {
+  const contextToken = membershipContextToken
+  const requestedProjectId = activeProjectId.value
   try {
-    const resp = await getWorkspaceAgentChildrenApi(activeProjectId.value, tree.agentId)
-    const children = (resp.data || []).map((item) => ({
-      ...item,
-      hasChildren: true,
-      level: treeNode.level + 1
-    }))
+    const resp = await getWorkspaceAgentChildrenApi(requestedProjectId, tree.agentId)
+    if (contextToken !== membershipContextToken || requestedProjectId !== activeProjectId.value) {
+      resolve([])
+      return
+    }
+    const children = normalizeAgentList(resp.data || [], treeNode.level + 1)
+    children.forEach((child) => loadedAgentsById.set(child.agentId, child))
     if (isAllProjects.value) loadProjectMemberships(children, membershipContextToken)
     resolve(sortAgents(children))
   } catch {
@@ -974,6 +934,7 @@ const getLoadedAgent = (agentId) => {
   if (!agentId) return null
   return (
     allAgents.value.find((item) => item.agentId === agentId) ||
+    loadedAgentsById.get(agentId) ||
     agentTable.value?.getLoadedAgent?.(agentId) ||
     null
   )
@@ -997,10 +958,6 @@ const openEditAgentDialog = (row) => {
   editAgent.value?.openEditAgentDialog(row, getParentHostContext(row))
 }
 
-const openShareAgentDialog = (row) => {
-  shareAgent.value?.openShareAgent(row)
-}
-
 const openImportAgentDialog = () => {
   if (!isCurrentWorkspaceWritable.value) {
     showWarning(
@@ -1017,58 +974,29 @@ const handleCreateCommand = (command) => {
   if (command === 'import') openImportAgentDialog()
 }
 
-const downloadBase64Config = (base64, filename) => {
-  downloadBlob(new Blob([base64], { type: 'text/plain' }), filename)
-}
-
-const batchExportAgents = async () => {
-  const targets = dedupeAgents(selectedAgents.value).filter((item) => item?.agentId)
-  if (!targets.length) {
-    showWarning('请先勾选要导出的主机')
-    return
-  }
-  batchExportLoading.value = true
+const batchExportAgents = () => runBatchAction('export', async () => {
+  const targets = selectedAgents.value.slice()
   try {
     const targetIds = targets.map((item) => item.agentId)
     const response = await exportAgentsApi(targetIds)
     const includedAgents = Array.isArray(response.data) ? response.data : []
     const bundle = buildAgentTransferBundle(includedAgents, targetIds)
     const date = new Date().toISOString().slice(0, 10)
-    const filename =
-      targets.length === 1
-        ? `${targets[0].agentName || 'agent'}_bundle_${date}.txt`
-        : `agents_bundle_${date}.txt`
-    downloadBase64Config(encodeAgentTransferPayload(bundle), filename)
+    const filename = targets.length === 1
+      ? `${targets[0].agentName || 'agent'}_bundle_${date}.txt`
+      : `agents_bundle_${date}.txt`
+    downloadBlob(new Blob([encodeAgentTransferPayload(bundle)], { type: 'text/plain' }), filename)
     const dependencyCount = Math.max(0, bundle.agents.length - targets.length)
-    showSuccess(
-      dependencyCount
-        ? `已导出 ${targets.length} 台目标主机，并携带 ${dependencyCount} 台祖先依赖`
-        : `已导出 ${targets.length} 台主机`
-    )
+    showSuccess(dependencyCount
+      ? `已导出 ${targets.length} 台目标主机，并携带 ${dependencyCount} 台祖先依赖`
+      : `已导出 ${targets.length} 台主机`)
   } catch (error) {
     showError(error?.message || '导出主机配置失败')
-  } finally {
-    batchExportLoading.value = false
   }
-}
+})
 
 const selectAllAgents = () => {
-  if (allSelected.value) {
-    clearAgentSelection()
-  } else {
-    const ids = filteredAgents.value.map((item) => item.agentId).filter(Boolean)
-    agentTable.value?.selectAll?.(ids)
-  }
-}
-
-const handleBatchCommand = (command) => {
-  const handlers = {
-    'toggle-all': selectAllAgents,
-    export: batchExportAgents,
-    detach: detachFromCurrentProject,
-    delete: batchDeleteAgents
-  }
-  handlers[command]?.()
+  if (!selectionDisabled.value) toggleVisible()
 }
 
 const openAddAgentDialog = () => {
@@ -1084,15 +1012,12 @@ const openAddAgentDialog = () => {
 }
 
 const handleProjectChange = (projectId) => {
-  if (!projectId || projectId === selectedProjectId.value) return
+  if (batchBusy.value || !projectId || projectId === selectedProjectId.value) return
   selectProject(projectId)
   currentAgent.value = null
   activeSessionId.value = ''
-  membershipContextToken += 1
   projectMemberships.value = {}
-  tableKey.value += 1
-  clearAgentSelection()
-  Promise.all([getAgents(), getLiveSessions()])
+  refresh({ reloadProjects: false })
 }
 
 const handleProjectSaved = async (project) => {
@@ -1104,18 +1029,19 @@ const handleProjectSaved = async (project) => {
 }
 
 const openProjectAssignment = () => {
-  projectAssignment.value?.open(dedupeAgents(selectedAgents.value))
+  if (selectionDisabled.value || !selectedCount.value || !assignableProjects.value.length) return
+  projectAssignment.value?.open(selectedAgents.value.slice())
 }
 
-const handleProjectAssignmentSaved = async () => {
+const refreshAfterProjectMembershipChange = async () => {
   clearAgentSelection()
   await loadProjects()
   await refresh({ reloadProjects: false })
 }
 
-const detachFromCurrentProject = async () => {
+const detachFromCurrentProject = () => runBatchAction('detach', async () => {
   const projectId = activeProjectId.value
-  const targets = dedupeAgents(selectedAgents.value).filter((item) => item?.agentId)
+  const targets = selectedAgents.value.slice()
   if (!projectId || !activeProject.value?.contentEditable || !targets.length) return
   await executeDeleteWithConfirm(
     () =>
@@ -1127,20 +1053,17 @@ const detachFromCurrentProject = async () => {
       message: `确定将选中的 ${targets.length} 台入口主机从项目中移除吗？主机资产本身会继续保留。`,
       successMessage: '已从项目移除',
       errorMessage: '移出项目失败',
-      onSuccess: async () => {
-        clearAgentSelection()
-        await loadProjects()
-        await refresh({ reloadProjects: false })
-      }
+      onSuccess: refreshAfterProjectMembershipChange
     }
   )
-}
+})
 
 const openAddChildAgent = (row) => {
   addChildAgent.value?.openAddChildAgent(row, getAgentRuntimeStatus(row))
 }
 
 const deleteAgent = async (row) => {
+  if (batchBusy.value) return
   await executeDeleteWithConfirm(() => deleteAgentApi({ agentId: row.agentId }), {
     message: `删除主机“${row.agentName || row.agentId}”将同时删除其全部子节点并关闭相关会话，此操作不可恢复。`,
     successMessage: '主机删除成功',
@@ -1150,17 +1073,17 @@ const deleteAgent = async (row) => {
   })
 }
 
-const batchDeleteAgents = async () => {
-  const targets = dedupeAgents(selectedAgents.value).filter((item) => item?.agentId)
+const batchDeleteAgents = () => runBatchAction('delete', async () => {
+  const targets = selectedAgents.value.slice()
   const selectedIds = new Set(targets.map((item) => item.agentId))
-  const agentById = new Map(allAgents.value.map((item) => [item.agentId, item]))
+  const agentById = new Map([...allAgents.value, ...targets].map((item) => [item.agentId, item]))
   const deletionRoots = targets.filter((item) => {
     const visited = new Set([item.agentId])
     let parentId = item.parentAgentId
     while (parentId && parentId !== 'root' && !visited.has(parentId)) {
       if (selectedIds.has(parentId)) return false
       visited.add(parentId)
-      parentId = agentById.get(parentId)?.parentAgentId
+      parentId = (agentById.get(parentId) || getLoadedAgent(parentId))?.parentAgentId
     }
     return true
   })
@@ -1170,12 +1093,15 @@ const batchDeleteAgents = async () => {
     loadingRef: loading,
     onSuccess: () => refresh()
   })
-}
+})
 
 const refresh = async ({ reloadProjects = true } = {}) => {
+  membershipContextToken += 1
+  loadedAgentsById.clear()
   tableKey.value += 1
   agentTable.value?.clearSelection()
-  selectedAgents.value = []
+  clearAgentSelection()
+  visibleAgents.value = []
   if (reloadProjects) await loadProjects()
   await Promise.all([getAgents(), getLiveSessions()])
 }
@@ -1203,15 +1129,18 @@ watch(connectionTestResults, (val) => {
   }
 })
 
-watch(sortMode, () => {
-  prioritizeOnlineNodes.value = false
+watch(selectedAgentIds, () => {
+  if (!batchBusy.value) batchTestProgress.value = null
 })
+
 </script>
 
 <style scoped>
 @import '@/styles/workbench-directory-shared.css';
 
 .agent-manager {
+  --agent-directory-padding: 8px;
+  --agent-expand-gutter: 22px;
   --workbench-border-soft: color-mix(in srgb, var(--el-border-color) 42%, transparent);
   --pm-blue: var(--el-color-primary);
   --pm-blue-soft: color-mix(in srgb, var(--el-color-primary) 12%, var(--app-control-background));
@@ -1227,7 +1156,7 @@ watch(sortMode, () => {
 
 .filter-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px auto;
+  grid-template-columns: minmax(0, 1fr) 30px;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -1330,140 +1259,10 @@ watch(sortMode, () => {
   font-weight: 600;
 }
 
-.batch-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: var(--radius-control);
-  border: 1px solid var(--pm-border);
-  background: transparent;
-  color: var(--pm-muted);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--motion-fast) var(--motion-easing);
-}
-
-.batch-toggle-btn:hover {
-  color: var(--pm-blue);
-  border-color: color-mix(in srgb, var(--pm-blue) 30%, transparent);
-  background: color-mix(in srgb, var(--pm-blue) 6%, transparent);
-}
-
-.batch-toggle-btn.active {
-  color: var(--pm-blue);
-  border-color: color-mix(in srgb, var(--pm-blue) 40%, transparent);
-  background: color-mix(in srgb, var(--pm-blue) 10%, transparent);
-}
-
 .table-panel {
   flex: 1;
   min-height: 0;
-  padding: 8px;
+  padding: var(--agent-directory-padding);
 }
 
-/* ── 底部批量操作栏 ── */
-.batch-action-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px;
-  margin: 0 8px 8px;
-  border-radius: var(--radius-control);
-  background: var(--app-selected-background);
-  border: 1px solid color-mix(in srgb, var(--el-color-primary) 24%, var(--app-border-color));
-  box-shadow: none;
-  flex-shrink: 0;
-  z-index: var(--z-sticky-bar);
-}
-
-.batch-bar-count {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--pm-blue);
-  white-space: nowrap;
-}
-
-.batch-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.bar-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--pm-muted);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--motion-fast) var(--motion-easing);
-  white-space: nowrap;
-}
-
-.bar-btn:hover {
-  color: var(--pm-blue);
-  background: color-mix(in srgb, var(--pm-blue) 8%, transparent);
-  border-color: color-mix(in srgb, var(--pm-blue) 24%, transparent);
-}
-
-.bar-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.bar-btn--muted:hover {
-  color: var(--pm-muted);
-  background: var(--pm-panel-soft);
-  border-color: transparent;
-}
-
-.bar-btn--primary {
-  color: white;
-  background: var(--el-color-primary);
-  border-color: var(--el-color-primary);
-}
-
-.bar-btn--primary:hover {
-  color: white;
-  background: var(--el-color-primary-light-3);
-  border-color: var(--el-color-primary-light-3);
-}
-
-.bar-btn--icon {
-  width: 26px;
-  padding: 0;
-  justify-content: center;
-}
-
-.batch-bar-actions :deep(.el-dropdown) {
-  display: inline-flex;
-}
-
-:global(.batch-danger-item) {
-  color: var(--el-color-danger) !important;
-}
-
-/* 入场/离场动画 */
-.batch-bar-enter-active,
-.batch-bar-leave-active {
-  transition:
-    opacity var(--motion-base) var(--motion-easing),
-    transform var(--motion-base) var(--motion-easing);
-}
-
-.batch-bar-enter-from,
-.batch-bar-leave-to {
-  opacity: 0;
-  transform: translateY(6px);
-}
 </style>

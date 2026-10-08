@@ -11,18 +11,14 @@ function parseHeadersToObject(headers) {
     }
   } catch { /* not JSON, fall through to line parsing */ }
 
-  return raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .reduce((acc, line) => {
-      const separatorIndex = line.indexOf(':')
-      if (separatorIndex === -1) return acc
-      const key = line.slice(0, separatorIndex).trim()
-      const value = line.slice(separatorIndex + 1).trim()
-      if (key) acc[key] = value
-      return acc
-    }, {})
+  const headersObject = {}
+  for (const line of raw.split(/\r?\n/)) {
+    const separatorIndex = line.indexOf(':')
+    if (separatorIndex === -1) continue
+    const key = line.slice(0, separatorIndex).trim()
+    if (key) headersObject[key] = line.slice(separatorIndex + 1).trim()
+  }
+  return headersObject
 }
 
 export function stringifyHeadersForSubmit(headers) {
@@ -30,9 +26,7 @@ export function stringifyHeadersForSubmit(headers) {
 }
 
 export function formatHeadersForEditor(headers) {
-  const entries = Object.entries(parseHeadersToObject(headers))
-  if (!entries.length) return ''
-  return entries.map(([key, value]) => `${key}: ${value ?? ''}`).join('\n')
+  return getHeaderEntries(headers).map(([key, value]) => `${key}: ${value ?? ''}`).join('\n')
 }
 
 export function getHeaderEntries(headers) {

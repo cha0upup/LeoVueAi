@@ -99,7 +99,7 @@
       </el-form>
 
       <div class="dialog-footer file-dialog-footer upload-actions">
-        <el-button @click="handleClose">
+        <el-button @click="uploadVisible = false">
           取消
         </el-button>
 
@@ -196,12 +196,7 @@ const openDialog = (sessionIdParam, fullCurrentPathParam) => {
   uploadVisible.value = true
   dialogSessionId.value = sessionIdParam
   fullCurrentPath.value = fullCurrentPathParam
-  form.serverPath = fullCurrentPathParam + '/'
   resetForm()
-}
-
-const handleClose = () => {
-  uploadVisible.value = false
 }
 
 const resetForm = () => {
@@ -259,7 +254,7 @@ const startUpload = async () => {
     }
 
     showSuccess('上传已开始，可在任务管理器中查看进度')
-    handleClose()
+    uploadVisible.value = false
   } catch (error) {
     showError(`上传失败: ${error.message}`)
   }

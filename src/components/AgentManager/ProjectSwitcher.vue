@@ -13,7 +13,7 @@
             class="project-trigger"
             type="button"
             aria-label="切换项目工作区"
-            :disabled="loading"
+            :disabled="loading || disabled"
           >
             <span
               class="project-trigger__icon"
@@ -42,6 +42,7 @@
             <button
               type="button"
               class="project-picker__create"
+              :disabled="disabled"
               @click="createProject"
             >
               <el-icon><Icon :icon="iconMap.add" /></el-icon>
@@ -105,72 +106,44 @@
               </el-icon>
             </button>
 
-            <section
-              v-if="filteredActiveProjects.length"
-              class="project-option-group"
+            <template
+              v-for="group in projectGroups"
+              :key="group.label"
             >
-              <div class="project-option-group__title">
-                <span>进行中</span><small>{{ filteredActiveProjects.length }}</small>
-              </div>
-              <button
-                v-for="project in filteredActiveProjects"
-                :key="project.projectId"
-                type="button"
-                class="project-option-card"
-                :class="{ selected: modelValue === project.projectId }"
-                @click="choose(project.projectId)"
+              <section
+                v-if="group.projects.length"
+                class="project-option-group"
               >
-                <span class="project-option-card__icon">
-                  <el-icon><Icon :icon="iconMap.folder" /></el-icon>
-                </span>
-                <span class="project-option-card__body">
-                  <strong>{{ project.projectName || '未命名项目' }}</strong>
-                  <small>
-                    {{ project.projectCode ? `${project.projectCode} · ` : '' }}{{ project.hostCount || 0 }}
-                    主机 · {{ project.activeSessionCount || 0 }} 会话
-                  </small>
-                </span>
-                <el-icon
-                  v-if="modelValue === project.projectId"
-                  class="selected-check"
+                <div class="project-option-group__title">
+                  <span>{{ group.label }}</span><small>{{ group.projects.length }}</small>
+                </div>
+                <button
+                  v-for="project in group.projects"
+                  :key="project.projectId"
+                  type="button"
+                  class="project-option-card"
+                  :class="{ archived: group.archived, selected: modelValue === project.projectId }"
+                  @click="choose(project.projectId)"
                 >
-                  <Icon :icon="iconMap.check" />
-                </el-icon>
-              </button>
-            </section>
-            <section
-              v-if="filteredArchivedProjects.length"
-              class="project-option-group"
-            >
-              <div class="project-option-group__title">
-                <span>已归档</span><small>{{ filteredArchivedProjects.length }}</small>
-              </div>
-              <button
-                v-for="project in filteredArchivedProjects"
-                :key="project.projectId"
-                type="button"
-                class="project-option-card archived"
-                :class="{ selected: modelValue === project.projectId }"
-                @click="choose(project.projectId)"
-              >
-                <span class="project-option-card__icon">
-                  <el-icon><Icon icon="mdi:archive-outline" /></el-icon>
-                </span>
-                <span class="project-option-card__body">
-                  <strong>{{ project.projectName || '未命名项目' }}</strong>
-                  <small>
-                    {{ project.projectCode ? `${project.projectCode} · ` : '' }}{{ project.hostCount || 0 }}
-                    主机 · {{ project.activeSessionCount || 0 }} 会话
-                  </small>
-                </span>
-                <el-icon
-                  v-if="modelValue === project.projectId"
-                  class="selected-check"
-                >
-                  <Icon :icon="iconMap.check" />
-                </el-icon>
-              </button>
-            </section>
+                  <span class="project-option-card__icon">
+                    <el-icon><Icon :icon="group.icon" /></el-icon>
+                  </span>
+                  <span class="project-option-card__body">
+                    <strong>{{ project.projectName || '未命名项目' }}</strong>
+                    <small>
+                      {{ project.projectCode ? `${project.projectCode} · ` : '' }}{{ project.hostCount || 0 }}
+                      主机 · {{ project.activeSessionCount || 0 }} 会话
+                    </small>
+                  </span>
+                  <el-icon
+                    v-if="modelValue === project.projectId"
+                    class="selected-check"
+                  >
+                    <Icon :icon="iconMap.check" />
+                  </el-icon>
+                </button>
+              </section>
+            </template>
 
             <div
               v-if="!hasResults"
@@ -191,6 +164,7 @@
           class="workspace-action"
           type="button"
           aria-label="新建项目"
+          :disabled="disabled"
           @click="$emit('create')"
         >
           <el-icon><Icon :icon="iconMap.folderAdd" /></el-icon>
@@ -205,6 +179,7 @@
           class="workspace-action"
           type="button"
           aria-label="项目设置"
+          :disabled="disabled"
           @click="$emit('edit', activeProject)"
         >
           <el-icon><Icon :icon="iconMap.settings" /></el-icon>
@@ -245,7 +220,8 @@ const props = defineProps({
   modelValue: { type: String, required: true },
   projects: { type: Array, default: () => [] },
   activeProject: { type: Object, default: null },
-  loading: { type: Boolean, default: false }
+  loading: { type: Boolean, default: false },
+  disabled: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:modelValue', 'create', 'edit'])
 
@@ -254,8 +230,6 @@ const pickerVisible = ref(false)
 const query = ref('')
 const searchInput = ref(null)
 
-const activeProjects = computed(() => props.projects.filter((item) => item.status !== 'archived'))
-const archivedProjects = computed(() => props.projects.filter((item) => item.status === 'archived'))
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase())
 const matches = (project) => {
   if (!normalizedQuery.value) return true
@@ -263,8 +237,15 @@ const matches = (project) => {
     .filter(Boolean)
     .some((value) => String(value).toLocaleLowerCase().includes(normalizedQuery.value))
 }
-const filteredActiveProjects = computed(() => activeProjects.value.filter(matches))
-const filteredArchivedProjects = computed(() => archivedProjects.value.filter(matches))
+const projectGroups = computed(() => [
+  { label: '进行中', archived: false, icon: iconMap.folder },
+  { label: '已归档', archived: true, icon: 'mdi:archive-outline' }
+].map((group) => ({
+  ...group,
+  projects: props.projects.filter((project) =>
+    (project.status === 'archived') === group.archived && matches(project)
+  )
+})))
 const matchesUnassigned = computed(
   () => !normalizedQuery.value || '待整理主机 未归属项目'.includes(normalizedQuery.value)
 )
@@ -275,29 +256,27 @@ const hasResults = computed(
   () =>
     matchesAll.value ||
     matchesUnassigned.value ||
-    filteredActiveProjects.value.length > 0 ||
-    filteredArchivedProjects.value.length > 0
+    projectGroups.value.some((group) => group.projects.length > 0)
 )
 const currentTitle = computed(() => {
   if (props.activeProject) return props.activeProject.projectName
   return props.modelValue === ALL_PROJECTS_ID ? '全部资产' : '待整理主机'
 })
-const currentSubtitle = computed(() => {
-  if (!props.activeProject) {
-    return ''
-  }
-  return props.activeProject.projectCode || props.activeProject.description || ''
-})
+const currentSubtitle = computed(() =>
+  props.activeProject?.projectCode || props.activeProject?.description || ''
+)
 const currentIcon = computed(() => {
   if (props.activeProject) return iconMap.folderOpened
   return props.modelValue === ALL_PROJECTS_ID ? iconMap.server : iconMap.inbox
 })
 
 const choose = (projectId) => {
+  if (props.disabled) return
   emit('update:modelValue', projectId)
   pickerVisible.value = false
 }
 const createProject = () => {
+  if (props.disabled) return
   pickerVisible.value = false
   emit('create')
 }
@@ -319,6 +298,11 @@ watch(pickerVisible, async (visible) => {
   border: 0;
   border-radius: 10px;
   flex-shrink: 0;
+}
+
+.project-workspace button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .project-workspace__meta,

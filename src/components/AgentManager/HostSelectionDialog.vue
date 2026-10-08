@@ -103,7 +103,7 @@
           </el-button>
           <el-button
             :disabled="!currentHostId || selectedHostId === currentHostId"
-            @click="bindCurrent"
+            @click="choose(currentHostId)"
           >
             进入当前命中主机
           </el-button>
@@ -111,7 +111,7 @@
             type="primary"
             :disabled="!selectedHostId"
             :loading="loading"
-            @click="bindSelected"
+            @click="choose(selectedHostId)"
           >
             进入{{ selectedLabel }}
           </el-button>
@@ -126,10 +126,9 @@ import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import { discoverAgentHostsApi, getAgentCacheHostsApi } from '@/services/api/agent-node.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 const emit = defineEmits(['cancel'])
-const iconMap = icons
 const visible = ref(false)
 const stage = ref('discovering')
 const loading = ref(false)
@@ -184,9 +183,6 @@ const choose = (hostId) => {
   if (!hostId || !context.value) return
   closeWith({ ...context.value, selectedHostId: hostId })
 }
-
-const bindCurrent = () => choose(currentHostId.value)
-const bindSelected = () => choose(selectedHostId.value)
 
 const discover = async () => {
   if (!context.value?.agentId || loading.value) return

@@ -11,6 +11,20 @@ import {
   ROUTE_PATHS
 } from '@/constants/app.js'
 
+const TAB_STORAGE_FIELDS = [
+  'cacheMode',
+  'capabilities',
+  'connLink',
+  'id',
+  'initialPrompt',
+  'isLoaded',
+  'projectId',
+  'projectName',
+  'sessionId',
+  'tabKey',
+  'title'
+]
+
 const currentTab = ref(MAIN_HOME_TAB_ID)
 const tabs = ref([])
 let tabsRestored = false
@@ -36,32 +50,8 @@ const createTabKey = () => {
 
 export function useMainTabs({ confirmAction, iconMap }) {
   const saveTabsToStorage = () => {
-    const tabsToSave = tabs.value.map(
-      ({
-        cacheMode,
-        capabilities,
-        connLink,
-        id,
-        initialPrompt,
-        isLoaded,
-        projectId,
-        projectName,
-        sessionId,
-        tabKey,
-        title
-      }) => ({
-        cacheMode,
-        capabilities,
-        connLink,
-        id,
-        initialPrompt,
-        isLoaded,
-        projectId,
-        projectName,
-        sessionId,
-        tabKey,
-        title
-      })
+    const tabsToSave = tabs.value.map((tab) =>
+      Object.fromEntries(TAB_STORAGE_FIELDS.map((field) => [field, tab[field]]))
     )
 
     safeLocalStorage.setJSON(MAIN_TAB_STORAGE_KEYS.tabs, tabsToSave)
@@ -150,9 +140,7 @@ export function useMainTabs({ confirmAction, iconMap }) {
     saveTabsToStorage()
   }
 
-  const getTabRoute = (tab) => {
-    return tab?.tabKey ? getAgentTabPath(tab.tabKey) : ROUTE_PATHS.main
-  }
+  const getTabRoute = (tab) => tab?.tabKey ? getAgentTabPath(tab.tabKey) : ROUTE_PATHS.main
 
   const closeTab = async (tabId, index) => {
     const requestGeneration = sessionGeneration.value
@@ -231,9 +219,7 @@ export function useMainTabs({ confirmAction, iconMap }) {
     return newTab
   }
 
-  onMounted(() => {
-    restoreTabsFromStorage()
-  })
+  onMounted(restoreTabsFromStorage)
 
   return {
     HOME_TAB_ID: MAIN_HOME_TAB_ID,

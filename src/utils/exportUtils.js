@@ -25,6 +25,20 @@ export function executeBlobDownload(request, filename, options = {}) {
   )
 }
 
+// 导出开始时固定选中项；下载成功后仅移除本次导出的选择。
+export async function exportSelectedArchive(selectedIds, request, filenamePrefix, itemName, loadingRef) {
+  const ids = Array.from(selectedIds.value)
+  if (!ids.length) return
+  const date = new Date().toISOString().slice(0, 10)
+  await executeBlobDownload(() => request(ids), `${filenamePrefix}_${date}.zip`, {
+    loadingRef,
+    successMessage: `已导出 ${ids.length} ${itemName}`,
+    onSuccess: () => {
+      for (const id of ids) selectedIds.value.delete(id)
+    }
+  }).catch(() => false)
+}
+
 /**
  * TSV 导出工具
  *

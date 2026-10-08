@@ -17,9 +17,7 @@ export function useMonacoEditorInstance() {
   }
 
   const recreateEditorInstance = (editorRef, containerRef, options, extra = {}) => {
-    const { disposeModel = false } = extra
-
-    disposeEditorInstance(editorRef, { disposeModel })
+    disposeEditorInstance(editorRef, extra)
 
     if (!containerRef?.value) {
       return null

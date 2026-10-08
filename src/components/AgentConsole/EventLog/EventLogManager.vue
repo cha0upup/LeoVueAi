@@ -19,7 +19,7 @@
         :query-meta="queryMeta"
         @list-sources="handleListSources"
         @source-change="handleSourceChange"
-        @format-change="handleFormatChange"
+        @format-change="handleSelectionChanged"
         @query="handleQuery"
         @preview="handlePreview"
         @stats="handleStats"
@@ -179,18 +179,6 @@ const {
   }
 })
 
-function nextRequest(type) {
-  return requestGuard.next(type)
-}
-
-function isCurrentRequest(type, sequence) {
-  return requestGuard.isCurrent(type, sequence)
-}
-
-function invalidateRequests(...types) {
-  requestGuard.invalidate(types)
-}
-
 function clearQueryResult() {
   entries.value = []
   queryMeta.value = null
@@ -199,7 +187,7 @@ function clearQueryResult() {
 }
 
 function resetWorkspace() {
-  invalidateRequests('sources', 'query', 'meta', 'aggregate', 'preview', 'stats')
+  requestGuard.invalidate()
   stopFollow()
   sources.value = []
   entries.value = []
@@ -230,11 +218,11 @@ watch(() => props.sessionId, resetWorkspace)
 
 // 列举日志源
 async function handleListSources() {
-  const sequence = nextRequest('sources')
+  const sequence = requestGuard.next('sources')
   isLoading.value = true
   try {
     const res = await listEventLogSourcesApi(withSession())
-    if (!isCurrentRequest('sources', sequence)) return
+    if (!requestGuard.isCurrent('sources', sequence)) return
     const data = res.data
     sources.value = data.sources || []
     osInfo.value = data.os || ''
@@ -243,10 +231,10 @@ async function handleListSources() {
       showWarning('未找到可用日志源')
     }
   } catch (e) {
-    if (!isCurrentRequest('sources', sequence)) return
+    if (!requestGuard.isCurrent('sources', sequence)) return
     handleApiError(e, '获取日志源失败')
   } finally {
-    if (isCurrentRequest('sources', sequence)) isLoading.value = false
+    if (requestGuard.isCurrent('sources', sequence)) isLoading.value = false
   }
 }
 
@@ -259,7 +247,7 @@ function handleSelectSource(src) {
 
 function handleSelectionChanged() {
   stopFollow()
-  invalidateRequests('query', 'meta', 'aggregate', 'preview', 'stats')
+  requestGuard.invalidate(['query', 'meta', 'aggregate', 'preview', 'stats'])
   clearQueryResult()
   fileMeta.value = null
   statsData.value = null
@@ -283,14 +271,10 @@ function handleSourceChange(name) {
   handleSelectionChanged()
 }
 
-function handleFormatChange() {
-  handleSelectionChanged()
-}
-
 // 查询日志(支持 cursor / direction / since 进行翻页和时间跳转)
 async function handleQuery(opts = {}) {
   stopFollow()
-  const sequence = nextRequest('query')
+  const sequence = requestGuard.next('query')
   const params = withSession(buildEventLogQueryParams({
     source: selectedSource.value,
     keyword: keyword.value,
@@ -302,7 +286,7 @@ async function handleQuery(opts = {}) {
   queried.value = true
   try {
     const res = await queryEventLogApi(params)
-    if (!isCurrentRequest('query', sequence)) return
+    if (!requestGuard.isCurrent('query', sequence)) return
     const data = res.data
     entries.value = data.entries || []
     osInfo.value = data.os || osInfo.value
@@ -311,10 +295,10 @@ async function handleQuery(opts = {}) {
       showInfo(opts.cursor !== undefined ? '没有更多日志' : '未查询到日志条目')
     }
   } catch (e) {
-    if (!isCurrentRequest('query', sequence)) return
+    if (!requestGuard.isCurrent('query', sequence)) return
     handleApiError(e, '查询日志失败')
   } finally {
-    if (isCurrentRequest('query', sequence)) isQuerying.value = false
+    if (requestGuard.isCurrent('query', sequence)) isQuerying.value = false
   }
 }
 
@@ -341,7 +325,7 @@ function handleJumpToTime() {
 
 // 获取文件元数据(展示文件大小/时间跨度)
 async function loadFileMeta() {
-  const sequence = nextRequest('meta')
+  const sequence = requestGuard.next('meta')
   if (!selectedSource.value || !selectedSource.value.startsWith('/')) {
     fileMeta.value = null
     return
@@ -352,10 +336,10 @@ async function loadFileMeta() {
   })
   try {
     const res = await metaEventLogApi(params)
-    if (!isCurrentRequest('meta', sequence)) return
+    if (!requestGuard.isCurrent('meta', sequence)) return
     fileMeta.value = res.data
   } catch {
-    if (isCurrentRequest('meta', sequence)) fileMeta.value = null
+    if (requestGuard.isCurrent('meta', sequence)) fileMeta.value = null
   }
 }
 
@@ -374,7 +358,7 @@ function startFollow() {
     return
   }
   stopFollow()
-  invalidateRequests('query')
+  requestGuard.invalidate(['query'])
   isQuerying.value = false
   try {
     startFollowing({
@@ -388,7 +372,7 @@ function startFollow() {
   }
 }
 
-onBeforeUnmount(() => { stopFollow() })
+onBeforeUnmount(stopFollow)
 
 // 聚合统计
 async function handleAggregate() {
@@ -396,7 +380,7 @@ async function handleAggregate() {
     showWarning('聚合需要文件路径形式的日志源(以 / 开头)')
     return
   }
-  const sequence = nextRequest('aggregate')
+  const sequence = requestGuard.next('aggregate')
   const params = withSession(buildEventLogAggregateParams({
     source: selectedSource.value,
     format: selectedFormat.value,
@@ -413,14 +397,14 @@ async function handleAggregate() {
   showAggregateDialog.value = true
   try {
     const res = await aggregateEventLogApi(params)
-    if (!isCurrentRequest('aggregate', sequence)) return
+    if (!requestGuard.isCurrent('aggregate', sequence)) return
     aggregateResult.value = res.data
   } catch (e) {
-    if (!isCurrentRequest('aggregate', sequence)) return
+    if (!requestGuard.isCurrent('aggregate', sequence)) return
     handleApiError(e, '聚合失败')
     showAggregateDialog.value = false
   } finally {
-    if (isCurrentRequest('aggregate', sequence)) isAggregating.value = false
+    if (requestGuard.isCurrent('aggregate', sequence)) isAggregating.value = false
   }
 }
 
@@ -430,7 +414,7 @@ async function handlePreview() {
     showWarning('预览需要文件路径形式的日志源(以 / 开头)')
     return
   }
-  const sequence = nextRequest('preview')
+  const sequence = requestGuard.next('preview')
   const params = withSession({
     source: selectedSource.value,
     format: selectedFormat.value || undefined,
@@ -442,35 +426,34 @@ async function handlePreview() {
   showPreviewDialog.value = true
   try {
     const res = await metaEventLogApi(params)
-    if (!isCurrentRequest('preview', sequence)) return
+    if (!requestGuard.isCurrent('preview', sequence)) return
     previewData.value = res.data
   } catch (e) {
-    if (!isCurrentRequest('preview', sequence)) return
+    if (!requestGuard.isCurrent('preview', sequence)) return
     handleApiError(e, '预览失败')
     showPreviewDialog.value = false
   } finally {
-    if (isCurrentRequest('preview', sequence)) isPreviewing.value = false
+    if (requestGuard.isCurrent('preview', sequence)) isPreviewing.value = false
   }
 }
 
 // 查看统计
 async function handleStats() {
-  const sequence = nextRequest('stats')
+  const sequence = requestGuard.next('stats')
   const params = withSession({ source: selectedSource.value || undefined })
   statsData.value = null
   isStatsLoading.value = true
   showStatsDialog.value = true
   try {
     const res = await getEventLogStatsApi(params)
-    if (!isCurrentRequest('stats', sequence)) return
-    const data = res.data
-    statsData.value = data
+    if (!requestGuard.isCurrent('stats', sequence)) return
+    statsData.value = res.data
   } catch (e) {
-    if (!isCurrentRequest('stats', sequence)) return
+    if (!requestGuard.isCurrent('stats', sequence)) return
     handleApiError(e, '获取统计失败')
     showStatsDialog.value = false
   } finally {
-    if (isCurrentRequest('stats', sequence)) isStatsLoading.value = false
+    if (requestGuard.isCurrent('stats', sequence)) isStatsLoading.value = false
   }
 }
 

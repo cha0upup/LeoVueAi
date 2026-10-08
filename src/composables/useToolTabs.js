@@ -40,7 +40,8 @@ export function useToolTabs(moduleDefinitions, { getSessionId = () => '', isModu
     return sid ? `agent-tabs-${sid}` : null
   }
 
-  const _loadFromStorage = () => {
+  // Load persisted tabs explicitly after mount or session switch, when the session ID is available.
+  function loadForSession() {
     const key = _storageKey()
     if (!key) return
     const savedState = safeSessionStorage.getJSON(
@@ -69,13 +70,6 @@ export function useToolTabs(moduleDefinitions, { getSessionId = () => '', isModu
 
   // Persist on every change
   watch([tabKeys, activeKey], _saveToStorage, { deep: true })
-
-  // Load persisted tabs for the current session.
-  // Call explicitly from onMounted and on session switch — not at composable init time
-  // because getSessionId() may not have a valid value yet during setup().
-  function loadForSession() {
-    _loadFromStorage()
-  }
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const tabs = computed(() => tabKeys.value.map((k) => moduleMap[k]).filter((m) => m && _isAvailableKey(m.key)))
@@ -123,8 +117,7 @@ export function useToolTabs(moduleDefinitions, { getSessionId = () => '', isModu
 
   /** Close a tab. If it's the last tab, keep it. */
   function closeTab(key) {
-    if (key === 'ai') return
-    if (tabKeys.value.length <= 1) return   // keep at least one tab open
+    if (key === 'ai' || tabKeys.value.length <= 1) return // keep at least one tab open
     const idx = tabKeys.value.indexOf(key)
     if (idx === -1) return
 

@@ -50,26 +50,10 @@ function isWindowsPath(path) {
 export function normalizePathForTree(path) {
   if (!path) return ''
 
+  // 统一盘符大小写；所有路径共用尾部分隔符处理。
   let normalized = formatFilePath(path)
-
-  // Windows 盘符路径（如 C:/）
-  if (isWindowsPath(normalized)) {
-    // 统一盘符为大写，确保一致性（如 c:/ -> C:/）
-    const driveMatchResult = normalized.match(/^([A-Za-z]):(.*)$/)
-    if (driveMatchResult) {
-      const [, driveLetter, pathRest] = driveMatchResult
-      normalized = `${driveLetter.toUpperCase()}:${pathRest}`
-    }
-
-    // 确保盘符后有一个斜杠
-    if (normalized.match(/^[A-Za-z]:$/)) {
-      return `${normalized}/`
-    }
-    return normalized.endsWith('/') ? normalized : `${normalized}/`
-  }
-
-  // Linux 路径确保以斜杠结尾（根目录除外）
-  if (normalized === '/') return normalized
+  const driveMatch = normalized.match(/^([A-Za-z]):(.*)$/)
+  if (driveMatch) normalized = `${driveMatch[1].toUpperCase()}:${driveMatch[2]}`
   return normalized.endsWith('/') ? normalized : `${normalized}/`
 }
 
@@ -92,12 +76,8 @@ export function buildChildPath(parentPath, childName) {
  * @returns {string} 完整路径
  */
 export function buildFullPath(disk, relativePath = '') {
-  const isWinDisk = disk?.includes(':') ?? false
-  const isUncRoot = /^\/\//.test(disk || '')
-  if (!relativePath) {
-    return isWinDisk || isUncRoot ? formatFilePath(`${disk}/`) : '/'
-  }
-  return formatFilePath(isWinDisk || isUncRoot ? `${disk}/${relativePath}` : `/${relativePath}`)
+  const root = disk?.includes(':') || /^\/\//.test(disk || '') ? disk : ''
+  return formatFilePath(`${root}/${relativePath || ''}`)
 }
 
 /**
@@ -122,22 +102,19 @@ export function parseAbsolutePath(absolutePath) {
     }
   }
 
-  if (formattedPath.includes(':')) {
-    // Windows 路径：提取盘符
-    const driveMatchResult = formattedPath.match(/^([A-Za-z]:)(.*)$/)
-    if (driveMatchResult) {
-      const [, driveLetter, pathRest] = driveMatchResult
-      return {
-        disk: driveLetter,
-        relativePath: pathRest.replace(/^\/+/, '') || ''
-      }
+  const driveMatchResult = formattedPath.match(/^([A-Za-z]:)(.*)$/)
+  if (driveMatchResult) {
+    const [, driveLetter, pathRest] = driveMatchResult
+    return {
+      disk: driveLetter,
+      relativePath: pathRest.replace(/^\/+/, '')
     }
   }
 
   // Linux 路径
   return {
     disk: '/',
-    relativePath: formattedPath.replace(/^\/+/, '') || ''
+    relativePath: formattedPath.replace(/^\/+/, '')
   }
 }
 
@@ -156,24 +133,16 @@ export function useFilePath(options = {}) {
    * @returns {Array<{text: string, link: string}>} 面包屑数组
    */
   const breadcrumbs = computed(() => {
-    const crumbs = []
     const isWindowsRoot = (disk?.value?.includes(':') ?? false) || /^\/\//.test(disk?.value || '')
     const rootText = isWindowsRoot ? disk?.value : '/'
-    const rootLink = formatFilePath(isWindowsRoot ? `${disk?.value}/` : '/')
-
-    crumbs.push({ text: rootText, link: rootLink })
-
-    const pathValue = currentPath?.value || ''
-    if (pathValue) {
-      const pathParts = pathValue.split('/').filter(Boolean)
-      pathParts.forEach((part, index) => {
-        const segmentParts = pathParts.slice(0, index + 1)
-        const rawLinkPath = isWindowsRoot
-          ? `${disk?.value}/${segmentParts.join('/')}`
-          : `/${segmentParts.join('/')}`
-        crumbs.push({ text: part, link: formatFilePath(rawLinkPath) })
+    const crumbs = [{ text: rootText, link: buildFullPath(disk?.value) }]
+    const pathParts = (currentPath?.value || '').split('/').filter(Boolean)
+    pathParts.forEach((part, index) => {
+      crumbs.push({
+        text: part,
+        link: buildFullPath(disk?.value, pathParts.slice(0, index + 1).join('/'))
       })
-    }
+    })
 
     return crumbs
   })
@@ -181,9 +150,7 @@ export function useFilePath(options = {}) {
   /**
    * 计算当前完整路径
    */
-  const currentFullPath = computed(() => {
-    return buildFullPath(disk?.value, currentPath?.value)
-  })
+  const currentFullPath = computed(() => buildFullPath(disk?.value, currentPath?.value))
 
   /**
    * 判断是否可以返回上一级

@@ -1,4 +1,4 @@
-import { unref } from 'vue'
+import { toValue } from 'vue'
 
 /**
  * 统一构造带 sessionId 的 agent API 请求体。
@@ -18,10 +18,7 @@ import { unref } from 'vue'
  *   - 字符串字面量
  */
 export function useSessionParams(sessionRef) {
-  function readSessionId() {
-    if (typeof sessionRef === 'function') return sessionRef()
-    return unref(sessionRef)
-  }
+  const readSessionId = () => toValue(sessionRef)
 
   function withSession(extra = {}) {
     return { sessionId: readSessionId(), ...extra }

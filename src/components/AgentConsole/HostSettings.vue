@@ -344,9 +344,10 @@ const handleRefreshComponents = () => {
   fetchComponents()
 }
 
-const handleReload = async (classname) => {
+const changeComponent = async (classname, reload) => {
+  const action = reload ? '重新加载' : '加载'
   if (!currentSessionId.value) {
-    showWarning('当前无有效会话，无法重新加载组件')
+    showWarning(`当前无有效会话，无法${action}组件`)
     return
   }
 
@@ -354,24 +355,24 @@ const handleReload = async (classname) => {
   try {
     await executeRequest(
       async () => {
-        const response = await reloadComponentApi({
-          sessionId: currentSessionId.value,
-          classname
-        })
+        const response = reload
+          ? await reloadComponentApi({ sessionId: currentSessionId.value, classname })
+          : await loadComponentApi({ sessionId: currentSessionId.value, params: { classname } })
         const data = response?.data || {}
-        if (data.code === 200 && data.reloaded === true) {
-          showSuccess(data.msg || '组件重新加载成功')
-        } else if (data.code === 200 && data.cached === true) {
+        if (data.code === 200 && (!reload || data.reloaded === true)) {
+          showSuccess(data.msg || `组件${action}成功`)
+          if (!reload) loadedComponents.value = [...loadedComponents.value, classname]
+        } else if (reload && data.code === 200 && data.cached === true) {
           showWarning('命中组件加载缓存，本次没有重新部署组件')
         } else {
-          showError(data.msg || '组件重新加载失败')
+          showError(data.msg || `组件${action}失败`)
         }
         return response
       },
       {
         loadingRef: null,
         successMessage: null,
-        errorMessage: '组件重新加载失败'
+        errorMessage: `组件${action}失败`
       }
     )
   } finally {
@@ -379,39 +380,8 @@ const handleReload = async (classname) => {
   }
 }
 
-const handleLoadNew = async (classname) => {
-  if (!currentSessionId.value) {
-    showWarning('当前无有效会话，无法加载组件')
-    return
-  }
-
-  reloadingSet.value.add(classname)
-  try {
-    await executeRequest(
-      async () => {
-        const response = await loadComponentApi({
-          sessionId: currentSessionId.value,
-          params: { classname }
-        })
-        const data = response?.data || {}
-        if (data.code === 200) {
-          showSuccess(data.msg || '组件加载成功')
-          loadedComponents.value = [...loadedComponents.value, classname]
-        } else {
-          showError(data.msg || '组件加载失败')
-        }
-        return response
-      },
-      {
-        loadingRef: null,
-        successMessage: null,
-        errorMessage: '组件加载失败'
-      }
-    )
-  } finally {
-    reloadingSet.value.delete(classname)
-  }
-}
+const handleReload = (classname) => changeComponent(classname, true)
+const handleLoadNew = (classname) => changeComponent(classname, false)
 
 const handleSave = () => {
   const pageSize = Number(localSettings.listPageSize) || 50

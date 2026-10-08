@@ -57,9 +57,5 @@ export function useConfirmClose({ isDirty, onClose, confirmText = {} }) {
     }
   }
 
-  async function handleClose() {
-    if (await ensureCanClose()) onClose()
-  }
-
-  return { handleBeforeClose, handleClose }
+  return { handleBeforeClose, handleClose: () => handleBeforeClose() }
 }

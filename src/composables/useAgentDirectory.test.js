@@ -1,7 +1,41 @@
 import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 
-import { buildAgentUpdatePayload, useAgentDirectory } from './useAgentDirectory.js'
+import { buildAgentUpdatePayload, normalizeAgentList, useAgentDirectory } from './useAgentDirectory.js'
+
+describe('directory child metadata', () => {
+  it('preserves real branches and leaves instead of marking every host expandable', () => {
+    const rows = normalizeAgentList([
+      { agentId: 'branch', hasChildren: true },
+      { agentId: 'leaf', hasChildren: false },
+      { agentId: 'empty' }
+    ])
+    expect(rows.map(row => row.hasChildren)).toEqual([true, false, false])
+    expect(rows.every(row => row.level === 0)).toBe(true)
+  })
+
+  it('uses the same metadata normalization for lazy-loaded child rows', () => {
+    const input = [{ agentId: 'child', hasChildren: false }]
+    expect(normalizeAgentList(input, 2)).toEqual([{ agentId: 'child', hasChildren: false, level: 2 }])
+    expect(input[0]).not.toHaveProperty('level')
+  })
+
+  it('recognizes already loaded children and retains deduplication', () => {
+    expect(normalizeAgentList([
+      { agentId: 'parent', children: [{ agentId: 'child' }] },
+      { agentId: 'leaf', hasChildren: true },
+      { agentId: 'leaf', hasChildren: false },
+      null
+    ]).map(row => [row.agentId, row.hasChildren])).toEqual([['parent', true], ['leaf', false]])
+  })
+
+  it('uses the server flag rather than stale loaded children or a truthy string', () => {
+    expect(normalizeAgentList([
+      { agentId: 'stale', hasChildren: false, children: [{ agentId: 'removed-child' }] },
+      { agentId: 'invalid', hasChildren: 'false' }
+    ]).map(row => row.hasChildren)).toEqual([false, false])
+  })
+})
 
 describe('proxy quick-toggle update payload', () => {
   it.each([
@@ -55,7 +89,7 @@ describe('proxy quick-toggle update payload', () => {
   })
 })
 
-const createDirectory = ({ keyword = '', prioritizeOnline = false } = {}) => {
+const createDirectory = ({ keyword = '' } = {}) => {
   const allAgents = ref([
     {
       agentId: 'host-a',
@@ -72,20 +106,17 @@ const createDirectory = ({ keyword = '', prioritizeOnline = false } = {}) => {
   ])
   const searchKeyword = ref(keyword)
   const sortMode = ref('updateTime')
-  const prioritizeOnlineNodes = ref(prioritizeOnline)
-  const connectionTestResults = ref({})
   const sessionsByAgentId = ref({
     'host-a': [{ sessionId: 'live-session-123' }]
   })
 
-  return useAgentDirectory({
+  const directory = useAgentDirectory({
     allAgents,
     searchKeyword,
     sortMode,
-    prioritizeOnlineNodes,
-    connectionTestResults,
     sessionsByAgentId
   })
+  return { ...directory, allAgents, sortMode, sessionsByAgentId }
 }
 
 describe('useAgentDirectory live-session integration', () => {
@@ -95,9 +126,22 @@ describe('useAgentDirectory live-session integration', () => {
     expect(filteredAgents.value.map((item) => item.agentId)).toEqual(['host-a'])
   })
 
-  it('prioritizes hosts with live sessions when online sorting is enabled', () => {
-    const { filteredAgents } = createDirectory({ prioritizeOnline: true })
+  it('keeps explicit update-time ordering when live sessions change', () => {
+    const { filteredAgents, sessionsByAgentId } = createDirectory()
+    expect(filteredAgents.value.map(item => item.agentId)).toEqual(['host-b', 'host-a'])
+    sessionsByAgentId.value = { 'host-b': [{ sessionId: 'new-session' }] }
+    expect(filteredAgents.value.map(item => item.agentId)).toEqual(['host-b', 'host-a'])
+  })
 
-    expect(filteredAgents.value.map((item) => item.agentId)).toEqual(['host-a', 'host-b'])
+  it('sorts by name only when explicitly selected', () => {
+    const { filteredAgents, sortMode } = createDirectory()
+    sortMode.value = 'name'
+    expect(filteredAgents.value.map(item => item.agentId)).toEqual(['host-a', 'host-b'])
+  })
+
+  it('sorts a copy without modifying the original list', () => {
+    const { allAgents, sortAgents } = createDirectory()
+    expect(sortAgents(allAgents.value).map(item => item.agentId)).toEqual(['host-b', 'host-a'])
+    expect(allAgents.value.map(item => item.agentId)).toEqual(['host-a', 'host-b'])
   })
 })

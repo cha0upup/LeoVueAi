@@ -697,11 +697,6 @@ const visibleChildren = computed(() => (
   background: transparent;
 }
 
-.task-node--tool .process-status.is-danger {
-  color: var(--el-color-danger);
-  background: transparent;
-}
-
 .process-icon.is-success {
   color: var(--el-color-success);
   background: color-mix(in srgb, var(--el-color-success) 9%, transparent);

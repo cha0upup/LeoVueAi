@@ -76,7 +76,7 @@
       </el-form>
 
       <div class="dialog-footer file-dialog-footer download-actions">
-        <el-button @click="handleClose">
+        <el-button @click="downloadVisible = false">
           取消
         </el-button>
         <el-button
@@ -196,7 +196,7 @@ const startDownload = async () => {
   }
   try {
     const taskId = createDownloadTask()
-    handleClose()
+    downloadVisible.value = false
     showSuccess('下载任务已提交，可在任务管理器中查看进度')
     taskEngine.startTask(taskId).catch((err) => {
       showError(`下载启动失败: ${err.message}`)
@@ -204,11 +204,6 @@ const startDownload = async () => {
   } catch (error) {
     showError(`开始下载失败: ${error.message}`)
   }
-}
-
-// 关闭对话框
-const handleClose = () => {
-  downloadVisible.value = false
 }
 
 const iconMap = icons

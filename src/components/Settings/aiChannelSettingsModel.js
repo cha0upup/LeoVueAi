@@ -25,6 +25,56 @@ export const REASONING_EFFORT_OPTIONS = [
   { label: '极高', value: 'xhigh' }
 ]
 
+const CAPABILITY_SOURCE_LABELS = {
+  manual: '开发者维护',
+  system: '系统内置',
+  official: '官方能力库',
+  probe: '真实探测',
+  capability_library: '未收录',
+  conservative_default: '保守默认'
+}
+
+const HEALTH_STATUS_LABELS = {
+  open: '熔断中',
+  degraded: '不稳定',
+  healthy: '健康'
+}
+
+const HEALTH_TAG_TYPES = {
+  open: 'danger',
+  degraded: 'warning',
+  healthy: 'success'
+}
+
+const PROBE_SUMMARY_LABELS = {
+  textGeneration: '文本',
+  streaming: '流式',
+  functionCalling: '工具',
+  structuredOutput: 'JSON',
+  reasoning: '推理'
+}
+
+const PROBE_FEATURE_LABELS = {
+  textGeneration: '文本生成',
+  streaming: '流式输出',
+  functionCalling: '工具调用',
+  structuredOutput: 'JSON 输出',
+  reasoning: 'Reasoning'
+}
+
+const PROBE_STATUS_LABELS = {
+  supported: '已确认',
+  unsupported: '不支持',
+  inconclusive: '不确定',
+  skipped: '未执行'
+}
+
+const PROBE_STATUS_TYPES = {
+  supported: 'success',
+  unsupported: 'danger',
+  inconclusive: 'warning'
+}
+
 export function normalizeProtocol(value) {
   return value === AI_PROTOCOL.responses ? AI_PROTOCOL.responses : AI_PROTOCOL.chatCompletions
 }
@@ -42,7 +92,6 @@ export function createModelForm() {
     providerKey: 'custom',
     providerName: '',
     baseUrl: 'https://api.openai.com/v1',
-    apiKey: '',
     model: '',
     protocol: AI_PROTOCOL.responses,
     completionsPath: RESPONSES_PATH,
@@ -52,7 +101,6 @@ export function createModelForm() {
     contextWindowTokens: null,
     temperature: null,
     fallbackModelId: null,
-    headersJson: '',
     remark: '',
     enabledBool: true,
     isActiveBool: true
@@ -240,18 +288,7 @@ export function shortTokens(value) {
 }
 
 export function capabilitySourceLabel(value) {
-  return (
-    {
-      manual: '开发者维护',
-      system: '系统内置',
-      official: '官方能力库',
-      probe: '真实探测',
-      capability_library: '未收录',
-      conservative_default: '保守默认'
-    }[value] ||
-    value ||
-    '能力库'
-  )
+  return CAPABILITY_SOURCE_LABELS[value] || value || '能力库'
 }
 
 export function effectiveLimitLabel(model) {
@@ -268,23 +305,11 @@ export function effectiveLimitLabel(model) {
 }
 
 export function healthStatusLabel(status) {
-  return (
-    {
-      open: '熔断中',
-      degraded: '不稳定',
-      healthy: '健康'
-    }[status] || '未探测'
-  )
+  return HEALTH_STATUS_LABELS[status] || '未探测'
 }
 
 export function healthTagType(status) {
-  return (
-    {
-      open: 'danger',
-      degraded: 'warning',
-      healthy: 'success'
-    }[status] || 'info'
-  )
+  return HEALTH_TAG_TYPES[status] || 'info'
 }
 
 export function supportItems(model) {
@@ -300,50 +325,22 @@ export function supportItems(model) {
 }
 
 export function probeSummary(items) {
-  const labels = {
-    textGeneration: '文本',
-    streaming: '流式',
-    functionCalling: '工具',
-    structuredOutput: 'JSON',
-    reasoning: '推理'
-  }
   return (items || [])
     .map((item) => {
       const mark = item.status === 'supported' ? '✓' : item.status === 'unsupported' ? '×' : '？'
-      return `${labels[item.feature] || item.feature}${mark}`
+      return `${PROBE_SUMMARY_LABELS[item.feature] || item.feature}${mark}`
     })
     .join('、')
 }
 
 export function probeFeatureLabel(feature) {
-  return (
-    {
-      textGeneration: '文本生成',
-      streaming: '流式输出',
-      functionCalling: '工具调用',
-      structuredOutput: 'JSON 输出',
-      reasoning: 'Reasoning'
-    }[feature] || feature
-  )
+  return PROBE_FEATURE_LABELS[feature] || feature
 }
 
 export function probeStatusLabel(status) {
-  return (
-    {
-      supported: '已确认',
-      unsupported: '不支持',
-      inconclusive: '不确定',
-      skipped: '未执行'
-    }[status] || '未知'
-  )
+  return PROBE_STATUS_LABELS[status] || '未知'
 }
 
 export function probeStatusType(status) {
-  return (
-    {
-      supported: 'success',
-      unsupported: 'danger',
-      inconclusive: 'warning'
-    }[status] || 'info'
-  )
+  return PROBE_STATUS_TYPES[status] || 'info'
 }

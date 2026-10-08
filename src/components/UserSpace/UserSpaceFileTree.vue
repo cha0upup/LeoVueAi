@@ -6,7 +6,7 @@
           text
           class="path-home-btn"
           aria-label="返回成果库根目录"
-          @click="emitGoRoot"
+          @click="emit('go-root')"
         >
           <el-icon><Icon :icon="iconMap.homeFilled" /></el-icon>
         </el-button>
@@ -19,7 +19,7 @@
             <el-breadcrumb-item>
               <a
                 href="#"
-                @click.prevent="emitGoRoot"
+                @click.prevent="emit('go-root')"
               >全部成果</a>
             </el-breadcrumb-item>
             <el-breadcrumb-item
@@ -28,7 +28,7 @@
             >
               <a
                 href="#"
-                @click.prevent="emitGoPath(segment.path)"
+                @click.prevent="emit('go-path', segment.path)"
               >{{
                 resolvePathLabel(segment.name)
               }}</a>
@@ -52,7 +52,7 @@
           title="刷新"
           circle
           :loading="loading"
-          @click="emitFetchList"
+          @click="emit('fetch-list')"
         >
           <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
         </el-button>
@@ -63,7 +63,7 @@
       ref="uploadInputRef"
       type="file"
       class="hidden-input"
-      @change="emitHandleUploadChange"
+      @change="emit('handle-upload-change', $event)"
     >
 
     <div class="file-list">
@@ -91,7 +91,7 @@
           type="button"
           class="entry-item"
           :class="{ active: selectedEntry?.path === row.path }"
-          @click="emitSelectEntry(row)"
+          @click="emit('select-entry', row)"
           @dblclick="emitPrimaryAction(row)"
         >
           <span class="entry-name">
@@ -123,7 +123,7 @@
               v-if="row.isDirectory"
               size="small"
               text
-              @click.stop="emitEnterDirectory(row)"
+              @click.stop="emit('enter-directory', row)"
             >
               打开
             </el-button>
@@ -131,7 +131,7 @@
               v-else
               size="small"
               text
-              @click.stop="emitPreviewFile(row)"
+              @click.stop="emit('preview-file', row)"
             >
               预览
             </el-button>
@@ -149,14 +149,14 @@
         >
           <el-button
             v-if="searchKeyword"
-            @click="emitClearSearch"
+            @click="emit('search-keyword-change', '')"
           >
             清空筛选
           </el-button>
           <el-button
             v-else
             type="primary"
-            @click="emitTriggerUpload"
+            @click="emit('trigger-upload')"
           >
             上传文件
           </el-button>
@@ -169,12 +169,12 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { icons } from '@/utils/icons.js'
-import { formatDate, formatFileSize } from '@/utils/format.js'
+import { formatDate as formatTimestamp, formatFileSize } from '@/utils/format.js'
 import {
   filterUserSpaceEntries,
   getUserSpaceEntryIconKey,
-  getUserSpaceFileExtension,
-  resolveArtifactCategoryLabel,
+  getUserSpaceFileExtension as getFileExtension,
+  resolveArtifactCategoryLabel as resolvePathLabel,
   sortUserSpaceEntries
 } from './userSpaceModel.js'
 
@@ -230,33 +230,16 @@ const pathSegments = computed(() => {
     path: parts.slice(0, index + 1).join('/')
   }))
 })
-const resolvePathLabel = (name) => resolveArtifactCategoryLabel(name)
 
 const filteredFileList = computed(() => filterUserSpaceEntries(props.fileList, props.searchKeyword))
 
 const displayedFileList = computed(() => sortUserSpaceEntries(filteredFileList.value))
 
-const formatTimestamp = (value) => formatDate(value)
-const getFileExtension = (path) => getUserSpaceFileExtension(path)
 const resolveEntryIcon = (row) => iconMap[getUserSpaceEntryIconKey(row)] || iconMap.file
 
-// Emit methods
-const emitFetchList = () => emit('fetch-list')
-const emitGoRoot = () => emit('go-root')
-const emitGoPath = (path) => emit('go-path', path)
-const emitEnterDirectory = (row) => emit('enter-directory', row)
-const emitPreviewFile = (row) => emit('preview-file', row)
-const emitTriggerUpload = () => emit('trigger-upload')
-const emitHandleUploadChange = (event) => emit('handle-upload-change', event)
-const emitSelectEntry = (row) => emit('select-entry', row)
-const emitClearSearch = () => emit('search-keyword-change', '')
 const emitPrimaryAction = (row) => {
-  emitSelectEntry(row)
-  if (row?.isDirectory) {
-    emitEnterDirectory(row)
-  } else {
-    emitPreviewFile(row)
-  }
+  emit('select-entry', row)
+  emit(row?.isDirectory ? 'enter-directory' : 'preview-file', row)
 }
 
 const triggerUpload = () => {

@@ -73,10 +73,6 @@ export function useAiProviderManager({
     }
   }
 
-  const resetProviderForm = (initial = createProviderForm()) => {
-    resetReactiveForm(providerForm, initial)
-  }
-
   const selectProviderPreset = (provider) => {
     selectedProviderKey.value = provider.key
     providerForm.providerKey = provider.key || 'custom'
@@ -129,7 +125,7 @@ export function useAiProviderManager({
     providerHeadersTouched.value = false
     selectedProviderKey.value = ''
     providerDefaultModelIndex.value = 0
-    resetProviderForm()
+    resetReactiveForm(providerForm, createProviderForm())
     providerDialogVisible.value = true
   }
 
@@ -137,7 +133,7 @@ export function useAiProviderManager({
     providerEditing.value = provider
     providerHeadersTouched.value = false
     selectedProviderKey.value = provider.providerKey || ''
-    resetProviderForm({
+    resetReactiveForm(providerForm, {
       name: provider.name || '',
       providerKey: provider.providerKey || 'custom',
       baseUrl: provider.baseUrl || 'https://api.openai.com/v1',
@@ -156,8 +152,6 @@ export function useAiProviderManager({
     const selected = providerForm.models
       .map((item, index) => ({ ...item, index }))
       .filter((item) => item.checked && item.model?.trim())
-    if (selected.length === 0) return []
-
     const selectedDefaultIndex = selected.findIndex(
       (item) => item.index === providerDefaultModelIndex.value
     )
@@ -210,7 +204,7 @@ export function useAiProviderManager({
       } else {
         await ensureCapabilitiesLoaded()
         const body = buildProviderBody(true)
-        const unknown = (body.models || []).filter(
+        const unknown = body.models.filter(
           (item) => !findCapabilityByModelName(item.model, providerForm.providerKey)
         )
         await createAiProviderApi(body)

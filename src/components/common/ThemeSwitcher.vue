@@ -3,7 +3,7 @@
     <el-dropdown
       trigger="click"
       placement="bottom-end"
-      @command="handleThemeChange"
+      @command="themeStore.setTheme($event)"
     >
       <button
         class="theme-switcher-button"
@@ -37,13 +37,13 @@
             <div class="theme-item">
               <div
                 class="theme-preview"
-                :style="getThemePreviewStyle(theme.value)"
+                :style="{ background: themePreviewColors[theme.value] || themePreviewColors.light }"
               >
                 <span class="theme-preview-dot" />
               </div>
               <div class="theme-text">
                 <span class="theme-name">{{ theme.name }}</span>
-                <span class="theme-value">{{ getThemeDescription(theme.value) }}</span>
+                <span class="theme-value">{{ themeDescriptions[theme.value] || '界面主题' }}</span>
               </div>
               <el-icon
                 v-if="currentTheme === theme.value"
@@ -65,37 +65,22 @@ import { icons } from '@/utils/icons.js'
 import { useTheme } from '@/stores/theme'
 
 const themeStore = useTheme()
-const currentTheme = computed(() => themeStore.currentTheme.value)
-const availableThemes = computed(() => themeStore.getAvailableThemes())
+const { currentTheme } = themeStore
+const availableThemes = themeStore.getAvailableThemes()
 const currentThemeMeta = computed(() => themeStore.getCurrentTheme())
 const iconMap = icons
 
-const handleThemeChange = (themeName) => {
-  themeStore.setTheme(themeName)
+const themeDescriptions = {
+  light: '参考 IDEA Light',
+  dark: '参考 IDEA Darcula'
 }
 
-const currentThemeIcon = computed(() => {
-  if (currentTheme.value === 'light') return iconMap.sunny
-  return iconMap.moon
-})
-
-const getThemeDescription = (themeValue) => {
-  const descriptions = {
-    light: '参考 IDEA Light',
-    dark: '参考 IDEA Darcula'
-  }
-  return descriptions[themeValue] || '界面主题'
+const themePreviewColors = {
+  light: '#edf3ff',
+  dark: '#2b2d30'
 }
 
-const getThemePreviewStyle = (themeValue) => {
-  const previewColors = {
-    light: '#edf3ff',
-    dark: '#2b2d30'
-  }
-  return {
-    background: previewColors[themeValue] || previewColors.light
-  }
-}
+const currentThemeIcon = computed(() => currentTheme.value === 'light' ? iconMap.sunny : iconMap.moon)
 </script>
 
 <style scoped>

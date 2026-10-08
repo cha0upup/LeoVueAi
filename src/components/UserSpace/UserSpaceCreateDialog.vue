@@ -57,6 +57,7 @@
 
 <script setup>
 import { computed, reactive, watch } from 'vue'
+import { useDialogVisible } from '@/composables/useDialogVisible.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -68,10 +69,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'submit'])
 const form = reactive({ name: '', content: '' })
 const isDirectory = computed(() => props.type === 'directory')
-const visible = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
-})
+const visible = useDialogVisible(props, emit)
 
 watch(
   () => props.modelValue,

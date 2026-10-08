@@ -193,7 +193,6 @@ import { Link, Monitor } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
 
 import { exportAgentsApi } from '@/services/api/agent-manage.js'
-import { AGENT_DEFAULT_MAX_REQUEST_COUNT } from '@/utils/constants.js'
 import { icons } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
@@ -214,19 +213,7 @@ let shareRequestToken = 0
 const agent = ref({
   agentId: '',
   agentName: '',
-  createByUserId: '',
-  connLink: '',
-  reqDisguiseId: '',
-  respDisguiseId: '',
-  headers: '',
-  permission: 'private',
-  proxyEnabled: 0,
-  maxReqCount: AGENT_DEFAULT_MAX_REQUEST_COUNT,
-  proxyType: 'http',
-  proxyHost: '127.0.0.1',
-  proxyPort: 8080,
-  protocol: 'http',
-  type: 'java'
+  connLink: ''
 })
 
 const agentById = computed(() =>

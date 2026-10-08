@@ -234,7 +234,7 @@
           :view-mode="viewMode"
           @change-disk="handleDiskChangeFromTable"
           @change-current-path="handlePathChange"
-          @loading="handleLoadingChange"
+          @loading="isLoading = $event"
         />
       </main>
     </div>
@@ -333,8 +333,7 @@ const handleDiskChange = (newDisk) => {
   selectedDisk.value = newDisk
   currentPath.value = ''
 
-  const diskPath = formatFilePath(`${newDisk}/`)
-  goToPath(diskPath)
+  goToPath(formatFilePath(`${newDisk}/`))
 }
 
 /**
@@ -377,13 +376,6 @@ const handleCreatedEntry = async (entry) => {
  */
 const createEntry = (type) => {
   fileCreateRef.value?.openDialog(props.sessionId, currentFullPath.value, type)
-}
-
-/**
- * 处理加载状态变化
- */
-const handleLoadingChange = (val) => {
-  isLoading.value = val
 }
 
 /**
@@ -470,11 +462,8 @@ const handlePathInput = () => {
 
   if (!normalizedPath.startsWith('/') && !normalizedPath.match(/^[A-Za-z]:/)) {
     const current = currentFullPath.value
-    if (current.endsWith('/')) {
-      normalizedPath = formatFilePath(`${current}${normalizedPath}`)
-    } else {
-      normalizedPath = formatFilePath(`${current}/${normalizedPath}`)
-    }
+    const separator = current.endsWith('/') ? '' : '/'
+    normalizedPath = formatFilePath(`${current}${separator}${normalizedPath}`)
   } else {
     normalizedPath = formatFilePath(normalizedPath)
   }

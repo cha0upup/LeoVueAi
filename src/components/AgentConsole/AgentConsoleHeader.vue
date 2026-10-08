@@ -232,11 +232,6 @@ const getChainItemTooltip = (index, totalLength) => {
   border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 22%, transparent);
 }
 
-.module-badge-card,
-.module-badge-icon-wrap,
-.module-badge-icon,
-.module-badge-title { display: none; }
-
 .card-topline {
   display: inline-flex;
   align-items: center;

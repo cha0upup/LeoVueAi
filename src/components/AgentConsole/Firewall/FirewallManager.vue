@@ -29,12 +29,10 @@
             style="width: 120px"
           >
             <el-option
-              label="入站 (in)"
-              value="in"
-            />
-            <el-option
-              label="出站 (out)"
-              value="out"
+              v-for="(label, value) in DIRECTION_OPTIONS"
+              :key="value"
+              :label="label"
+              :value="value"
             />
           </el-select>
           <el-input
@@ -308,52 +306,20 @@
             placeholder="Windows 必填，如 Allow_HTTP"
           />
         </el-form-item>
-        <el-form-item label="方向">
+        <el-form-item
+          v-for="field in RULE_SELECT_FIELDS"
+          :key="field.key"
+          :label="field.label"
+        >
           <el-select
-            v-model="addForm.direction"
+            v-model="addForm[field.key]"
             style="width: 100%"
           >
             <el-option
-              label="入站 (in)"
-              value="in"
-            />
-            <el-option
-              label="出站 (out)"
-              value="out"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="动作">
-          <el-select
-            v-model="addForm.action"
-            style="width: 100%"
-          >
-            <el-option
-              label="允许 (allow)"
-              value="allow"
-            />
-            <el-option
-              label="阻止 (block)"
-              value="block"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="协议">
-          <el-select
-            v-model="addForm.protocol"
-            style="width: 100%"
-          >
-            <el-option
-              label="TCP"
-              value="tcp"
-            />
-            <el-option
-              label="UDP"
-              value="udp"
-            />
-            <el-option
-              label="Any"
-              value="any"
+              v-for="(label, value) in field.options"
+              :key="value"
+              :label="label"
+              :value="value"
             />
           </el-select>
         </el-form-item>
@@ -410,6 +376,14 @@ import {
 } from '@/services/api/firewall.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
+import { sortRowsByText } from '@/utils/dataUtils.js'
+
+const DIRECTION_OPTIONS = { in: '入站 (in)', out: '出站 (out)' }
+const RULE_SELECT_FIELDS = [
+  { key: 'direction', label: '方向', options: DIRECTION_OPTIONS },
+  { key: 'action', label: '动作', options: { allow: '允许 (allow)', block: '阻止 (block)' } },
+  { key: 'protocol', label: '协议', options: { tcp: 'TCP', udp: 'UDP', any: 'Any' } }
+]
 
 const props = defineProps({
   sessionId: {
@@ -477,16 +451,7 @@ const filteredRules = computed(() => {
       return name.includes(q) || port.includes(q) || addr.includes(q) || prog.includes(q)
     })
   }
-  const { prop, order } = sortState.value
-  if (prop && order) {
-    list.sort((a, b) => {
-      const va = (a[prop] || '').toString()
-      const vb = (b[prop] || '').toString()
-      const cmp = va.localeCompare(vb)
-      return order === 'ascending' ? cmp : -cmp
-    })
-  }
-  return list
+  return sortRowsByText(list, sortState.value)
 })
 
 // ==================== 方法 ====================

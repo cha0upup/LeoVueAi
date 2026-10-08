@@ -33,24 +33,10 @@
             style="width: 130px"
           >
             <el-option
-              label="Running"
-              value="running"
-            />
-            <el-option
-              label="Stopped"
-              value="stopped"
-            />
-            <el-option
-              label="Active"
-              value="active"
-            />
-            <el-option
-              label="Inactive"
-              value="inactive"
-            />
-            <el-option
-              label="Failed"
-              value="failed"
+              v-for="status in ['Running', 'Stopped', 'Active', 'Inactive', 'Failed']"
+              :key="status"
+              :label="status"
+              :value="status.toLowerCase()"
             />
           </el-select>
         </div>
@@ -181,34 +167,20 @@
                 启动
               </el-button>
               <el-popconfirm
-                :title="`确认停止服务 '${row.serviceName}'？`"
-                confirm-button-text="停止"
+                v-for="action in SERVICE_CONFIRM_ACTIONS"
+                :key="action.operation"
+                :title="`确认${action.label}服务 '${row.serviceName}'？`"
+                :confirm-button-text="action.label"
                 cancel-button-text="取消"
-                @confirm="handleControl(row.serviceName, 'stop')"
+                @confirm="handleControl(row.serviceName, action.operation)"
               >
                 <template #reference>
                   <el-button
                     size="small"
                     text
-                    type="warning"
+                    :type="action.type"
                   >
-                    停止
-                  </el-button>
-                </template>
-              </el-popconfirm>
-              <el-popconfirm
-                :title="`确认重启服务 '${row.serviceName}'？`"
-                confirm-button-text="重启"
-                cancel-button-text="取消"
-                @confirm="handleControl(row.serviceName, 'restart')"
-              >
-                <template #reference>
-                  <el-button
-                    size="small"
-                    text
-                    type="primary"
-                  >
-                    重启
+                    {{ action.label }}
                   </el-button>
                 </template>
               </el-popconfirm>
@@ -356,32 +328,19 @@
             启动
           </el-button>
           <el-popconfirm
-            :title="`确认停止服务 '${detailTarget}'？`"
-            confirm-button-text="停止"
+            v-for="action in SERVICE_CONFIRM_ACTIONS"
+            :key="action.operation"
+            :title="`确认${action.label}服务 '${detailTarget}'？`"
+            :confirm-button-text="action.label"
             cancel-button-text="取消"
-            @confirm="handleControl(detailTarget, 'stop')"
+            @confirm="handleControl(detailTarget, action.operation)"
           >
             <template #reference>
               <el-button
                 size="small"
-                type="warning"
+                :type="action.type"
               >
-                停止
-              </el-button>
-            </template>
-          </el-popconfirm>
-          <el-popconfirm
-            :title="`确认重启服务 '${detailTarget}'？`"
-            confirm-button-text="重启"
-            cancel-button-text="取消"
-            @confirm="handleControl(detailTarget, 'restart')"
-          >
-            <template #reference>
-              <el-button
-                size="small"
-                type="primary"
-              >
-                重启
+                {{ action.label }}
               </el-button>
             </template>
           </el-popconfirm>
@@ -430,6 +389,12 @@ import {
 } from '@/services/api/service-manager.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
+import { sortRowsByText } from '@/utils/dataUtils.js'
+
+const SERVICE_CONFIRM_ACTIONS = [
+  { operation: 'stop', label: '停止', type: 'warning' },
+  { operation: 'restart', label: '重启', type: 'primary' }
+]
 
 const props = defineProps({
   sessionId: {
@@ -461,30 +426,18 @@ const createForm = reactive({
 // ==================== 计算属性 ====================
 
 const filteredServices = computed(() => {
-  let list = [...services.value]
   const q = searchText.value.trim().toLowerCase()
-  if (q) {
-    list = list.filter(s => {
+  const f = statusFilter.value ? statusFilter.value.toLowerCase() : ''
+  const list = [...services.value].filter(s => {
+    if (q) {
       const name = (s.serviceName || '').toLowerCase()
       const display = (s.displayName || '').toLowerCase()
-      return name.includes(q) || display.includes(q)
-    })
-  }
-  if (statusFilter.value) {
-    const f = statusFilter.value.toLowerCase()
-    list = list.filter(s => (s.status || '').toLowerCase().includes(f))
-  }
+      if (!name.includes(q) && !display.includes(q)) return false
+    }
+    return !f || (s.status || '').toLowerCase().includes(f)
+  })
 
-  const { prop, order } = sortState.value
-  if (prop && order) {
-    list.sort((a, b) => {
-      const va = (a[prop] || '').toString()
-      const vb = (b[prop] || '').toString()
-      const cmp = va.localeCompare(vb)
-      return order === 'ascending' ? cmp : -cmp
-    })
-  }
-  return list
+  return sortRowsByText(list, sortState.value)
 })
 
 // ==================== 方法 ====================
@@ -494,8 +447,7 @@ async function handleListAll() {
   loaded.value = true
   try {
     const res = await listServicesApi({ sessionId: props.sessionId })
-    const data = res.data.data
-    services.value = data.services || []
+    services.value = res.data.data.services || []
     if (services.value.length === 0) {
       showWarning('未获取到服务列表')
     }
@@ -525,6 +477,13 @@ async function handleQueryDetail(serviceName) {
   }
 }
 
+async function refreshService(serviceName) {
+  if (loaded.value) await handleListAll()
+  if (showDetailDialog.value && detailTarget.value === serviceName) {
+    await handleQueryDetail(serviceName)
+  }
+}
+
 async function handleControl(serviceName, operation) {
   if (!serviceName) return
   try {
@@ -537,12 +496,7 @@ async function handleControl(serviceName, operation) {
     }
     const opLabel = { start: '启动', stop: '停止', restart: '重启' }[operation]
     showSuccess(`${opLabel}服务 '${serviceName}' 成功`)
-    // 刷新列表
-    if (loaded.value) await handleListAll()
-    // 如果详情对话框打开中，刷新详情
-    if (showDetailDialog.value && detailTarget.value === serviceName) {
-      await handleQueryDetail(serviceName)
-    }
+    await refreshService(serviceName)
   } catch (err) {
     showError('操作失败: ' + (err.message || err))
   }
@@ -553,10 +507,7 @@ async function handleToggleAutoStart(serviceName, enable) {
   try {
     await toggleServiceAutoStartApi({ sessionId: props.sessionId, serviceName, enable })
     showSuccess(`服务 '${serviceName}' 已${enable ? '启用' : '禁用'}开机自启`)
-    if (loaded.value) await handleListAll()
-    if (showDetailDialog.value && detailTarget.value === serviceName) {
-      await handleQueryDetail(serviceName)
-    }
+    await refreshService(serviceName)
   } catch (err) {
     showError('操作失败: ' + (err.message || err))
   }

@@ -1,15 +1,32 @@
 <template>
   <div class="request-list-wrap">
-    <div v-for="(request, index) in model" :key="index" class="request-item">
+    <div
+      v-for="(request, index) in model"
+      :key="index"
+      class="request-item"
+    >
       <div class="request-item-header">
         <span class="request-item-title">请求 {{ index + 1 }}</span>
-        <el-button type="danger" link size="small" @click="model.splice(index, 1)">
+        <el-button
+          type="danger"
+          link
+          size="small"
+          @click="model.splice(index, 1)"
+        >
           删除
         </el-button>
       </div>
       <div class="request-item-body">
-        <el-form-item label="方法" class="inline-item">
-          <el-select v-model="request.method" placeholder="方法" size="small" style="width: 110px">
+        <el-form-item
+          label="方法"
+          class="inline-item"
+        >
+          <el-select
+            v-model="request.method"
+            placeholder="方法"
+            size="small"
+            style="width: 110px"
+          >
             <el-option
               v-for="method in httpMethods"
               :key="method"
@@ -18,10 +35,21 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="路径" class="inline-item">
-          <el-input v-model="request.path" placeholder="/path" size="small" clearable />
+        <el-form-item
+          label="路径"
+          class="inline-item"
+        >
+          <el-input
+            v-model="request.path"
+            placeholder="/path"
+            size="small"
+            clearable
+          />
         </el-form-item>
-        <el-form-item label="超时(ms)" class="inline-item">
+        <el-form-item
+          label="超时(ms)"
+          class="inline-item"
+        >
           <el-input-number
             v-model="request.timeout"
             :min="0"
@@ -87,7 +115,12 @@
         </el-form-item>
       </div>
     </div>
-    <el-button type="primary" plain size="small" @click="model.push(createEmptyRequest())">
+    <el-button
+      type="primary"
+      plain
+      size="small"
+      @click="model.push(createEmptyRequest())"
+    >
       + 添加请求
     </el-button>
   </div>

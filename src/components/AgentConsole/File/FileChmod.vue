@@ -139,9 +139,7 @@ const roleOctal = (key) => {
   return String((p.r ? 4 : 0) + (p.w ? 2 : 0) + (p.x ? 1 : 0))
 }
 
-const octalFull = computed(() => {
-  return `${roleOctal('owner')}${roleOctal('group')}${roleOctal('other')}`
-})
+const octalFull = computed(() => roles.map(({ key }) => roleOctal(key)).join(''))
 
 const octalValid = computed(() => /^[0-7]{3,4}$/.test(octalInput.value.trim()))
 
@@ -150,17 +148,21 @@ const syncInput = () => {
   octalInput.value = octalFull.value
 }
 
-// Sync input → checkboxes
-const syncFromInput = () => {
-  const raw = octalInput.value.trim().replace(/^0/, '')
+const applyOctalPermissions = (octalStr) => {
+  const raw = octalStr.replace(/^0/, '')
   if (!/^[0-7]{3}$/.test(raw)) return
   const bits = raw.split('').map(Number)
-  const keys = ['owner', 'group', 'other']
-  keys.forEach((k, i) => {
-    perms.value[k].r = !!(bits[i] & 4)
-    perms.value[k].w = !!(bits[i] & 2)
-    perms.value[k].x = !!(bits[i] & 1)
+  roles.forEach(({ key }, i) => {
+    perms.value[key].r = !!(bits[i] & 4)
+    perms.value[key].w = !!(bits[i] & 2)
+    perms.value[key].x = !!(bits[i] & 1)
   })
+  return raw
+}
+
+// Sync input → checkboxes without rewriting the user's input.
+const syncFromInput = () => {
+  applyOctalPermissions(octalInput.value.trim())
 }
 
 const filePath = computed(() =>
@@ -174,24 +176,12 @@ const summaryBadges = computed(() => [
   { label: octalFull.value, type: octalValid.value ? 'primary' : 'danger' }
 ])
 
-const parseOctalToPerms = (octalStr) => {
-  const raw = octalStr.replace(/^0/, '')
-  if (!/^[0-7]{3}$/.test(raw)) return
-  const bits = raw.split('').map(Number)
-  const keys = ['owner', 'group', 'other']
-  keys.forEach((k, i) => {
-    perms.value[k].r = !!(bits[i] & 4)
-    perms.value[k].w = !!(bits[i] & 2)
-    perms.value[k].x = !!(bits[i] & 1)
-  })
-  octalInput.value = raw
-}
-
 const openDialog = (initialMode) => {
   recursive.value = false
   // Try to set initial perms from existing file permissions if passed
   if (initialMode && /^[0-7]{3,4}$/.test(String(initialMode))) {
-    parseOctalToPerms(String(initialMode))
+    const mode = applyOctalPermissions(String(initialMode))
+    if (mode) octalInput.value = mode
   } else {
     // Derive from canRead/canWrite/canExecute booleans as a best-effort default
     const f = props.file

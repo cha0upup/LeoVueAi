@@ -54,6 +54,7 @@ import { monaco } from '@/utils/monaco.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
+import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { formatFileSize } from '@/utils/format.js'
 import { detectUserSpaceLanguage } from './userSpaceModel.js'
 
@@ -63,10 +64,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
-const visible = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
-})
+const visible = useDialogVisible(props, emit)
 const previewLanguage = computed(() => detectUserSpaceLanguage(props.data.path))
 const editor = ref(null)
 const editorContainer = ref(null)

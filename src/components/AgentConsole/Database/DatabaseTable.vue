@@ -5,8 +5,8 @@
         <TableFilterBuilder
           :columns="tableColumns"
           :filters="filters"
-          @apply="handleFilterApply"
-          @clear="handleFilterClear"
+          @apply="emit('query-change', { filters: $event, orderBy })"
+          @clear="emit('query-change', { filters: [], orderBy })"
         />
         <el-button
           v-if="orderBy.length"
@@ -25,7 +25,7 @@
           size="small"
           class="timeout-input"
           aria-label="查询超时秒数"
-          @change="(value) => emit('query-timeout-change', value)"
+          @change="emit('query-timeout-change', $event)"
         />
         <span class="timeout-label">秒</span>
         <el-button
@@ -63,7 +63,7 @@
         stripe
         highlight-current-row
         max-height="calc(100vh - 18.75rem)"
-        @selection-change="handleSelectionChange"
+        @selection-change="emit('selection-change', $event)"
         @sort-change="handleSortChange"
       >
         <el-table-column
@@ -106,8 +106,8 @@
           layout="total, prev, pager, next, sizes"
           size="small"
           background
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
+          @size-change="emit('size-change', $event)"
+          @current-change="emit('page-change', $event)"
         />
       </div>
     </template>
@@ -116,7 +116,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { formatCellValue as formatCellValueUtil } from '@/utils/database.js'
+import { formatCellValue } from '@/utils/database.js'
 import TableFilterBuilder from './TableFilterBuilder.vue'
 import {
   formatDatabaseResultSize,
@@ -175,14 +175,6 @@ const tableRef = ref(null)
 const truncationMessage = computed(() => getDatabaseTruncationMessage(props.queryStatus))
 const resultSize = computed(() => formatDatabaseResultSize(props.queryStatus.resultBytes))
 
-const handleFilterApply = (filters) => {
-  emit('query-change', { filters, orderBy: props.orderBy })
-}
-
-const handleFilterClear = () => {
-  emit('query-change', { filters: [], orderBy: props.orderBy })
-}
-
 const handleSortChange = ({ prop, order }) => {
   emit('query-change', {
     filters: props.filters,
@@ -195,19 +187,6 @@ const handleSortChange = ({ prop, order }) => {
 const clearSort = () => {
   tableRef.value?.clearSort()
   emit('query-change', { filters: props.filters, orderBy: [] })
-}
-const handleCurrentChange = (page) => {
-  emit('page-change', page)
-}
-
-const handleSizeChange = (size) => {
-  emit('size-change', size)
-}
-
-const formatCellValue = (value, column) => formatCellValueUtil(value, column)
-
-const handleSelectionChange = (selection) => {
-  emit('selection-change', selection)
 }
 </script>
 

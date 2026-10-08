@@ -44,7 +44,10 @@
         </div>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="主机名称" prop="agentName">
+            <el-form-item
+              label="主机名称"
+              prop="agentName"
+            >
               <el-input
                 v-model="childAgent.agentName"
                 placeholder="请输入子节点主机名称"
@@ -53,7 +56,10 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="连接地址" prop="connLink">
+            <el-form-item
+              label="连接地址"
+              prop="connLink"
+            >
               <el-input
                 v-model="childAgent.connLink"
                 placeholder="请输入子节点主机连接地址"
@@ -65,7 +71,10 @@
 
         <el-row :gutter="20">
           <el-col :span="8">
-            <el-form-item label="传输协议" prop="protocol">
+            <el-form-item
+              label="传输协议"
+              prop="protocol"
+            >
               <el-select
                 v-model="childAgent.protocol"
                 placeholder="请选择传输协议"
@@ -88,7 +97,10 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="节点类型" prop="type">
+            <el-form-item
+              label="节点类型"
+              prop="type"
+            >
               <el-select
                 v-model="childAgent.type"
                 placeholder="请选择节点类型"
@@ -111,7 +123,10 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="访问权限" prop="permission">
+            <el-form-item
+              label="访问权限"
+              prop="permission"
+            >
               <el-select
                 v-model="childAgent.permission"
                 placeholder="请选择访问权限"
@@ -125,9 +140,18 @@
                 >
                   <div class="option-content">
                     <el-icon class="option-icon">
-                      <Icon v-if="item.value === 'public'" :icon="iconMap.check" />
-                      <Icon v-else-if="item.value === 'team'" :icon="iconMap.user" />
-                      <Icon v-else-if="item.value === 'private'" :icon="iconMap.lock" />
+                      <Icon
+                        v-if="item.value === 'public'"
+                        :icon="iconMap.check"
+                      />
+                      <Icon
+                        v-else-if="item.value === 'team'"
+                        :icon="iconMap.user"
+                      />
+                      <Icon
+                        v-else-if="item.value === 'private'"
+                        :icon="iconMap.lock"
+                      />
                     </el-icon>
                     <span>{{ item.label }}</span>
                   </div>
@@ -146,7 +170,11 @@
         <div class="disguise-required-panel">
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="请求伪装" prop="reqDisguiseId" required>
+              <el-form-item
+                label="请求伪装"
+                prop="reqDisguiseId"
+                required
+              >
                 <el-select
                   v-model="childAgent.reqDisguiseId"
                   placeholder="请选择请求伪装"
@@ -164,7 +192,11 @@
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="响应伪装" prop="respDisguiseId" required>
+              <el-form-item
+                label="响应伪装"
+                prop="respDisguiseId"
+                required
+              >
                 <el-select
                   v-model="childAgent.respDisguiseId"
                   placeholder="请选择响应伪装"
@@ -183,8 +215,15 @@
             </el-col>
           </el-row>
           <el-row :gutter="20">
-            <el-col v-if="childAgent.type === 'java'" :span="12">
-              <el-form-item label="AES 密钥" prop="payloadKey" required>
+            <el-col
+              v-if="childAgent.type === 'java'"
+              :span="12"
+            >
+              <el-form-item
+                label="AES 密钥"
+                prop="payloadKey"
+                required
+              >
                 <el-input
                   v-model="childAgent.payloadKey"
                   clearable
@@ -197,7 +236,10 @@
 
         <el-row :gutter="20">
           <el-col :span="24">
-            <el-form-item label="请求头信息" prop="headers">
+            <el-form-item
+              label="请求头信息"
+              prop="headers"
+            >
               <el-input
                 v-model="childAgent.headers"
                 type="textarea"
@@ -258,7 +300,10 @@
         <template v-if="proxyEnabled">
           <el-row :gutter="20">
             <el-col :span="8">
-              <el-form-item label="代理类型" prop="proxyType">
+              <el-form-item
+                label="代理类型"
+                prop="proxyType"
+              >
                 <el-select
                   v-model="childAgent.proxyType"
                   placeholder="请选择代理类型"
@@ -274,12 +319,22 @@
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="代理地址" prop="proxyHost">
-                <el-input v-model="childAgent.proxyHost" placeholder="请输入代理地址" clearable />
+              <el-form-item
+                label="代理地址"
+                prop="proxyHost"
+              >
+                <el-input
+                  v-model="childAgent.proxyHost"
+                  placeholder="请输入代理地址"
+                  clearable
+                />
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="代理端口" prop="proxyPort">
+              <el-form-item
+                label="代理端口"
+                prop="proxyPort"
+              >
                 <el-input-number
                   v-model="childAgent.proxyPort"
                   :min="1"
@@ -296,11 +351,20 @@
 
     <template #footer>
       <div class="dialog-footer-actions">
-        <el-button type="danger" class="cancel-btn" @click="close">
+        <el-button
+          type="danger"
+          class="cancel-btn"
+          @click="close"
+        >
           <el-icon><Icon :icon="iconMap.close" /></el-icon>
           取消
         </el-button>
-        <el-button type="primary" :loading="loading" class="submit-btn" @click="handleSubmit">
+        <el-button
+          type="primary"
+          :loading="loading"
+          class="submit-btn"
+          @click="handleSubmit"
+        >
           <el-icon><Icon :icon="iconMap.check" /></el-icon>
           {{ loading ? '添加中...' : '添加子节点主机' }}
         </el-button>
@@ -311,7 +375,7 @@
 
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import {
   createDefaultAgent,
   AGENT_MAX_REQUEST_COUNT,
@@ -326,13 +390,11 @@ import { addAgentApi } from '@/services/api/agent-manage.js'
 import ParentHostSummary from './ParentHostSummary.vue'
 import {
   createAgentDialogRules,
-  AGENT_PERMISSION_OPTIONS,
-  AGENT_PROTOCOL_OPTIONS,
-  AGENT_TYPE_OPTIONS,
-  AGENT_PROXY_OPTIONS
+  AGENT_PERMISSION_OPTIONS as permissions,
+  AGENT_PROTOCOL_OPTIONS as allProtocol,
+  AGENT_TYPE_OPTIONS as allTypes,
+  AGENT_PROXY_OPTIONS as proxyOptions
 } from '@/components/AgentManager/agentFormShared.js'
-
-const iconMap = icons
 
 const emit = defineEmits(['refresh'])
 
@@ -343,10 +405,6 @@ const addChildAgentDialog = dialog.visible
 const proxyEnabled = ref(false)
 const loading = ref(false)
 const allDisguises = ref([])
-const permissions = AGENT_PERMISSION_OPTIONS
-const allProtocol = AGENT_PROTOCOL_OPTIONS
-const allTypes = AGENT_TYPE_OPTIONS
-const proxyOptions = AGENT_PROXY_OPTIONS
 const parentAgent = ref(null)
 const parentRuntimeStatus = ref({ status: 'untested', label: '' })
 
@@ -367,10 +425,6 @@ const scrollFormToTop = () => {
   if (formElement) formElement.scrollTop = 0
 }
 
-const loadDisguises = async () => {
-  allDisguises.value = await getAllDisguises()
-}
-
 const resetForm = () => {
   const parentId = childAgent.parentAgentId || ''
   resetFormUtil(formRef, childAgent, createDefaultAgent({ parentAgentId: parentId }))
@@ -384,16 +438,11 @@ const close = () => {
   resetForm()
 }
 
-const refresh = () => {
-  emit('refresh')
-}
-
 const handleSubmit = async () => {
   // 验证表单
-  const isValid = await validateForm(formRef, {
+  if (!await validateForm(formRef, {
     errorMessage: '表单验证失败，请检查输入'
-  })
-  if (!isValid) return
+  })) return
 
   // 处理表单提交
   await executeRequest(
@@ -407,7 +456,7 @@ const handleSubmit = async () => {
       successMessage: '子节点主机添加成功！',
       errorMessage: '添加失败，请稍后重试',
       onSuccess: () => {
-        refresh()
+        emit('refresh')
         close()
       }
     }
@@ -426,8 +475,8 @@ const openAddChildAgent = (parentAgentConfig, runtimeStatus = {}) => {
   }
 }
 
-onMounted(() => {
-  loadDisguises()
+onMounted(async () => {
+  allDisguises.value = await getAllDisguises()
 })
 
 defineExpose({

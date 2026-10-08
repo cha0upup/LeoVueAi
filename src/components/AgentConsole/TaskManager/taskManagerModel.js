@@ -1,34 +1,15 @@
 import { ACTIVE_TASK_STATUSES, TASK_STATUS_TEXT, TaskStatus, TaskType } from '@/constants/task.js'
 
 const STATUS_BY_ENGINE_STATE = {
-  NEW: TaskStatus.PENDING,
-  RUNNING: TaskStatus.DOWNLOADING,
   PAUSED: TaskStatus.PAUSED,
   CANCELLED: TaskStatus.CANCELLED,
   FAILED: TaskStatus.FAILED,
   COMPLETED: TaskStatus.COMPLETED
 }
 
-const STATUS_BY_SQL_STATE = {
-  PENDING: TaskStatus.PENDING,
-  RUNNING: TaskStatus.DB_EXPORTING,
-  PAUSED: TaskStatus.PAUSED,
-  CANCELLED: TaskStatus.CANCELLED,
-  FAILED: TaskStatus.FAILED,
-  COMPLETED: TaskStatus.COMPLETED
-}
-
-const STATUS_BY_UPLOAD_ENGINE_STATE = {
-  NEW: TaskStatus.PENDING,
-  RUNNING: TaskStatus.UPLOADING,
-  PAUSED: TaskStatus.PAUSED,
-  CANCELLED: TaskStatus.CANCELLED,
-  FAILED: TaskStatus.FAILED,
-  COMPLETED: TaskStatus.COMPLETED
-}
-
-const normalizeStatus = (value, statusMap) => {
-  return statusMap[String(value || '').toUpperCase()] || TaskStatus.PENDING
+const normalizeStatus = (value, runningStatus) => {
+  const state = String(value || '').toUpperCase()
+  return state === 'RUNNING' ? runningStatus : STATUS_BY_ENGINE_STATE[state] || TaskStatus.PENDING
 }
 
 const basename = (path) => {
@@ -46,7 +27,7 @@ export const getDownloadRelativePath = (downloadPath) => {
 export const normalizeServerDownloadTask = (snapshot = {}) => {
   const expectedLength = Number(snapshot.expectedLength || 0)
   const downloadedBytes = Number(snapshot.downloadedBytes || 0)
-  const mappedStatus = normalizeStatus(snapshot.state, STATUS_BY_ENGINE_STATE)
+  const mappedStatus = normalizeStatus(snapshot.state, TaskStatus.DOWNLOADING)
 
   return {
     viewId: `server:${snapshot.taskId || ''}`,
@@ -81,7 +62,7 @@ export const normalizeServerSqlExportTask = (snapshot, sessionId = '') => {
     taskId: null,
     serverTaskId: task.taskId || '',
     type: TaskType.DB_EXPORT,
-    status: normalizeStatus(task.status, STATUS_BY_SQL_STATE),
+    status: normalizeStatus(task.status, TaskStatus.DB_EXPORTING),
     progress: Number(task.progress || 0),
     fileSize: Number(task.fileSize || 0),
     speed: 0,
@@ -116,7 +97,7 @@ export const normalizeServerUploadTask = (snapshot) => {
     taskId: null,
     serverTaskId: task.taskId || '',
     type: TaskType.UPLOAD,
-    status: normalizeStatus(task.state, STATUS_BY_UPLOAD_ENGINE_STATE),
+    status: normalizeStatus(task.state, TaskStatus.UPLOADING),
     progress:
       task.progress !== undefined
         ? Number(task.progress || 0)
@@ -261,18 +242,16 @@ export const getTaskTypeIcon = (type, iconMap) =>
     [TaskType.SCAN]: iconMap.scan
   })[type] || iconMap.task
 
+const isCommittingUpload = task => task.type === TaskType.UPLOAD &&
+  task.currentStage === 'COMMITTING' && task.status === TaskStatus.UPLOADING
+
 export const getPrimaryTaskAction = (task, iconMap) => {
   if (!task) return null
-  if (
-    task.type === TaskType.UPLOAD &&
-    task.currentStage === 'COMMITTING' &&
-    task.status === TaskStatus.UPLOADING
-  )
-    return null
+  if (isCommittingUpload(task)) return null
   if (
     task.status === TaskStatus.FAILED &&
-    ((task.isManagedLocally && [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type)) ||
-      ([TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type) && task.serverTaskId))
+    [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type) &&
+    (task.isManagedLocally || task.serverTaskId)
   ) {
     return { key: 'retry', label: '重试', icon: 'mdi:refresh' }
   }
@@ -346,26 +325,14 @@ export const getPrimaryTaskAction = (task, iconMap) => {
 export const getSecondaryTaskActions = (task, iconMap) => {
   if (!task) return []
   const actions = []
-  const committing =
-    task.type === TaskType.UPLOAD &&
-    task.currentStage === 'COMMITTING' &&
-    task.status === TaskStatus.UPLOADING
   if (
-    !committing &&
-    ACTIVE_TASK_STATUSES.includes(task.status) &&
-    task.isManagedLocally &&
-    task.canControl !== false
-  ) {
-    actions.push({ key: 'stop', label: '停止', icon: iconMap.circleClose, type: 'warning' })
-  }
-  if (
-    !committing &&
-    [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type) &&
-    task.serverTaskId &&
-    !task.isManagedLocally &&
-    [TaskStatus.DOWNLOADING, TaskStatus.UPLOADING, TaskStatus.PAUSED, TaskStatus.PENDING].includes(
-      task.status
-    )
+    !isCommittingUpload(task) &&
+    (task.isManagedLocally
+      ? ACTIVE_TASK_STATUSES.includes(task.status) && task.canControl !== false
+      : [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type) &&
+        task.serverTaskId &&
+        [TaskStatus.DOWNLOADING, TaskStatus.UPLOADING, TaskStatus.PAUSED, TaskStatus.PENDING]
+          .includes(task.status))
   ) {
     actions.push({ key: 'stop', label: '停止', icon: iconMap.circleClose, type: 'warning' })
   }

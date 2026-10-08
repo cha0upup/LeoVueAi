@@ -41,10 +41,10 @@ function nextNodeId(kind) {
 
 // ── Node 工厂 ─────────────────────────────────────────────────────────
 
-export function createNarrationNode(opts = {}) {
+function createContentNode(kind, opts) {
   return {
-    kind:      NODE_KIND.NARRATION,
-    id:        nextNodeId(NODE_KIND.NARRATION),
+    kind,
+    id:        nextNodeId(kind),
     content:   String(opts.content ?? ''),
     streaming: !!opts.streaming,
     seq:       Number(opts.seq ?? 0),
@@ -52,19 +52,16 @@ export function createNarrationNode(opts = {}) {
   }
 }
 
+export function createNarrationNode(opts = {}) {
+  return createContentNode(NODE_KIND.NARRATION, opts)
+}
+
 /**
  * 创建一个流式文本段节点。语义上代表 "AI 在思考/工具调用之间产出的可见正文片段"。
  * narration 用于完整结论，text 用于思考与工具调用之间的正文片段。
  */
 export function createTextNode(opts = {}) {
-  return {
-    kind:      NODE_KIND.TEXT,
-    id:        nextNodeId(NODE_KIND.TEXT),
-    content:   String(opts.content ?? ''),
-    streaming: !!opts.streaming,
-    seq:       Number(opts.seq ?? 0),
-    createdAt: Date.now()
-  }
+  return createContentNode(NODE_KIND.TEXT, opts)
 }
 
 export function createThinkingNode(opts = {}) {

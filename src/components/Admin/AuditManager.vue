@@ -14,15 +14,10 @@
       </el-input>
 
       <el-input
-        v-model="filterForm.userId"
-        placeholder="用户ID"
-        clearable
-        class="toolbar-field"
-      />
-
-      <el-input
-        v-model="filterForm.agentId"
-        placeholder="主机ID"
+        v-for="(label, field) in basicFilterFields"
+        :key="field"
+        v-model="filterForm[field]"
+        :placeholder="label"
         clearable
         class="toolbar-field"
       />
@@ -48,16 +43,10 @@
         class="toolbar-small"
       >
         <el-option
-          label="成功"
-          value="SUCCESS"
-        />
-        <el-option
-          label="失败"
-          value="FAILED"
-        />
-        <el-option
-          label="错误"
-          value="ERROR"
+          v-for="status in ['SUCCESS', 'FAILED', 'ERROR']"
+          :key="status"
+          :label="getStatusLabel(status)"
+          :value="status"
         />
       </el-select>
 
@@ -77,7 +66,7 @@
       <template #actions>
         <el-button
           text
-          @click="toggleAdvancedFilter"
+          @click="showAdvancedFilter = !showAdvancedFilter"
         >
           {{ showAdvancedFilter ? '收起高级筛选' : '展开高级筛选' }}
           <el-icon>
@@ -92,22 +81,12 @@
       class="audit-advanced surface"
     >
       <el-input
-        v-model="filterForm.userName"
-        placeholder="用户名"
+        v-for="(label, field) in advancedFilterFields"
+        :key="field"
+        v-model="filterForm[field]"
+        :placeholder="label"
         clearable
-        class="toolbar-field"
-      />
-      <el-input
-        v-model="filterForm.agentName"
-        placeholder="主机名"
-        clearable
-        class="toolbar-field"
-      />
-      <el-input
-        v-model="filterForm.sessionId"
-        placeholder="会话ID"
-        clearable
-        class="toolbar-wide"
+        :class="field === 'sessionId' ? 'toolbar-wide' : 'toolbar-field'"
       />
       <el-date-picker
         v-model="filterForm.dateRange"
@@ -190,7 +169,7 @@
       </el-tag>
       <el-button
         text
-        @click="clearAllFilters"
+        @click="resetFilter"
       >
         清空筛选
       </el-button>
@@ -420,7 +399,7 @@
 <script setup>
 import { computed, ref, reactive, onMounted, watch } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
@@ -456,7 +435,8 @@ import {
   hasActiveAuditFilter
 } from './auditManagerModel.js'
 
-const iconMap = icons
+const basicFilterFields = { userId: '用户ID', agentId: '主机ID' }
+const advancedFilterFields = { userName: '用户名', agentName: '主机名', sessionId: '会话ID' }
 
 // 响应式数据
 const loading = ref(false)
@@ -588,17 +568,12 @@ const fetchStatistics = async () => {
     if (requestSequence !== statisticsRequestSequence) return
     const totalLogs = Number(totalRes.data?.count || 0)
 
-    if (filterStatus === 'SUCCESS') {
+    const successOnly = filterStatus === 'SUCCESS'
+    const failedOnly = filterStatus === 'FAILED' || filterStatus === 'ERROR'
+    if (successOnly || failedOnly) {
       statistics.totalLogs = totalLogs
-      statistics.successLogs = totalLogs
-      statistics.failedLogs = 0
-      statistics.lastUpdate = new Date().toLocaleString('zh-CN')
-      return
-    }
-    if (filterStatus === 'FAILED' || filterStatus === 'ERROR') {
-      statistics.totalLogs = totalLogs
-      statistics.successLogs = 0
-      statistics.failedLogs = totalLogs
+      statistics.successLogs = successOnly ? totalLogs : 0
+      statistics.failedLogs = failedOnly ? totalLogs : 0
       statistics.lastUpdate = new Date().toLocaleString('zh-CN')
       return
     }
@@ -658,12 +633,6 @@ const resetFilter = async () => {
   Object.assign(filterForm, createAuditFilter())
   currentPage.value = 1
   await Promise.all([fetchLogs(), fetchStatistics()])
-}
-
-const clearAllFilters = () => resetFilter()
-
-const toggleAdvancedFilter = () => {
-  showAdvancedFilter.value = !showAdvancedFilter.value
 }
 
 const clearFilterItem = (key) => {

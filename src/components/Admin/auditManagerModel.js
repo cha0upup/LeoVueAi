@@ -25,15 +25,7 @@ const FILTER_LABEL_TO_FIELD = Object.freeze({
 
 export function createAuditFilter() {
   return {
-    userId: '',
-    userName: '',
-    agentId: '',
-    agentName: '',
-    sessionId: '',
-    operationType: '',
-    status: '',
-    clientIp: '',
-    keyword: '',
+    ...Object.fromEntries(FILTER_FIELDS.map((field) => [field, ''])),
     dateRange: []
   }
 }
@@ -189,19 +181,13 @@ export function getStatusIndicatorStatus(status) {
 
 export function getActiveAuditFilterSummary(filter) {
   const summary = {}
-  const addText = (label, value, formatter = (item) => item) => {
+  const formatters = { operationType: getOperationTypeLabel, status: getStatusLabel }
+  for (const [label, field] of Object.entries(FILTER_LABEL_TO_FIELD)) {
+    if (field === 'dateRange') continue
+    const value = filter?.[field]
     const normalized = typeof value === 'string' ? value.trim() : ''
-    if (normalized) summary[label] = formatter(normalized)
+    if (normalized) summary[label] = formatters[field]?.(normalized) ?? normalized
   }
-  addText('用户ID', filter?.userId)
-  addText('用户名', filter?.userName)
-  addText('主机ID', filter?.agentId)
-  addText('主机名', filter?.agentName)
-  addText('会话ID', filter?.sessionId)
-  addText('操作类型', filter?.operationType, getOperationTypeLabel)
-  addText('状态', filter?.status, getStatusLabel)
-  addText('客户端IP', filter?.clientIp)
-  addText('关键词', filter?.keyword)
   const [startTime, endTime] = Array.isArray(filter?.dateRange) ? filter.dateRange : []
   if (startTime && endTime) {
     summary['时间范围'] = `${startTime} ~ ${endTime}`

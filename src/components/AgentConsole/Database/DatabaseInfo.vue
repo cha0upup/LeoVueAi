@@ -14,7 +14,7 @@
         <el-button
           :loading="loading"
           size="small"
-          @click="handleRefresh"
+          @click="emit('refresh-namespace', objectRef)"
         >
           <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
           刷新
@@ -23,7 +23,7 @@
           v-if="canCreateTable"
           type="primary"
           size="small"
-          @click="handleCreateTable"
+          @click="emit('create-table', currentDatabase)"
         >
           <el-icon><Icon :icon="iconMap.documentAdd" /></el-icon>
           新建表
@@ -56,10 +56,10 @@
       </el-descriptions-item>
       <el-descriptions-item label="数据库类型">
         <el-tag
-          :type="getDialectTag()"
+          :type="getDialectTagType(connection.dialect)"
           size="large"
         >
-          {{ getDialectDisplay() }}
+          {{ sqlEngine.getDialectName(connection.dialect) }}
         </el-tag>
       </el-descriptions-item>
       <el-descriptions-item label="连接状态">
@@ -158,7 +158,7 @@
           size="small"
           background
           @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
+          @current-change="pagination.current = $event"
         />
       </div>
     </div>
@@ -256,14 +256,6 @@ watch(searchText, () => {
   pagination.value.current = 1
 })
 
-const getDialectDisplay = () => sqlEngine.getDialectName(props.connection.dialect)
-
-const getDialectTag = () => getDialectTagType(props.connection.dialect)
-
-const handleRefresh = () => {
-  emit('refresh-namespace', props.objectRef)
-}
-
 const handleExport = () => {
   emit(
     'export-database',
@@ -273,10 +265,6 @@ const handleExport = () => {
   )
 }
 
-const handleCreateTable = () => {
-  emit('create-table', currentDatabase.value)
-}
-
 const openTable = (row) => {
   if (row.objectRef) emit('select-object', row.objectRef)
 }
@@ -284,10 +272,6 @@ const openTable = (row) => {
 const handleSizeChange = (size) => {
   pagination.value.pageSize = size
   pagination.value.current = 1 // 改变每页数量时重置到第一页
-}
-
-const handleCurrentChange = (page) => {
-  pagination.value.current = page
 }
 
 </script>

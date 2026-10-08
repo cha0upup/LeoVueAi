@@ -27,19 +27,13 @@ const DEFAULT_TLS_FINGERPRINT_STRATEGY = {
 
 const PADDING_PRESETS = {
   stealth: { lengthDistribution: 'GAUSSIAN', minBytes: 128, maxBytes: 2048 },
-  normal: { lengthDistribution: 'UNIFORM', minBytes: 64, maxBytes: 512 },
+  normal: DEFAULT_PADDING_STRATEGY,
   light: { lengthDistribution: 'UNIFORM', minBytes: 16, maxBytes: 128 }
 }
 
-const splitLines = (value) =>
+const splitList = (value, separator) =>
   String(value || '')
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-
-const splitCommaList = (value) =>
-  String(value || '')
-    .split(',')
+    .split(separator)
     .map((item) => item.trim())
     .filter(Boolean)
 
@@ -140,7 +134,7 @@ export function useAgentStrategies() {
     const incomingPaths = Array.isArray(paths) ? paths : []
     const merged = [
       ...new Set([
-        ...splitLines(urlStrategyForm.urlPoolText),
+        ...splitList(urlStrategyForm.urlPoolText, /\r?\n/),
         ...incomingPaths.map((path) => String(path).trim()).filter(Boolean)
       ])
     ]
@@ -157,13 +151,13 @@ export function useAgentStrategies() {
       prefix: urlStrategyForm.prefix || null
     }
     if (urlStrategyForm.mode === 'POOL') {
-      const urlPool = splitLines(urlStrategyForm.urlPoolText)
+      const urlPool = splitList(urlStrategyForm.urlPoolText, /\r?\n/)
       if (urlPool.length) strategy.urlPool = urlPool
     }
     if (urlStrategyForm.mode === 'TEMPLATE' && urlStrategyForm.urlTemplate) {
       strategy.urlTemplate = urlStrategyForm.urlTemplate
     }
-    const extensions = splitCommaList(urlStrategyForm.extensionsText)
+    const extensions = splitList(urlStrategyForm.extensionsText, ',')
     if (extensions.length) strategy.extensions = extensions
     return JSON.stringify(strategy)
   }

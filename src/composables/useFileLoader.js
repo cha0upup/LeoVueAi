@@ -4,8 +4,6 @@ import { showWarning } from '@/utils/messageUtils.js'
 
 // 图片扩展名
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']
-// PDF 扩展名
-const PDF_EXTENSIONS = ['pdf']
 
 // 代码语言映射
 const LANGUAGE_MAP = {
@@ -63,16 +61,11 @@ export function useFileLoader({
   const isModified = ref(false)
   let loadGeneration = 0
 
-  const isZeroSizePreview = (payload) => {
-    const rawSize = payload?.size
-    const size = Number(rawSize)
-    return Number.isFinite(size) && size === 0
-  }
-
   const resolvePreviewData = (payload) => {
     const fileData = payload?.data
     if (fileData === null || fileData === undefined) {
-      if (isZeroSizePreview(payload)) {
+      const size = Number(payload?.size)
+      if (Number.isFinite(size) && size === 0) {
         return ''
       }
       throw new Error('后端返回数据为空')
@@ -93,7 +86,7 @@ export function useFileLoader({
 
     if (IMAGE_EXTENSIONS.includes(extension)) {
       fileType.value = 'image'
-    } else if (PDF_EXTENSIONS.includes(extension)) {
+    } else if (extension === 'pdf') {
       fileType.value = 'pdf'
     } else {
       codeLanguage.value = LANGUAGE_MAP[extension] || 'plaintext'

@@ -82,3 +82,19 @@ export function formatFilePath(filePath) {
 
   return formattedPath
 }
+
+/** 规范化目录路径，保留 POSIX 与 Windows 盘符根目录。 */
+export function normalizeDirectoryPath(path) {
+  const formatted = formatFilePath(path || '/').replace(/\/\.$/, '')
+  if (formatted === '/' || /^[A-Za-z]:\/?$/.test(formatted)) {
+    return formatted.endsWith('/') ? formatted : `${formatted}/`
+  }
+  return formatted.replace(/\/+$/, '')
+}
+
+/** 按现有文件路径规则拼接目录与名称。 */
+export function joinFilePath(basePath, name) {
+  const base = normalizeDirectoryPath(basePath)
+  if (base === '/') return formatFilePath(`/${name}`)
+  return formatFilePath(`${base}${base.endsWith('/') ? '' : '/'}${name}`)
+}

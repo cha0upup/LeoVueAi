@@ -34,33 +34,20 @@ function stringifyMessage(value, fallback) {
 }
 
 function notify(type, messageOrOptions, options = {}) {
-  if (isMessageOptions(messageOrOptions)) {
-    return ElMessage({
-      ...messageOrOptions,
-      ...options,
-      type
-    })
+  const hasOptions = isMessageOptions(messageOrOptions)
+  const messageOptions = {
+    ...(hasOptions ? messageOrOptions : {}),
+    ...options
   }
-
-  return ElMessage({
-    ...options,
-    type,
-    message: stringifyMessage(messageOrOptions, options.defaultMessage || '操作失败')
-  })
+  if (type) messageOptions.type = type
+  if (!hasOptions) {
+    messageOptions.message = stringifyMessage(messageOrOptions, options.defaultMessage || '操作失败')
+  }
+  return ElMessage(messageOptions)
 }
 
 export function showMessage(messageOrOptions, options = {}) {
-  if (isMessageOptions(messageOrOptions)) {
-    return ElMessage({
-      ...messageOrOptions,
-      ...options
-    })
-  }
-
-  return ElMessage({
-    ...options,
-    message: stringifyMessage(messageOrOptions, options.defaultMessage || '操作失败')
-  })
+  return notify(undefined, messageOrOptions, options)
 }
 
 export function showSuccess(messageOrOptions, options) {

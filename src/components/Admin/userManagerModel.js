@@ -42,21 +42,14 @@ export function filterUsers(users, { keyword = '', role = '', team = '' } = {}) 
   const query = normalizeIdentity(keyword)
 
   return list.filter((user) => {
-    if (query) {
-      const matchesQuery = [
-        user.userName,
-        user.userId,
-        user.privilege
-      ].some((value) => normalizeIdentity(value).includes(query))
-      if (!matchesQuery) return false
+    if (query && ![user.userName, user.userId, user.privilege].some(
+      (value) => normalizeIdentity(value).includes(query)
+    )) {
+      return false
     }
 
     if (role && normalizeText(user.privilege) !== normalizeText(role)) return false
-    if (team) {
-      const matchesTeam = normalizeText(user.teamId) === normalizeText(team)
-      if (!matchesTeam) return false
-    }
-    return true
+    return !team || normalizeText(user.teamId) === normalizeText(team)
   })
 }
 

@@ -60,7 +60,12 @@
           @dismiss="testResult = null"
         />
         <div class="dialog-footer-actions">
-          <el-button class="cancel-btn" @click="close"> 取消 </el-button>
+          <el-button
+            class="cancel-btn"
+            @click="close"
+          >
+            取消
+          </el-button>
           <el-button
             class="test-btn"
             :loading="testingConnection"
@@ -89,36 +94,28 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, watch } from 'vue'
+import { ref } from 'vue'
 import { icons } from '@/utils/icons.js'
-import { createDefaultAgent } from '@/utils/constants.js'
-import { useEditDialog } from '@/utils/dialogUtils.js'
-import { validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { useDialog } from '@/utils/dialogUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
-import { getAllDisguises } from '@/utils/agentUtils.js'
-import { formatHeadersForEditor, stringifyHeadersForSubmit } from '@/utils/headers.js'
-import { useAgentStrategies } from '@/composables/useAgentStrategies.js'
-import { useAgentUrlProbe } from '@/composables/useAgentUrlProbe.js'
-import { useAgentConnectionTest } from '@/composables/useAgentConnectionTest.js'
+import { useAgentForm } from '@/composables/useAgentForm.js'
 import AgentFormFields from './AgentFormFields.vue'
 import AgentConnectionResultBanner from './AgentConnectionResultBanner.vue'
 import ParentHostSummary from './ParentHostSummary.vue'
 import { updateAgentApi } from '@/services/api/agent-manage.js'
-import { createAgentDialogRules } from '@/components/AgentManager/agentFormShared.js'
 
 const iconMap = icons
-
 const emit = defineEmits(['refresh'])
-
-// 使用编辑对话框工具
-const editDialog = useEditDialog()
-const editAgentDialog = editDialog.visible
-
+const dialog = useDialog()
+const editAgentDialog = dialog.visible
 const loading = ref(false)
-const proxyEnabled = ref(false)
-const formRef = ref(null)
-const scrollFormToTop = () => formRef.value?.scrollToTop?.()
+const parentContext = ref(null)
 const {
+  agent,
+  proxyEnabled,
+  formRef,
+  rules,
+  allDisguises,
   urlStrategyEnabled,
   urlStrategyForm,
   paddingEnabled,
@@ -128,108 +125,34 @@ const {
   headerNoiseForm,
   tlsFingerprintEnabled,
   tlsFingerprintForm,
-  resetStrategies,
-  loadStrategies,
   applyPaddingPreset,
-  mergeUrlPoolPaths,
-  buildUrlStrategyJson,
-  buildPaddingStrategyJson,
-  buildHeaderNoiseStrategyJson,
-  buildTlsFingerprintStrategyJson
-} = useAgentStrategies()
+  scrollFormToTop,
+  buildAgentPayload,
+  validateCurrentForm,
+  testingConnection,
+  testResult,
+  testConnection,
+  probing,
+  handleProbe,
+  resetForm,
+  loadAgent
+} = useAgentForm()
 
-const allDisguises = ref([])
-const parentContext = ref(null)
-
-// 使用默认值创建agent对象
-const agent = reactive(createDefaultAgent())
-
-const rules = createAgentDialogRules({
-  requireDisguises: true,
-  requirePayloadKeyForJava: () => agent.type === 'java'
-})
-
-const buildAgentPayload = () => ({
-  ...agent,
-  proxyEnabled: proxyEnabled.value ? 1 : 0,
-  headers: stringifyHeadersForSubmit(agent.headers),
-  urlStrategy: buildUrlStrategyJson(),
-  paddingStrategy: buildPaddingStrategyJson(),
-  headerNoiseStrategy: buildHeaderNoiseStrategyJson(),
-  tlsFingerprintStrategy: buildTlsFingerprintStrategyJson()
-})
-
-const validateCurrentForm = () =>
-  validateForm(formRef, { errorMessage: '表单验证失败，请检查输入' })
-
-const {
-  testing: testingConnection,
-  result: testResult,
-  reset: resetConnectionTest,
-  testConnection
-} = useAgentConnectionTest({ validate: validateCurrentForm, buildPayload: buildAgentPayload })
-
-watch(
-  [
-    agent,
-    proxyEnabled,
-    urlStrategyEnabled,
-    urlStrategyForm,
-    paddingEnabled,
-    paddingPreset,
-    paddingForm,
-    headerNoiseEnabled,
-    headerNoiseForm,
-    tlsFingerprintEnabled,
-    tlsFingerprintForm
-  ],
-  resetConnectionTest,
-  { deep: true }
-)
-
-const loadDisguises = async () => {
-  allDisguises.value = await getAllDisguises()
-}
-
-const resetForm = () => {
-  resetFormUtil(formRef, agent, createDefaultAgent())
-  proxyEnabled.value = false
-  resetStrategies()
-  cancelProbe()
-  resetConnectionTest()
+const close = () => {
+  dialog.close()
+  resetForm()
   parentContext.value = null
 }
 
-const close = () => {
-  editDialog.close()
-  resetForm()
-}
-
 const openEditAgentDialog = (agentData, parentAgentConfig = null) => {
-  editDialog.open(agentData)
-  Object.assign(agent, createDefaultAgent(agentData))
-  agent.headers = formatHeadersForEditor(agentData.headers)
-  proxyEnabled.value = agent.proxyEnabled == 1
-  loadStrategies(agentData)
-  resetConnectionTest()
+  dialog.open()
+  loadAgent(agentData)
   parentContext.value = parentAgentConfig
 }
 
-const {
-  probing,
-  probePaths: handleProbe,
-  cancelProbe
-} = useAgentUrlProbe({
-  getBaseUrl: () => agent.connLink,
-  mergePaths: mergeUrlPoolPaths
-})
-
 const handleEdit = async () => {
-  // 验证表单
-  const isValid = await validateCurrentForm()
-  if (!isValid) return
+  if (!await validateCurrentForm()) return
 
-  // 处理表单提交
   await executeRequest(
     () => updateAgentApi(buildAgentPayload()),
     {
@@ -244,14 +167,7 @@ const handleEdit = async () => {
   )
 }
 
-onMounted(() => {
-  loadDisguises()
-})
-
-defineExpose({
-  openEditAgentDialog,
-  close
-})
+defineExpose({ openEditAgentDialog, close })
 </script>
 
 <style scoped>

@@ -62,11 +62,11 @@ export function useTaskCenterView({
 }) {
   const activeStatusSet = computed(() => new Set(activeStatuses?.value || activeStatuses || []))
 
-  const activeTypeTasks = computed(() => {
-    return (tasks.value || []).filter(
+  const activeTypeTasks = computed(() =>
+    (tasks.value || []).filter(
       (task) => activeTaskType.value === 'all' || task.type === activeTaskType.value
     )
-  })
+  )
 
   const isActiveStatus = (task) =>
     task?.status !== TaskStatus.PENDING && activeStatusSet.value.has(task?.status)
@@ -80,15 +80,14 @@ export function useTaskCenterView({
   const filteredTasks = computed(() => {
     const keyword = searchKeyword.value.trim().toLowerCase()
 
-    return [...activeTypeTasks.value]
-      .filter((task) => matchesStatus(task, statusFilter.value))
-      .filter((task) => taskMatchesKeyword(task, keyword))
+    return activeTypeTasks.value
+      .filter((task) => matchesStatus(task, statusFilter.value) && taskMatchesKeyword(task, keyword))
       .sort((a, b) => sortTasks(a, b, sortOption.value))
   })
 
-  const selectedTask = computed(() => {
-    return filteredTasks.value.find((task) => task.viewId === selectedTaskId.value) || null
-  })
+  const selectedTask = computed(
+    () => filteredTasks.value.find((task) => task.viewId === selectedTaskId.value) || null
+  )
 
   watch(
     filteredTasks,
@@ -100,9 +99,8 @@ export function useTaskCenterView({
     { immediate: true }
   )
 
-  const countTasksByType = (type) => {
-    return (tasks.value || []).filter((task) => task.type === type).length
-  }
+  const countTasksByType = (type) =>
+    (tasks.value || []).filter((task) => task.type === type).length
 
   return {
     activeTypeTasks,

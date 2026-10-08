@@ -150,7 +150,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import sqlEngine from './SqlEngine.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { formatDatabaseError } from '@/utils/databaseError.js'
@@ -160,7 +160,6 @@ import {
   normalizeDatabaseQueryTimeout
 } from './database-query-status.js'
 
-const iconMap = icons
 
 const props = defineProps({
   sessionId: {
@@ -310,21 +309,14 @@ const formatSql = () => {
     return
   }
   // 简单的SQL格式化
-  let formatted = sqlText.value
+  sqlText.value = sqlText.value
     .replace(/\s+/g, ' ')
     .replace(/,/g, ',\n  ')
-    .replace(/\bFROM\b/gi, '\nFROM')
-    .replace(/\bWHERE\b/gi, '\nWHERE')
-    .replace(/\bAND\b/gi, '\n  AND')
-    .replace(/\bOR\b/gi, '\n  OR')
-    .replace(/\bORDER BY\b/gi, '\nORDER BY')
-    .replace(/\bGROUP BY\b/gi, '\nGROUP BY')
-    .replace(/\bJOIN\b/gi, '\nJOIN')
-    .replace(/\bLEFT JOIN\b/gi, '\nLEFT JOIN')
-    .replace(/\bRIGHT JOIN\b/gi, '\nRIGHT JOIN')
+    .replace(/\b(FROM|WHERE|AND|OR|ORDER BY|GROUP BY|JOIN)\b/gi, (keyword) =>
+      `\n${/^(AND|OR)$/i.test(keyword) ? '  ' : ''}${keyword.toUpperCase()}`
+    )
     .trim()
 
-  sqlText.value = formatted
   showSuccess('SQL格式化完成')
 }
 

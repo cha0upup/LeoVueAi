@@ -5,13 +5,7 @@
  * SSR 或损坏数据而失败。业务代码只通过这里访问，避免存储异常中断主流程。
  */
 export function createSafeStorage(storageProvider) {
-  const resolveStorage = () => {
-    try {
-      return storageProvider?.() || null
-    } catch {
-      return null
-    }
-  }
+  const resolveStorage = () => storageProvider?.() || null
 
   const getItem = (key, fallback = null) => {
     try {

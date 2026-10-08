@@ -93,17 +93,3 @@ export function buildUpdateParams(pluginData) {
 
   return updateParams
 }
-
-/**
- * 根据响应状态查找更新后的插件
- * @param {Array} plugins - 插件列表
- * @param {Object} response - API 响应对象
- * @param {string} currentPluginId - 当前插件ID
- * @returns {Object|null} 更新后的插件对象
- */
-export function findUpdatedPlugin(plugins, response, currentPluginId) {
-  if (response?.data?.pluginId && response.data.pluginId !== currentPluginId) {
-    return plugins.find((p) => p.pluginId === response.data.pluginId) || null
-  }
-  return null
-}

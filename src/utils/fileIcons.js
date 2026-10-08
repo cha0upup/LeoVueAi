@@ -51,6 +51,7 @@ const EXTENSION_GROUPS = {
 }
 
 const ICON_BY_TYPE = {
+  folder: { icon: icons.folder, className: 'folder-icon' },
   image: { icon: icons.picture, className: 'image-icon' },
   video: { icon: icons.video, className: 'video-icon' },
   audio: { icon: icons.musicNote, className: 'audio-icon' },
@@ -88,35 +89,16 @@ const getFileTypeNameByExtension = (extension = '') => {
 }
 
 export const getFileIconMeta = (file = {}) => {
-  if (file.isDirectory) {
-    return {
-      icon: icons.folder,
-      className: 'folder-icon'
-    }
-  }
+  if (file.isDirectory) return { ...ICON_BY_TYPE.folder }
 
   const type = getFileTypeNameByExtension(file.extension || '')
   return ICON_BY_TYPE[type] || ICON_BY_TYPE.default
 }
 
 export const getFileIconPresentation = (file = {}) => {
-  if (file.isDirectory) {
-    return {
-      icon: icons.folder,
-      className: 'folder-icon',
-      color: COLOR_BY_TYPE.folder,
-      type: 'folder'
-    }
-  }
-
-  const extension =
-    file.extension ||
-    file.ext ||
-    String(file.name || '')
-      .split('.')
-      .pop() ||
-    ''
-  const type = getFileTypeNameByExtension(extension)
+  const type = file.isDirectory ? 'folder' : getFileTypeNameByExtension(
+    file.extension || file.ext || String(file.name || '').split('.').pop() || ''
+  )
   const iconMeta = ICON_BY_TYPE[type] || ICON_BY_TYPE.default
 
   return {

@@ -336,31 +336,30 @@
         v-model:tls-fingerprint-enabled="tlsFingerprintEnabled"
         v-model:tls-fingerprint-form="tlsFingerprintForm"
         :probing="probing"
-        @probe="handleProbe"
-        @apply-padding-preset="applyPaddingPreset"
+        @probe="emit('probe')"
+        @apply-padding-preset="emit('apply-padding-preset', $event)"
       />
     </div>
   </el-form>
 </template>
 
 <script setup>
-import { ref, toRefs } from 'vue'
+import { ref } from 'vue'
 import { AGENT_MAX_REQUEST_COUNT, AGENT_MIN_REQUEST_COUNT } from '@/utils/constants.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import {
-  AGENT_PERMISSION_OPTIONS,
-  AGENT_PROTOCOL_OPTIONS,
-  AGENT_PROXY_OPTIONS,
-  AGENT_TYPE_OPTIONS
+  AGENT_PERMISSION_OPTIONS as permissions,
+  AGENT_PROTOCOL_OPTIONS as allProtocol,
+  AGENT_PROXY_OPTIONS as proxyOptions,
+  AGENT_TYPE_OPTIONS as allTypes
 } from './agentFormShared.js'
 import AgentStrategyFields from './AgentStrategyFields.vue'
 
-const props = defineProps({
+const { rules, disguises: allDisguises, probing } = defineProps({
   rules: { type: Object, required: true },
   disguises: { type: Array, default: () => [] },
   probing: { type: Boolean, default: false }
 })
-const { rules, disguises: allDisguises, probing } = toRefs(props)
 const emit = defineEmits(['submit', 'probe', 'apply-padding-preset'])
 const agent = defineModel('agent', { type: Object, required: true })
 const proxyEnabled = defineModel('proxyEnabled', { type: Boolean, default: false })
@@ -377,14 +376,7 @@ const tlsFingerprintEnabled = defineModel('tlsFingerprintEnabled', {
 })
 const tlsFingerprintForm = defineModel('tlsFingerprintForm', { type: Object, required: true })
 
-const iconMap = icons
-const permissions = AGENT_PERMISSION_OPTIONS
-const allProtocol = AGENT_PROTOCOL_OPTIONS
-const allTypes = AGENT_TYPE_OPTIONS
-const proxyOptions = AGENT_PROXY_OPTIONS
 const formRef = ref(null)
-const handleProbe = () => emit('probe')
-const applyPaddingPreset = (preset) => emit('apply-padding-preset', preset)
 
 const validate = (...args) => formRef.value?.validate(...args)
 const resetFields = (...args) => formRef.value?.resetFields(...args)

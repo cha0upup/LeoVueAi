@@ -18,7 +18,6 @@
             v-model="filterType"
             size="small"
             :disabled="!loaded"
-            @change="handleFilterChange"
           >
             <el-radio-button value="all">
               全部
@@ -216,8 +215,8 @@ const sortedList = computed(() => {
   if (!prop || !order) return list
 
   list.sort((a, b) => {
-    let va = a[prop] ?? ''
-    let vb = b[prop] ?? ''
+    const va = a[prop] ?? ''
+    const vb = b[prop] ?? ''
     const cmp = String(va).localeCompare(String(vb))
     return order === 'ascending' ? cmp : -cmp
   })
@@ -228,15 +227,13 @@ const sortedList = computed(() => {
 
 function flattenResult(rawData) {
   const items = []
-  const groups = ['system', 'user']
-  for (const group of groups) {
+  for (const group of ['system', 'user']) {
     const groupData = rawData[group]
     if (!groupData) continue
     for (const [source, info] of Object.entries(groupData)) {
-      if (info && info.packages && Array.isArray(info.packages)) {
-        for (const pkg of info.packages) {
-          items.push({ ...pkg, source: info.source || source, group })
-        }
+      if (!Array.isArray(info?.packages)) continue
+      for (const pkg of info.packages) {
+        items.push({ ...pkg, source: info.source || source, group })
       }
     }
   }
@@ -250,8 +247,7 @@ async function handleLoad() {
   searchText.value = ''
   try {
     const res = await listAllSoftwareApi({ sessionId: props.sessionId })
-    const data = res.data.data
-    allItems.value = flattenResult(data)
+    allItems.value = flattenResult(res.data.data)
     if (allItems.value.length === 0) {
       showWarning('未发现已安装软件')
     } else {
@@ -264,10 +260,6 @@ async function handleLoad() {
   } finally {
     isLoading.value = false
   }
-}
-
-function handleFilterChange() {
-  // 纯前端过滤，无需任何操作，computed 自动响应
 }
 
 function handleSortChange({ prop, order }) {

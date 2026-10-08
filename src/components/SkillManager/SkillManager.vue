@@ -177,108 +177,19 @@
                 class="filter-grid"
                 :class="{ 'filter-grid--simple': catalogMode === 'simple' }"
               >
-                <label v-if="catalogMode === 'governance'">
-                  <span>能力域</span>
+                <label
+                  v-for="field in catalogFilterFields"
+                  :key="field.key"
+                >
+                  <span>{{ field.label }}</span>
                   <el-select
-                    v-model="filters.domain"
+                    v-model="filters[field.key]"
                     clearable
-                    placeholder="全部能力域"
+                    :filterable="Boolean(field.filterable)"
+                    :placeholder="field.placeholder"
                   >
                     <el-option
-                      v-for="item in taxonomy.domains"
-                      :key="item"
-                      :label="item"
-                      :value="item"
-                    />
-                  </el-select>
-                </label>
-                <label>
-                  <span>主分类</span>
-                  <el-select
-                    v-model="filters.category"
-                    clearable
-                    filterable
-                    placeholder="全部分类"
-                  >
-                    <el-option
-                      v-for="item in availableCategories"
-                      :key="item"
-                      :label="item"
-                      :value="item"
-                    />
-                  </el-select>
-                </label>
-                <label v-if="catalogMode === 'governance'">
-                  <span>能力包</span>
-                  <el-select
-                    v-model="filters.pack"
-                    clearable
-                    filterable
-                    placeholder="全部能力包"
-                  >
-                    <el-option
-                      v-for="item in availablePacks"
-                      :key="item"
-                      :label="item"
-                      :value="item"
-                    />
-                  </el-select>
-                </label>
-                <label>
-                  <span>平台</span>
-                  <el-select
-                    v-model="filters.platform"
-                    clearable
-                    filterable
-                    placeholder="全部平台"
-                  >
-                    <el-option
-                      v-for="item in availablePlatforms"
-                      :key="item"
-                      :label="item"
-                      :value="item"
-                    />
-                  </el-select>
-                </label>
-                <label>
-                  <span>风险</span>
-                  <el-select
-                    v-model="filters.risk"
-                    clearable
-                    placeholder="全部风险"
-                  >
-                    <el-option
-                      v-for="item in taxonomy.risks"
-                      :key="item"
-                      :label="item"
-                      :value="item"
-                    />
-                  </el-select>
-                </label>
-                <label v-if="catalogMode === 'governance'">
-                  <span>访问模式</span>
-                  <el-select
-                    v-model="filters.accessMode"
-                    clearable
-                    placeholder="全部访问模式"
-                  >
-                    <el-option
-                      v-for="item in taxonomy.accessModes"
-                      :key="item"
-                      :label="item"
-                      :value="item"
-                    />
-                  </el-select>
-                </label>
-                <label v-if="catalogMode === 'governance'">
-                  <span>生命周期</span>
-                  <el-select
-                    v-model="filters.status"
-                    clearable
-                    placeholder="全部状态"
-                  >
-                    <el-option
-                      v-for="item in taxonomy.statuses"
+                      v-for="item in field.options"
                       :key="item"
                       :label="item"
                       :value="item"
@@ -1140,7 +1051,7 @@
 import { computed, defineComponent, h, nextTick, ref, watch } from 'vue'
 import { ElTag } from 'element-plus'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { confirmAction, executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
@@ -1212,7 +1123,6 @@ const OverviewListCard = defineComponent({
   }
 })
 
-const iconMap = icons
 const { isAdmin } = useAuth()
 const { state: uiState } = useSkillUiState()
 const catalogModeOptions = [
@@ -1322,6 +1232,57 @@ const availablePlatforms = computed(() =>
 const availablePacks = computed(() =>
   [...new Set(skills.value.map((item) => item.pack).filter(Boolean))].sort()
 )
+const catalogFilterFields = computed(() => [
+  {
+    key: 'domain',
+    label: '能力域',
+    placeholder: '全部能力域',
+    options: taxonomy.value.domains,
+    governance: true
+  },
+  {
+    key: 'category',
+    label: '主分类',
+    placeholder: '全部分类',
+    options: availableCategories.value,
+    filterable: true
+  },
+  {
+    key: 'pack',
+    label: '能力包',
+    placeholder: '全部能力包',
+    options: availablePacks.value,
+    filterable: true,
+    governance: true
+  },
+  {
+    key: 'platform',
+    label: '平台',
+    placeholder: '全部平台',
+    options: availablePlatforms.value,
+    filterable: true
+  },
+  {
+    key: 'risk',
+    label: '风险',
+    placeholder: '全部风险',
+    options: taxonomy.value.risks
+  },
+  {
+    key: 'accessMode',
+    label: '访问模式',
+    placeholder: '全部访问模式',
+    options: taxonomy.value.accessModes,
+    governance: true
+  },
+  {
+    key: 'status',
+    label: '生命周期',
+    placeholder: '全部状态',
+    options: taxonomy.value.statuses,
+    governance: true
+  }
+].filter((field) => catalogMode.value === 'governance' || !field.governance))
 const hasFilters = computed(() => Object.values(filters.value).some(Boolean))
 
 const filterLabels = {
@@ -1416,12 +1377,8 @@ const clearFilters = () => {
 
 const applyQuickFilter = (kind) => {
   const next = emptyFilters()
-  if (kind === 'runtime') next.availability = 'runtime'
-  else if (kind === 'controlled') next.availability = 'controlled'
-  else if (kind === 'problems') next.health = 'problems'
-  else if (kind === 'warning') next.health = 'warning'
-  else if (kind === 'invalid') next.health = 'invalid'
-  else if (kind === 'draft') next.availability = 'draft'
+  if (['runtime', 'controlled', 'draft'].includes(kind)) next.availability = kind
+  else if (['problems', 'warning', 'invalid'].includes(kind)) next.health = kind
   filters.value = next
 }
 

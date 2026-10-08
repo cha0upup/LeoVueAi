@@ -601,6 +601,37 @@ function isContainerPending(row) {
   )
 }
 
+async function executeDockerAction(type, resourceId, {
+  request,
+  label,
+  tab = 'containers',
+  errorFallback = '未知错误',
+  onSuccess
+}) {
+  const capturedSessionId = props.sessionId
+  const key = getActionKey(type, resourceId, capturedSessionId)
+  if (!beginAction(key)) return
+
+  try {
+    const response = await request(capturedSessionId)
+    const data = getDockerPayload(response)
+    if (props.sessionId !== capturedSessionId) return
+    if (data.success) {
+      showSuccess(`${label}成功: ${resourceId}`)
+      onSuccess?.()
+      await refreshTab(tab, { notify: false })
+    } else {
+      showError(`${label}失败: ${data.output || errorFallback}`)
+    }
+  } catch (error) {
+    if (props.sessionId === capturedSessionId) {
+      showError(`${label}失败: ${getErrorMessage(error)}`)
+    }
+  } finally {
+    finishAction(key)
+  }
+}
+
 async function handleLifecycle(command, row) {
   const containerId = getDockerResourceId(row)
   if (!containerId) return
@@ -612,90 +643,31 @@ async function handleLifecycle(command, row) {
 
   const action = CONTAINER_ACTIONS[command]
   if (!action) return
-  const capturedSessionId = props.sessionId
-  const key = getActionKey(command, containerId, capturedSessionId)
-  if (!beginAction(key)) return
-
-  try {
-    const response = await action.api({
-      sessionId: capturedSessionId,
-      containerId,
-      ...action.params
-    })
-    const data = getDockerPayload(response)
-    if (props.sessionId !== capturedSessionId) return
-    if (data.success) {
-      showSuccess(`${action.label}容器成功: ${containerId}`)
-      await refreshTab('containers', { notify: false })
-    } else {
-      showError(`${action.label}容器失败: ${data.output || '未知错误'}`)
-    }
-  } catch (error) {
-    if (props.sessionId === capturedSessionId) {
-      showError(`${action.label}容器失败: ${getErrorMessage(error)}`)
-    }
-  } finally {
-    finishAction(key)
-  }
+  await executeDockerAction(command, containerId, {
+    request: (sessionId) => action.api({ sessionId, containerId, ...action.params }),
+    label: `${action.label}容器`
+  })
 }
 
 async function confirmRemoveContainer({ containerId, force }) {
-  const capturedSessionId = props.sessionId
-  const key = getActionKey('remove-container', containerId, capturedSessionId)
-  if (!beginAction(key)) return
-
-  try {
-    const response = await removeDockerContainerApi({
-      sessionId: capturedSessionId,
-      containerId,
-      force
-    })
-    const data = getDockerPayload(response)
-    if (props.sessionId !== capturedSessionId) return
-    if (data.success) {
-      showSuccess(`删除容器成功: ${containerId}`)
+  await executeDockerAction('remove-container', containerId, {
+    request: (sessionId) => removeDockerContainerApi({ sessionId, containerId, force }),
+    label: '删除容器',
+    onSuccess: () => {
       removeDialogVisible.value = false
-      await refreshTab('containers', { notify: false })
-    } else {
-      showError(`删除容器失败: ${data.output || '未知错误'}`)
     }
-  } catch (error) {
-    if (props.sessionId === capturedSessionId) {
-      showError(`删除容器失败: ${getErrorMessage(error)}`)
-    }
-  } finally {
-    finishAction(key)
-  }
+  })
 }
 
 async function handleRemoveImage(row) {
   const imageId = getDockerResourceId(row)
   if (!imageId) return
-  const capturedSessionId = props.sessionId
-  const key = getActionKey('remove-image', imageId, capturedSessionId)
-  if (!beginAction(key)) return
-
-  try {
-    const response = await removeDockerImageApi({
-      sessionId: capturedSessionId,
-      imageId,
-      force: false
-    })
-    const data = getDockerPayload(response)
-    if (props.sessionId !== capturedSessionId) return
-    if (data.success) {
-      showSuccess(`删除镜像成功: ${imageId}`)
-      await refreshTab('images', { notify: false })
-    } else {
-      showError(`删除镜像失败: ${data.output || '可能有容器引用'}`)
-    }
-  } catch (error) {
-    if (props.sessionId === capturedSessionId) {
-      showError(`删除镜像失败: ${getErrorMessage(error)}`)
-    }
-  } finally {
-    finishAction(key)
-  }
+  await executeDockerAction('remove-image', imageId, {
+    request: (sessionId) => removeDockerImageApi({ sessionId, imageId, force: false }),
+    label: '删除镜像',
+    tab: 'images',
+    errorFallback: '可能有容器引用'
+  })
 }
 
 function handleExport() {
@@ -864,10 +836,6 @@ const statusTag = getDockerStatusTag
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-
-.terminal-panel-body :deep(.terminal-viewport__chrome) {
-  display: none;
 }
 
 @keyframes blink {

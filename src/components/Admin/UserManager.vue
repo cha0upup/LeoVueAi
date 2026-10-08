@@ -19,20 +19,10 @@
         class="toolbar-filter"
       >
         <el-option
-          label="全部角色"
-          value=""
-        />
-        <el-option
-          label="管理员"
-          value="admin"
-        />
-        <el-option
-          label="队长"
-          value="leader"
-        />
-        <el-option
-          label="普通用户"
-          value="normal"
+          v-for="role in ['', 'admin', 'leader', 'normal']"
+          :key="role"
+          :label="role ? getRoleDisplayName(role) : '全部角色'"
+          :value="role"
         />
       </el-select>
 
@@ -56,7 +46,7 @@
 
       <template #actions>
         <el-button
-          :disabled="!filteredUsers || filteredUsers.length === 0"
+          :disabled="!filteredUsers.length"
           plain
           @click="exportUsers"
         >
@@ -76,39 +66,16 @@
     </AdminToolbar>
 
     <AdminStatsGrid :columns="5">
-      <article class="metric-card total-users">
-        <span class="metric-icon"><el-icon><Icon :icon="iconMap.user" /></el-icon></span>
+      <article
+        v-for="card in statsCardConfigs"
+        :key="card.key"
+        class="metric-card"
+        :class="card.className"
+      >
+        <span class="metric-icon"><el-icon><Icon :icon="card.icon" /></el-icon></span>
         <div>
-          <strong class="metric-value">{{ stats.total }}</strong>
-          <span class="metric-label">用户总数</span>
-        </div>
-      </article>
-      <article class="metric-card admin-users">
-        <span class="metric-icon"><el-icon><Icon :icon="iconMap.userFilled" /></el-icon></span>
-        <div>
-          <strong class="metric-value">{{ stats.admin }}</strong>
-          <span class="metric-label">管理员</span>
-        </div>
-      </article>
-      <article class="metric-card leader-users">
-        <span class="metric-icon"><el-icon><Icon :icon="iconMap.userFilled" /></el-icon></span>
-        <div>
-          <strong class="metric-value">{{ stats.leader }}</strong>
-          <span class="metric-label">队长</span>
-        </div>
-      </article>
-      <article class="metric-card normal-users">
-        <span class="metric-icon"><el-icon><Icon :icon="iconMap.avatar" /></el-icon></span>
-        <div>
-          <strong class="metric-value">{{ stats.normal }}</strong>
-          <span class="metric-label">普通用户</span>
-        </div>
-      </article>
-      <article class="metric-card team-users">
-        <span class="metric-icon"><el-icon><Icon :icon="iconMap.userFilled" /></el-icon></span>
-        <div>
-          <strong class="metric-value">{{ stats.assignedToTeam }}</strong>
-          <span class="metric-label">已归属团队</span>
+          <strong class="metric-value">{{ stats[card.key] }}</strong>
+          <span class="metric-label">{{ card.label }}</span>
         </div>
       </article>
     </AdminStatsGrid>
@@ -116,7 +83,7 @@
     <AdminWorkspacePanel title="用户列表">
       <template #tags>
         <el-tag effect="light">
-          筛选结果 {{ filteredUsers?.length || 0 }}
+          筛选结果 {{ filteredUsers.length }}
         </el-tag>
       </template>
 
@@ -134,7 +101,7 @@
 
       <el-table
         v-loading="loading"
-        :data="filteredUsers || []"
+        :data="filteredUsers"
         class="users-table"
         empty-text="暂无用户"
       >
@@ -284,7 +251,7 @@
       :submitting="submitting"
       @submit="submitUser"
       @closed="closeUserDialog"
-      @form-ready="setUserFormRef"
+      @form-ready="userFormRef = $event"
     />
 
     <UserPasswordResetDialog
@@ -293,7 +260,7 @@
       :rules="resetRules"
       :resetting="resetting"
       @submit="submitResetPassword"
-      @form-ready="setResetFormRef"
+      @form-ready="resetFormRef = $event"
     />
   </div>
 </template>
@@ -303,7 +270,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElNotification } from 'element-plus'
 import { v4 as uuidV4 } from 'uuid'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { executeDeleteWithConfirm, confirmAction } from '@/utils/confirmUtils.js'
@@ -344,7 +311,13 @@ import {
   userStats
 } from './userManagerModel.js'
 
-const iconMap = icons
+const statsCardConfigs = [
+  { key: 'total', label: '用户总数', icon: iconMap.user, className: 'total-users' },
+  { key: 'admin', label: '管理员', icon: iconMap.userFilled, className: 'admin-users' },
+  { key: 'leader', label: '队长', icon: iconMap.userFilled, className: 'leader-users' },
+  { key: 'normal', label: '普通用户', icon: iconMap.avatar, className: 'normal-users' },
+  { key: 'assignedToTeam', label: '已归属团队', icon: iconMap.userFilled, className: 'team-users' }
+]
 
 const { currentUser, isAdmin, isLeader, fetchAuth } = useAuth()
 
@@ -373,15 +346,16 @@ const filterTeam = ref('')
 // 表单
 const userFormRef = ref(null)
 const resetFormRef = ref(null)
-const setUserFormRef = (instance) => {
-  userFormRef.value = instance
-}
-const setResetFormRef = (instance) => {
-  resetFormRef.value = instance
-}
-
 const userForm = reactive(createUserForm())
 const resetForm = reactive(createPasswordResetForm())
+
+const createPasswordMatchValidator = getPassword => (rule, value, callback) => {
+  if (value !== getPassword()) {
+    callback(new Error('两次输入密码不一致'))
+  } else {
+    callback()
+  }
+}
 
 // 表单验证规则
 const userRules = {
@@ -405,13 +379,7 @@ const userRules = {
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
     {
-      validator: (rule, value, callback) => {
-        if (value !== userForm.password) {
-          callback(new Error('两次输入密码不一致'))
-        } else {
-          callback()
-        }
-      },
+      validator: createPasswordMatchValidator(() => userForm.password),
       trigger: 'blur'
     }
   ],
@@ -431,13 +399,7 @@ const resetRules = {
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
     {
-      validator: (rule, value, callback) => {
-        if (value !== resetForm.newPassword) {
-          callback(new Error('两次输入密码不一致'))
-        } else {
-          callback()
-        }
-      },
+      validator: createPasswordMatchValidator(() => resetForm.newPassword),
       trigger: 'blur'
     }
   ]
@@ -457,11 +419,17 @@ const actorContext = computed(() => ({
 }))
 
 // 方法
+const notifyUser = (type, message) => {
+  ElNotification({
+    title: { warning: '禁止操作', success: '成功', error: '失败' }[type],
+    message,
+    type
+  })
+}
+
 const refreshData = async () => {
   await executeRequest(
-    async () => {
-      await Promise.all([getAllUsers(), getAllTeams()])
-    },
+    () => Promise.all([getAllUsers(), getAllTeams()]),
     {
       loadingRef: loading,
       errorMessage: '数据刷新失败'
@@ -488,19 +456,11 @@ const openAddDialog = () => {
 
 const editUser = (user) => {
   if (isBuiltInAdmin(user)) {
-    ElNotification({
-      title: '禁止操作',
-      message: 'admin 是系统内置账户，不能编辑。',
-      type: 'warning'
-    })
+    notifyUser('warning', 'admin 是系统内置账户，不能编辑。')
     return
   }
   if (!canManageUser(user)) {
-    ElNotification({
-      title: '禁止操作',
-      message: getManageDisabledReason(user) || '无权编辑该用户。',
-      type: 'warning'
-    })
+    notifyUser('warning', getManageDisabledReason(user) || '无权编辑该用户。')
     return
   }
   userDialog.open(user)
@@ -517,17 +477,12 @@ const defaultUserForm = createUserForm()
 
 const closeUserDialog = () => {
   userDialog.close()
-  resetUserForm()
-}
-
-const resetUserForm = () => {
   resetFormUtil(userFormRef, userForm, defaultUserForm)
 }
 
 const submitUser = async () => {
   // 验证表单
-  const isValid = await validateForm(userFormRef)
-  if (!isValid) return
+  if (!await validateForm(userFormRef)) return
 
   const editing = isEdit.value
 
@@ -556,20 +511,12 @@ const submitUser = async () => {
       successMessage: null, // 使用ElNotification，不显示ElMessage
       errorMessage: null,
       onSuccess: () => {
-        ElNotification({
-          title: '成功',
-          message: editing ? '用户更新成功！' : '用户添加成功！',
-          type: 'success'
-        })
+        notifyUser('success', editing ? '用户更新成功！' : '用户添加成功！')
         closeUserDialog()
         return getAllUsers()
       },
       onError: (error) => {
-        ElNotification({
-          title: '失败',
-          message: error?.message || (editing ? '用户更新失败！' : '用户添加失败！'),
-          type: 'error'
-        })
+        notifyUser('error', error?.message || (editing ? '用户更新失败！' : '用户添加失败！'))
       }
     }
   ).catch(() => false)
@@ -577,19 +524,11 @@ const submitUser = async () => {
 
 const deleteUser = async (user) => {
   if (isBuiltInAdmin(user)) {
-    ElNotification({
-      title: '禁止操作',
-      message: 'admin 是系统内置账户，不能删除。',
-      type: 'warning'
-    })
+    notifyUser('warning', 'admin 是系统内置账户，不能删除。')
     return
   }
   if (!canManageUser(user)) {
-    ElNotification({
-      title: '禁止操作',
-      message: getManageDisabledReason(user) || '无权删除该用户。',
-      type: 'warning'
-    })
+    notifyUser('warning', getManageDisabledReason(user) || '无权删除该用户。')
     return
   }
 
@@ -601,19 +540,11 @@ const deleteUser = async (user) => {
       successMessage: null, // 使用ElNotification
       errorMessage: null,
       onSuccess: () => {
-        ElNotification({
-          title: '成功',
-          message: '用户删除成功！',
-          type: 'success'
-        })
+        notifyUser('success', '用户删除成功！')
         return getAllUsers()
       },
       onError: () => {
-        ElNotification({
-          title: '失败',
-          message: '用户删除失败！',
-          type: 'error'
-        })
+        notifyUser('error', '用户删除失败！')
       }
     }
   )
@@ -621,11 +552,7 @@ const deleteUser = async (user) => {
 
 const resetPassword = (user) => {
   if (!canManageUser(user)) {
-    ElNotification({
-      title: '禁止操作',
-      message: getManageDisabledReason(user) || '无权重置该用户密码。',
-      type: 'warning'
-    })
+    notifyUser('warning', getManageDisabledReason(user) || '无权重置该用户密码。')
     return
   }
   resetForm.userId = user.userId
@@ -636,8 +563,7 @@ const resetPassword = (user) => {
 
 const submitResetPassword = async () => {
   // 验证表单
-  const isValid = await validateForm(resetFormRef)
-  if (!isValid) return
+  if (!await validateForm(resetFormRef)) return
 
   await executeRequest(
     () =>
@@ -650,19 +576,11 @@ const submitResetPassword = async () => {
       successMessage: null, // 使用ElNotification
       errorMessage: null,
       onSuccess: () => {
-        ElNotification({
-          title: '成功',
-          message: '密码重置成功！',
-          type: 'success'
-        })
+        notifyUser('success', '密码重置成功！')
         resetPasswordDialog.close()
       },
       onError: (error) => {
-        ElNotification({
-          title: '失败',
-          message: error?.message || '密码重置失败！',
-          type: 'error'
-        })
+        notifyUser('error', error?.message || '密码重置失败！')
       }
     }
   ).catch(() => false)
@@ -690,19 +608,13 @@ const exportUsers = async () => {
   ])
 }
 
-const canManageUser = (user) => {
-  return canManageUserForActor(user, actorContext.value)
-}
+const canManageUser = (user) => canManageUserForActor(user, actorContext.value)
 
 const canEditUser = (user) => canEditUserForActor(user, actorContext.value)
 
-const getManageDisabledReason = (user) => {
-  return getManageDisabledReasonForActor(user, actorContext.value)
-}
+const getManageDisabledReason = (user) => getManageDisabledReasonForActor(user, actorContext.value)
 
-const getEditDisabledReason = (user) => {
-  return getEditDisabledReasonForActor(user, actorContext.value)
-}
+const getEditDisabledReason = (user) => getEditDisabledReasonForActor(user, actorContext.value)
 
 // 生命周期
 onMounted(async () => {

@@ -48,7 +48,7 @@
           <button
             type="button"
             :class="{ active: !isWorkspaceHome && !currentPath }"
-            @click="openFileBrowser"
+            @click="goPath()"
           >
             <el-icon><Icon :icon="iconMap.folderOpened" /></el-icon>
             <span><strong>全部成果</strong><small>{{ workspaceSummaryText }}</small></span>
@@ -89,10 +89,10 @@
             </div>
           </div>
           <div class="artifact-detail__actions">
-            <el-button @click="openCreateFileDialog">
+            <el-button @click="createFileVisible = true">
               <el-icon><Icon :icon="iconMap.documentAdd" /></el-icon>新建文档
             </el-button>
-            <el-button @click="openCreateDirDialog">
+            <el-button @click="createDirVisible = true">
               <el-icon><Icon :icon="iconMap.folderAdd" /></el-icon>新建目录
             </el-button>
             <el-button
@@ -120,7 +120,7 @@
             </div>
             <el-button
               type="primary"
-              @click="openFileBrowser"
+              @click="goPath()"
             >
               浏览全部成果<el-icon><Icon :icon="iconMap.arrowRight" /></el-icon>
             </el-button>
@@ -145,7 +145,7 @@
                 </div>
                 <el-button
                   text
-                  @click="openFileBrowser"
+                  @click="goPath()"
                 >
                   查看全部
                 </el-button>
@@ -209,15 +209,15 @@
             :search-keyword="searchKeyword"
             :selected-entry="selectedEntry"
             @fetch-list="refreshWorkspace"
-            @go-root="goRoot"
+            @go-root="goPath()"
             @go-path="goPath"
             @trigger-upload="triggerUpload"
             @handle-upload-change="handleUploadChange"
-            @select-entry="selectEntry"
+            @select-entry="selectedEntry = $event"
             @enter-directory="enterDirectory"
             @preview-file="previewFile"
-            @search-keyword-change="(keyword) => (searchKeyword = keyword)"
-            @clear-search="() => (searchKeyword = '')"
+            @search-keyword-change="searchKeyword = $event"
+            @clear-search="searchKeyword = ''"
           />
           <UserSpaceTable
             :selected-entry="selectedEntry"
@@ -254,7 +254,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { confirmAction, confirmDelete } from '@/utils/confirmUtils.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import {
   userFileListApi,
@@ -271,7 +271,7 @@ import UserSpaceCreateDialog from './UserSpaceCreateDialog.vue'
 import UserSpaceFileTree from './UserSpaceFileTree.vue'
 import UserSpacePreviewDialog from './UserSpacePreviewDialog.vue'
 import UserSpaceTable from './UserSpaceTable.vue'
-import { formatDate, formatFileSize } from '@/utils/format.js'
+import { formatDate as formatTimestamp, formatFileSize } from '@/utils/format.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import {
   filterUserSpaceEntries,
@@ -280,8 +280,6 @@ import {
   normalizeWorkspaceOverview,
   resolveArtifactCategoryLabel
 } from './userSpaceModel.js'
-
-const iconMap = icons
 
 const loading = ref(false)
 const workspaceMode = ref('home')
@@ -316,27 +314,15 @@ const totalCount = computed(() => fileList.value.length)
 const filteredCount = computed(() => filteredFileList.value.length)
 const directoryCount = computed(() => fileList.value.filter((item) => item.isDirectory).length)
 const fileCount = computed(() => fileList.value.filter((item) => !item.isDirectory).length)
-const currentPathLabel = computed(() => {
-  return resolveArtifactCategoryLabel(currentPath.value) || '成果库根目录'
-})
+const currentPathLabel = computed(() => resolveArtifactCategoryLabel(currentPath.value) || '成果库根目录')
 const isWorkspaceHome = computed(() => workspaceMode.value === 'home' && !currentPath.value)
 const workspaceSummaryText = computed(() => {
   const files = Number(workspaceOverview.value.totalFiles || 0)
   const directories = Number(workspaceOverview.value.totalDirectories || 0)
   return `${files} 个文件 · ${directories} 个文件夹`
 })
-const recentFiles = computed(() => {
-  const files = Array.isArray(workspaceOverview.value.recentFiles)
-    ? workspaceOverview.value.recentFiles
-    : []
-  return files.slice(0, 5)
-})
-const topDirectories = computed(() => {
-  const dirs = Array.isArray(workspaceOverview.value.topDirectories)
-    ? workspaceOverview.value.topDirectories
-    : []
-  return dirs.slice(0, 5)
-})
+const recentFiles = computed(() => workspaceOverview.value.recentFiles.slice(0, 5))
+const topDirectories = computed(() => workspaceOverview.value.topDirectories.slice(0, 5))
 const artifactCategories = computed(() => {
   const meta = [
     {
@@ -402,26 +388,14 @@ const workspaceStats = computed(() => {
   return stats
 })
 
-const formatTimestamp = (value) => formatDate(value)
-
-const selectEntry = (row) => {
-  selectedEntry.value = row
-}
-
 const keepSelection = () => {
   if (!fileList.value.length) {
     selectedEntry.value = null
     return
   }
   const prevPath = selectedEntry.value?.path
-  if (prevPath) {
-    const found = fileList.value.find((item) => item.path === prevPath)
-    if (found) {
-      selectedEntry.value = found
-      return
-    }
-  }
-  selectedEntry.value = filteredFileList.value[0] || fileList.value[0] || null
+  selectedEntry.value = (prevPath && fileList.value.find((item) => item.path === prevPath))
+    || filteredFileList.value[0] || fileList.value[0] || null
 }
 
 const fetchList = async () => {
@@ -468,13 +442,6 @@ const leaveCurrentPreviewContext = () => {
   previewVisible.value = false
 }
 
-const goRoot = async () => {
-  leaveCurrentPreviewContext()
-  currentPath.value = ''
-  workspaceMode.value = 'files'
-  await fetchList()
-}
-
 const goPath = async (path) => {
   leaveCurrentPreviewContext()
   currentPath.value = path || ''
@@ -509,13 +476,6 @@ const openWorkspaceHome = async () => {
   await refreshWorkspace()
 }
 
-const openFileBrowser = async () => {
-  leaveCurrentPreviewContext()
-  currentPath.value = ''
-  workspaceMode.value = 'files'
-  await fetchList()
-}
-
 const triggerUpload = async () => {
   if (uploading.value) return
   if (isWorkspaceHome.value) {
@@ -525,38 +485,47 @@ const triggerUpload = async () => {
   fileTreeRef.value?.triggerUpload()
 }
 
+const writeWithOverwrite = async (write, confirmOverwrite, errorPrefix) => {
+  try {
+    await write(false)
+  } catch (error) {
+    if (error?.code !== 409) {
+      showError(`${errorPrefix}: ${error?.message || '未知错误'}`)
+      return
+    }
+    const confirmed = await confirmOverwrite()
+    if (!confirmed) return
+    try {
+      await write(true)
+    } catch (overwriteError) {
+      showError(`${errorPrefix}: ${overwriteError?.message || '未知错误'}`)
+    }
+  }
+}
+
 const handleUploadChange = async (event) => {
   const file = event?.target?.files?.[0]
   if (!file || uploading.value) return
   const uploadPath = currentPath.value || undefined
   uploading.value = true
   try {
-    await userFileUploadApi(file, { path: uploadPath })
-    showSuccess('上传成功')
-    await refreshWorkspace()
-  } catch (error) {
-    if (error?.code === 409) {
-      const confirmed = await confirmAction({
+    await writeWithOverwrite(
+      async (overwrite) => {
+        await userFileUploadApi(file, {
+          path: uploadPath,
+          ...(overwrite ? { overwrite: true } : {})
+        })
+        showSuccess(overwrite ? '已覆盖上传' : '上传成功')
+        await refreshWorkspace()
+      },
+      () => confirmAction({
         title: '覆盖同名文件',
         message: `「${file.name}」已存在，覆盖后无法恢复原文件，是否继续？`,
         confirmButtonText: '覆盖上传',
         type: 'warning'
-      })
-      if (!confirmed) return
-      try {
-        await userFileUploadApi(file, {
-          path: uploadPath,
-          overwrite: true
-        })
-        showSuccess('已覆盖上传')
-        await refreshWorkspace()
-        return
-      } catch (overwriteError) {
-        showError(`上传失败: ${overwriteError?.message || '未知错误'}`)
-        return
-      }
-    }
-    showError(`上传失败: ${error?.message || '未知错误'}`)
+      }),
+      '上传失败'
+    )
   } finally {
     uploading.value = false
   }
@@ -594,21 +563,14 @@ const previewFile = async (row) => {
 
 const deleteEntry = async (row) => {
   try {
-    let recursive = false
-    if (row.isDirectory) {
-      const confirmed = await confirmDelete({
-        title: '删除目录',
-        message: `目录 "${row.name}" 删除需要递归删除，确认继续？`
-      })
-      if (!confirmed) return
-      recursive = true
-    } else {
-      const confirmed = await confirmDelete({
-        title: '删除文件',
-        message: `确认删除文件 "${row.name}"？`
-      })
-      if (!confirmed) return
-    }
+    const recursive = Boolean(row.isDirectory)
+    const confirmed = await confirmDelete({
+      title: recursive ? '删除目录' : '删除文件',
+      message: recursive
+        ? `目录 "${row.name}" 删除需要递归删除，确认继续？`
+        : `确认删除文件 "${row.name}"？`
+    })
+    if (!confirmed) return
 
     await userFileDeleteApi({ path: row.path, recursive })
     showSuccess('删除成功')
@@ -616,14 +578,6 @@ const deleteEntry = async (row) => {
   } catch (error) {
     showError(`删除失败: ${error?.message || '未知错误'}`)
   }
-}
-
-const openCreateDirDialog = () => {
-  createDirVisible.value = true
-}
-
-const openCreateFileDialog = () => {
-  createFileVisible.value = true
 }
 
 const submitCreateDir = async (form) => {
@@ -658,38 +612,25 @@ const submitCreateFile = async (form) => {
   const content = String(form?.content || '')
   creatingFile.value = true
   try {
-    await userFileCreateFileApi({
-      path,
-      content
-    })
-    showSuccess('文件创建成功')
-    createFileVisible.value = false
-    await refreshWorkspace()
-  } catch (error) {
-    if (error?.code === 409) {
-      const confirmed = await confirmAction({
+    await writeWithOverwrite(
+      async (overwrite) => {
+        await userFileCreateFileApi({
+          path,
+          content,
+          ...(overwrite ? { overwrite: true } : {})
+        })
+        showSuccess(overwrite ? '已覆盖同名文件' : '文件创建成功')
+        createFileVisible.value = false
+        await refreshWorkspace()
+      },
+      () => confirmAction({
         title: '覆盖同名文件',
         message: `「${name}」已存在，覆盖后无法恢复原内容，是否继续？`,
         confirmButtonText: '覆盖创建',
         type: 'warning'
-      })
-      if (!confirmed) return
-      try {
-        await userFileCreateFileApi({
-          path,
-          content,
-          overwrite: true
-        })
-        showSuccess('已覆盖同名文件')
-        createFileVisible.value = false
-        await refreshWorkspace()
-        return
-      } catch (overwriteError) {
-        showError(`创建文件失败: ${overwriteError?.message || '未知错误'}`)
-        return
-      }
-    }
-    showError(`创建文件失败: ${error?.message || '未知错误'}`)
+      }),
+      '创建文件失败'
+    )
   } finally {
     creatingFile.value = false
   }

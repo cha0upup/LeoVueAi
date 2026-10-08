@@ -315,28 +315,10 @@
         <el-form-item label="值类型">
           <el-select v-model="addForm.valueType">
             <el-option
-              label="REG_SZ"
-              value="REG_SZ"
-            />
-            <el-option
-              label="REG_DWORD"
-              value="REG_DWORD"
-            />
-            <el-option
-              label="REG_QWORD"
-              value="REG_QWORD"
-            />
-            <el-option
-              label="REG_EXPAND_SZ"
-              value="REG_EXPAND_SZ"
-            />
-            <el-option
-              label="REG_MULTI_SZ"
-              value="REG_MULTI_SZ"
-            />
-            <el-option
-              label="REG_BINARY"
-              value="REG_BINARY"
+              v-for="valueType in ['REG_SZ', 'REG_DWORD', 'REG_QWORD', 'REG_EXPAND_SZ', 'REG_MULTI_SZ', 'REG_BINARY']"
+              :key="valueType"
+              :label="valueType"
+              :value="valueType"
             />
           </el-select>
         </el-form-item>

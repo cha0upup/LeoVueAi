@@ -131,7 +131,7 @@
                   size="small"
                   link
                   :disabled="!form.content"
-                  @click="clearContent"
+                  @click="form.content = ''"
                 >
                   <el-icon><Icon :icon="iconMap.delete" /></el-icon>
                   清空
@@ -142,7 +142,7 @@
               v-model="form.content"
               type="textarea"
               :rows="7"
-              :placeholder="contentPlaceholder"
+              placeholder="输入文件内容，可留空"
               resize="none"
               class="content-editor"
               show-word-limit
@@ -208,7 +208,7 @@ import { Check } from '@element-plus/icons-vue'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
-import { formatFilePath } from '@/utils/format.js'
+import { joinFilePath, normalizeDirectoryPath } from '@/utils/format.js'
 import { validateForm } from '@/utils/formUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { newDirApi, newFileApi } from '@/services/api/agent-files.js'
@@ -241,40 +241,19 @@ const namePlaceholder = computed(() => (
   createType.value === 'file' ? '请输入完整文件名，例如 app.js' : '请输入文件夹名称'
 ))
 
-const contentPlaceholder = computed(() => '输入文件内容，可留空')
-
-const normalizeDirectoryPath = (path) => {
-  const formatted = formatFilePath(path || '/').replace(/\/\.$/, '')
-  if (formatted === '/' || /^[A-Za-z]:\/?$/.test(formatted)) {
-    return formatted.endsWith('/') ? formatted : `${formatted}/`
-  }
-  return formatted.replace(/\/+$/, '')
-}
-
-const joinPath = (basePath, name) => {
-  const base = normalizeDirectoryPath(basePath)
-  if (base === '/') return formatFilePath(`/${name}`)
-  return formatFilePath(`${base}${base.endsWith('/') ? '' : '/'}${name}`)
-}
-
 const targetDirectory = computed(() => normalizeDirectoryPath(currentPath.value))
 
 const normalizedName = computed(() => form.value.name.trim())
 
 const hasNameExtension = computed(() => /\.[^./\\]+$/.test(normalizedName.value))
 
-const effectiveName = computed(() => {
-  if (!normalizedName.value) return ''
-  return normalizedName.value
-})
-
 const fullPath = computed(() => {
-  if (!effectiveName.value) return targetDirectory.value
-  return joinPath(targetDirectory.value, effectiveName.value)
+  if (!normalizedName.value) return targetDirectory.value
+  return joinFilePath(targetDirectory.value, normalizedName.value)
 })
 
 const pathPreviewText = computed(() => (
-  effectiveName.value ? fullPath.value : '输入名称后生成路径'
+  normalizedName.value ? fullPath.value : '输入名称后生成路径'
 ))
 
 const nameAssistText = computed(() => {
@@ -431,10 +410,6 @@ const handleNameInput = () => {
   }
 }
 
-const clearContent = () => {
-  form.value.content = ''
-}
-
 const copyTargetPath = () => {
   navigator.clipboard.writeText(targetDirectory.value).then(
     () => showSuccess('已复制目录路径'),
@@ -443,7 +418,7 @@ const copyTargetPath = () => {
 }
 
 const copyGeneratedPath = () => {
-  if (!effectiveName.value) return
+  if (!normalizedName.value) return
   navigator.clipboard.writeText(fullPath.value).then(
     () => showSuccess('已复制生成路径'),
     () => showError('复制失败，请手动复制')
@@ -474,7 +449,7 @@ const handleSave = async ({ openAfterCreate = false } = {}) => {
 
         await (isFolder ? newDirApi(params) : newFileApi(params))
         return {
-          name: effectiveName.value,
+          name: normalizedName.value,
           path: fullPath.value,
           type: isFolder ? 'folder' : 'file',
           size: isFolder ? 0 : form.value.content.length,

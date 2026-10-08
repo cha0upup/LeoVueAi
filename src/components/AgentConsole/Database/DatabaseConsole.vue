@@ -47,7 +47,7 @@
       @refresh-namespace="refreshNamespace"
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
-      @selection-change="handleTableSelectionChange"
+      @selection-change="selectedRows = $event"
       @query-change="applyQuery"
       @query-timeout-change="setQueryTimeout"
       @cancel-query="cancelActiveRequest"
@@ -229,10 +229,9 @@ const editRowDialogVisible = ref(false)
 const editingRowData = reactive({})
 const editingOriginalRowData = ref({})
 const selectedRows = ref([])
-const selectedRowsCount = ref(0)
+const selectedRowsCount = computed(() => selectedRows.value.length)
 watch(tableRows, () => {
   selectedRows.value = []
-  selectedRowsCount.value = 0
 })
 
 const hasCapability = (capability) => sqlEngine.hasCapability(connection.dialect, capability)
@@ -395,11 +394,6 @@ const handleEditRowSuccess = async () => {
   clearEditingData()
 }
 
-const handleTableSelectionChange = (selection) => {
-  selectedRows.value = selection
-  selectedRowsCount.value = selection.length
-}
-
 const handleEditSelected = () => {
   if (selectedRows.value.length === 0) {
     showWarning(DATABASE_MESSAGES.SELECT_ROW_REQUIRED)
@@ -438,7 +432,6 @@ const handleDeleteSelected = async () => {
       }
 
       selectedRows.value = []
-      selectedRowsCount.value = 0
 
       if (currentDatabase.value && currentTable.value) {
         await loadTableRows(currentTableRef.value)
@@ -586,7 +579,6 @@ const resetWorkspace = () => {
   resetMetadata()
   clearSelection()
   selectedRows.value = []
-  selectedRowsCount.value = 0
 }
 
 const connectDatabase = async () => {

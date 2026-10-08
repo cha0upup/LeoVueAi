@@ -69,40 +69,30 @@ watch(
   }
 )
 
+const updateEditorOptions = (options) => {
+  if (monacoEditor.value) {
+    toRaw(monacoEditor.value).updateOptions(options)
+  }
+}
+
 watch(
   () => props.fontSize,
-  (newSize) => {
-    if (monacoEditor.value) {
-      toRaw(monacoEditor.value).updateOptions({ fontSize: newSize })
-    }
-  }
+  (fontSize) => updateEditorOptions({ fontSize })
 )
 
 watch(
   () => props.wordWrap,
-  (wrap) => {
-    if (monacoEditor.value) {
-      toRaw(monacoEditor.value).updateOptions({ wordWrap: wrap ? 'on' : 'off' })
-    }
-  }
+  (wrap) => updateEditorOptions({ wordWrap: wrap ? 'on' : 'off' })
 )
 
 watch(
   () => props.showLineNumbers,
-  (show) => {
-    if (monacoEditor.value) {
-      toRaw(monacoEditor.value).updateOptions({ lineNumbers: show ? 'on' : 'off' })
-    }
-  }
+  (show) => updateEditorOptions({ lineNumbers: show ? 'on' : 'off' })
 )
 
 watch(
   () => props.showMinimap,
-  (show) => {
-    if (monacoEditor.value) {
-      toRaw(monacoEditor.value).updateOptions({ minimap: { enabled: show } })
-    }
-  }
+  (show) => updateEditorOptions({ minimap: { enabled: show } })
 )
 
 const initEditor = () => {
@@ -202,16 +192,10 @@ const formatCode = () => {
   }
 }
 
-const getContent = () => {
-  if (monacoEditor.value) {
-    return toRaw(monacoEditor.value).getValue()
-  }
-  return props.content
-}
+const getContent = () =>
+  monacoEditor.value ? toRaw(monacoEditor.value).getValue() : props.content
 
-const getEditorInstance = () => {
-  return monacoEditor.value
-}
+const getEditorInstance = () => monacoEditor.value
 
 const stopMonacoThemeWatch = watchMonacoTheme(() => monacoEditor.value)
 

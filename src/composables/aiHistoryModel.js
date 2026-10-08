@@ -18,12 +18,6 @@ const normalizeTimestamp = value => {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : Date.now()
 }
 
-const mergePatch = (target, patch, immutableKeys) => {
-  Object.entries(patch).forEach(([key, value]) => {
-    if (!immutableKeys.includes(key) && value != null) target[key] = value
-  })
-}
-
 const mapAssistantNodes = (message, includeSubtasks) => {
   const toolNodes = new Map()
   const subtaskNodes = new Map()
@@ -43,7 +37,9 @@ const mapAssistantNodes = (message, includeSubtasks) => {
     const key = item[idField]
     const existing = key ? nodesById.get(key) : null
     if (existing) {
-      mergePatch(existing, item, ['kind', 'seq', idField])
+      for (const [field, value] of Object.entries(item)) {
+        if (field !== 'kind' && field !== 'seq' && field !== idField && value != null) existing[field] = value
+      }
     } else {
       const merged = { ...item }
       if (key) nodesById.set(key, merged)
@@ -121,19 +117,17 @@ const persistedRuntimeStatus = message => {
 
 export const mapPersistedMessages = (serverMessages, { includeSubtasks = false } = {}) => {
   const messages = Array.isArray(serverMessages) ? serverMessages : []
-  const answeredQuestionIds = new Set(messages
-    .map(message => message?.answerToQuestionId)
-    .filter(Boolean)
-    .map(String))
+  const answeredQuestionIds = new Set()
   const answersByQuestionId = new Map()
+  const retryTextByTurn = new Map()
   messages.forEach(message => {
-    if (message?.role !== 'user' || !message.answerToQuestionId) return
-    const answeredId = String(message.answerToQuestionId)
-    answersByQuestionId.set(answeredId, String(message.content || ''))
+    if (message?.answerToQuestionId) answeredQuestionIds.add(String(message.answerToQuestionId))
+    if (message?.role !== 'user') return
+    if (message.answerToQuestionId) {
+      answersByQuestionId.set(String(message.answerToQuestionId), String(message.content || ''))
+    }
+    if (message.turnId) retryTextByTurn.set(message.turnId, message.content ?? '')
   })
-  const retryTextByTurn = new Map(messages
-    .filter(message => message?.role === 'user' && message?.turnId)
-    .map(message => [message.turnId, message.content ?? '']))
   return messages.map(message => {
     const timestamp = normalizeTimestamp(message?.timestamp)
     if (message?.role === 'user') {

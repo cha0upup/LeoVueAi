@@ -156,7 +156,7 @@
               <template #default="{ row }">
                 <span
                   class="user-link"
-                  @click="handleQueryUser(row.name)"
+                  @click="handleQueryDetail('users', row.name)"
                 >{{ row.name }}</span>
               </template>
             </el-table-column>
@@ -240,7 +240,7 @@
               <template #default="{ row }">
                 <span
                   class="user-link"
-                  @click="handleQueryGroup(row.name)"
+                  @click="handleQueryDetail('groups', row.name)"
                 >{{ row.name }}</span>
               </template>
             </el-table-column>
@@ -362,36 +362,21 @@ const whoamiDisplay = computed(() => {
   return d
 })
 
-const filteredUsers = computed(() => {
-  let list = users.value
+function filterAccounts(list, fields) {
   if (hideSystem.value) {
-    list = list.filter(u => !u.system)
+    list = list.filter(item => !item.system)
   }
   if (searchText.value) {
     const kw = searchText.value.toLowerCase()
-    list = list.filter(u => {
-      return (u.name && u.name.toLowerCase().includes(kw)) ||
-             (u.fullName && u.fullName.toLowerCase().includes(kw)) ||
-             (u.home && u.home.toLowerCase().includes(kw))
-    })
+    list = list.filter(item => fields.some(field =>
+      item[field] && item[field].toLowerCase().includes(kw)
+    ))
   }
   return list
-})
+}
 
-const filteredGroups = computed(() => {
-  let list = groups.value
-  if (hideSystem.value) {
-    list = list.filter(g => !g.system)
-  }
-  if (searchText.value) {
-    const kw = searchText.value.toLowerCase()
-    list = list.filter(g => {
-      return (g.name && g.name.toLowerCase().includes(kw)) ||
-             (g.members && g.members.toLowerCase().includes(kw))
-    })
-  }
-  return list
-})
+const filteredUsers = computed(() => filterAccounts(users.value, ['name', 'fullName', 'home']))
+const filteredGroups = computed(() => filterAccounts(groups.value, ['name', 'members']))
 
 const currentList = computed(() => activeTab.value === 'users' ? filteredUsers.value : filteredGroups.value)
 const currentLoading = computed(() => activeTab.value === 'users' ? isLoadingUsers.value : isLoadingGroups.value)
@@ -411,79 +396,53 @@ async function handleWhoami() {
   }
 }
 
-async function handleListUsers() {
-  isLoadingUsers.value = true
-  activeTab.value = 'users'
+async function loadAccounts(tab) {
+  const userList = tab === 'users'
+  const key = userList ? 'users' : 'groups'
+  const loading = userList ? isLoadingUsers : isLoadingGroups
+  const list = userList ? users : groups
+  const loaded = userList ? usersLoaded : groupsLoaded
+  const label = userList ? '用户' : '组'
+  loading.value = true
+  activeTab.value = key
   try {
-    const res = await listUsersApi(withSession())
+    const request = userList ? listUsersApi : listGroupsApi
+    const res = await request(withSession())
     const data = res.data.data
-    users.value = data.users || []
-    usersLoaded.value = true
+    list.value = data[key] || []
+    loaded.value = true
     osInfo.value = data.os
-    if (!users.value.length) showWarning('未找到用户')
+    if (!list.value.length) showWarning(`未找到${label}`)
   } catch (e) {
-    handleApiError(e, '获取用户列表失败')
+    handleApiError(e, `获取${label}列表失败`)
   } finally {
-    isLoadingUsers.value = false
-  }
-}
-
-async function handleListGroups() {
-  isLoadingGroups.value = true
-  activeTab.value = 'groups'
-  try {
-    const res = await listGroupsApi(withSession())
-    const data = res.data.data
-    groups.value = data.groups || []
-    groupsLoaded.value = true
-    osInfo.value = data.os
-    if (!groups.value.length) showWarning('未找到组')
-  } catch (e) {
-    handleApiError(e, '获取组列表失败')
-  } finally {
-    isLoadingGroups.value = false
+    loading.value = false
   }
 }
 
 async function handleRefresh() {
-  if (activeTab.value === 'users') {
-    await handleListUsers()
-  } else {
-    await handleListGroups()
-  }
+  await loadAccounts(activeTab.value)
 }
 
 async function handleTabChange(tab) {
   searchText.value = ''
-  if (tab === 'users' && !usersLoaded.value) {
-    await handleListUsers()
-  } else if (tab === 'groups' && !groupsLoaded.value) {
-    await handleListGroups()
+  if ((tab === 'users' && !usersLoaded.value) || (tab === 'groups' && !groupsLoaded.value)) {
+    await loadAccounts(tab)
   }
 }
 
-async function handleQueryUser(username) {
-  detailTitle.value = '用户详情: ' + username
+async function handleQueryDetail(tab, name) {
+  const userDetail = tab === 'users'
+  const label = userDetail ? '用户' : '组'
+  detailTitle.value = label + '详情: ' + name
   detailData.value = null
   showDetailDialog.value = true
   try {
-    const res = await queryUserApi(withSession({ username }))
+    const request = userDetail ? queryUserApi : queryGroupApi
+    const res = await request(withSession({ [userDetail ? 'username' : 'groupName']: name }))
     detailData.value = res.data.data.detail
   } catch (e) {
-    handleApiError(e, '查询用户失败')
-    showDetailDialog.value = false
-  }
-}
-
-async function handleQueryGroup(groupName) {
-  detailTitle.value = '组详情: ' + groupName
-  detailData.value = null
-  showDetailDialog.value = true
-  try {
-    const res = await queryGroupApi(withSession({ groupName }))
-    detailData.value = res.data.data.detail
-  } catch (e) {
-    handleApiError(e, '查询组失败')
+    handleApiError(e, `查询${label}失败`)
     showDetailDialog.value = false
   }
 }

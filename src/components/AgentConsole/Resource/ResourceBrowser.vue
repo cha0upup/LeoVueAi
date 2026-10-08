@@ -50,7 +50,7 @@
         <el-button
           type="primary"
           :loading="loading"
-          :disabled="!canFetch"
+          :disabled="!queryValue"
           @click="onFetch"
         >
           <el-icon v-if="!loading">
@@ -80,7 +80,7 @@
         <el-button
           :disabled="!result"
           size="default"
-          @click="onClear"
+          @click="result = null; error = null"
         >
           <el-icon><Icon :icon="iconMap.delete" /></el-icon>
           清空
@@ -149,10 +149,10 @@
           </el-descriptions-item>
           <el-descriptions-item label="类型">
             <el-tag
-              :type="previewTagType"
+              :type="previewTag.type"
               size="small"
             >
-              {{ previewTagLabel }}
+              {{ previewTag.label }}
             </el-tag>
             <el-tag
               v-if="result.textTruncated"
@@ -237,26 +237,18 @@ const emptyHint = computed(() =>
     : '输入相对 classpath 的资源路径（application.yml、META-INF/MANIFEST.MF 等）'
 )
 
-const canFetch = computed(() =>
+const queryValue = computed(() =>
   mode.value === 'class'
-    ? !!className.value.trim()
-    : !!resourcePath.value.trim()
+    ? className.value.trim()
+    : resourcePath.value.trim()
 )
 
-const previewTagType = computed(() => {
+const previewTag = computed(() => {
   switch (result.value?.preview) {
-    case 'java': return 'success'
-    case 'text': return 'primary'
-    case 'hex': return 'info'
-    default: return 'info'
-  }
-})
-const previewTagLabel = computed(() => {
-  switch (result.value?.preview) {
-    case 'java': return 'Java 反编译'
-    case 'text': return '文本'
-    case 'hex': return '二进制（十六进制）'
-    default: return '未知'
+    case 'java': return { type: 'success', label: 'Java 反编译' }
+    case 'text': return { type: 'primary', label: '文本' }
+    case 'hex': return { type: 'info', label: '二进制（十六进制）' }
+    default: return { type: 'info', label: '未知' }
   }
 })
 
@@ -316,7 +308,7 @@ const hexPreview = computed(() => {
 // ── 操作 ────────────────────────────────────────────────────
 
 const onFetch = async () => {
-  if (!canFetch.value) {
+  if (!queryValue.value) {
     showWarning(mode.value === 'class' ? '请输入类名' : '请输入资源路径')
     return
   }
@@ -324,16 +316,11 @@ const onFetch = async () => {
   error.value = null
   result.value = null
   try {
-    const payload = {
+    const response = await fetchResourceApi({
       sessionId: props.sessionId,
-      mode: mode.value
-    }
-    if (mode.value === 'class') {
-      payload.className = className.value.trim()
-    } else {
-      payload.resourcePath = resourcePath.value.trim()
-    }
-    const response = await fetchResourceApi(payload)
+      mode: mode.value,
+      [mode.value === 'class' ? 'className' : 'resourcePath']: queryValue.value
+    })
     result.value = response.data || null
     pushHistory()
   } catch (err) {
@@ -347,11 +334,15 @@ const onFetch = async () => {
 }
 
 const pushHistory = () => {
-  const entry = mode.value === 'class'
-    ? { key: `c:${className.value.trim()}`, label: className.value.trim(), mode: 'class', value: className.value.trim() }
-    : { key: `p:${resourcePath.value.trim()}`, label: resourcePath.value.trim(), mode: 'path', value: resourcePath.value.trim() }
-  const next = [entry, ...history.value.filter((h) => h.key !== entry.key)]
-  history.value = next.slice(0, HISTORY_MAX)
+  const isClass = mode.value === 'class'
+  const value = queryValue.value
+  const entry = {
+    key: `${isClass ? 'c' : 'p'}:${value}`,
+    label: value,
+    mode: isClass ? 'class' : 'path',
+    value
+  }
+  history.value = [entry, ...history.value.filter((h) => h.key !== entry.key)].slice(0, HISTORY_MAX)
 }
 
 const loadHistory = (item) => {
@@ -382,8 +373,7 @@ const onDownload = () => {
   if (!result.value?.base64) return
   try {
     const raw = atob(result.value.base64)
-    const bytes = new Uint8Array(raw.length)
-    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
+    const bytes = Uint8Array.from(raw, (character) => character.charCodeAt(0))
     const blob = new Blob([bytes], { type: 'application/octet-stream' })
     // 用资源路径最后一段作为文件名
     const path = result.value.resourcePath || 'resource'
@@ -391,11 +381,6 @@ const onDownload = () => {
   } catch (err) {
     showError('下载失败：' + (err?.message || err))
   }
-}
-
-const onClear = () => {
-  result.value = null
-  error.value = null
 }
 
 const formatBytes = (n) => {

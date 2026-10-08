@@ -49,20 +49,10 @@
             style="width:130px"
           >
             <el-option
-              label="LISTEN"
-              value="LISTEN"
-            />
-            <el-option
-              label="ESTABLISHED"
-              value="ESTABLISHED"
-            />
-            <el-option
-              label="TIME_WAIT"
-              value="TIME_WAIT"
-            />
-            <el-option
-              label="CLOSE_WAIT"
-              value="CLOSE_WAIT"
+              v-for="state in ['LISTEN', 'ESTABLISHED', 'TIME_WAIT', 'CLOSE_WAIT']"
+              :key="state"
+              :label="state"
+              :value="state"
             />
           </el-select>
           <el-select
@@ -73,12 +63,10 @@
             style="width:90px"
           >
             <el-option
-              label="TCP"
-              value="TCP"
-            />
-            <el-option
-              label="UDP"
-              value="UDP"
+              v-for="protocol in ['TCP', 'UDP']"
+              :key="protocol"
+              :label="protocol"
+              :value="protocol"
             />
           </el-select>
           <span
@@ -370,47 +358,32 @@ const filteredConnections = computed(() => {
 })
 
 async function handleRefresh() {
-  if (activeTab.value === 'list') {
-    await handleList()
-  } else {
-    await handleSummary()
-  }
+  await loadNetworkData(activeTab.value)
 }
 
-async function handleList() {
+async function loadNetworkData(tab) {
+  const listing = tab === 'list'
   isLoading.value = true
-  loaded.value = true
+  if (listing) loaded.value = true
   try {
-    const res = await listNetworkConnectionsApi(withSession())
-    const data = res.data
-    connections.value = data.connections || []
-    if (connections.value.length === 0) {
-      showWarning('未获取到网络连接')
+    const request = listing ? listNetworkConnectionsApi : networkConnectionSummaryApi
+    const res = await request(withSession())
+    if (listing) {
+      connections.value = res.data.connections || []
+      if (connections.value.length === 0) showWarning('未获取到网络连接')
+    } else {
+      summaryData.value = res.data
     }
   } catch (err) {
-    handleApiError(err, '获取网络连接失败')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-async function handleSummary() {
-  isLoading.value = true
-  try {
-    const res = await networkConnectionSummaryApi(withSession())
-    summaryData.value = res.data
-  } catch (err) {
-    handleApiError(err, '获取统计信息失败')
+    handleApiError(err, listing ? '获取网络连接失败' : '获取统计信息失败')
   } finally {
     isLoading.value = false
   }
 }
 
 function handleTabChange(tab) {
-  if (tab === 'list' && !loaded.value) {
-    handleList()
-  } else if (tab === 'summary' && !summaryData.value) {
-    handleSummary()
+  if ((tab === 'list' && !loaded.value) || (tab === 'summary' && !summaryData.value)) {
+    loadNetworkData(tab)
   }
 }
 

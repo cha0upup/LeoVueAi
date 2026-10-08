@@ -51,7 +51,7 @@
           v-model="listWidth"
           :min="listMin"
           :max="listMax"
-          @change="onListWidthChange"
+          @change="emit('list-width-change', $event)"
         />
 
         <main class="detail-panel">
@@ -96,8 +96,6 @@ watch(
 )
 
 watch(listWidth, (v) => emit('update:listWidth', v))
-
-const onListWidthChange = (v) => emit('list-width-change', v)
 </script>
 
 <style scoped>

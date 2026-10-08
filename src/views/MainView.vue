@@ -88,14 +88,8 @@ const {
   iconMap
 })
 
-const readRouteTabKey = () => {
-  const rawTabKey = route.params.tabKey
-  return Array.isArray(rawTabKey) ? rawTabKey[0] : rawTabKey
-}
-
 const openAgentConsole = (agentConsoleParams) => {
-  const tab = addAgentConsoleTab(agentConsoleParams)
-  const targetRoute = getTabRoute(tab)
+  const targetRoute = getTabRoute(addAgentConsoleTab(agentConsoleParams))
 
   if (route.fullPath !== targetRoute) {
     router.push(targetRoute)
@@ -104,7 +98,8 @@ const openAgentConsole = (agentConsoleParams) => {
 
 const syncTabFromRoute = () => {
   if (route.name === ROUTE_NAMES.mainAgent) {
-    const tabKey = readRouteTabKey()
+    const rawTabKey = route.params.tabKey
+    const tabKey = Array.isArray(rawTabKey) ? rawTabKey[0] : rawTabKey
     const tab = tabKey ? switchTabByKey(tabKey) : null
 
     if (!tab) {

@@ -24,62 +24,29 @@
             </button>
           </div>
 
-          <p class="admin-menu__group">
-            <span>Identity</span>
-            <strong>账号与组织</strong>
-          </p>
-          <button
-            v-for="tab in accountTabs"
-            :key="tab.name"
-            type="button"
-            class="admin-menu-item"
-            :class="{ 'is-active': activeTab === tab.name }"
-            :data-tab="tab.name"
-            :title="sidebarCollapsed ? tab.label : ''"
-            :aria-label="tab.label"
-            @click="selectTab(tab.name)"
+          <template
+            v-for="group in tabGroups"
+            :key="group.name"
           >
-            <el-icon><Icon :icon="tab.icon" /></el-icon>
-            <span>{{ tab.label }}</span>
-          </button>
-
-          <p class="admin-menu__group">
-            <span>Governance</span>
-            <strong>审计治理</strong>
-          </p>
-          <button
-            v-for="tab in auditTabs"
-            :key="tab.name"
-            type="button"
-            class="admin-menu-item"
-            :class="{ 'is-active': activeTab === tab.name }"
-            :data-tab="tab.name"
-            :title="sidebarCollapsed ? tab.label : ''"
-            :aria-label="tab.label"
-            @click="selectTab(tab.name)"
-          >
-            <el-icon><Icon :icon="tab.icon" /></el-icon>
-            <span>{{ tab.label }}</span>
-          </button>
-
-          <p class="admin-menu__group">
-            <span>System</span>
-            <strong>系统能力</strong>
-          </p>
-          <button
-            v-for="tab in systemTabs"
-            :key="tab.name"
-            type="button"
-            class="admin-menu-item"
-            :class="{ 'is-active': activeTab === tab.name }"
-            :data-tab="tab.name"
-            :title="sidebarCollapsed ? tab.label : ''"
-            :aria-label="tab.label"
-            @click="selectTab(tab.name)"
-          >
-            <el-icon><Icon :icon="tab.icon" /></el-icon>
-            <span>{{ tab.label }}</span>
-          </button>
+            <p class="admin-menu__group">
+              <span>{{ group.name }}</span>
+              <strong>{{ group.label }}</strong>
+            </p>
+            <button
+              v-for="tab in group.tabs"
+              :key="tab.name"
+              type="button"
+              class="admin-menu-item"
+              :class="{ 'is-active': activeTab === tab.name }"
+              :data-tab="tab.name"
+              :title="sidebarCollapsed ? tab.label : ''"
+              :aria-label="tab.label"
+              @click="selectTab(tab.name)"
+            >
+              <el-icon><Icon :icon="tab.icon" /></el-icon>
+              <span>{{ tab.label }}</span>
+            </button>
+          </template>
         </nav>
       </aside>
 
@@ -103,12 +70,11 @@ import TeamManager from '@/components/Admin/TeamManager.vue'
 import UserManager from '@/components/Admin/UserManager.vue'
 import AiChannelSettings from '@/components/Settings/AiChannelSettings.vue'
 import { ROUTE_PATHS } from '@/constants/app.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { useAppModeNavigation } from '@/composables/useAppModeNavigation.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 
-const iconMap = icons
 const router = useRouter()
 const route = useRoute()
 
@@ -121,10 +87,6 @@ const tabs = [
     label: '用户管理',
     adminOnly: false,
     icon: iconMap.user,
-    summary: '处理账号新增、角色配置与状态维护。',
-    description: '集中管理用户身份、角色与团队归属，适合执行账户治理与批量维护。',
-    tagType: 'primary',
-    tagText: '账户',
     component: UserManager
   },
   {
@@ -132,10 +94,6 @@ const tabs = [
     label: '团队管理',
     adminOnly: false,
     icon: iconMap.userFilled,
-    summary: '组织团队结构，明确队长与成员归属。',
-    description: '维护团队实体与负责人分配，为后续权限隔离和资源视角提供组织基础。',
-    tagType: 'success',
-    tagText: '组织',
     component: TeamManager
   },
   {
@@ -143,10 +101,6 @@ const tabs = [
     label: '审计日志',
     adminOnly: true,
     icon: iconMap.document,
-    summary: '筛选、追踪并清理系统操作日志。',
-    description: '面向运维审计与安全追溯，支持多维筛选日志、定位风险操作并维护日志留存。',
-    tagType: 'warning',
-    tagText: '追踪',
     component: AuditManager
   },
   {
@@ -154,10 +108,6 @@ const tabs = [
     label: '审计统计',
     adminOnly: true,
     icon: iconMap.trendCharts,
-    summary: '查看审计行为分布与时间趋势。',
-    description: '提供按用户、团队、主机与操作类型的统计视角，用于发现异常与优化治理策略。',
-    tagType: 'info',
-    tagText: '分析',
     component: AuditStatistics
   },
   {
@@ -165,10 +115,6 @@ const tabs = [
     label: 'AI 模型接入',
     adminOnly: true,
     icon: iconMap.settings,
-    summary: '管理 AI 供应商、模型同步与能力上限。',
-    description: '配置平台接入的 AI 供应商，识别模型能力上限并控制默认调用模型。',
-    tagType: 'danger',
-    tagText: '配置',
     component: AiChannelSettings
   }
 ]
@@ -179,19 +125,19 @@ const sidebarCollapsed = ref(false)
 
 // 根据角色过滤可见模块：只有 admin 可见 adminOnly 标记的模块
 const visibleTabs = computed(() => tabs.filter((tab) => !tab.adminOnly || isAdmin.value))
-const accountTabs = computed(() => visibleTabs.value.filter((tab) => ['users', 'teams'].includes(tab.name)))
-const auditTabs = computed(() => visibleTabs.value.filter((tab) => ['audit', 'statistics'].includes(tab.name)))
-const systemTabs = computed(() => visibleTabs.value.filter((tab) => ['system'].includes(tab.name)))
+const tabGroups = computed(() => [
+  { name: 'Identity', label: '账号与组织', tabs: visibleTabs.value.filter((tab) => ['users', 'teams'].includes(tab.name)) },
+  { name: 'Governance', label: '审计治理', tabs: visibleTabs.value.filter((tab) => ['audit', 'statistics'].includes(tab.name)) },
+  { name: 'System', label: '系统能力', tabs: visibleTabs.value.filter((tab) => tab.name === 'system') }
+])
 
 const activeTabMeta = computed(
   () => visibleTabs.value.find((tab) => tab.name === activeTab.value) ?? visibleTabs.value[0]
 )
-const getQueryTab = (tabName) => {
-  return Array.isArray(tabName) ? tabName[0] : tabName
-}
+const getQueryTab = (tabName) => Array.isArray(tabName) ? tabName[0] : tabName
 
 const normalizeTabName = (tabName) => {
-  const value = Array.isArray(tabName) ? tabName[0] : tabName
+  const value = getQueryTab(tabName)
   return visibleTabs.value.some((tab) => tab.name === value)
     ? value
     : visibleTabs.value[0]?.name
@@ -205,24 +151,20 @@ const getAdminTabLocation = (tabName) => ({
 const syncActiveTabFromRoute = ({ normalizeUrl = false } = {}) => {
   const queryTab = getQueryTab(route.query.tab)
   const nextTab = normalizeTabName(queryTab)
-  if (nextTab) {
-    activeTab.value = nextTab
-  }
-  if (normalizeUrl && nextTab && queryTab !== nextTab) {
+  if (!nextTab) return
+  activeTab.value = nextTab
+  if (normalizeUrl && queryTab !== nextTab) {
     const normalizedLocation = getAdminTabLocation(nextTab)
     rememberAdminRoute(router.resolve(normalizedLocation).fullPath)
     router.replace(normalizedLocation)
     return
   }
-  if (nextTab) {
-    rememberAdminRoute(route.fullPath)
-  }
+  rememberAdminRoute(route.fullPath)
 }
 
 const selectTab = (tabName) => {
   const nextTab = normalizeTabName(tabName)
-  if (!nextTab) return
-  if (getQueryTab(route.query.tab) === nextTab) return
+  if (!nextTab || getQueryTab(route.query.tab) === nextTab) return
   const nextLocation = getAdminTabLocation(nextTab)
   rememberAdminRoute(router.resolve(nextLocation).fullPath)
   router.push(nextLocation)
@@ -230,9 +172,7 @@ const selectTab = (tabName) => {
 
 watch(
   () => route.query.tab,
-  () => {
-    syncActiveTabFromRoute({ normalizeUrl: true })
-  }
+  () => syncActiveTabFromRoute({ normalizeUrl: true })
 )
 
 watch(sidebarCollapsed, (collapsed) => {

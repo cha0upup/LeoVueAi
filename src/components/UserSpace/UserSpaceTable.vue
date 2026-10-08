@@ -33,7 +33,7 @@
         <el-button
           v-if="selectedEntry.isDirectory"
           type="primary"
-          @click="emitEnterDirectory(selectedEntry)"
+          @click="emit('enter-directory', selectedEntry)"
         >
           <el-icon><Icon :icon="iconMap.folderOpened" /></el-icon>
           打开
@@ -41,14 +41,14 @@
         <el-button
           v-else
           type="primary"
-          @click="emitPreviewFile(selectedEntry)"
+          @click="emit('preview-file', selectedEntry)"
         >
           <el-icon><Icon :icon="iconMap.view" /></el-icon>
           预览
         </el-button>
         <el-button
           v-if="!selectedEntry.isDirectory"
-          @click="emitDownloadFile(selectedEntry)"
+          @click="emit('download-file', selectedEntry)"
         >
           <el-icon><Icon :icon="iconMap.download" /></el-icon>
           下载
@@ -56,7 +56,7 @@
         <el-button
           type="danger"
           plain
-          @click="emitDeleteEntry(selectedEntry)"
+          @click="emit('delete-entry', selectedEntry)"
         >
           <el-icon><Icon :icon="iconMap.delete" /></el-icon>
           删除
@@ -102,8 +102,8 @@
 
 <script setup>
 import { icons } from '@/utils/icons.js'
-import { formatFileSize, formatDate } from '@/utils/format.js'
-import { getUserSpaceEntryIconKey, getUserSpaceFileExtension } from './userSpaceModel.js'
+import { formatFileSize, formatDate as formatTimestamp } from '@/utils/format.js'
+import { getUserSpaceEntryIconKey, getUserSpaceFileExtension as getFileExtension } from './userSpaceModel.js'
 
 const iconMap = icons
 
@@ -116,16 +116,7 @@ defineProps({
 
 const emit = defineEmits(['enter-directory', 'preview-file', 'download-file', 'delete-entry'])
 
-const formatTimestamp = (value) => formatDate(value)
-
-const getFileExtension = (path) => getUserSpaceFileExtension(path)
 const resolveEntryIcon = (row) => iconMap[getUserSpaceEntryIconKey(row)] || iconMap.file
-
-// Emit methods
-const emitEnterDirectory = (row) => emit('enter-directory', row)
-const emitPreviewFile = (row) => emit('preview-file', row)
-const emitDownloadFile = (row) => emit('download-file', row)
-const emitDeleteEntry = (row) => emit('delete-entry', row)
 </script>
 
 <style scoped>

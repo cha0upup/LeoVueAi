@@ -10,28 +10,7 @@ const DEFAULT_STATE = {
   treePanelWidth: 240
 }
 
-function readState() {
-  const parsed = safeLocalStorage.getJSON(
-    STORAGE_KEY,
-    {},
-    (value) => value && typeof value === 'object' && !Array.isArray(value)
-  )
-  return { ...DEFAULT_STATE, ...parsed }
-}
-
-function writeState(state) {
-  safeLocalStorage.setJSON(STORAGE_KEY, state)
-}
-
 let sharedState = null
-
-function getSharedState() {
-  if (sharedState) return sharedState
-
-  sharedState = ref(readState())
-  watch(sharedState, writeState, { deep: true })
-  return sharedState
-}
 
 /**
  * Skill Manager 的 UI 状态持久化。
@@ -40,5 +19,14 @@ function getSharedState() {
  * 多个组件共享同一份状态，避免互相覆盖。
  */
 export function useSkillUiState() {
-  return { state: getSharedState() }
+  if (!sharedState) {
+    const parsed = safeLocalStorage.getJSON(
+      STORAGE_KEY,
+      {},
+      (value) => value && typeof value === 'object' && !Array.isArray(value)
+    )
+    sharedState = ref({ ...DEFAULT_STATE, ...parsed })
+    watch(sharedState, (state) => safeLocalStorage.setJSON(STORAGE_KEY, state), { deep: true })
+  }
+  return { state: sharedState }
 }

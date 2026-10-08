@@ -165,7 +165,7 @@
 import { computed } from 'vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { icons } from '@/utils/icons.js'
-import { formatDate } from '@/utils/format.js'
+import { formatDate as formatTime } from '@/utils/format.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
 const props = defineProps({
@@ -217,10 +217,6 @@ async function copyText(text, successMessage) {
   } catch {
     showError('复制失败，请手动复制')
   }
-}
-
-function formatTime(timestamp) {
-  return timestamp ? formatDate(timestamp) : '-'
 }
 </script>
 

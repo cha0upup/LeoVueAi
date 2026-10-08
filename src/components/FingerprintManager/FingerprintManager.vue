@@ -243,7 +243,7 @@ import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import EntityCard from '@/components/common/EntityCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import BatchActionBar from '@/components/common/BatchActionBar.vue'
-import { executeBlobDownload } from '@/utils/exportUtils.js'
+import { executeBlobDownload, exportSelectedArchive } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { useBatchSelection } from '@/composables/useBatchSelection.js'
 
@@ -292,8 +292,8 @@ function getRowId(row) {
 }
 
 let detailRequestId = 0
-async function fetchDetail(idOrFingerprintId) {
-  if (!idOrFingerprintId) {
+async function fetchDetail(fingerprintId) {
+  if (!fingerprintId) {
     detailData.value = null
     return
   }
@@ -301,7 +301,7 @@ async function fetchDetail(idOrFingerprintId) {
   detailLoading.value = true
   detailData.value = null
   try {
-    const res = await getFingerprintDetailApi({ fingerprintId: idOrFingerprintId })
+    const res = await getFingerprintDetailApi({ fingerprintId })
     if (requestId !== detailRequestId) return
     detailData.value = res.data ?? null
   } catch {
@@ -329,13 +329,9 @@ async function getFingerprints() {
       fingerprints.value = (Array.isArray(list) ? list : [])
         .slice()
         .sort((a, b) => (a.name || a.fingerprintId).localeCompare(b.name || b.fingerprintId))
-      if (fingerprints.value.length === 0) {
-        selectedFingerprint.value = null
-        detailData.value = null
-      } else {
-        const kept = prevId ? fingerprints.value.find((f) => f.fingerprintId === prevId) : null
-        selectedFingerprint.value = kept ?? fingerprints.value[0]
-      }
+      const kept = prevId ? fingerprints.value.find((f) => f.fingerprintId === prevId) : null
+      selectedFingerprint.value = kept ?? fingerprints.value[0] ?? null
+      if (!fingerprints.value.length) detailData.value = null
       return response
     },
     {
@@ -357,8 +353,7 @@ function openEditDialog(row) {
   detailLoading.value = true
   getFingerprintDetailApi({ fingerprintId: id })
     .then((res) => {
-      const d = res.data ?? null
-      currentEditDetail.value = d
+      currentEditDetail.value = res.data ?? null
       showSaveDialog.value = true
     })
     .catch(() => {
@@ -448,31 +443,15 @@ const {
   clearBatchSelection
 } = useBatchSelection(filteredFingerprints, item => item?.fingerprintId)
 
-async function handleBatchExport() {
-  const ids = Array.from(selectedIds.value)
-  if (!ids.length) return
-  const date = new Date().toISOString().slice(0, 10)
-  await executeBlobDownload(
-    () => exportFingerprintsBatchApi({ fingerprintIds: ids }),
-    `fingerprints_${date}.zip`,
-    {
-      loadingRef: batchExportLoading,
-      successMessage: `已导出 ${ids.length} 条指纹`,
-      onSuccess: () => {
-        for (const id of ids) selectedIds.value.delete(id)
-      }
-    }
-  ).catch(() => false)
-}
+const handleBatchExport = () => exportSelectedArchive(
+  selectedIds, ids => exportFingerprintsBatchApi({ fingerprintIds: ids }),
+  'fingerprints', '条指纹', batchExportLoading
+)
 
 // ── 导入回调 ──────────────────────────────────────────────────────────────
-async function handleImported() {
-  await getFingerprints()
-}
+const handleImported = getFingerprints
 
-onMounted(() => {
-  getFingerprints()
-})
+onMounted(getFingerprints)
 </script>
 
 <style scoped>

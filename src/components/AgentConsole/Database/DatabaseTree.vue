@@ -15,10 +15,7 @@
           :class="getNodeClass(node.level)"
         >
           <div class="node-content">
-            <el-icon
-              class="node-icon"
-              :class="getIconClass(node.level)"
-            >
+            <el-icon class="node-icon">
               <Icon :icon="node.level === 1 ? iconMap.folderOpened : iconMap.document" />
             </el-icon>
             <span class="node-label">{{ nodeData.label }}</span>
@@ -74,12 +71,6 @@ const handleNodeClick = (_data, node) => {
 const getNodeClass = (level) => {
   if (level === 1) return 'database-node'
   if (level === 2) return 'table-node'
-  return ''
-}
-
-const getIconClass = (level) => {
-  if (level === 1) return 'database-icon'
-  if (level === 2) return 'table-icon'
   return ''
 }
 </script>
@@ -178,12 +169,5 @@ const getIconClass = (level) => {
 .node-row.table-node .node-label {
   font-weight: 500;
   color: var(--el-text-color-regular);
-}
-
-/* 列节点特殊样式 */
-.node-row.column-node .node-label {
-  font-weight: 400;
-  color: var(--el-text-color-secondary);
-  font-size: 0.8125rem;
 }
 </style>

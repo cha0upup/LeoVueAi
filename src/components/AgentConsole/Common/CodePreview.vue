@@ -45,9 +45,7 @@ const ensureEditor = () => {
   recreateEditorInstance(editorRef, containerRef, buildOptions(), { disposeModel: true })
 }
 
-onMounted(() => {
-  ensureEditor()
-})
+onMounted(ensureEditor)
 
 // 内容变化：复用同一 editor 实例改 value，避免重建（保留滚动位置）
 watch(
@@ -64,13 +62,8 @@ watch(
   }
 )
 
-// 语言变化：用 monaco model 切语言；语言不可变时重建
-watch(
-  () => props.language,
-  () => {
-    ensureEditor()
-  }
-)
+// 语言变化时重建 editor。
+watch(() => props.language, ensureEditor)
 
 const stopThemeWatch = watchMonacoTheme(() => editorRef.value)
 

@@ -164,10 +164,6 @@ const rules = {
 
 const formRef = ref(null)
 
-const openChangePasswordDialog = () => {
-  dialog.open()
-}
-
 const handleClose = () => {
   resetFormUtil(formRef, form, {
     oldPassword: '',
@@ -192,15 +188,13 @@ const submitForm = async () => {
     {
       successMessage: '密码修改成功',
       errorMessage: '请求失败，请稍后重试',
-      onSuccess: () => {
-        handleClose()
-      }
+      onSuccess: handleClose
     }
   )
 }
 
 defineExpose({
-  openChangePasswordDialog
+  openChangePasswordDialog: dialog.open
 })
 </script>
 

@@ -25,18 +25,19 @@
       :filter-node-method="filterNode"
       :current-node-key="currentAgentId"
       :expand-on-click-node="false"
-      :show-checkbox="batchMode"
+      show-checkbox
       check-strictly
       highlight-current
       class="host-tree"
-      :class="{ 'batch-mode': batchMode }"
       @check="handleCheck"
-      @node-click="handleNodeClick"
+      @node-click="emit('row-click', $event)"
+      @node-expand="publishVisibleAgents"
+      @node-collapse="publishVisibleAgents"
     >
       <template #default="{ data }">
         <div
           class="tree-node"
-          @dblclick="handleQuickEnter(data)"
+          @dblclick="emit('enter-console', data)"
         >
           <div
             class="node-card"
@@ -118,7 +119,7 @@
               class="quick-enter"
               type="button"
               title="进入控制台"
-              @click.stop="handleQuickEnter(data)"
+              @click.stop="emit('enter-console', data)"
             >
               <el-icon><Icon icon="ep:arrow-right" /></el-icon>
             </button>
@@ -135,6 +136,7 @@ import { icons } from '@/utils/icons.js'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import { getHostDisplayName, getHostIcon, isChildHost } from './agentDetailUtils.js'
+import { collectVisibleAgents } from './agentTreeSelection.js'
 
 const iconMap = icons
 
@@ -147,20 +149,22 @@ const props = defineProps({
   currentAgentId: { type: String, default: '' },
   connectionResults: { type: Object, default: () => ({}) },
   testingAgentIds: { type: Array, default: () => [] },
-  batchMode: { type: Boolean, default: false },
+  checkedAgentIds: { type: Array, default: () => [] },
+  selectionDisabled: { type: Boolean, default: false },
   sessionsByAgentId: { type: Object, default: () => ({}) },
   projectMemberships: { type: Object, default: () => ({}) },
   emptyTitle: { type: String, default: '暂无主机' },
   emptyDescription: { type: String, default: '添加第一台主机以开始使用控制台' }
 })
 
-const emit = defineEmits(['row-click', 'enter-console', 'selection-change'])
+const emit = defineEmits(['row-click', 'enter-console', 'toggle-selection', 'visible-agents-change'])
 
 const agentTree = ref(null)
 
 const treeProps = {
   label: 'agentName',
   children: 'children',
+  disabled: () => props.selectionDisabled,
   isLeaf: (data) => !data?.hasChildren
 }
 
@@ -194,24 +198,42 @@ const getConnectionStatusText = (row) => {
 const getConnectionStatusTitle = (row) =>
   `连接测试：${getConnectionStatusText(row)} · 最近心跳：${formatHeartbeat(row.lastHeartbeat)}`
 
+const publishVisibleAgents = async () => {
+  await nextTick()
+  emit('visible-agents-change', collectVisibleAgents(props.agents, (id) => agentTree.value?.getNode?.(id)))
+}
+
+const syncChecked = () => agentTree.value?.setCheckedKeys?.(props.checkedAgentIds)
+
+const syncTreeState = async () => {
+  await nextTick()
+  syncChecked()
+  agentTree.value?.filter?.(props.keyword)
+  publishVisibleAgents()
+}
+
 const handleLoad = (node, resolve) => {
+  const complete = (rows) => {
+    resolve(rows)
+    return syncTreeState()
+  }
   if (node.level === 0) {
-    resolve(props.agents)
+    complete(props.agents)
     return
   }
-  props.loadChildren(node.data, node, resolve)
-}
-
-const handleNodeClick = (data) => {
-  emit('row-click', data)
-}
-
-const handleQuickEnter = (data) => {
-  emit('enter-console', data)
+  if (!node.data?.hasChildren) {
+    complete([])
+    return
+  }
+  props.loadChildren(node.data, node, complete)
 }
 
 const handleCheck = (data, checkedInfo = {}) => {
-  emit('selection-change', checkedInfo.checkedNodes || [])
+  if (props.selectionDisabled) {
+    syncChecked()
+    return
+  }
+  emit('toggle-selection', data, (checkedInfo.checkedKeys || []).includes(data.agentId))
 }
 
 const formatHeartbeat = (ts) => {
@@ -240,29 +262,14 @@ const filterNode = (keyword, data) => {
 
 const clearSelection = () => {
   agentTree.value?.setCurrentKey(null)
-  clearChecked()
-}
-
-const clearChecked = () => {
-  agentTree.value?.setCheckedKeys?.([])
-  emit('selection-change', [])
-}
-
-const selectAll = async (agentIds) => {
-  agentTree.value?.setCheckedKeys?.(agentIds)
-  await nextTick()
-  const checkedNodes = agentTree.value?.getCheckedNodes?.() || []
-  emit('selection-change', checkedNodes)
 }
 
 const getLoadedAgent = (agentId) => agentTree.value?.getNode?.(agentId)?.data || null
 
 watch(
-  () => props.keyword,
-  (value) => {
-    agentTree.value?.filter?.(value)
-  },
-  { immediate: true }
+  [() => props.checkedAgentIds, () => props.agents, () => props.tableKey, () => props.keyword],
+  syncTreeState,
+  { immediate: true, flush: 'post' }
 )
 
 watch(
@@ -277,8 +284,6 @@ watch(
 
 defineExpose({
   clearSelection,
-  clearChecked,
-  selectAll,
   getLoadedAgent
 })
 </script>
@@ -288,7 +293,7 @@ defineExpose({
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 2px 6px 8px;
+  padding: 2px 0 8px;
 }
 
 /* ─── Tree base ─── */
@@ -298,7 +303,7 @@ defineExpose({
 
 .host-tree :deep(.el-tree-node__content) {
   position: relative;
-  align-items: flex-start;
+  align-items: center;
   height: auto;
   min-width: 0;
   padding: 0 !important;
@@ -311,10 +316,9 @@ defineExpose({
 }
 
 .host-tree :deep(.el-tree-node__content > .el-checkbox) {
-  margin-right: 6px;
-  margin-left: 24px;
-  margin-top: 18px;
-  transform: translateY(-50%);
+  margin-right: 4px;
+  margin-left: var(--agent-expand-gutter, 22px);
+  height: 50px;
 }
 
 .host-tree :deep(.el-checkbox__inner) {
@@ -323,14 +327,10 @@ defineExpose({
   height: 14px;
 }
 
-.host-tree:not(.batch-mode) :deep(.el-tree-node__content > .el-checkbox) {
-  display: none;
-}
-
 .host-tree :deep(.el-tree-node__expand-icon) {
   position: absolute;
   top: 15px;
-  left: 3px;
+  left: 1px;
   z-index: 1;
   margin: 0;
   padding: 4px;
@@ -370,7 +370,7 @@ defineExpose({
   width: 100%;
   min-width: 0;
   min-height: 50px;
-  padding: 8px 8px 8px 26px;
+  padding: 8px;
   border-radius: var(--radius-tag);
   border: 1px solid transparent;
   border-bottom-color: var(--app-divider-color);
@@ -389,10 +389,6 @@ defineExpose({
 
 .node-card.is-child {
   background: transparent;
-}
-
-.host-tree.batch-mode .node-card {
-  padding-left: 8px;
 }
 
 /* ─── Icon shell ─── */
@@ -555,7 +551,7 @@ defineExpose({
 /* ─── Quick enter button ─── */
 .quick-enter {
   position: absolute;
-  left: 26px;
+  left: 8px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -577,10 +573,6 @@ defineExpose({
 .node-card:focus-within .quick-enter {
   pointer-events: auto;
   opacity: 1;
-}
-
-.host-tree.batch-mode .quick-enter {
-  left: 8px;
 }
 
 .quick-enter:hover {

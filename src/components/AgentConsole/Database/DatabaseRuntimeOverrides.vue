@@ -1,14 +1,26 @@
 <template>
-  <el-collapse v-model="activeNames" class="runtime-overrides">
+  <el-collapse
+    v-model="activeNames"
+    class="runtime-overrides"
+  >
     <el-collapse-item name="runtime-overrides">
       <template #title>
         <div class="runtime-overrides__title">
           <el-icon><Icon icon="mdi:tune-variant" /></el-icon>
           <span>高级运行时覆盖</span>
-          <el-tag size="small" :type="runtimeStatusType" effect="plain">
+          <el-tag
+            size="small"
+            :type="runtimeStatusType"
+            effect="plain"
+          >
             {{ runtimeStatusLabel }}
           </el-tag>
-          <el-button text size="small" :loading="loading" @click.stop="$emit('refresh')">
+          <el-button
+            text
+            size="small"
+            :loading="loading"
+            @click.stop="$emit('refresh')"
+          >
             重新探测
           </el-button>
         </div>
@@ -37,8 +49,13 @@
         class="runtime-overrides__alert"
       />
 
-      <section v-if="showJava" class="runtime-overrides__group">
-        <div class="runtime-overrides__group-title">Java / JDBC</div>
+      <section
+        v-if="showJava"
+        class="runtime-overrides__group"
+      >
+        <div class="runtime-overrides__group-title">
+          Java / JDBC
+        </div>
         <el-form-item label="JDBC URL">
           <el-input
             v-model="model.java.jdbcUrl"
@@ -70,13 +87,18 @@
             v-model="model.java.propertiesText"
             type="textarea"
             :rows="3"
-            placeholder='JSON 对象，例如 {"sslMode":"verify-full"}'
+            placeholder="JSON 对象，例如 {&quot;sslMode&quot;:&quot;verify-full&quot;}"
           />
         </el-form-item>
       </section>
 
-      <section v-if="showPhp" class="runtime-overrides__group">
-        <div class="runtime-overrides__group-title">PHP / PDO</div>
+      <section
+        v-if="showPhp"
+        class="runtime-overrides__group"
+      >
+        <div class="runtime-overrides__group-title">
+          PHP / PDO
+        </div>
         <el-form-item label="PDO DSN">
           <el-input
             v-model="model.php.dsn"

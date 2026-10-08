@@ -225,36 +225,10 @@
           <el-form-item label="计划类型">
             <el-select v-model="createForm.schedule">
               <el-option
-                label="MINUTE"
-                value="MINUTE"
-              />
-              <el-option
-                label="HOURLY"
-                value="HOURLY"
-              />
-              <el-option
-                label="DAILY"
-                value="DAILY"
-              />
-              <el-option
-                label="WEEKLY"
-                value="WEEKLY"
-              />
-              <el-option
-                label="MONTHLY"
-                value="MONTHLY"
-              />
-              <el-option
-                label="ONCE"
-                value="ONCE"
-              />
-              <el-option
-                label="ONSTART"
-                value="ONSTART"
-              />
-              <el-option
-                label="ONLOGON"
-                value="ONLOGON"
+                v-for="schedule in ['MINUTE', 'HOURLY', 'DAILY', 'WEEKLY', 'MONTHLY', 'ONCE', 'ONSTART', 'ONLOGON']"
+                :key="schedule"
+                :label="schedule"
+                :value="schedule"
               />
             </el-select>
           </el-form-item>
@@ -394,6 +368,7 @@ import {
 } from '@/services/api/scheduled-task.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
+import { sortRowsByText } from '@/utils/dataUtils.js'
 
 const props = defineProps({
   sessionId: {
@@ -437,16 +412,7 @@ const filteredTasks = computed(() => {
     })
   }
 
-  const { prop, order } = sortState.value
-  if (prop && order) {
-    list.sort((a, b) => {
-      const va = (a[prop] || '').toString()
-      const vb = (b[prop] || '').toString()
-      const cmp = va.localeCompare(vb)
-      return order === 'ascending' ? cmp : -cmp
-    })
-  }
-  return list
+  return sortRowsByText(list, sortState.value)
 })
 
 // ==================== 方法 ====================

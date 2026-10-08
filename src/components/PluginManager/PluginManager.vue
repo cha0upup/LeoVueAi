@@ -20,7 +20,7 @@
           type="primary"
           size="small"
           class="action-add"
-          @click="dialogs.add.open()"
+          @click="addDialog.open()"
         >
           <el-icon><Icon :icon="iconMap.add" /></el-icon>
           新增插件
@@ -205,20 +205,21 @@
         :loading="listLoading"
         :deleting="deleteLoading"
         :exporting="detailExportLoading"
-        @edit="openEditDialog"
+        @edit="editDialog.open"
         @delete="handleDeletePlugin"
         @export="handleDetailExport(selectedPlugin)"
       />
     </template>
 
-    <AddPluginDialog
+    <PluginFormDialog
       v-model="showAddPluginDialog"
       :plugin-types="pluginTypes"
       @submit="handleAddPlugin"
     />
 
-    <EditPluginDialog
+    <PluginFormDialog
       v-model="showEditPluginDialog"
+      mode="edit"
       :plugin="currentEditPlugin"
       :plugin-types="pluginTypes"
       :loading="updateLoading"
@@ -227,7 +228,7 @@
 
     <ImportPluginDialog
       v-model="showImportDialog"
-      @imported="handleImported"
+      @imported="getPlugins"
     />
   </ManagerLayout>
 </template>
@@ -235,11 +236,11 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { executeBatchDelete, executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
-import { useDialogs, useEditDialog } from '@/utils/dialogUtils.js'
-import { buildUpdateParams, findUpdatedPlugin, PLUGIN_TYPES } from '@/utils/plugin.js'
+import { useDialog, useEditDialog } from '@/utils/dialogUtils.js'
+import { buildUpdateParams, PLUGIN_TYPES as pluginTypes } from '@/utils/plugin.js'
 import {
   deletePluginApi,
   addPluginApi,
@@ -248,15 +249,14 @@ import {
   exportPluginApi,
   exportPluginsBatchApi
 } from '@/services/api/plugins.js'
-import AddPluginDialog from './AddPluginDialog.vue'
-import EditPluginDialog from './EditPluginDialog.vue'
+import PluginFormDialog from './PluginFormDialog.vue'
 import PluginDetail from './PluginDetail.vue'
 import ImportPluginDialog from './ImportPluginDialog.vue'
 import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import EntityCard from '@/components/common/EntityCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import BatchActionBar from '@/components/common/BatchActionBar.vue'
-import { executeBlobDownload } from '@/utils/exportUtils.js'
+import { executeBlobDownload, exportSelectedArchive } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { useBatchSelection } from '@/composables/useBatchSelection.js'
 
@@ -268,9 +268,9 @@ const selectedPluginId = computed(() => selectedPlugin.value?.pluginId || '')
 const searchKeyword = ref('')
 const activeType = ref('all')
 
-const dialogs = useDialogs(['add'])
+const addDialog = useDialog()
 const editDialog = useEditDialog()
-const showAddPluginDialog = dialogs.add.visible
+const showAddPluginDialog = addDialog.visible
 const showEditPluginDialog = editDialog.visible
 const showImportDialog = ref(false)
 const currentEditPlugin = editDialog.currentItem
@@ -281,9 +281,6 @@ const deleteLoading = ref(false)
 const batchExportLoading = ref(false)
 const batchDeleteLoading = ref(false)
 const detailExportLoading = ref(false)
-
-const pluginTypes = PLUGIN_TYPES
-const iconMap = icons
 
 const typeCounts = computed(() => Object.fromEntries(
   pluginTypes.map(({ value }) => [value, plugins.value.filter(item => item.pluginType === value).length])
@@ -358,7 +355,7 @@ const handleAddPlugin = async (pluginData) => {
     successMessage: '插件添加成功',
     errorMessage: '添加插件失败，请重试',
     onSuccess: () => {
-      dialogs.add.close()
+      addDialog.close()
       getPlugins()
     }
   })
@@ -386,16 +383,9 @@ const getPlugins = async () => {
   )
 }
 
-const openEditDialog = (plugin) => {
-  editDialog.open(plugin)
-}
-
 const handleUpdatePlugin = async (pluginData) => {
   await executeRequest(
-    () => {
-      const updateParams = buildUpdateParams(pluginData)
-      return updatePluginApi(updateParams)
-    },
+    () => updatePluginApi(buildUpdateParams(pluginData)),
     {
       loadingRef: updateLoading,
       successMessage: '插件更新成功',
@@ -409,9 +399,10 @@ const handleUpdatePlugin = async (pluginData) => {
         editDialog.close()
         await getPlugins()
 
-        const updatedPlugin = findUpdatedPlugin(plugins.value, response, pluginData.pluginId)
-        if (updatedPlugin) {
-          selectedPlugin.value = updatedPlugin
+        const updatedPluginId = response?.data?.pluginId
+        if (updatedPluginId && updatedPluginId !== pluginData.pluginId) {
+          const updatedPlugin = plugins.value.find((item) => item.pluginId === updatedPluginId)
+          if (updatedPlugin) selectedPlugin.value = updatedPlugin
         }
       }
     }
@@ -443,32 +434,12 @@ function handleQuickExport(item, loadingRef) {
 
 const handleDetailExport = (plugin) => handleQuickExport(plugin, detailExportLoading)
 
-async function handleBatchExport() {
-  const ids = Array.from(selectedIds.value)
-  if (!ids.length) return
-  const date = new Date().toISOString().slice(0, 10)
-  await executeBlobDownload(
-    () => exportPluginsBatchApi({ pluginIds: ids }),
-    `plugins_${date}.zip`,
-    {
-      loadingRef: batchExportLoading,
-      successMessage: `已导出 ${ids.length} 个插件`,
-      onSuccess: () => {
-        for (const id of ids) selectedIds.value.delete(id)
-      }
-    }
-  ).catch(() => false)
-}
+const handleBatchExport = () => exportSelectedArchive(
+  selectedIds, ids => exportPluginsBatchApi({ pluginIds: ids }),
+  'plugins', '个插件', batchExportLoading
+)
 
-// ── 导入回调 ──────────────────────────────────────────────────────────────
-
-async function handleImported() {
-  await getPlugins()
-}
-
-onMounted(() => {
-  getPlugins()
-})
+onMounted(getPlugins)
 </script>
 
 <style scoped>

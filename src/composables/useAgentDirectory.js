@@ -47,15 +47,17 @@ export const buildAgentUpdatePayload = (row, overrides = {}) => {
   }
 }
 
-export const normalizeAgentList = (list = []) => {
+export const normalizeAgentList = (list = [], level = INITIAL_LEVEL) => {
   const seen = new Map()
   list.forEach((item) => {
     const key = item?.agentId
     if (!key) return
     seen.set(key, {
       ...item,
-      hasChildren: true,
-      level: INITIAL_LEVEL
+      hasChildren: typeof item.hasChildren === 'boolean'
+        ? item.hasChildren
+        : Array.isArray(item.children) && item.children.length > 0,
+      level
     })
   })
   return Array.from(seen.values())
@@ -91,27 +93,11 @@ export function useAgentDirectory({
   allAgents,
   searchKeyword,
   sortMode,
-  prioritizeOnlineNodes,
-  connectionTestResults,
   sessionsByAgentId
 }) {
-  const getOnlineSortPriority = (row) => {
-    if (!prioritizeOnlineNodes.value) return 0
-    const agentId = row?.agentId
-    if (agentId && sessionsByAgentId?.value?.[agentId]?.length) return 0
-    const result = agentId ? connectionTestResults.value[agentId] : null
-    return result?.success ? 0 : 1
-  }
-
   const sortAgents = (list = []) => {
-    const sorted = list.slice()
-    const baseSorter = sortMode.value === 'name' ? compareAgentByName : compareAgentByUpdateTime
-    sorted.sort((a, b) => {
-      const onlineDiff = getOnlineSortPriority(a) - getOnlineSortPriority(b)
-      if (onlineDiff !== 0) return onlineDiff
-      return baseSorter(a, b)
-    })
-    return sorted
+    const compare = sortMode.value === 'name' ? compareAgentByName : compareAgentByUpdateTime
+    return list.slice().sort(compare)
   }
 
   const filteredAgents = computed(() => {

@@ -13,39 +13,12 @@ import { ref } from 'vue'
 export function useDialog(initialValue = false) {
   const visible = ref(initialValue)
 
-  const open = () => {
-    visible.value = true
-  }
-
-  const close = () => {
-    visible.value = false
-  }
-
-  const toggle = () => {
-    visible.value = !visible.value
-  }
-
   return {
     visible,
-    open,
-    close,
-    toggle
+    open: () => { visible.value = true },
+    close: () => { visible.value = false },
+    toggle: () => { visible.value = !visible.value }
   }
-}
-
-/**
- * 创建多个对话框状态管理
- * @param {Array<string>} dialogNames - 对话框名称数组
- * @returns {Object} 包含所有对话框状态的对象
- */
-export function useDialogs(dialogNames) {
-  const dialogs = {}
-
-  dialogNames.forEach((name) => {
-    dialogs[name] = useDialog()
-  })
-
-  return dialogs
 }
 
 /**

@@ -28,7 +28,7 @@
           :active-key="activeKey"
           :badges="tabBadges"
           @activate="setActive"
-          @close="handleCloseTab"
+          @close="closeTab"
           @open-palette="paletteVisible = true"
           @open-settings="handlePaletteOpen('settings')"
         />
@@ -117,7 +117,6 @@
                   <component
                     :is="entry.component"
                     v-bind="getModuleProps(entry.key)"
-                    :key="`${entry.key}-${refreshKey}`"
                     v-on="getModuleListeners(entry.key)"
                   />
                   <template #fallback>
@@ -149,7 +148,7 @@
     <!-- ⌘K Command Palette -->
     <CommandPalette
       :visible="paletteVisible"
-      :module-definitions="paletteModules"
+      :module-definitions="availableModuleEntries"
       :is-open="isOpen"
       @open="handlePaletteOpen"
       @close="paletteVisible = false"
@@ -174,7 +173,7 @@ import CommandPalette from '@/components/Workspace/CommandPalette.vue'
 import AiDock from '@/components/Workspace/AiDock.vue'
 import { showError } from '@/utils/messageUtils.js'
 import { taskEngine } from '@/components/AgentConsole/File/TaskEngine.js'
-import { TaskStatus } from '@/constants/task.js'
+import { ACTIVE_TASK_STATUSES, TaskStatus } from '@/constants/task.js'
 import { AGENT_CONSOLE_SETTINGS_STORAGE_KEY } from '@/constants/app.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 
@@ -190,6 +189,17 @@ const CACHE_MODE_DISABLED_KEYS = [
   'container',
   'task-manager',
   'settings'
+]
+
+const TASK_EVENTS = [
+  'taskCreated',
+  'taskStarted',
+  'taskPaused',
+  'taskResumed',
+  'taskCompleted',
+  'taskFailed',
+  'taskCancelled',
+  'taskRemoved'
 ]
 
 // Props
@@ -241,7 +251,6 @@ const agentRuntime = ref('')
 const runtimeProfile = ref(null)
 let initializationVersion = 0
 const iconMap = icons
-const refreshKey = ref(0)
 const paletteVisible = ref(false)
 const sessionCapabilities = computed(() => (
   serverCapabilities.value.length ? serverCapabilities.value : props.capabilities
@@ -285,13 +294,7 @@ function _updateTaskBadge() {
   const sid = props.sessionId
   if (!sid) return
   const tasks = taskEngine.getTasksBySession(sid)
-  const running = tasks.filter(t =>
-    t.status === TaskStatus.DOWNLOADING ||
-    t.status === TaskStatus.UPLOADING ||
-    t.status === TaskStatus.DB_EXPORTING ||
-    t.status === TaskStatus.SCANNING ||
-    t.status === TaskStatus.PENDING
-  ).length
+  const running = tasks.filter(t => ACTIVE_TASK_STATUSES.includes(t.status)).length
   const failed = tasks.filter(t => t.status === TaskStatus.FAILED).length
   const completed = tasks.filter(t => t.status === TaskStatus.COMPLETED).length
 
@@ -322,14 +325,7 @@ const initStepIndex = computed(() => {
   const idx = INIT_STEPS.indexOf(initStep.value)
   return idx >= 0 ? idx + 1 : (initStep.value ? INIT_STEPS.length : 0)
 })
-const initProgressWidth = computed(() => {
-  switch (initStep.value) {
-    case '校验模块配置…': return 20
-    case '获取连接链路…': return 55
-    case '读取主机信息…': return 85
-    default: return 0
-  }
-})
+const initProgressWidth = computed(() => [20, 55, 85][INIT_STEPS.indexOf(initStep.value)] || 0)
 
 // ── Settings (provided to children) ───────────────────────────────────────
 const loadInitialSettings = () => {
@@ -364,12 +360,8 @@ provide('updateSidebarBadge', (key, value) => {
 const displayConnLinkChain = computed(() => {
   const chain = serverConnLinkChain.value
   if (!chain?.length) return []
-  const validChain = chain.filter((link) => link?.trim())
-  return validChain.length ? [...validChain].reverse() : []
+  return chain.filter((link) => link?.trim()).reverse()
 })
-
-// Modules available for the command palette (excludes cache-disabled ones)
-const paletteModules = computed(() => availableModuleEntries.value)
 
 // Sync settings.sessionId with prop
 watch(
@@ -401,15 +393,8 @@ const handlePaletteOpen = (key) => {
   openTab(key)
 }
 
-const handleCloseTab = (key) => {
-  closeTab(key)
-  // Note: we keep initializedModules[key]=true to preserve component state
-  // if the tab is reopened later in the same session.
-}
-
 // Preserve existing API for children that call switchTab via provide (if any)
-const switchTab = (tabKey) => handlePaletteOpen(tabKey)
-provide('switchTab', switchTab)
+provide('switchTab', handlePaletteOpen)
 
 // ── Keyboard shortcut ─────────────────────────────────────────────────────
 const onGlobalKeydown = (e) => {
@@ -513,14 +498,7 @@ const initializeComponent = async () => {
 // ── Lifecycle ──────────────────────────────────────────────────────────────
 onMounted(() => {
   window.addEventListener('keydown', onWindowKeydown)
-  taskEngine.on('taskCreated', _onTaskEvent)
-  taskEngine.on('taskStarted', _onTaskEvent)
-  taskEngine.on('taskPaused', _onTaskEvent)
-  taskEngine.on('taskResumed', _onTaskEvent)
-  taskEngine.on('taskCompleted', _onTaskEvent)
-  taskEngine.on('taskFailed', _onTaskEvent)
-  taskEngine.on('taskCancelled', _onTaskEvent)
-  taskEngine.on('taskRemoved', _onTaskEvent)
+  TASK_EVENTS.forEach((event) => taskEngine.on(event, _onTaskEvent))
   if (props.sessionId) {
     loadForSession()
     // Only initialize the active tab — others load lazily on first activation
@@ -533,14 +511,7 @@ onMounted(() => {
 onUnmounted(() => {
   initializationVersion += 1
   window.removeEventListener('keydown', onWindowKeydown)
-  taskEngine.off('taskCreated', _onTaskEvent)
-  taskEngine.off('taskStarted', _onTaskEvent)
-  taskEngine.off('taskPaused', _onTaskEvent)
-  taskEngine.off('taskResumed', _onTaskEvent)
-  taskEngine.off('taskCompleted', _onTaskEvent)
-  taskEngine.off('taskFailed', _onTaskEvent)
-  taskEngine.off('taskCancelled', _onTaskEvent)
-  taskEngine.off('taskRemoved', _onTaskEvent)
+  TASK_EVENTS.forEach((event) => taskEngine.off(event, _onTaskEvent))
 })
 
 // Lazy-initialize modules on first activation
@@ -653,15 +624,6 @@ watch(
 /* v-show sets display:none — must override flex */
 .module-container[style*='display: none'] {
   display: none !important;
-}
-
-.content-component {
-  width: 100%;
-  height: 100%;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .module-loading-state {

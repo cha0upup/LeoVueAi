@@ -64,7 +64,7 @@
               <el-button
                 size="small"
                 link
-                @click="useCurrentDirectory"
+                @click="form.targetDir = ''"
               >
                 当前目录
               </el-button>
@@ -91,7 +91,7 @@
               <el-button
                 size="small"
                 link
-                @click="resetTargetName"
+                @click="form.targetName = ''"
               >
                 {{ isMove ? '保留原名' : '默认副本名' }}
               </el-button>
@@ -115,31 +115,15 @@
           <span class="field-label">同名冲突</span>
           <div class="conflict-chips">
             <button
+              v-for="option in conflictOptions"
+              :key="option.value"
               type="button"
               class="conflict-chip"
-              :class="{ active: conflictStrategy === 'overwrite', 'conflict-chip--danger': conflictStrategy === 'overwrite' }"
-              @click="conflictStrategy = 'overwrite'"
+              :class="conflictStrategy === option.value ? ['active', option.selectedClass] : []"
+              @click="conflictStrategy = option.value"
             >
-              <el-icon><Icon :icon="iconMap.warning" /></el-icon>
-              覆盖
-            </button>
-            <button
-              type="button"
-              class="conflict-chip"
-              :class="{ active: conflictStrategy === 'autorename' }"
-              @click="conflictStrategy = 'autorename'"
-            >
-              <el-icon><Icon :icon="iconMap.rename" /></el-icon>
-              自动重命名
-            </button>
-            <button
-              type="button"
-              class="conflict-chip"
-              :class="{ active: conflictStrategy === 'skip', 'conflict-chip--muted': conflictStrategy === 'skip' }"
-              @click="conflictStrategy = 'skip'"
-            >
-              <el-icon><Icon :icon="iconMap.cancel" /></el-icon>
-              跳过
+              <el-icon><Icon :icon="option.icon" /></el-icon>
+              {{ option.label }}
             </button>
           </div>
         </div>
@@ -208,7 +192,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { formatFilePath, formatFileSize as formatSize } from '@/utils/format.js'
 import { copyFileApi, moveFileApi } from '@/services/api/agent-files.js'
@@ -222,9 +206,6 @@ import {
 } from '@/utils/fileValidator.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
-
-// 图标映射
-const iconMap = icons
 
 // Props
 const props = defineProps({
@@ -260,6 +241,12 @@ const CONFLICT_STRATEGIES = {
   autorename: '自动重命名',
   skip: '跳过'
 }
+
+const conflictOptions = [
+  { value: 'overwrite', label: '覆盖', icon: iconMap.warning, selectedClass: 'conflict-chip--danger' },
+  { value: 'autorename', label: CONFLICT_STRATEGIES.autorename, icon: iconMap.rename },
+  { value: 'skip', label: CONFLICT_STRATEGIES.skip, icon: iconMap.cancel, selectedClass: 'conflict-chip--muted' }
+]
 
 // 响应式数据
 const dialogVisible = ref(false)
@@ -350,14 +337,6 @@ const handleClose = () => {
   emit('close')
 }
 
-const useCurrentDirectory = () => {
-  form.value.targetDir = ''
-}
-
-const resetTargetName = () => {
-  form.value.targetName = ''
-}
-
 const handleSubmit = async () => {
   if (processing.value || !formRef.value) return
 
@@ -385,23 +364,15 @@ const handleSubmit = async () => {
 
   processing.value = true
   try {
-    if (isMove.value) {
-      await moveFileApi({
-        sessionId: props.sessionId,
-        path: sourcePath.value,
-        newPath: fullTargetPath.value,
-        conflictStrategy: conflictStrategy.value
-      })
-      showSuccess('移动成功')
-    } else {
-      await copyFileApi({
-        sessionId: props.sessionId,
-        path: sourcePath.value,
-        destPath: fullTargetPath.value,
-        conflictStrategy: conflictStrategy.value
-      })
-      showSuccess('复制成功')
-    }
+    const moving = isMove.value
+    const transfer = moving ? moveFileApi : copyFileApi
+    await transfer({
+      sessionId: props.sessionId,
+      path: sourcePath.value,
+      [moving ? 'newPath' : 'destPath']: fullTargetPath.value,
+      conflictStrategy: conflictStrategy.value
+    })
+    showSuccess(moving ? '移动成功' : '复制成功')
     dialogVisible.value = false
     emit('refresh')
     emit('close')

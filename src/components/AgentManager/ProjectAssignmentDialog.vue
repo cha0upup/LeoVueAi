@@ -96,20 +96,10 @@
         style="width: 150px"
       >
         <el-option
-          label="开发"
-          value="dev"
-        />
-        <el-option
-          label="测试"
-          value="test"
-        />
-        <el-option
-          label="预发布"
-          value="staging"
-        />
-        <el-option
-          label="生产"
-          value="prod"
+          v-for="(label, value) in environmentOptions"
+          :key="value"
+          :label="label"
+          :value="value"
         />
       </el-select>
     </div>
@@ -143,7 +133,7 @@ import { computed, nextTick, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import { attachProjectAgentsApi } from '@/services/api/projects.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { showSuccess } from '@/utils/messageUtils.js'
 
 const props = defineProps({
@@ -151,7 +141,7 @@ const props = defineProps({
   currentProjectId: { type: String, default: '' }
 })
 const emit = defineEmits(['saved'])
-const iconMap = icons
+const environmentOptions = { dev: '开发', test: '测试', staging: '预发布', prod: '生产' }
 const visible = ref(false)
 const saving = ref(false)
 const projectId = ref('')

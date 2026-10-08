@@ -10,10 +10,7 @@
 import { ref } from 'vue'
 import { getFileSystemProfileApi } from '@/services/api/agent-files.js'
 import { executeRequest } from '@/utils/apiUtils.js'
-import {
-  isWindowsDisk,
-  extractDriveName
-} from './useFilePath.js'
+import { isWindowsDisk, extractDriveName } from './useFilePath.js'
 
 /**
  * useFileSystem composable
@@ -33,19 +30,15 @@ export function useFileSystem(options = {}) {
 
   /**
    * 从文件列表构建磁盘列表
-   * @param {Array} fileList - 文件列表
+   * @param {Array} roots - 文件系统根路径列表
    * @returns {Array<{label: string, value: string}>} 磁盘列表
    */
   const buildDiskList = (roots) => {
     return roots
-      .filter((root) => isWindowsDisk(root))
+      .filter(isWindowsDisk)
       .map((root) => {
-        const sourcePath = String(root || '')
-        const driveName = extractDriveName(sourcePath)
-        return {
-          label: driveName,
-          value: driveName
-        }
+        const driveName = extractDriveName(String(root || ''))
+        return { label: driveName, value: driveName }
       })
       .sort((a, b) => a.value.localeCompare(b.value))
   }
@@ -63,17 +56,11 @@ export function useFileSystem(options = {}) {
           fileSystemProfile.value = profile
           isWindows.value = profile.osFamily === 'WINDOWS'
 
-          if (isWindows.value) {
-            const newDiskList = buildDiskList(roots)
-            diskList.value = newDiskList
-
-            // 如果当前没有选中磁盘，选择第一个
-            if (!selectedDisk.value && newDiskList.length > 0) {
-              selectedDisk.value = newDiskList[0].value
-            }
-          } else {
-            diskList.value = []
+          diskList.value = isWindows.value ? buildDiskList(roots) : []
+          if (!isWindows.value) {
             selectedDisk.value = ''
+          } else if (!selectedDisk.value && diskList.value.length) {
+            selectedDisk.value = diskList.value[0].value
           }
         },
         {

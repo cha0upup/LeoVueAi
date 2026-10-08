@@ -28,12 +28,8 @@ export function shortenPreviewPath(path, maxLength = 50, edgeLength = 20) {
   return `${value.slice(0, edgeLength)}...${value.slice(-edgeLength)}`
 }
 
-function getPreferredLineEnding(path) {
-  return /\.(bat|cmd)$/i.test(path || '') ? 'CRLF' : FILE_PREVIEW_DEFAULT_LINE_ENDING
-}
-
 export function detectFileLineEnding(content, path = '') {
-  if (!content) return getPreferredLineEnding(path)
+  if (!content) return /\.(bat|cmd)$/i.test(path || '') ? 'CRLF' : FILE_PREVIEW_DEFAULT_LINE_ENDING
   if (content.includes('\r\n')) return 'CRLF'
   if (content.includes('\r')) return 'CR'
   return 'LF'
@@ -53,8 +49,7 @@ export function getTextPreviewStats(content) {
 }
 
 export function resolvePreviewFileSize(responseData) {
-  const rawSize = responseData?.size
-  const size = Number(rawSize)
+  const size = Number(responseData?.size)
   return Number.isFinite(size) && size >= 0 ? size : 0
 }
 

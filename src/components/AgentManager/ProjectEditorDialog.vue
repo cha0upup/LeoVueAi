@@ -63,23 +63,15 @@
       >
         <div class="permission-options">
           <button
+            v-for="option in permissionOptions"
+            :key="option.value"
             type="button"
             class="permission-card"
-            :class="{ selected: form.permission === 'private' }"
-            @click="form.permission = 'private'"
+            :class="{ selected: form.permission === option.value }"
+            @click="form.permission = option.value"
           >
-            <span class="permission-card__icon"><el-icon><Icon :icon="iconMap.lock" /></el-icon></span>
-            <span><strong>仅自己</strong><small>只有项目负责人和管理员可查看与维护</small></span>
-            <span class="permission-card__radio"><i /></span>
-          </button>
-          <button
-            type="button"
-            class="permission-card"
-            :class="{ selected: form.permission === 'team' }"
-            @click="form.permission = 'team'"
-          >
-            <span class="permission-card__icon"><el-icon><Icon icon="mdi:account-group-outline" /></el-icon></span>
-            <span><strong>团队协作</strong><small>同团队成员可查看并整理项目主机</small></span>
+            <span class="permission-card__icon"><el-icon><Icon :icon="option.icon" /></el-icon></span>
+            <span><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span>
             <span class="permission-card__radio"><i /></span>
           </button>
         </div>
@@ -150,10 +142,13 @@ import {
 } from '@/services/api/projects.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 const emit = defineEmits(['saved'])
-const iconMap = icons
+const permissionOptions = [
+  { value: 'private', label: '仅自己', description: '只有项目负责人和管理员可查看与维护', icon: iconMap.lock },
+  { value: 'team', label: '团队协作', description: '同团队成员可查看并整理项目主机', icon: 'mdi:account-group-outline' }
+]
 const visible = ref(false)
 const editing = ref(false)
 const saving = ref(false)

@@ -20,7 +20,7 @@
                   class="collapse-toggle"
                   type="button"
                   :aria-label="sidebarCollapsed ? '展开导航' : '折叠导航'"
-                  @click="toggleSidebar"
+                  @click="sidebarCollapsed = !sidebarCollapsed"
                 >
                   <el-icon>
                     <Icon :icon="sidebarCollapsed ? iconMap.arrowRight : iconMap.arrowLeft" />
@@ -75,7 +75,7 @@
                 >
                   <component
                     :is="component"
-                    @open-agent-console="openAgentConsole"
+                    @open-agent-console="emit('open-agent-console', $event)"
                   />
                 </div>
               </template>
@@ -89,7 +89,7 @@
 
 <script setup>
 import { defineAsyncComponent, onMounted, reactive, ref, watch } from 'vue'
-import { DEFAULT_HOME_MENU_KEY, HOME_MENU_GROUPS } from '@/constants/app.js'
+import { DEFAULT_HOME_MENU_KEY, HOME_MENU_GROUPS as menuGroups } from '@/constants/app.js'
 import { icons } from '@/utils/icons.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 
@@ -120,7 +120,6 @@ const sidebarCollapsed = ref(false)
 const iconMap = icons
 // 记录已挂载过的模块 key，首次访问时懒挂载，之后用 v-show 保留状态
 const initializedModules = reactive({ [DEFAULT_HOME_MENU_KEY]: true })
-const menuGroups = HOME_MENU_GROUPS
 
 const componentMap = {
   agent: AgentManager,
@@ -138,14 +137,6 @@ const handleSelect = (key) => {
     initializedModules[key] = true // 首次访问时懒挂载，此后 v-show 保留状态
   }
   selectedMenu.value = key
-}
-
-const toggleSidebar = () => {
-  sidebarCollapsed.value = !sidebarCollapsed.value
-}
-
-const openAgentConsole = (agentConsoleParams) => {
-  emit('open-agent-console', agentConsoleParams)
 }
 
 onMounted(() => {
@@ -184,17 +175,12 @@ watch(sidebarCollapsed, (collapsed) => {
   transition: width var(--motion-slow) var(--motion-easing);
 }
 
-.home-aside.is-collapsed {
-  width: 58px;
-}
-
 .aside-shell {
   height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-2) var(--space-3) 0;
   border-radius: 0;
   border: 0;
   border-right: 1px solid var(--app-surface-border-strong);
@@ -214,8 +200,6 @@ watch(sidebarCollapsed, (collapsed) => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin: 0 var(--space-3) var(--space-3);
-  padding: 0 0 var(--space-3);
   border-bottom: 1px solid var(--app-surface-border-subtle);
 }
 
@@ -229,7 +213,6 @@ watch(sidebarCollapsed, (collapsed) => {
 .nav-section-kicker,
 .menu-group-kicker {
   color: var(--el-text-color-placeholder);
-  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
   line-height: 1.1;
@@ -238,20 +221,16 @@ watch(sidebarCollapsed, (collapsed) => {
 
 .nav-section-title strong {
   color: var(--el-text-color-primary);
-  font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
 }
 
 .collapse-toggle {
-  width: 26px;
-  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid color-mix(in srgb, var(--el-border-color) 34%, transparent);
   border-radius: 6px;
-  background: color-mix(in srgb, var(--app-control-background) 80%, transparent);
   color: var(--el-text-color-secondary);
   cursor: pointer;
   transition:
@@ -262,8 +241,6 @@ watch(sidebarCollapsed, (collapsed) => {
 
 .collapse-toggle:hover {
   color: var(--el-color-primary);
-  border-color: color-mix(in srgb, var(--el-color-primary) 28%, transparent);
-  background: color-mix(in srgb, var(--el-color-primary) 7%, var(--app-control-background));
 }
 
 .sidebar-menu {
@@ -271,29 +248,19 @@ watch(sidebarCollapsed, (collapsed) => {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding-bottom: 2px;
 }
 
 .menu-group {
-  display: flex;
   flex-direction: column;
   gap: 1px;
-}
-
-.menu-group + .menu-group {
-  padding-top: 10px;
-  border-top: 1px solid color-mix(in srgb, var(--el-border-color) 24%, transparent);
 }
 
 .menu-group-label {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  min-height: 31px;
-  padding: 0 12px 5px 14px;
 }
 
 .menu-group-label strong {
@@ -307,10 +274,6 @@ watch(sidebarCollapsed, (collapsed) => {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 4px 10px 4px 12px;
-  border-radius: 0 var(--radius-control) var(--radius-control) 0;
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
@@ -333,7 +296,6 @@ watch(sidebarCollapsed, (collapsed) => {
 }
 
 .menu-item.is-active::before {
-  content: '';
   position: absolute;
   left: 0;
   top: 9px;
@@ -344,47 +306,21 @@ watch(sidebarCollapsed, (collapsed) => {
 }
 
 .menu-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   position: relative;
-  color: var(--el-color-primary);
-  background: transparent;
-  font-size: 14px;
-}
-
-.menu-item.is-active .menu-icon {
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 9%, var(--app-control-background));
 }
 
 .menu-title {
   font-size: 13px;
   font-weight: 500;
-  color: var(--el-text-color-primary);
   min-width: 0;
 }
 
 .menu-item.is-active .menu-title {
   color: var(--el-color-primary);
-}
-
-.menu-badges {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.menu-badges :deep(.status-indicator) {
-  min-width: 24px;
-  justify-content: center;
-  font-variant-numeric: tabular-nums;
 }
 
 .home-aside.is-collapsed .aside-shell {
@@ -408,8 +344,6 @@ watch(sidebarCollapsed, (collapsed) => {
 
 .home-aside.is-collapsed .nav-section-header {
   justify-content: center;
-  margin: 0 0 12px 6px;
-  padding-bottom: 10px;
 }
 
 .home-aside.is-collapsed .menu-group-label {
@@ -420,34 +354,6 @@ watch(sidebarCollapsed, (collapsed) => {
 .home-aside.is-collapsed .menu-item {
   justify-content: center;
   gap: 0;
-  min-height: 36px;
-  padding: 5px 0 5px 6px;
-}
-
-.home-aside.is-collapsed .menu-icon {
-  width: 28px;
-  height: 28px;
-}
-
-.home-aside.is-collapsed .menu-group + .menu-group {
-  margin-top: 6px;
-  padding-top: 6px;
-}
-
-.home-aside.is-collapsed .menu-badges {
-  display: none;
-}
-
-.home-aside.is-collapsed .menu-item.has-task-alert .menu-icon::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: -1px;
-  width: 6px;
-  height: 6px;
-  border: 1px solid var(--app-control-background);
-  border-radius: 50%;
-  background: var(--el-color-danger);
 }
 
 /* 与管理后台侧栏保持一致的目录结构与交互状态。 */
@@ -575,11 +481,6 @@ watch(sidebarCollapsed, (collapsed) => {
   margin-top: 12px;
   padding-top: 0;
   border-top: 1px solid var(--app-surface-border-subtle);
-}
-
-.home-aside.is-collapsed .menu-item.has-task-alert .menu-icon::after {
-  top: -3px;
-  right: -4px;
 }
 
 .home-main {
@@ -740,10 +641,6 @@ watch(sidebarCollapsed, (collapsed) => {
   .home-aside.is-collapsed .menu-icon {
     width: 24px;
     height: 24px;
-  }
-
-  .home-aside.is-collapsed .menu-badges {
-    display: inline-flex;
   }
 }
 
