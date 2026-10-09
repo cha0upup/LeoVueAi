@@ -116,7 +116,14 @@
           v-if="isRunning"
           class="list-actions"
         >
-          <span class="list-count">{{ statistics?.connections?.length ?? 0 }} 条连接</span>
+          <span class="list-count">{{ connectionCount }} 条连接</span>
+          <el-button
+            text
+            size="small"
+            @click="detailsVisible = !detailsVisible"
+          >
+            {{ detailsVisible ? '收起明细' : '展开明细' }}
+          </el-button>
           <el-button
             text
             size="small"
@@ -131,7 +138,7 @@
       </div>
 
       <div
-        v-if="isRunning && statistics"
+        v-if="isRunning && statistics && detailsVisible"
         class="table-shell"
       >
         <el-table
@@ -235,8 +242,18 @@
         </div>
       </div>
 
+      <el-pagination
+        v-if="isRunning && detailsVisible && connectionCount > 50"
+        v-model:current-page="connectionPage"
+        class="connection-pagination"
+        :page-size="50"
+        :total="connectionCount"
+        layout="prev, pager, next"
+        :disabled="checking"
+      />
+
       <div
-        v-else
+        v-if="!isRunning || !statistics"
         class="empty-state"
       >
         <el-icon aria-hidden="true">
@@ -267,6 +284,11 @@ const props = defineProps({
 
 const bindAddr = defineModel('bindAddr', { type: String, required: true })
 const port = defineModel('port', { type: Number, default: undefined })
+const detailsVisible = defineModel('detailsVisible', { type: Boolean, default: true })
+const connectionPage = defineModel('connectionPage', { type: Number, default: 1 })
+const connectionCount = computed(
+  () => props.statistics?.connectionCount ?? props.statistics?.connections?.length ?? 0
+)
 const emit = defineEmits(['start', 'stop', 'refresh'])
 
 const statusTag = computed(() => {
@@ -307,3 +329,11 @@ const getIpTagType = (ip) => {
 </script>
 
 <style scoped src="./proxy-panel.css"></style>
+
+<style scoped>
+.connection-pagination {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+}
+</style>

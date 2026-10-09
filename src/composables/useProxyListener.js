@@ -11,6 +11,10 @@ export function useProxyListener({ sessionId, emit, label, defaultPort, statusFi
   const status = ref('unknown')
   const errorMessage = ref('')
   const statistics = shallowRef(null)
+  const detailsVisible = ref(true)
+  const connectionPage = ref(1)
+  const pageSize = 50
+  let lastDetailsCheck = 0
   const active = inject('proxyActive', true)
   const pageVisible = ref(typeof document === 'undefined' || document.visibilityState !== 'hidden')
   const visible = computed(() => unref(active) && pageVisible.value)
@@ -76,9 +80,33 @@ export function useProxyListener({ sessionId, emit, label, defaultPort, statusFi
           lastStatusCheck = Date.now()
         }
         if (isRunning.value) {
-          const response = await api.statistics({ sessionId: currentSession })
+          const includeConnections =
+            detailsVisible.value &&
+            (verifyStatus || !statistics.value || Date.now() - lastDetailsCheck >= 10_000)
+          const response = await api.statistics({
+            sessionId: currentSession,
+            includeConnections,
+            page: connectionPage.value,
+            pageSize
+          })
           if (!isCurrent(request)) return
-          statistics.value = response.data
+          const data = response.data
+          const lastPage = Math.max(
+            1,
+            Math.ceil((data.connectionCount ?? data.activeConnections ?? 0) / pageSize)
+          )
+          if (connectionPage.value > lastPage) {
+            connectionPage.value = lastPage
+            return
+          }
+          statistics.value = {
+            ...data,
+            connections:
+              data.connectionCount === 0
+                ? []
+                : (data.connections ?? statistics.value?.connections ?? [])
+          }
+          if (includeConnections) lastDetailsCheck = Date.now()
         } else {
           statistics.value = null
         }
@@ -120,6 +148,8 @@ export function useProxyListener({ sessionId, emit, label, defaultPort, statusFi
       if (!isCurrent(request)) return
       isRunning.value = start
       statistics.value = null
+      connectionPage.value = 1
+      lastDetailsCheck = 0
       errorMessage.value = ''
       if (start) {
         controlForm.value.bindAddr = response.data?.bindAddr ?? bindAddr
@@ -147,12 +177,24 @@ export function useProxyListener({ sessionId, emit, label, defaultPort, statusFi
       invalidate()
       starting.value = stopping.value = isRunning.value = false
       statistics.value = null
+      connectionPage.value = 1
+      lastDetailsCheck = lastStatusCheck = 0
       errorMessage.value = ''
       controlForm.value = { bindAddr: '0.0.0.0', port: defaultPort }
       if (mounted) {
         publish('unknown')
         fetchStatistics()
       }
+    },
+    { flush: 'sync' }
+  )
+  watch(
+    [detailsVisible, connectionPage],
+    () => {
+      lastDetailsCheck = 0
+      if (starting.value || stopping.value) return
+      invalidate()
+      refresh(false)
     },
     { flush: 'sync' }
   )
@@ -187,6 +229,8 @@ export function useProxyListener({ sessionId, emit, label, defaultPort, statusFi
     status,
     errorMessage,
     statistics,
+    detailsVisible,
+    connectionPage,
     handleStart: () => changeListener(true),
     handleStop: () => changeListener(false),
     fetchStatistics

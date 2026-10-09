@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, shallowRef, unref, watch } from 'vue'
 import {
   listLocalForwardsApi,
   startLocalForwardApi,
@@ -57,10 +57,32 @@ export function useProxyRules(mode, sessionId, emit) {
   let mounted = false
   let generation = 0
   let refreshPromise
+  let timer
+  const active = inject('proxyActive', true)
+  const hasPendingCleanup = () => rules.value.some((rule) => rule.cleanupPending)
+  const schedulePendingRefresh = () => {
+    clearTimeout(timer)
+    if (!mounted || !hasPendingCleanup()) return
+    timer = setTimeout(() => {
+      if (
+        unref(active) &&
+        (typeof document === 'undefined' || document.visibilityState !== 'hidden')
+      )
+        fetchRules()
+      else schedulePendingRefresh()
+    }, 3000)
+  }
   const current = (request) => mounted && generation === request
   const publish = () => {
     emit('rules-change', rules.value.length)
-    emit('status-change', rules.value.some((rule) => rule.running) ? 'running' : 'stopped')
+    emit(
+      'status-change',
+      rules.value.some((rule) => rule.running)
+        ? 'running'
+        : hasPendingCleanup()
+          ? 'error'
+          : 'stopped'
+    )
   }
   const reportError = (error, notify = false) => {
     errorMessage.value = handleError(error, {
@@ -70,6 +92,7 @@ export function useProxyRules(mode, sessionId, emit) {
     emit('status-change', 'error')
   }
   const invalidate = () => {
+    clearTimeout(timer)
     refreshing.value = false
     refreshPromise = null
     return ++generation
@@ -77,6 +100,7 @@ export function useProxyRules(mode, sessionId, emit) {
   const fetchRules = (internal = false) => {
     if (!mounted || (busy.value && internal !== true)) return
     if (refreshPromise) return refreshPromise
+    clearTimeout(timer)
     const request = generation
     const currentSession = sessionId()
     refreshing.value = true
@@ -96,6 +120,7 @@ export function useProxyRules(mode, sessionId, emit) {
         if (current(request)) {
           refreshing.value = false
           refreshPromise = null
+          schedulePendingRefresh()
         }
       }
     })
@@ -106,10 +131,11 @@ export function useProxyRules(mode, sessionId, emit) {
     const request = invalidate()
     operation.value = { kind, key: params[config.key] }
     try {
-      await config.api[kind]({ sessionId: sessionId(), ...params })
+      const response = await config.api[kind]({ sessionId: sessionId(), ...params })
       if (!current(request)) return
       errorMessage.value = ''
-      if (kind === 'add') {
+      const pending = response.data?.cleanupPending || response.data?.pendingCount > 0
+      if (kind === 'add' || pending) {
         await fetchRules(true)
       } else {
         rules.value =
@@ -118,11 +144,19 @@ export function useProxyRules(mode, sessionId, emit) {
             : rules.value.filter((rule) => rule[config.key] !== params[config.key])
         publish()
       }
-      if (current(request)) showSuccess(`${config.label}已${ACTION_LABELS[kind]}`)
+      if (current(request)) {
+        if (pending) {
+          errorMessage.value = response.data?.msg ?? '本地已停止，远端清理待确认'
+          showWarning(errorMessage.value)
+        } else showSuccess(`${config.label}已${ACTION_LABELS[kind]}`)
+      }
     } catch (error) {
       if (current(request)) reportError(error, true)
     } finally {
-      if (current(request)) operation.value = null
+      if (current(request)) {
+        operation.value = null
+        schedulePendingRefresh()
+      }
     }
   }
   const handleAdd = () => {

@@ -187,16 +187,24 @@
 
           <el-table-column
             label="状态"
-            width="100"
+            width="130"
             align="center"
           >
             <template #default="{ row }">
               <el-tag
                 size="small"
-                :type="row.running ? 'success' : 'danger'"
+                :type="row.running ? 'success' : row.cleanupPending ? 'warning' : 'info'"
                 effect="plain"
               >
-                {{ row.running ? '运行中' : '已停止' }}
+                {{
+                  row.running
+                    ? '运行中'
+                    : row.cleanupPending
+                      ? '远端待确认'
+                      : row.state === 'starting'
+                        ? '启动中'
+                        : '已停止'
+                }}
               </el-tag>
             </template>
           </el-table-column>
@@ -213,7 +221,7 @@
 
           <el-table-column
             label="操作"
-            width="100"
+            width="130"
             align="center"
           >
             <template #default="{ row }">
@@ -226,7 +234,7 @@
                 @click="handleStop(row.listenId)"
               >
                 <el-icon><Icon :icon="iconMap.delete" /></el-icon>
-                删除
+                {{ row.cleanupPending ? '重试清理' : '删除' }}
               </el-button>
             </template>
           </el-table-column>

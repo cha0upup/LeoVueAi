@@ -2,6 +2,8 @@
   <ProxyListenerPanel
     v-model:bind-addr="controlForm.bindAddr"
     v-model:port="controlForm.port"
+    v-model:details-visible="detailsVisible"
+    v-model:connection-page="connectionPage"
     class="socks5-proxy"
     :is-running="isRunning"
     :starting="starting"
@@ -37,6 +39,8 @@ const {
   status,
   errorMessage,
   statistics,
+  detailsVisible,
+  connectionPage,
   handleStart,
   handleStop,
   fetchStatistics
