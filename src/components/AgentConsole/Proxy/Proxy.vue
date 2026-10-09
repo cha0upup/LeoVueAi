@@ -75,7 +75,7 @@
 </template>
 
 <script setup>
-import { computed, inject, ref, unref, useId, watch } from 'vue'
+import { computed, inject, provide, ref, unref, useId, watch } from 'vue'
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { supportsCapabilityRequirements } from '@/composables/useAgentConsoleModules.js'
@@ -86,6 +86,8 @@ import ReverseTunnel from './ReverseTunnel.vue'
 
 const iconMap = icons
 const agentCapabilities = inject('agentCapabilities', ref([]))
+const activeModule = inject('agentActiveModule', null)
+provide('proxyActive', computed(() => !activeModule || unref(activeModule) === 'proxy'))
 
 defineProps({
   sessionId: {

@@ -12,6 +12,7 @@
             <span class="control-label">绑定地址</span>
             <el-input
               v-model="addForm.bindAddr"
+              :disabled="busy"
               aria-label="绑定地址"
               placeholder="127.0.0.1"
               clearable
@@ -21,6 +22,7 @@
             <span class="control-label">agent 监听端口</span>
             <el-input-number
               v-model="addForm.remoteListenPort"
+              :disabled="busy"
               aria-label="节点监听端口"
               :min="1"
               :max="65535"
@@ -33,6 +35,7 @@
             <span class="control-label">转发目标主机</span>
             <el-input
               v-model="addForm.forwardHost"
+              :disabled="busy"
               aria-label="转发目标主机"
               placeholder="127.0.0.1"
               clearable
@@ -42,6 +45,7 @@
             <span class="control-label">转发目标端口</span>
             <el-input-number
               v-model="addForm.forwardPort"
+              :disabled="busy"
               aria-label="转发目标端口"
               :min="1"
               :max="65535"
@@ -55,6 +59,7 @@
         <el-button
           type="primary"
           :loading="adding"
+          :disabled="busy && !adding"
           class="primary-action"
           @click="handleAdd"
         >
@@ -63,6 +68,14 @@
         </el-button>
       </div>
     </section>
+
+    <el-alert
+      v-if="errorMessage"
+      :title="errorMessage"
+      type="error"
+      :closable="false"
+      show-icon
+    />
 
     <!-- Rules list -->
     <section class="rules-panel">
@@ -81,6 +94,7 @@
             text
             size="small"
             :loading="stoppingAll"
+            :disabled="busy && !stoppingAll"
             @click="handleStopAll"
           >
             <el-icon><Icon :icon="iconMap.stop" /></el-icon>
@@ -90,6 +104,8 @@
           <el-button
             text
             size="small"
+            :loading="refreshing"
+            :disabled="busy"
             @click="fetchRules"
           >
             <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
@@ -191,7 +207,7 @@
             align="center"
           >
             <template #default="{ row }">
-              <span class="muted-text">{{ row.startTime ? formatTime(row.startTime) : '-' }}</span>
+              <span class="muted-text">{{ row.startTime ? formatDate(row.startTime) : '-' }}</span>
             </template>
           </el-table-column>
 
@@ -205,7 +221,8 @@
                 type="danger"
                 size="small"
                 text
-                :loading="stoppingId === row.listenId"
+                :loading="stoppingKey === row.listenId"
+                :disabled="busy && stoppingKey !== row.listenId"
                 @click="handleStop(row.listenId)"
               >
                 <el-icon><Icon :icon="iconMap.delete" /></el-icon>
@@ -231,147 +248,27 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
-import { icons } from '@/utils/icons.js'
-import {
-  listReverseTunnelsApi,
-  startReverseTunnelApi,
-  stopAllReverseTunnelsApi,
-  stopReverseTunnelApi
-} from '@/services/api/agent-tools.js'
-import { executeRequest } from '@/utils/apiUtils.js'
 import { Icon } from '@iconify/vue'
-import { showWarning } from '@/utils/messageUtils.js'
+import { icons as iconMap } from '@/utils/icons.js'
+import { useProxyRules } from '@/composables/useProxyRules.js'
+import { formatDate } from '@/utils/format.js'
 
-const iconMap = icons
-
-const props = defineProps({
-  sessionId: {
-    type: String,
-    required: true
-  }
-})
-
+const props = defineProps({ sessionId: { type: String, required: true } })
 const emit = defineEmits(['status-change', 'rules-change'])
-
-const rules = ref([])
-const adding = ref(false)
-const stoppingAll = ref(false)
-const stoppingId = ref(null)
-
-const addForm = ref({
-  remoteListenPort: 8080,
-  bindAddr: '127.0.0.1',
-  forwardHost: '',
-  forwardPort: 4444
-})
-
-const fetchRules = async () => {
-  try {
-    const res = await listReverseTunnelsApi({ sessionId: props.sessionId })
-    rules.value = res.data ?? []
-    emit('rules-change', rules.value.length)
-  } catch {
-    // silently ignore
-  }
-}
-
-const handleAdd = async () => {
-  const { remoteListenPort, bindAddr, forwardHost, forwardPort } = addForm.value
-  if (!remoteListenPort || remoteListenPort < 1 || remoteListenPort > 65535) {
-    showWarning('请输入有效的 agent 监听端口（1-65535）')
-    return
-  }
-  if (!forwardHost || !forwardHost.trim()) {
-    showWarning('请输入转发目标主机地址')
-    return
-  }
-  if (!forwardPort || forwardPort < 1 || forwardPort > 65535) {
-    showWarning('请输入有效的转发目标端口（1-65535）')
-    return
-  }
-
-  adding.value = true
-  try {
-    await executeRequest(
-      async () =>
-        startReverseTunnelApi({
-          sessionId: props.sessionId,
-          remoteListenPort,
-          bindAddr: bindAddr?.trim() || '127.0.0.1',
-          forwardHost: forwardHost.trim(),
-          forwardPort
-        }),
-      {
-        loadingRef: adding,
-        successMessage: `反向隧道已添加：agent:${remoteListenPort} → ${forwardHost}:${forwardPort}`,
-        errorMessage: '添加反向隧道失败'
-      }
-    )
-    await fetchRules()
-    emit('status-change', 'running')
-  } catch {
-    // error handled by executeRequest
-  } finally {
-    adding.value = false
-  }
-}
-
-const handleStop = async (listenId) => {
-  stoppingId.value = listenId
-  try {
-    await executeRequest(
-      async () => stopReverseTunnelApi({ sessionId: props.sessionId, listenId }),
-      {
-        successMessage: '反向隧道已删除',
-        errorMessage: '删除反向隧道失败'
-      }
-    )
-    await fetchRules()
-    if (rules.value.length === 0) emit('status-change', 'stopped')
-  } catch {
-    // error handled
-  } finally {
-    stoppingId.value = null
-  }
-}
-
-const handleStopAll = async () => {
-  stoppingAll.value = true
-  try {
-    await executeRequest(
-      async () => stopAllReverseTunnelsApi({ sessionId: props.sessionId }),
-      {
-        loadingRef: stoppingAll,
-        successMessage: '所有反向隧道已清除',
-        errorMessage: '清除失败'
-      }
-    )
-    rules.value = []
-    emit('status-change', 'stopped')
-    emit('rules-change', 0)
-  } catch {
-    // error handled
-  } finally {
-    stoppingAll.value = false
-  }
-}
-
-const formatTime = (ms) => {
-  if (!ms) return '-'
-  const d = new Date(ms)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
-
-onMounted(async () => {
-  await fetchRules()
-  if (rules.value.length > 0) {
-    emit('status-change', 'running')
-  } else {
-    emit('status-change', 'stopped')
-  }
-})
+const {
+  rules,
+  addForm,
+  busy,
+  adding,
+  stoppingAll,
+  stoppingKey,
+  refreshing,
+  errorMessage,
+  fetchRules,
+  handleAdd,
+  handleStop,
+  handleStopAll
+} = useProxyRules('reverse', () => props.sessionId, emit)
 </script>
 
 <style scoped src="./proxy-panel.css"></style>

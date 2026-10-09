@@ -12,12 +12,22 @@
           <el-icon><Icon :icon="statusTag.icon" /></el-icon>
           {{ statusTag.label }}
         </el-tag>
+        <el-button
+          v-if="status === 'error'"
+          text
+          size="small"
+          :loading="checking"
+          :disabled="starting || stopping"
+          @click="emit('refresh')"
+        >
+          重新检查
+        </el-button>
       </div>
 
       <div class="workspace-actions">
         <BindAddressInput
           v-model="bindAddr"
-          :disabled="isRunning || starting"
+          :disabled="isRunning || starting || stopping || checking"
           stacked
         />
         <div class="port-control">
@@ -29,13 +39,14 @@
             :max="65535"
             :precision="0"
             controls-position="right"
-            :disabled="isRunning || starting"
+            :disabled="isRunning || starting || stopping || checking"
           />
         </div>
         <el-button
           v-if="!isRunning"
           type="primary"
           :loading="starting"
+          :disabled="stopping || checking || status === 'unknown' || status === 'error'"
           class="primary-action"
           @click="emit('start')"
         >
@@ -54,6 +65,14 @@
         </el-button>
       </div>
     </section>
+
+    <el-alert
+      v-if="errorMessage"
+      :title="errorMessage"
+      type="error"
+      :closable="false"
+      show-icon
+    />
 
     <section
       v-if="isRunning && statistics"
@@ -89,7 +108,8 @@
             v-if="isRunning"
             class="connections-subtitle"
           >
-            上行 {{ formatRate(statistics?.uploadRate) }} · 下行 {{ formatRate(statistics?.downloadRate) }}
+            上行 {{ formatRate(statistics?.uploadRate) }} · 下行
+            {{ formatRate(statistics?.downloadRate) }}
           </span>
         </div>
         <div
@@ -100,6 +120,8 @@
           <el-button
             text
             size="small"
+            :loading="checking"
+            :disabled="starting || stopping"
             @click="emit('refresh')"
           >
             <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
@@ -220,7 +242,7 @@
         <el-icon aria-hidden="true">
           <Icon :icon="iconMap.connection" />
         </el-icon>
-        <p>{{ isRunning ? '正在获取连接信息…' : '配置监听地址和端口，然后启动代理。' }}</p>
+        <p>{{ emptyMessage }}</p>
       </div>
     </section>
   </div>
@@ -237,6 +259,9 @@ const props = defineProps({
   isRunning: { type: Boolean, default: false },
   starting: { type: Boolean, default: false },
   stopping: { type: Boolean, default: false },
+  checking: { type: Boolean, default: false },
+  status: { type: String, default: 'unknown' },
+  errorMessage: { type: String, default: '' },
   statistics: { type: Object, default: null }
 })
 
@@ -244,10 +269,18 @@ const bindAddr = defineModel('bindAddr', { type: String, required: true })
 const port = defineModel('port', { type: Number, default: undefined })
 const emit = defineEmits(['start', 'stop', 'refresh'])
 
-const statusTag = computed(() => props.isRunning
-  ? { type: 'success', icon: iconMap.success, label: '运行中' }
-  : { type: 'info', icon: iconMap.info, label: '未启动' }
-)
+const statusTag = computed(() => {
+  if (props.status === 'error') return { type: 'danger', icon: iconMap.info, label: '状态异常' }
+  if (props.status === 'unknown') return { type: 'info', icon: iconMap.info, label: '正在检查' }
+  return props.isRunning
+    ? { type: 'success', icon: iconMap.success, label: '运行中' }
+    : { type: 'info', icon: iconMap.info, label: '未启动' }
+})
+const emptyMessage = computed(() => {
+  if (props.status === 'error') return '代理状态待确认，请重新检查。'
+  if (props.status === 'unknown') return '正在检查代理状态…'
+  return props.isRunning ? '正在获取连接信息…' : '配置监听地址和端口，然后启动代理。'
+})
 
 const formatBytes = (bytes) => ((bytes ?? 0) ? formatFileSize(bytes) : '0 B')
 const formatRate = (rate) => ((rate ?? 0) ? `${formatFileSize(rate)}/s` : '0 B/s')

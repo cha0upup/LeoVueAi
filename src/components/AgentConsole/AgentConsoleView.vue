@@ -276,6 +276,7 @@ const { tabs, activeKey, openTab, ensureTab, closeTab, setActive, isOpen, resetT
     getSessionId: () => props.sessionId || '',
     isModuleAvailable: (_key, module) => isModuleAvailable(module)
   })
+provide('agentActiveModule', activeKey)
 
 // ── Tab badges (task notifications) ───────────────────────────────────────
 // badge shape: { count: number, type: 'info' | 'success' | 'danger' | 'warning' }
