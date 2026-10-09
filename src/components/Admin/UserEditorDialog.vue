@@ -25,33 +25,22 @@
         />
       </el-form-item>
 
-      <el-form-item
-        v-if="!editing"
-        label="密码"
-        prop="password"
-      >
-        <el-input
-          v-model="form.password"
-          type="password"
-          placeholder="请输入密码"
-          :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
-          show-password
-        />
-      </el-form-item>
-
-      <el-form-item
-        v-if="!editing"
-        label="确认密码"
-        prop="confirmPassword"
-      >
-        <el-input
-          v-model="form.confirmPassword"
-          type="password"
-          placeholder="请确认密码"
-          :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
-          show-password
-        />
-      </el-form-item>
+      <template v-if="!editing">
+        <el-form-item
+          v-for="field in passwordFields"
+          :key="field.prop"
+          :label="field.label"
+          :prop="field.prop"
+        >
+          <el-input
+            v-model="form[field.prop]"
+            type="password"
+            :placeholder="field.placeholder"
+            :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
+            show-password
+          />
+        </el-form-item>
+      </template>
 
       <el-form-item
         label="角色"
@@ -140,6 +129,11 @@ import { reactive } from 'vue'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
 
 const visible = defineModel({ type: Boolean, default: false })
+
+const passwordFields = [
+  { prop: 'password', label: '密码', placeholder: '请输入密码' },
+  { prop: 'confirmPassword', label: '确认密码', placeholder: '请确认密码' }
+]
 
 const props = defineProps({
   editing: { type: Boolean, default: false },

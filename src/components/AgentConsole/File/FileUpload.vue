@@ -73,24 +73,10 @@
                 style="width: 100%"
               >
                 <el-option
-                  label="64KB"
-                  :value="65536"
-                />
-                <el-option
-                  label="128KB"
-                  :value="131072"
-                />
-                <el-option
-                  label="256KB"
-                  :value="262144"
-                />
-                <el-option
-                  label="512KB"
-                  :value="524288"
-                />
-                <el-option
-                  label="1MB"
-                  :value="1048576"
+                  v-for="option in FILE_TRANSFER_CHUNK_OPTIONS"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
                 />
               </el-select>
             </el-form-item>
@@ -124,6 +110,7 @@ import { computed, reactive, ref } from 'vue'
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { formatFilePath, formatFileSize as formatSize } from '@/utils/format.js'
+import { FILE_TRANSFER_CHUNK_OPTIONS } from '@/constants/task.js'
 import { taskEngine } from './TaskEngine.js'
 import { getFileIconPresentation } from '@/utils/fileIcons.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'

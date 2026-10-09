@@ -43,7 +43,7 @@
           <el-button
             v-if="isScript(item.pluginType)"
             size="small"
-            @click="emitLoad(item)"
+            @click="emit('load-script', item)"
           >
             载入编辑器
           </el-button>
@@ -172,7 +172,7 @@
                         :disabled="!executionResult"
                         size="small"
                         text
-                        @click="clearResult"
+                        @click="executionResult = ''"
                       >
                         <el-icon><Icon :icon="iconMap.delete" /></el-icon>
                         清空
@@ -222,7 +222,7 @@
                         :disabled="!executionResult"
                         size="small"
                         text
-                        @click="clearResult"
+                        @click="executionResult = ''"
                       >
                         清空
                       </el-button>
@@ -319,50 +319,29 @@ const { dialogWidth } = useResponsiveDialogWidth({
 const normalizeType = (type) => String(type ?? '').toLowerCase()
 const isScript = (type) => SCRIPT_TYPES.includes(normalizeType(type))
 
-const typeLabelFor = (type) => {
-  switch (normalizeType(type)) {
-    case 'js': return 'JavaScript'
-    case 'groovy': return 'Groovy'
-    case 'python': return 'Python'
-    case 'php': return 'PHP'
-    case TYPE_JAVA: return 'Java'
-    default: return type || 'Unknown'
-  }
-}
+const typePresentations = new Map([
+  [TYPE_JAVA, { label: 'Java', icon: iconMap.coffeeCup, tag: 'info', color: 'primary', mix: 10 }],
+  ['js', { label: 'JavaScript', icon: iconMap.codeJson || iconMap.code, tag: 'warning', color: 'warning', mix: 12 }],
+  ['groovy', { label: 'Groovy', icon: iconMap.codeView || iconMap.code, tag: 'success', color: 'success', mix: 12 }],
+  ['python', { label: 'Python', icon: iconMap.codeFile || iconMap.code, tag: 'primary', color: 'primary', mix: 12 }],
+  ['php', { label: 'PHP', icon: iconMap.codeFile || iconMap.code, tag: 'success', color: 'success', mix: 12 }]
+])
+const presentationFor = (type) => typePresentations.get(normalizeType(type))
+const typeLabelFor = (type) => presentationFor(type)?.label || type || 'Unknown'
 
 const iconForType = (type) => {
-  switch (normalizeType(type)) {
-    case 'js': return iconMap.codeJson || iconMap.code
-    case 'groovy': return iconMap.codeView || iconMap.code
-    case 'python': return iconMap.codeFile || iconMap.code
-    case 'php': return iconMap.codeFile || iconMap.code
-    case TYPE_JAVA: return iconMap.coffeeCup
-    default: return iconMap.code
-  }
+  const presentation = presentationFor(type)
+  return presentation ? presentation.icon : iconMap.code
 }
 
-const tagTypeFor = (type) => {
-  switch (normalizeType(type)) {
-    case 'js': return 'warning'
-    case 'groovy': return 'success'
-    case 'python': return 'primary'
-    case 'php': return 'success'
-    case TYPE_JAVA: return 'info'
-    default: return 'info'
-  }
-}
+const tagTypeFor = (type) => presentationFor(type)?.tag || 'info'
 
 const iconStyleFor = (type) => {
-  const t = normalizeType(type)
-  const palette = {
-    java: ['var(--el-color-primary)', 'color-mix(in srgb, var(--el-color-primary) 10%, var(--app-control-background))'],
-    js: ['var(--el-color-warning)', 'color-mix(in srgb, var(--el-color-warning) 12%, var(--app-control-background))'],
-    groovy: ['var(--el-color-success)', 'color-mix(in srgb, var(--el-color-success) 12%, var(--app-control-background))'],
-    python: ['var(--el-color-primary)', 'color-mix(in srgb, var(--el-color-primary) 12%, var(--app-control-background))'],
-    php: ['var(--el-color-success)', 'color-mix(in srgb, var(--el-color-success) 12%, var(--app-control-background))']
+  const { color, mix } = presentationFor(type) || typePresentations.get(TYPE_JAVA)
+  return {
+    color: `var(--el-color-${color})`,
+    background: `color-mix(in srgb, var(--el-color-${color}) ${mix}%, var(--app-control-background))`
   }
-  const [color, bg] = palette[t] || palette.java
-  return { color, background: bg }
 }
 
 // ── 数据加载 ─────────────────────────────────────────────────
@@ -374,7 +353,6 @@ const getPlugins = async () => {
     const list = Array.isArray(response.data) ? response.data : []
     plugins.value = list
       .filter((item) => item.runtime === agentRuntime.value)
-      .slice()
       .sort((a, b) => (a.pluginName || a.pluginId).localeCompare(b.pluginName || b.pluginId))
     emit('plugin-count-updated', plugins.value.length)
   } catch (error) {
@@ -389,10 +367,6 @@ const openInvokeDialog = (plugin) => {
   paramsInput.value = plugin.paramsDemo || ''
   executionResult.value = ''
   showInvokeDialog.value = true
-}
-
-const emitLoad = (plugin) => {
-  emit('load-script', plugin)
 }
 
 const invokePlugin = async () => {
@@ -420,10 +394,6 @@ const invokePlugin = async () => {
   }
 }
 
-const clearResult = () => {
-  executionResult.value = ''
-}
-
 const copyResult = async () => {
   if (!executionResult.value) return
   try {
@@ -434,9 +404,7 @@ const copyResult = async () => {
   }
 }
 
-onMounted(async () => {
-  await getPlugins()
-})
+onMounted(getPlugins)
 
 defineExpose({
   getPlugins

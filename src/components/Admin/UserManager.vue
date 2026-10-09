@@ -276,7 +276,7 @@ import { executeRequest } from '@/utils/apiUtils.js'
 import { executeDeleteWithConfirm, confirmAction } from '@/utils/confirmUtils.js'
 import { omitFields } from '@/utils/dataUtils.js'
 import { useEditDialog, useDialog } from '@/utils/dialogUtils.js'
-import { validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { createPasswordRules, createPasswordMatchValidator, validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
 import {
   addUserApi,
   deleteUserApi,
@@ -349,14 +349,6 @@ const resetFormRef = ref(null)
 const userForm = reactive(createUserForm())
 const resetForm = reactive(createPasswordResetForm())
 
-const createPasswordMatchValidator = getPassword => (rule, value, callback) => {
-  if (value !== getPassword()) {
-    callback(new Error('两次输入密码不一致'))
-  } else {
-    callback()
-  }
-}
-
 // 表单验证规则
 const userRules = {
   userName: [
@@ -367,19 +359,11 @@ const userRules = {
       trigger: 'blur'
     }
   ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    {
-      min: AUTH_FIELD_LIMITS.passwordMinLength,
-      max: AUTH_FIELD_LIMITS.passwordMaxLength,
-      message: `密码长度在 ${AUTH_FIELD_LIMITS.passwordMinLength} 到 ${AUTH_FIELD_LIMITS.passwordMaxLength} 个字符`,
-      trigger: 'blur'
-    }
-  ],
+  password: createPasswordRules('请输入密码'),
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
     {
-      validator: createPasswordMatchValidator(() => userForm.password),
+      validator: createPasswordMatchValidator(() => userForm.password, '两次输入密码不一致'),
       trigger: 'blur'
     }
   ],
@@ -387,19 +371,11 @@ const userRules = {
 }
 
 const resetRules = {
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    {
-      min: AUTH_FIELD_LIMITS.passwordMinLength,
-      max: AUTH_FIELD_LIMITS.passwordMaxLength,
-      message: `密码长度在 ${AUTH_FIELD_LIMITS.passwordMinLength} 到 ${AUTH_FIELD_LIMITS.passwordMaxLength} 个字符`,
-      trigger: 'blur'
-    }
-  ],
+  newPassword: createPasswordRules(),
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
     {
-      validator: createPasswordMatchValidator(() => resetForm.newPassword),
+      validator: createPasswordMatchValidator(() => resetForm.newPassword, '两次输入密码不一致'),
       trigger: 'blur'
     }
   ]

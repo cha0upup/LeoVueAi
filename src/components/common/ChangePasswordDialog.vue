@@ -33,64 +33,26 @@
         class="password-form"
       >
         <div class="form-grid">
-          <div class="field-card">
+          <div
+            v-for="field in passwordFields"
+            :key="field.prop"
+            class="field-card"
+          >
             <div class="field-head">
-              <span>旧密码</span>
-              <small>验证当前身份</small>
+              <span>{{ field.label }}</span>
+              <small>{{ field.hint }}</small>
             </div>
-            <el-form-item prop="oldPassword">
+            <el-form-item :prop="field.prop">
               <el-input
-                v-model="form.oldPassword"
+                v-model="form[field.prop]"
                 type="password"
-                placeholder="请输入旧密码"
+                :placeholder="field.placeholder"
                 :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
                 show-password
                 class="password-input"
               >
                 <template #prefix>
-                  <el-icon><Icon :icon="iconMap.key" /></el-icon>
-                </template>
-              </el-input>
-            </el-form-item>
-          </div>
-
-          <div class="field-card">
-            <div class="field-head">
-              <span>新密码</span>
-              <small>设置新的登录凭据</small>
-            </div>
-            <el-form-item prop="newPassword">
-              <el-input
-                v-model="form.newPassword"
-                type="password"
-                placeholder="请输入新密码"
-                :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
-                show-password
-                class="password-input"
-              >
-                <template #prefix>
-                  <el-icon><Icon :icon="iconMap.lock" /></el-icon>
-                </template>
-              </el-input>
-            </el-form-item>
-          </div>
-
-          <div class="field-card">
-            <div class="field-head">
-              <span>确认密码</span>
-              <small>再次确认新密码</small>
-            </div>
-            <el-form-item prop="confirmPassword">
-              <el-input
-                v-model="form.confirmPassword"
-                type="password"
-                placeholder="请再次输入新密码"
-                :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
-                show-password
-                class="password-input"
-              >
-                <template #prefix>
-                  <el-icon><Icon :icon="iconMap.check" /></el-icon>
+                  <el-icon><Icon :icon="iconMap[field.icon]" /></el-icon>
                 </template>
               </el-input>
             </el-form-item>
@@ -123,7 +85,7 @@ import { ref, reactive } from 'vue'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
 import { icons } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
-import { validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { createPasswordRules, createPasswordMatchValidator, validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { changePasswordApi } from '@/services/api/auth.js'
 
@@ -131,34 +93,24 @@ const dialog = useDialog()
 const changePasswordVisible = dialog.visible
 const iconMap = icons
 
+const passwordFields = [
+  { prop: 'oldPassword', label: '旧密码', hint: '验证当前身份', placeholder: '请输入旧密码', icon: 'key' },
+  { prop: 'newPassword', label: '新密码', hint: '设置新的登录凭据', placeholder: '请输入新密码', icon: 'lock' },
+  { prop: 'confirmPassword', label: '确认密码', hint: '再次确认新密码', placeholder: '请再次输入新密码', icon: 'check' }
+]
+
 const form = reactive({
   oldPassword: '',
   newPassword: '',
   confirmPassword: ''
 })
 
-const validateConfirmPassword = (rule, value, callback) => {
-  if (value !== form.newPassword) {
-    callback(new Error('两次输入的密码不一致'))
-  } else {
-    callback()
-  }
-}
-
 const rules = {
   oldPassword: [{ required: true, message: '请输入旧密码', trigger: 'blur' }],
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    {
-      min: AUTH_FIELD_LIMITS.passwordMinLength,
-      max: AUTH_FIELD_LIMITS.passwordMaxLength,
-      message: `密码长度在 ${AUTH_FIELD_LIMITS.passwordMinLength} 到 ${AUTH_FIELD_LIMITS.passwordMaxLength} 个字符`,
-      trigger: 'blur'
-    }
-  ],
+  newPassword: createPasswordRules(),
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
-    { validator: validateConfirmPassword, trigger: 'blur' }
+    { validator: createPasswordMatchValidator(() => form.newPassword), trigger: 'blur' }
   ]
 }
 

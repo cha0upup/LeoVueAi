@@ -42,45 +42,23 @@ export function formatDate(timestamp) {
 }
 
 export function formatFilePath(filePath) {
-  // 1. 确保输入是字符串类型
   if (typeof filePath !== 'string') {
     throw new Error('文件路径必须是字符串')
   }
 
-  // 2. 根据操作系统规范化路径分隔符
-  // 使用正则替换所有的反斜杠 '\\' 为正斜杠 '/'
   const isUncPath = /^(?:\\\\|\/\/)/.test(filePath)
-  let formattedPath = filePath.replace(/\\/g, '/')
+  let formattedPath = filePath
+    .replace(/\\/g, '/')
+    .replace(/^([a-zA-Z]:)(?![/])/, '$1/')
+    .replace(/\/+/g, '/')
 
-  // 2.1 处理 Windows 盘符路径缺少斜杠的情况：例如 "D:IdeaProjects/xxx"
-  // 规范化为 "D:/IdeaProjects/xxx"，否则后端在 Windows 上会当成相对路径
-  // 匹配形如 "D:后面不是 /" 的开头
-  if (/^[a-zA-Z]:(?![/])/.test(formattedPath)) {
-    formattedPath = formattedPath.replace(/^([a-zA-Z]:)(?![/])/, '$1/')
-  }
-
-  // 3. 删除多余的斜杠 (例如 '//', '///' 等)
-  // 这将处理像 "/folder//subfolder///file.txt" 这样的路径
-  formattedPath = isUncPath
-    ? `//${formattedPath.replace(/^\/+/, '').replace(/\/+/g, '/')}`
-    : formattedPath.replace(/\/+/g, '/')
-
-  // 4. 检查是否是 Windows 盘符根目录（如 D:/）
-  const isWindowsDriveRoot = /^[a-zA-Z]:\/$/.test(formattedPath)
-
-  // 5. 去除路径结尾的多余斜杠（除了根目录和 Windows 盘符根目录）
-  if (!isWindowsDriveRoot && formattedPath !== '/' && formattedPath.endsWith('/')) {
+  // UNC 路径保留双斜杠前缀，根目录保留结尾斜杠。
+  if (isUncPath) formattedPath = `/${formattedPath}`
+  if (!/^[a-zA-Z]:\/$/.test(formattedPath) && formattedPath !== '/' && formattedPath.endsWith('/')) {
     formattedPath = formattedPath.slice(0, -1)
   }
 
-  // 6. 处理 './' 路径：保留开头的 './' 或 '.'，移除路径中间的 './'
-  if (formattedPath === './' || formattedPath === '.') {
-    return '.'
-  }
-  // 移除路径中间的 './' 模式
-  formattedPath = formattedPath.replace('/./', '/')
-
-  return formattedPath
+  return formattedPath.replace('/./', '/')
 }
 
 /** 规范化目录路径，保留 POSIX 与 Windows 盘符根目录。 */
@@ -95,6 +73,5 @@ export function normalizeDirectoryPath(path) {
 /** 按现有文件路径规则拼接目录与名称。 */
 export function joinFilePath(basePath, name) {
   const base = normalizeDirectoryPath(basePath)
-  if (base === '/') return formatFilePath(`/${name}`)
   return formatFilePath(`${base}${base.endsWith('/') ? '' : '/'}${name}`)
 }

@@ -31,20 +31,11 @@
               <span class="field-name">{{ scope.row.fieldName }}</span>
               <div class="field-meta">
                 <el-tag
-                  v-if="!scope.row.nullable"
-                  type="danger"
+                  :type="scope.row.nullable ? 'info' : 'danger'"
                   size="small"
-                  class="required-tag"
+                  :class="scope.row.nullable ? 'optional-tag' : 'required-tag'"
                 >
-                  必填
-                </el-tag>
-                <el-tag
-                  v-else
-                  type="info"
-                  size="small"
-                  class="optional-tag"
-                >
-                  可选
+                  {{ scope.row.nullable ? '可选' : '必填' }}
                 </el-tag>
                 <span class="field-type">{{ scope.row.type }}</span>
               </div>
@@ -57,29 +48,28 @@
           min-width="300"
         >
           <template #default="scope">
-            <template v-if="scope.row.inputComponent === 'el-select'">
-              <el-select
-                v-model="formData[scope.row.fieldName]"
-                placeholder="请选择"
-                style="width: 100%"
-                clearable
-                size="default"
-              >
-                <el-option
-                  label="True"
-                  :value="true"
-                />
-                <el-option
-                  label="False"
-                  :value="false"
-                />
-                <el-option
-                  v-if="scope.row.nullable"
-                  label="NULL"
-                  :value="null"
-                />
-              </el-select>
-            </template>
+            <el-select
+              v-if="scope.row.inputComponent === 'el-select'"
+              v-model="formData[scope.row.fieldName]"
+              placeholder="请选择"
+              style="width: 100%"
+              clearable
+              size="default"
+            >
+              <el-option
+                label="True"
+                :value="true"
+              />
+              <el-option
+                label="False"
+                :value="false"
+              />
+              <el-option
+                v-if="scope.row.nullable"
+                label="NULL"
+                :value="null"
+              />
+            </el-select>
             <component
               :is="scope.row.inputComponent"
               v-else

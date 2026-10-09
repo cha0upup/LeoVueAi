@@ -17,33 +17,18 @@
         </el-radio-group>
 
         <el-input
-          v-if="mode === 'class'"
-          v-model="className"
+          :key="mode === 'class' ? 'class' : 'path'"
+          v-model="queryInput"
           class="rb-input"
           size="default"
-          placeholder="完整类名，例如 com.example.Foo（会自动转为 com/example/Foo.class）"
+          :placeholder="mode === 'class' ? '完整类名，例如 com.example.Foo（会自动转为 com/example/Foo.class）' : '相对 classpath 的路径，例如 application.yml、META-INF/MANIFEST.MF'"
           clearable
           spellcheck="false"
           :disabled="loading"
           @keydown.enter="onFetch"
         >
           <template #prefix>
-            <el-icon><Icon :icon="iconMap.coffeeCup" /></el-icon>
-          </template>
-        </el-input>
-        <el-input
-          v-else
-          v-model="resourcePath"
-          class="rb-input"
-          size="default"
-          placeholder="相对 classpath 的路径，例如 application.yml、META-INF/MANIFEST.MF"
-          clearable
-          spellcheck="false"
-          :disabled="loading"
-          @keydown.enter="onFetch"
-        >
-          <template #prefix>
-            <el-icon><Icon :icon="iconMap.codeFile" /></el-icon>
+            <el-icon><Icon :icon="mode === 'class' ? iconMap.coffeeCup : iconMap.codeFile" /></el-icon>
           </template>
         </el-input>
 
@@ -174,28 +159,25 @@
         </div>
 
         <div class="preview-pane">
-          <template v-if="result.preview === 'java' && result.javaCode">
-            <CodePreview
-              :model-value="result.javaCode"
-              language="java"
-            />
-          </template>
-          <template v-else-if="result.preview === 'text' && result.text">
-            <CodePreview
-              :model-value="result.text"
-              :language="textLanguage"
-            />
-          </template>
-          <template v-else>
-            <el-input
-              :model-value="hexPreview"
-              type="textarea"
-              :rows="22"
-              readonly
-              spellcheck="false"
-              class="code-input mono"
-            />
-          </template>
+          <CodePreview
+            v-if="result.preview === 'java' && result.javaCode"
+            :model-value="result.javaCode"
+            language="java"
+          />
+          <CodePreview
+            v-else-if="result.preview === 'text' && result.text"
+            :model-value="result.text"
+            :language="textLanguage"
+          />
+          <el-input
+            v-else
+            :model-value="hexPreview"
+            type="textarea"
+            :rows="22"
+            readonly
+            spellcheck="false"
+            class="code-input mono"
+          />
         </div>
       </div>
     </div>
@@ -237,11 +219,11 @@ const emptyHint = computed(() =>
     : '输入相对 classpath 的资源路径（application.yml、META-INF/MANIFEST.MF 等）'
 )
 
-const queryValue = computed(() =>
-  mode.value === 'class'
-    ? className.value.trim()
-    : resourcePath.value.trim()
-)
+const queryInput = computed({
+  get: () => (mode.value === 'class' ? className : resourcePath).value,
+  set: (value) => { (mode.value === 'class' ? className : resourcePath).value = value }
+})
+const queryValue = computed(() => queryInput.value.trim())
 
 const previewTag = computed(() => {
   switch (result.value?.preview) {
@@ -347,11 +329,7 @@ const pushHistory = () => {
 
 const loadHistory = (item) => {
   mode.value = item.mode
-  if (item.mode === 'class') {
-    className.value = item.value
-  } else {
-    resourcePath.value = item.value
-  }
+  queryInput.value = item.value
   onFetch()
 }
 

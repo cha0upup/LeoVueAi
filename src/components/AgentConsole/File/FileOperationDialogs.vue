@@ -3,44 +3,29 @@
   <FileDownload ref="fileDownloadRef" />
   <FileDelete
     ref="fileDeleteRef"
-    :session-id="sessionId"
-    :file="activeFile"
-    :disk="disk"
-    :current-path="currentPath"
+    v-bind="fileDialogProps"
     @refresh="emit('refresh')"
   />
   <FileCompress
     ref="fileCompressRef"
-    :session-id="sessionId"
-    :file="activeFile"
-    :disk="disk"
-    :current-path="currentPath"
+    v-bind="fileDialogProps"
     @refresh="emit('refresh')"
   />
   <FileDecompress
     ref="fileDecompressRef"
-    :session-id="sessionId"
-    :file="activeFile"
-    :disk="disk"
-    :current-path="currentPath"
+    v-bind="fileDialogProps"
     @refresh="emit('refresh')"
   />
   <FileTransfer
     ref="fileCopyRef"
     mode="copy"
-    :session-id="sessionId"
-    :file="activeFile"
-    :disk="disk"
-    :current-path="currentPath"
+    v-bind="fileDialogProps"
     @refresh="emit('refresh')"
   />
   <FileTransfer
     ref="fileMoveRef"
     mode="move"
-    :session-id="sessionId"
-    :file="activeFile"
-    :disk="disk"
-    :current-path="currentPath"
+    v-bind="fileDialogProps"
     @refresh="emit('refresh')"
   />
   <FileTouch
@@ -49,24 +34,18 @@
   />
   <FileRename
     ref="fileRenameRef"
-    :session-id="sessionId"
-    :file="activeFile"
-    :disk="disk"
-    :current-path="currentPath"
+    v-bind="fileDialogProps"
     @refresh="emit('refresh')"
   />
   <FileChmod
     ref="fileChmodRef"
-    :session-id="sessionId"
-    :file="activeFile"
-    :disk="disk"
-    :current-path="currentPath"
+    v-bind="fileDialogProps"
     @refresh="emit('refresh')"
   />
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import FilePreview from './FilePreview.vue'
 import FileDownload from './FileDownload.vue'
 import FileDelete from './FileDelete.vue'
@@ -86,6 +65,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['refresh'])
 const activeFile = ref({})
+const fileDialogProps = computed(() => ({
+  sessionId: props.sessionId,
+  file: activeFile.value,
+  disk: props.disk,
+  currentPath: props.currentPath
+}))
 const filePreviewRef = ref(null)
 const fileDownloadRef = ref(null)
 const fileDeleteRef = ref(null)

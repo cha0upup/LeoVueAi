@@ -50,24 +50,10 @@
                 style="width: 100%"
               >
                 <el-option
-                  label="64KB"
-                  :value="65536"
-                />
-                <el-option
-                  label="128KB"
-                  :value="131072"
-                />
-                <el-option
-                  label="256KB"
-                  :value="262144"
-                />
-                <el-option
-                  label="512KB"
-                  :value="524288"
-                />
-                <el-option
-                  label="1MB"
-                  :value="1048576"
+                  v-for="option in FILE_TRANSFER_CHUNK_OPTIONS"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
                 />
               </el-select>
             </el-form-item>
@@ -97,6 +83,7 @@ import { computed, reactive, ref } from 'vue'
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { formatFilePath, formatFileSize as formatSize } from '@/utils/format.js'
+import { FILE_TRANSFER_CHUNK_OPTIONS } from '@/constants/task.js'
 import { taskEngine } from './TaskEngine.js'
 import { getFileMd5Api } from '@/services/api/agent-files.js'
 import { getFileIconPresentation } from '@/utils/fileIcons.js'
@@ -136,15 +123,6 @@ const openDialog = async (sessionIdParam, filePathParam, fileNameParam, fileSize
 
   // 获取文件MD5和大小信息
   try {
-    await getFileMD5()
-  } catch {
-    // 静默处理获取MD5失败
-  }
-}
-
-// 获取文件MD5和大小信息
-const getFileMD5 = async () => {
-  try {
     const response = await getFileMd5Api({
       sessionId: dialogSessionId.value,
       path: formatFilePath(filePath.value + fileName.value)
@@ -157,21 +135,6 @@ const getFileMD5 = async () => {
   } catch {
     // 静默处理获取MD5失败
   }
-}
-
-// 创建下载任务
-const createDownloadTask = () => {
-  return taskEngine.createDownloadTask(
-    dialogSessionId.value,
-    filePath.value,
-    fileName.value,
-    fileSize.value,
-    {
-      chunkSize: form.chunkSize,
-      concurrency: form.concurrency,
-      background: true
-    }
-  )
 }
 
 const fileIconPresentation = computed(() =>
@@ -195,7 +158,17 @@ const startDownload = async () => {
     return
   }
   try {
-    const taskId = createDownloadTask()
+    const taskId = taskEngine.createDownloadTask(
+      dialogSessionId.value,
+      filePath.value,
+      fileName.value,
+      fileSize.value,
+      {
+        chunkSize: form.chunkSize,
+        concurrency: form.concurrency,
+        background: true
+      }
+    )
     downloadVisible.value = false
     showSuccess('下载任务已提交，可在任务管理器中查看进度')
     taskEngine.startTask(taskId).catch((err) => {

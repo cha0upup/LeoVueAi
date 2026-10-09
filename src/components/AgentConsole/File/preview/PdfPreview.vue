@@ -89,9 +89,7 @@ watch(() => props.pdfSrc, (val) => {
   if (val && val.startsWith('data:application/pdf')) {
     loading.value = true
     try {
-      const byteStr = atob(val.split(',')[1])
-      const bytes = new Uint8Array(byteStr.length)
-      for (let i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i)
+      const bytes = Uint8Array.from(atob(val.split(',')[1]), character => character.charCodeAt(0))
       const blob = new Blob([bytes], { type: 'application/pdf' })
       objectUrl.value = URL.createObjectURL(blob)
     } catch {

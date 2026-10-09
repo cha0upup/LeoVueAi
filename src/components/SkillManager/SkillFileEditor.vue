@@ -364,9 +364,7 @@ const handleDownload = () => {
   if (props.encoding === 'text') {
     blob = new Blob([props.fileContent], { type: 'text/plain;charset=utf-8' })
   } else {
-    const bin = atob(props.fileContent)
-    const bytes = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    const bytes = Uint8Array.from(atob(props.fileContent), character => character.charCodeAt(0))
     blob = new Blob([bytes], { type: 'application/octet-stream' })
   }
   downloadBlob(blob, props.filePath.split('/').pop())

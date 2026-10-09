@@ -1,8 +1,30 @@
+import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
 import { showError } from './messageUtils.js'
 /**
  * 表单工具函数
  * 提供表单相关的通用方法
  */
+
+export function createPasswordRules(requiredMessage = '请输入新密码') {
+  return [
+    { required: true, message: requiredMessage, trigger: 'blur' },
+    {
+      min: AUTH_FIELD_LIMITS.passwordMinLength,
+      max: AUTH_FIELD_LIMITS.passwordMaxLength,
+      message: `密码长度在 ${AUTH_FIELD_LIMITS.passwordMinLength} 到 ${AUTH_FIELD_LIMITS.passwordMaxLength} 个字符`,
+      trigger: 'blur'
+    }
+  ]
+}
+
+export const createPasswordMatchValidator = (getPassword, message = '两次输入的密码不一致') =>
+  (rule, value, callback) => {
+    if (value !== getPassword()) {
+      callback(new Error(message))
+    } else {
+      callback()
+    }
+  }
 
 /**
  * 表单验证的通用处理

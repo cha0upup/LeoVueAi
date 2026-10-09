@@ -229,23 +229,10 @@ const downloadClassFile = () => {
   }
 
   try {
-    // bytecode是Base64编码的字符串，需要解码为二进制数据
-    const base64String = bytecodeData.value.bytecode
-    // 解码Base64字符串
-    const binaryString = atob(base64String)
-    // 转换为字节数组
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-
-    // 创建Blob对象
+    const bytes = Uint8Array.from(atob(bytecodeData.value.bytecode), character => character.charCodeAt(0))
     const blob = new Blob([bytes], { type: 'application/java-vm' })
-
-    // 生成文件名（使用类名）
     const className = bytecodeData.value.className || 'UnknownClass'
     const fileName = className.split('.').pop() + '.class'
-
     downloadBlob(blob, fileName)
 
     showSuccess('class文件下载成功')

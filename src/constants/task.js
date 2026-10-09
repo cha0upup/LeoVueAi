@@ -42,3 +42,11 @@ export const TASK_STATUS_TEXT = {
   [TaskStatus.FAILED]: '失败',
   [TaskStatus.CANCELLED]: '已取消'
 }
+
+export const FILE_TRANSFER_CHUNK_OPTIONS = Object.freeze([
+  { label: '64KB', value: 65536 },
+  { label: '128KB', value: 131072 },
+  { label: '256KB', value: 262144 },
+  { label: '512KB', value: 524288 },
+  { label: '1MB', value: 1048576 }
+])

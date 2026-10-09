@@ -21,26 +21,15 @@
         class="reset-form"
       >
         <el-form-item
-          label="新密码"
-          prop="newPassword"
+          v-for="field in passwordFields"
+          :key="field.prop"
+          :label="field.label"
+          :prop="field.prop"
         >
           <el-input
-            v-model="form.newPassword"
+            v-model="form[field.prop]"
             type="password"
-            placeholder="请输入新密码"
-            :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
-            show-password
-          />
-        </el-form-item>
-
-        <el-form-item
-          label="确认密码"
-          prop="confirmPassword"
-        >
-          <el-input
-            v-model="form.confirmPassword"
-            type="password"
-            placeholder="请确认新密码"
+            :placeholder="field.placeholder"
             :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
             show-password
           />
@@ -70,6 +59,11 @@ import { reactive } from 'vue'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
 
 const visible = defineModel({ type: Boolean, default: false })
+
+const passwordFields = [
+  { prop: 'newPassword', label: '新密码', placeholder: '请输入新密码' },
+  { prop: 'confirmPassword', label: '确认密码', placeholder: '请确认新密码' }
+]
 
 const props = defineProps({
   formState: { type: Object, required: true },

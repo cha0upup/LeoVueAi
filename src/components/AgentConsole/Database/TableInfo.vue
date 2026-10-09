@@ -24,35 +24,12 @@
         {{ nullableCount }}
       </el-descriptions-item>
       <el-descriptions-item
-        v-if="tableInfo.engine"
-        label="存储引擎"
+        v-for="field in visibleTableDetails"
+        :key="field.key"
+        :label="field.label"
+        :span="field.span"
       >
-        {{ tableInfo.engine }}
-      </el-descriptions-item>
-      <el-descriptions-item
-        v-if="tableInfo.collation"
-        label="排序规则"
-      >
-        {{ tableInfo.collation }}
-      </el-descriptions-item>
-      <el-descriptions-item
-        v-if="tableInfo.createTime"
-        label="创建时间"
-      >
-        {{ tableInfo.createTime }}
-      </el-descriptions-item>
-      <el-descriptions-item
-        v-if="tableInfo.updateTime"
-        label="更新时间"
-      >
-        {{ tableInfo.updateTime }}
-      </el-descriptions-item>
-      <el-descriptions-item
-        v-if="tableInfo.comment"
-        label="表注释"
-        :span="2"
-      >
-        {{ tableInfo.comment }}
+        {{ tableInfo[field.key] }}
       </el-descriptions-item>
     </el-descriptions>
   </div>
@@ -80,6 +57,15 @@ const props = defineProps({
     default: () => ({})
   }
 })
+
+const TABLE_DETAILS = [
+  { key: 'engine', label: '存储引擎' },
+  { key: 'collation', label: '排序规则' },
+  { key: 'createTime', label: '创建时间' },
+  { key: 'updateTime', label: '更新时间' },
+  { key: 'comment', label: '表注释', span: 2 }
+]
+const visibleTableDetails = computed(() => TABLE_DETAILS.filter(field => props.tableInfo[field.key]))
 
 const normalizedObjectRef = computed(() => normalizeDatabaseObjectRef(props.objectRef))
 const currentNamespace = computed(() =>

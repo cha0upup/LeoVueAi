@@ -201,34 +201,14 @@
             </div>
             <div class="config-form-grid">
               <el-form-item
-                v-if="visibleFields.has('database')"
-                label="数据库"
+                v-for="field in CONNECTION_TARGET_FIELDS.filter((item) => visibleFields.has(item.key))"
+                :key="field.key"
+                :label="field.label"
+                :required="field.required"
               >
                 <el-input
-                  v-model="form.database"
-                  placeholder="数据库名称"
-                  clearable
-                />
-              </el-form-item>
-              <el-form-item
-                v-if="visibleFields.has('service')"
-                label="Service"
-                required
-              >
-                <el-input
-                  v-model="form.service"
-                  placeholder="ORCLPDB1"
-                  clearable
-                />
-              </el-form-item>
-              <el-form-item
-                v-if="visibleFields.has('sid')"
-                label="SID"
-                required
-              >
-                <el-input
-                  v-model="form.sid"
-                  placeholder="ORCL"
+                  v-model="form[field.key]"
+                  :placeholder="field.placeholder"
                   clearable
                 />
               </el-form-item>
@@ -372,6 +352,12 @@ import { saveDatabaseConnectionApi } from '@/services/api/agent-manage.js'
 import { showWarning } from '@/utils/messageUtils.js'
 import DatabaseConnectionDiagnostics from './DatabaseConnectionDiagnostics.vue'
 import DatabaseRuntimeOverrides from './DatabaseRuntimeOverrides.vue'
+
+const CONNECTION_TARGET_FIELDS = [
+  { key: 'database', label: '数据库', placeholder: '数据库名称' },
+  { key: 'service', label: 'Service', placeholder: 'ORCLPDB1', required: true },
+  { key: 'sid', label: 'SID', placeholder: 'ORCL', required: true }
+]
 
 const props = defineProps({
   visible: { type: Boolean, default: false },

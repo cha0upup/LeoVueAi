@@ -33,57 +33,22 @@
       >
         <el-button-group class="action-group">
           <el-tooltip
-            content="新增"
+            v-for="action in rowActions"
+            :key="action.event"
+            :content="action.label"
             placement="top"
           >
             <el-button
-              v-if="canInsert"
-              type="primary"
+              v-if="action.enabled"
+              v-bind="action.buttonProps"
               size="small"
               class="action-btn"
-              @click="emit('add-row')"
+              @click="emit(action.event)"
             >
               <el-icon>
-                <Icon :icon="iconMap.plus" />
+                <Icon :icon="action.icon" />
               </el-icon>
-              新增
-            </el-button>
-          </el-tooltip>
-          <el-tooltip
-            content="编辑"
-            placement="top"
-          >
-            <el-button
-              v-if="canUpdate"
-              type="primary"
-              plain
-              size="small"
-              class="action-btn"
-              :disabled="selectedRowsCount === 0 || selectedRowsCount > 1"
-              @click="emit('edit-selected')"
-            >
-              <el-icon>
-                <Icon :icon="iconMap.edit" />
-              </el-icon>
-              编辑
-            </el-button>
-          </el-tooltip>
-          <el-tooltip
-            content="删除"
-            placement="top"
-          >
-            <el-button
-              v-if="canDelete"
-              size="small"
-              type="danger"
-              class="action-btn"
-              :disabled="selectedRowsCount === 0"
-              @click="emit('delete-selected')"
-            >
-              <el-icon>
-                <Icon :icon="iconMap.delete" />
-              </el-icon>
-              删除
+              {{ action.label }}
             </el-button>
           </el-tooltip>
         </el-button-group>
@@ -425,10 +390,22 @@ const emit = defineEmits([
 
 const dialectCapabilities = computed(() => sqlEngine.getCapabilities(props.connection.dialect))
 const canRawSql = computed(() => dialectCapabilities.value.rawSql === true)
-const canInsert = computed(() => dialectCapabilities.value.insert === true)
-const canUpdate = computed(() => dialectCapabilities.value.update === true)
-const canDelete = computed(() => dialectCapabilities.value.delete === true)
 const canExportTable = computed(() => dialectCapabilities.value.exportTable === true)
+const rowActions = computed(() => [
+  {
+    event: 'add-row', label: '新增', icon: iconMap.plus,
+    enabled: dialectCapabilities.value.insert === true, buttonProps: { type: 'primary' }
+  },
+  {
+    event: 'edit-selected', label: '编辑', icon: iconMap.edit,
+    enabled: dialectCapabilities.value.update === true,
+    buttonProps: { type: 'primary', plain: true, disabled: props.selectedRowsCount === 0 || props.selectedRowsCount > 1 }
+  },
+  {
+    event: 'delete-selected', label: '删除', icon: iconMap.delete,
+    enabled: dialectCapabilities.value.delete === true, buttonProps: { type: 'danger', disabled: props.selectedRowsCount === 0 }
+  }
+])
 
 const normalizedSelection = computed(() =>
   props.selectedObject ? normalizeDatabaseObjectRef(props.selectedObject) : null

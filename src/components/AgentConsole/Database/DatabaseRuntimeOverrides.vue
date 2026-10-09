@@ -10,10 +10,10 @@
           <span>高级运行时覆盖</span>
           <el-tag
             size="small"
-            :type="runtimeStatusType"
+            :type="runtimeStatus.type"
             effect="plain"
           >
-            {{ runtimeStatusLabel }}
+            {{ runtimeStatus.label }}
           </el-tag>
           <el-button
             text
@@ -160,25 +160,14 @@ const availableDrivers = computed(() =>
     ? props.capabilities.drivers.filter((driver) => driver?.available !== false)
     : []
 )
-const runtimeStatusType = computed(() => {
-  if (props.loading) return 'info'
-  if (!props.capabilities || Number(props.capabilities.code) !== 200) return 'warning'
-  if (
-    props.capabilities.available === false ||
-    props.capabilities.requestedDriver?.available === false
-  ) {
-    return 'danger'
-  }
-  return 'success'
-})
-const runtimeStatusLabel = computed(() => {
-  if (props.loading) return '探测中'
-  if (!props.capabilities) return '未探测'
-  if (Number(props.capabilities.code) !== 200) return '探测失败'
-  if (props.capabilities.available === false) return '运行时不可用'
-  if (props.capabilities.requestedDriver?.available === false) return '驱动不可用'
+const runtimeStatus = computed(() => {
+  if (props.loading) return { type: 'info', label: '探测中' }
+  if (!props.capabilities) return { type: 'warning', label: '未探测' }
+  if (Number(props.capabilities.code) !== 200) return { type: 'warning', label: '探测失败' }
+  if (props.capabilities.available === false) return { type: 'danger', label: '运行时不可用' }
+  if (props.capabilities.requestedDriver?.available === false) return { type: 'danger', label: '驱动不可用' }
   const provider = String(props.capabilities.provider || '').toUpperCase()
-  return provider ? `${provider} 可用` : '运行时可用'
+  return { type: 'success', label: provider ? `${provider} 可用` : '运行时可用' }
 })
 </script>
 

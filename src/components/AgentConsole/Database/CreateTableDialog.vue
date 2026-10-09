@@ -91,26 +91,15 @@
               </template>
             </el-table-column>
             <el-table-column
-              label="允许NULL"
+              v-for="flag in COLUMN_FLAGS"
+              :key="flag.key"
+              :label="flag.label"
               align="center"
             >
               <template #default="{ row }">
                 <div class="switch-wrapper">
                   <el-switch
-                    v-model="row.nullable"
-                    size="small"
-                  />
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column
-              label="主键"
-              align="center"
-            >
-              <template #default="{ row }">
-                <div class="switch-wrapper">
-                  <el-switch
-                    v-model="row.primaryKey"
+                    v-model="row[flag.key]"
                     size="small"
                   />
                 </div>
@@ -208,22 +197,27 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible', 'success'])
 
+const COLUMN_FLAGS = [
+  { key: 'nullable', label: '允许NULL' },
+  { key: 'primaryKey', label: '主键' }
+]
+
 const loading = ref(false)
+
+const createColumn = (primaryKey = false) => ({
+  name: primaryKey ? 'id' : '',
+  baseType: primaryKey ? 'INT' : 'VARCHAR',
+  typeParams: primaryKey ? '' : '255',
+  type: primaryKey ? 'INT' : 'VARCHAR(255)',
+  nullable: !primaryKey,
+  primaryKey,
+  default: ''
+})
 
 const formData = reactive({
   database: '',
   tableName: '',
-  columns: [
-    {
-      name: 'id',
-      baseType: 'INT',
-      typeParams: '',
-      type: 'INT',
-      nullable: false,
-      primaryKey: true,
-      default: ''
-    }
-  ]
+  columns: [createColumn(true)]
 })
 
 const dataTypeOptions = computed(() => {
@@ -238,17 +232,7 @@ watch(
       // 重置表单
       formData.database = props.database
       formData.tableName = ''
-      formData.columns = [
-        {
-          name: 'id',
-          baseType: 'INT',
-          typeParams: '',
-          type: 'INT',
-          nullable: false,
-          primaryKey: true,
-          default: ''
-        }
-      ]
+      formData.columns = [createColumn(true)]
     }
   }
 )
@@ -276,15 +260,7 @@ const onTypeChange = (columnIndex) => {
 }
 
 const addColumn = () => {
-  formData.columns.push({
-    name: '',
-    baseType: 'VARCHAR',
-    typeParams: '255',
-    type: 'VARCHAR(255)',
-    nullable: true,
-    primaryKey: false,
-    default: ''
-  })
+  formData.columns.push(createColumn())
 }
 
 const removeColumn = (index) => {
@@ -328,15 +304,13 @@ const confirmCreate = async () => {
 
   loading.value = true
   try {
-    const columns = formData.columns.map((col) => {
-      return {
-        name: col.name,
-        type: col.typeParams ? `${col.baseType}(${col.typeParams})` : col.baseType,
-        nullable: col.nullable,
-        primaryKey: col.primaryKey,
-        defaultValue: col.default || null
-      }
-    })
+    const columns = formData.columns.map((col) => ({
+      name: col.name,
+      type: col.typeParams ? `${col.baseType}(${col.typeParams})` : col.baseType,
+      nullable: col.nullable,
+      primaryKey: col.primaryKey,
+      defaultValue: col.default || null
+    }))
 
     const params = {
       sessionId: props.sessionId,

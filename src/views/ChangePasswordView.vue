@@ -119,7 +119,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { AUTH_FIELD_LIMITS, ROUTE_PATHS } from '@/constants/app.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { changePasswordApi, logoutApi } from '@/services/api/auth.js'
-import { validateForm } from '@/utils/formUtils.js'
+import { createPasswordRules, createPasswordMatchValidator, validateForm } from '@/utils/formUtils.js'
 import { icons } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
@@ -137,28 +137,12 @@ const form = reactive({
   confirmPassword: ''
 })
 
-const validateConfirmPassword = (rule, value, callback) => {
-  if (value !== form.newPassword) {
-    callback(new Error('两次输入的密码不一致'))
-    return
-  }
-  callback()
-}
-
 const rules = {
   oldPassword: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    {
-      min: AUTH_FIELD_LIMITS.passwordMinLength,
-      max: AUTH_FIELD_LIMITS.passwordMaxLength,
-      message: `密码长度在 ${AUTH_FIELD_LIMITS.passwordMinLength} 到 ${AUTH_FIELD_LIMITS.passwordMaxLength} 个字符`,
-      trigger: 'blur'
-    }
-  ],
+  newPassword: createPasswordRules(),
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
-    { validator: validateConfirmPassword, trigger: 'blur' }
+    { validator: createPasswordMatchValidator(() => form.newPassword), trigger: 'blur' }
   ]
 }
 
