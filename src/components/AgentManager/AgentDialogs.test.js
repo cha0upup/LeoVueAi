@@ -2,8 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick } from 'vue'
 import * as Vue from 'vue'
-import { readFileSync } from 'node:fs'
-import { compileScript, parse } from '@vue/compiler-sfc'
+import { compileTestComponent, findNode } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { icons } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
@@ -56,28 +55,9 @@ const modules = {
   './ParentHostSummary.vue': { default: ParentHostSummary }
 }
 
-// Compile the actual client templates: Vitest's default Node transform emits SSR components.
-const compileDialog = (name) => {
-  const { descriptor } = parse(readFileSync(new URL(`./${name}.vue`, import.meta.url), 'utf8'))
-  const compiled = compileScript(descriptor, { id: `${name}-test`, inlineTemplate: true }).content
-    .replace(/^import\s+(\{[^}]+\}|\w+)\s+from\s+['"]([^'"]+)['"];?$/gm, (_line, names, path) => {
-      if (!modules[path]) throw new Error(`Unexpected dialog import: ${path}`)
-      const binding = names.startsWith('{') ? names.replace(/\s+as\s+/g, ': ') : `{ default: ${names} }`
-      return `const ${binding} = modules[${JSON.stringify(path)}]`
-    })
-    .replace('export default', 'return')
-  return new Function('modules', compiled)(modules)
-}
+const compileDialog = name => compileTestComponent(new URL(`./${name}.vue`, import.meta.url), modules, `${name}-test`)
 const AddAgent = compileDialog('AddAgent')
 const EditAgent = compileDialog('EditAgent')
-const findNode = (node, type) => {
-  if (node.type === type) return node
-  for (const child of node.children) {
-    const found = findNode(child, type)
-    if (found) return found
-  }
-  return null
-}
 
 describe('Agent dialog shared form integration', () => {
   const apps = []

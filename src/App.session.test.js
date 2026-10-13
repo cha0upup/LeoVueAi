@@ -2,8 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, onMounted, onUnmounted, reactive } from 'vue'
 import * as Vue from 'vue'
-import { readFileSync } from 'node:fs'
-import { compileScript, parse } from '@vue/compiler-sfc'
+import { compileTestComponent } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { ROUTE_PATHS } from '@/constants/app.js'
@@ -12,9 +11,6 @@ import { sessionGeneration } from '@/services/sessionLifecycle.js'
 const mocks = vi.hoisted(() => ({ route: null }))
 vi.mock('@/services/api/auth.js', () => ({ getLoginStatusApi: vi.fn() }))
 
-// Vitest's Node transform compiles .vue files for SSR. Compile this real template
-// for the client so the test exercises KeepAlive instead of SSR's no-op wrapper.
-const { descriptor } = parse(readFileSync(new URL('./App.vue', import.meta.url), 'utf8'))
 const modules = {
   vue: Vue,
   'vue-router': { useRoute: () => mocks.route },
@@ -24,14 +20,7 @@ const modules = {
   '@/services/sessionLifecycle.js': { sessionGeneration },
   '@/composables/useAuth.js': { useAuth }
 }
-const compiled = compileScript(descriptor, { id: 'app-session-test', inlineTemplate: true }).content
-  .replace(/^import\s+(\{[^}]+\}|\w+)\s+from\s+['"]([^'"]+)['"];?$/gm, (line, names, path) => {
-    if (!modules[path]) throw new Error(`Unexpected App import: ${path}`)
-    const binding = names.startsWith('{') ? names.replace(/\s+as\s+/g, ': ') : `{ default: ${names} }`
-    return `const ${binding} = modules[${JSON.stringify(path)}]`
-  })
-  .replace('export default', 'return')
-const App = new Function('modules', compiled)(modules)
+const App = compileTestComponent(new URL('./App.vue', import.meta.url), modules, 'app-session-test')
 
 describe('app protected workspace lifecycle', () => {
   let app
