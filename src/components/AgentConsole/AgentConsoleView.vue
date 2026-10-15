@@ -6,11 +6,12 @@
     <div class="console-header-wrap">
       <Transition name="header-fade">
         <AgentConsoleHeader
-          v-if="sessionId && isInitialized"
+          v-if="sessionId"
           :conn-link="connLink"
           :current-host-id="currentHostId"
           :agent-name="agentName"
           :display-conn-link-chain="displayConnLinkChain"
+          :connection-path-status="connectionPathStatus"
           :cache-mode="props.cacheMode"
           :task-summary="taskSummary"
           :icon-map="iconMap"
@@ -245,6 +246,7 @@ const initStep = ref('')
 // 'ai' is now in the dock — exclude it from the tool tab area.
 const initializedModules = reactive({ info: true })
 const serverConnLinkChain = ref([])
+const connectionPathStatus = ref('loading')
 const currentHostId = ref('')
 const serverCapabilities = ref([])
 const agentRuntime = ref('')
@@ -422,14 +424,21 @@ const fetchConnLinkChain = async (sessionId, isCurrent) => {
     const response = await getConnLinkChainApi({ sessionId })
     if (!isCurrent()) return
     const raw = response?.data?.connLinkChain
-    if (!Array.isArray(raw)) { serverConnLinkChain.value = []; return }
-    serverConnLinkChain.value = raw.map((item) => {
-      if (typeof item === 'string') return item
-      if (item && typeof item === 'object') return item.connLink || item.agentName || item.agentId || ''
+    const chain = Array.isArray(raw) ? raw.map((item) => {
+      if (typeof item === 'string') return item.trim()
+      if (item && typeof item === 'object') {
+        const label = [item.connLink, item.agentName, item.agentId]
+          .find((value) => typeof value === 'string' && value.trim())
+        return label?.trim() || ''
+      }
       return ''
-    })
+    }).filter(Boolean) : []
+    serverConnLinkChain.value = chain
+    connectionPathStatus.value = chain.length ? 'ready' : 'unavailable'
   } catch {
-    if (isCurrent()) serverConnLinkChain.value = []
+    if (!isCurrent()) return
+    serverConnLinkChain.value = []
+    connectionPathStatus.value = 'unavailable'
   }
 }
 
@@ -468,6 +477,8 @@ const initializeComponent = async () => {
   isInitialized.value = false
   hasError.value = false
   errorMessage.value = ''
+  serverConnLinkChain.value = []
+  connectionPathStatus.value = 'loading'
   try {
     initStep.value = '校验模块配置…'
     if (!moduleEntries?.length) throw new Error('菜单配置为空')
@@ -489,6 +500,7 @@ const initializeComponent = async () => {
     isInitialized.value = true
   } catch (error) {
     if (!isCurrent()) return
+    if (connectionPathStatus.value === 'loading') connectionPathStatus.value = 'unavailable'
     initStep.value = ''
     hasError.value = true
     errorMessage.value = error.message
@@ -534,6 +546,7 @@ watch(
     isInitialized.value = false
     currentHostId.value = ''
     serverConnLinkChain.value = []
+    connectionPathStatus.value = 'loading'
     serverCapabilities.value = []
     agentRuntime.value = ''
     runtimeProfile.value = null
@@ -574,7 +587,7 @@ watch(
 /* Reserve header space to avoid layout shift on init */
 .console-header-wrap {
   flex-shrink: 0;
-  min-height: 42px;
+  min-height: 34px;
 }
 
 .header-fade-enter-active {

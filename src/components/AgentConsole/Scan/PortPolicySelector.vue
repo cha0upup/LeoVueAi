@@ -113,6 +113,7 @@ const parsedPolicy = computed(() => {
   }
 })
 const totalPortCount = computed(() => parsedPolicy.value.ports.length)
+const includedPortSet = computed(() => new Set(parsedPolicy.value.include))
 const parseError = computed(() => parsedPolicy.value.error || (!totalPortCount.value ? '请至少包含一个有效端口' : ''))
 
 watch([preset, parsedPolicy], () => {
@@ -126,15 +127,15 @@ watch([preset, parsedPolicy], () => {
 }, { immediate: true, flush: 'sync' })
 
 function isGroupSelected(group) {
-  return group.ports.every(port => parsedPolicy.value.include.includes(port))
+  return group.ports.every(port => includedPortSet.value.has(port))
 }
 function isGroupPartial(group) {
-  const selected = group.ports.filter(port => parsedPolicy.value.include.includes(port)).length
+  const selected = group.ports.filter(port => includedPortSet.value.has(port)).length
   return selected > 0 && selected < group.ports.length
 }
 function toggleGroup(group) {
   if (parsedPolicy.value.error) return
-  const ports = new Set(parsedPolicy.value.include)
+  const ports = new Set(includedPortSet.value)
   const remove = isGroupSelected(group)
   group.ports.forEach(port => remove ? ports.delete(port) : ports.add(port))
   customPortsText.value = formatPorts([...ports])

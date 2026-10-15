@@ -10,7 +10,7 @@
           <span
             v-if="tasks.length"
             class="selector-count"
-          >{{ tasks.length }} 个任务</span>
+          >已加载 {{ tasks.length }} 个任务</span>
         </div>
         <el-select
           v-if="tasks.length"
@@ -19,19 +19,34 @@
           filterable
           placeholder="选择一个扫描任务"
           no-data-text="暂无扫描任务"
+          no-match-text="未匹配已加载任务，可继续加载历史"
           @change="selectTask"
         >
           <el-option
-            v-for="task in historyTasks"
-            :key="getTaskId(task)"
+            v-for="task in tasks"
+            :key="task.id"
             :label="task.name || task.targetLabel || '未命名扫描'"
-            :value="getTaskId(task)"
+            :value="task.id"
           >
             <div class="task-option">
               <span class="task-option-name">{{ task.name || task.targetLabel || '未命名扫描' }}</span>
-              <span class="task-option-meta">{{ TASK_STATUS_TEXT[task.status] }} · {{ formatCount(getMetrics(task).targetTotal) }} 个目标</span>
+              <span class="task-option-meta">{{ TASK_STATUS_TEXT[task.status] }} · {{ formatCount(task.targetCount) }} 个目标</span>
             </div>
           </el-option>
+          <template
+            v-if="hasMoreHistory"
+            #footer
+          >
+            <el-button
+              text
+              type="primary"
+              :loading="loadingMore"
+              :disabled="historyLoading && !loadingMore"
+              @click.stop="loadMoreTasks"
+            >
+              加载更多历史任务
+            </el-button>
+          </template>
         </el-select>
         <div
           v-if="activeTask"
@@ -82,14 +97,14 @@
     </div>
 
     <main
-      v-if="activeTask"
+      v-if="activeTask?.detailsLoaded"
       class="discovery-content"
     >
       <section class="progress-card">
         <div class="progress-card-head">
           <div class="progress-card-info">
             <p class="task-subtitle">
-              {{ formatCount(metrics.targetTotal) }} 个目标 · {{ portPolicyLabel(activeTask) }} · {{ elapsedText }}
+              {{ formatCount(activeTask.targetCount) }} 个目标 · {{ portPolicyLabel(activeTask) }} · {{ elapsedText }}
             </p>
             <span
               v-if="isRunning(activeTask)"
@@ -134,18 +149,18 @@
         <div class="progress-card-body">
           <div class="stage-track">
             <div
-              v-for="(stage, index) in stageDefinitions"
+              v-for="(stage, index) in displayStages"
               :key="stage.name"
               class="stage-node"
-              :class="stageClass(stage.name)"
+              :class="stage.classes"
             >
               <div class="stage-node-marker">
-                <el-icon v-if="stageIsComplete(stage.name)">
+                <el-icon v-if="stage.classes.complete">
                   <Check />
                 </el-icon><span v-else>{{ index + 1 }}</span>
               </div>
               <div class="stage-node-copy">
-                <strong>{{ stage.label }}</strong><span>{{ stageStatusText(stage.name) }}</span>
+                <strong>{{ stage.label }}</strong><span>{{ stage.statusText }}</span>
               </div>
             </div>
           </div>
@@ -174,7 +189,7 @@
         class="hosts-strip"
       >
         <div class="hosts-heading">
-          <strong>存活主机</strong><b>{{ formatCount(metrics.reachableHostCount) }}</b>
+          <strong>已确认可达</strong><b>{{ formatCount(activeTask.reachableHostCount) }}</b>
         </div>
         <div
           v-if="visibleReachableHosts.length"
@@ -193,18 +208,18 @@
         <span
           v-else
           class="stage-output-empty"
-        >{{ isRunning(activeTask) || isPaused(activeTask) ? '发现存活主机后将在这里显示' : '未发现存活主机' }}</span>
+        >{{ isRunning(activeTask) || isPaused(activeTask) ? '确认可达的主机会在这里显示，未确认主机仍会参与端口扫描' : '尚未确认可达主机' }}</span>
       </section>
 
       <p
         v-else
         class="stage-output-empty"
       >
-        {{ stageDefinitions.length === 1 && stageDefinitions[0].name === 'FINGERPRINT' ? '对选定应用执行组件识别。' : '未执行主机探活，直接扫描输入目标。' }}
+        {{ displayStages.length === 1 && displayStages[0].name === 'FINGERPRINT' ? '对选定应用执行组件识别。' : '未执行主机探活，直接扫描输入目标。' }}
       </p>
 
       <AssetResultTable
-        v-if="stageDefinitions.some(stage => ['PORT_SCAN', 'FINGERPRINT'].includes(stage.name))"
+        v-if="displayStages.some(stage => ['PORT_SCAN', 'FINGERPRINT'].includes(stage.name))"
         :task-id="activeBackendTaskId"
         :session-id="sessionId"
         :refresh-token="resultRefreshToken"
@@ -213,16 +228,16 @@
     </main>
 
     <section
-      v-else-if="!hasLoaded"
+      v-else-if="!hasLoaded || (activeTask && !activeTask.detailsLoaded && !loadError)"
       class="page-empty"
       role="status"
-      aria-label="正在加载扫描任务"
+      :aria-label="activeTask ? '正在加载任务详情' : '正在加载扫描任务'"
     >
       <el-skeleton
         :rows="3"
         animated
       />
-      <p>正在加载扫描任务…</p>
+      <p>{{ activeTask ? '正在加载任务详情…' : '正在加载扫描任务…' }}</p>
     </section>
     <section
       v-else-if="loadError"
@@ -301,6 +316,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { confirmAction } from '@/utils/confirmUtils.js'
+import { clampProgress } from '@/utils/format.js'
 import AssetResultTable from './AssetResultTable.vue'
 import ScanComposer from './ScanComposer.vue'
 import FingerprintScanComposer from './FingerprintScanComposer.vue'
@@ -320,6 +336,9 @@ const {
   loading: historyLoading,
   hasLoaded,
   loadError,
+  hasMoreHistory,
+  loadingMore,
+  loadMoreTasks,
   resultRefreshToken,
   selectTask,
   syncTasks,
@@ -335,37 +354,51 @@ watch(
     supplementalSelection.value = null
   }
 )
-const stageDefinitions = computed(() => {
-  const stages = activeTask.value?.stages
-  return selectScanStages(stages?.length ? stages.map(stage => stage.name) : undefined)
+const displayStages = computed(() => {
+  const task = activeTask.value
+  const snapshots = task?.stages
+  return selectScanStages(snapshots?.length ? snapshots.map(stage => stage.name) : undefined)
+    .map(stage => {
+      const snapshot = snapshots?.find(item => item.name === stage.name)
+      const terminalWithoutSnapshot = !snapshot && TERMINAL_TASK_STATUSES.includes(task?.status)
+      return {
+        ...stage,
+        snapshot,
+        classes: {
+          complete: snapshot ? ['COMPLETED', 'SKIPPED'].includes(snapshot.status) : task?.status === TaskStatus.COMPLETED,
+          current: !terminalWithoutSnapshot && (task?.currentStage === stage.name || snapshot?.status === 'RUNNING'),
+          failed: snapshot?.status === 'FAILED'
+        },
+        statusText: stageStatusText(task, stage.name, snapshot)
+      }
+    })
 })
 
-const fingerprintStats = computed(() => activeTask.value?.stages?.find(stage => stage.name === 'FINGERPRINT'))
+const fingerprintStats = computed(() => displayStages.value.find(stage => stage.name === 'FINGERPRINT')?.snapshot)
 
-const hasReachability = computed(() => stageDefinitions.value.some(stage => stage.name === 'REACHABILITY'))
+const hasReachability = computed(() => displayStages.value.some(stage => stage.name === 'REACHABILITY'))
 
 const activeBackendTaskId = computed(() => {
   return activeTask.value?.backendTaskId || null
 })
-const metrics = computed(() => getMetrics(activeTask.value))
 const currentStageLabel = computed(() => {
   const status = activeTask.value?.status
   if (status === TaskStatus.COMPLETED) return '已完成'
   if (status === TaskStatus.FAILED) return '扫描失败'
   return (
-    stageDefinitions.value.find((stage) => stage.name === activeTask.value?.currentStage)?.label ||
+    displayStages.value.find((stage) => stage.name === activeTask.value?.currentStage)?.label ||
     '准备扫描'
   )
 })
 const throughputText = computed(() => {
   const task = activeTask.value
   const startedAt = timestampValue(task?.startTime)
-  const processed = metrics.value.processed
+  const processed = task?.probeCompleted ?? 0
   if (task?.status === TaskStatus.COMPLETED) return '扫描已完成'
   if (TERMINAL_TASK_STATUSES.includes(task?.status)) return '扫描已结束'
   if (!startedAt || processed <= 0) return '等待数据'
   const elapsed = Math.max(1, (Date.now() - startedAt) / 1000)
-  return `${formatCount(Math.round(processed / elapsed))} 目标/秒`
+  return `${formatCount(Math.round(processed / elapsed))} 探测/秒`
 })
 const elapsedText = computed(() => {
   const task = activeTask.value
@@ -383,17 +416,8 @@ const visibleReachableHosts = computed(() =>
     : []
 )
 const reachableHostOverflow = computed(() =>
-  Math.max(0, getMetrics(activeTask.value).reachableHostCount - visibleReachableHosts.value.length)
+  Math.max(0, (activeTask.value?.reachableHostCount ?? 0) - visibleReachableHosts.value.length)
 )
-const historyTasks = computed(() =>
-  [...tasks.value].sort(
-    (left, right) =>
-      timestampValue(right.createdAt) - timestampValue(left.createdAt)
-  )
-)
-function getTaskId(task) {
-  return task?.id || null
-}
 function handleScanStarted(task) {
   if (task?.sessionId && task.sessionId !== props.sessionId) return
   const backendTaskId = task?.taskId
@@ -462,17 +486,6 @@ function isRunning(task) {
 function isPaused(task) {
   return task?.status === TaskStatus.PAUSED
 }
-function getMetrics(task) {
-  return {
-    targetTotal: task?.targetCount ?? 0,
-    processed: task?.processedCount ?? 0,
-    reachableHostCount: task?.reachableHostCount ?? 0,
-    openCount: task?.openCount ?? 0,
-    serviceCount: task?.serviceCount ?? 0,
-    fingerprintCount: task?.fingerprintCount ?? 0,
-    identifiedApplicationCount: task?.identifiedApplicationCount ?? 0
-  }
-}
 function portPolicyLabel(task) {
   if (task?.stages?.length === 1 && task.stages[0].name === 'REACHABILITY') return '仅主机探活'
   const ports = Array.isArray(task?.scanPorts) ? task.scanPorts.length : 0
@@ -484,10 +497,6 @@ function getProgressStatus(task) {
   if (task.status === TaskStatus.FAILED) return 'exception'
   if (isPaused(task)) return 'warning'
   return undefined
-}
-function clampProgress(value) {
-  const number = Number(value || 0)
-  return Number.isFinite(number) ? Math.max(0, Math.min(100, number)) : 0
 }
 function formatCount(value) {
   return Number(value || 0).toLocaleString('zh-CN')
@@ -502,43 +511,22 @@ function timestampValue(value) {
   const parsed = Date.parse(String(value || ''))
   return Number.isFinite(parsed) ? parsed : 0
 }
-function stageSnapshot(name) {
-  return activeTask.value?.stages?.find((stage) => stage.name === name) || null
-}
-function stageIsComplete(name) {
-  const stage = stageSnapshot(name)
-  if (stage) return ['COMPLETED', 'SKIPPED'].includes(stage.status)
-  return activeTask.value?.status === TaskStatus.COMPLETED
-}
-function stageClass(name) {
-  const stage = stageSnapshot(name)
-  const terminalWithoutSnapshot =
-    !stage && TERMINAL_TASK_STATUSES.includes(activeTask.value?.status)
-  return {
-    complete: stageIsComplete(name),
-    current:
-      !terminalWithoutSnapshot && (activeTask.value?.currentStage === name || stage?.status === 'RUNNING'),
-    failed: stage?.status === 'FAILED'
-  }
-}
-function stageStatusText(name) {
-  const stage = stageSnapshot(name)
+function stageStatusText(task, name, stage) {
   if (stage) {
     if (stage.reason === 'NO_HTTP_APPLICATIONS') return '无 HTTP 应用，已跳过'
     if (stage.reason === 'DISABLED' || stage.status === 'SKIPPED') return '已跳过'
-    if (name === 'REACHABILITY' && activeTask.value?.reachableHostList)
-      return `${formatCount(getMetrics(activeTask.value).reachableHostCount)} 台存活`
-    if (name === 'PORT_SCAN' && getMetrics(activeTask.value).openCount)
-      return `${formatCount(getMetrics(activeTask.value).openCount)} 个开放端口`
+    if (name === 'REACHABILITY' && task?.reachableHostList)
+      return `${formatCount(task.reachableHostCount)} 台已确认可达`
+    if (name === 'PORT_SCAN' && task?.openCount)
+      return `${formatCount(task.openCount)} 个开放端口`
     if (name === 'FINGERPRINT') {
-      const counts = getMetrics(activeTask.value)
-      return `${formatCount(counts.identifiedApplicationCount)} 个应用 · ${formatCount(counts.fingerprintCount)} 个组件命中 · ${Number(stage.completed || 0)}/${Number(stage.total || 0)}`
+      return `${formatCount(task.identifiedApplicationCount)} 个应用 · ${formatCount(task.fingerprintCount)} 个组件命中 · ${Number(stage.completed || 0)}/${Number(stage.total || 0)}`
     }
-    if (name === 'SERVICE_PROBE' && getMetrics(activeTask.value).serviceCount)
-      return `${formatCount(getMetrics(activeTask.value).serviceCount)} 个服务`
+    if (name === 'SERVICE_PROBE' && task?.serviceCount)
+      return `${formatCount(task.serviceCount)} 个服务`
     return stage.status === 'RUNNING' ? '扫描中' : TASK_STATUS_TEXT[stage.status.toLowerCase()] || stage.status
   }
-  const status = activeTask.value?.status
+  const status = task?.status
   if (status === TaskStatus.COMPLETED) return '已完成'
   if (status === TaskStatus.FAILED) return '未完成'
   if (status === TaskStatus.CANCELLED) return '已取消'

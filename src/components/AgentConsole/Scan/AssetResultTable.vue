@@ -407,8 +407,9 @@ const props = defineProps({
 const emit = defineEmits(['fingerprint-scan'])
 
 // 状态
-const loading = ref(false)
-const showTableLoading = ref(false)
+const loadingMode = ref(null)
+const loading = computed(() => Boolean(loadingMode.value))
+const showTableLoading = computed(() => loadingMode.value === 'visible')
 const loadError = ref('')
 const resultTable = ref(null)
 const detailRow = ref(null)
@@ -470,8 +471,7 @@ async function loadData({ silent = false } = {}) {
   filters.keyword = searchText.value
 
   const sequence = ++requestSequence
-  loading.value = true
-  showTableLoading.value = !silent
+  loadingMode.value = silent ? 'silent' : 'visible'
   if (!silent) resultTable.value?.clearSelection()
   try {
     const { field, order } = sortBy.value
@@ -512,8 +512,7 @@ async function loadData({ silent = false } = {}) {
       loadError.value = error?.message || '未知错误'
   } finally {
     if (sequence === requestSequence) {
-      loading.value = false
-      showTableLoading.value = false
+      loadingMode.value = null
       if (refreshPending) void loadData({ silent: true })
     }
   }
@@ -674,7 +673,7 @@ watch(
     requestSequence += 1
     if (searchTimer) window.clearTimeout(searchTimer)
     searchTimer = null
-    loading.value = false
+    loadingMode.value = null
     refreshPending = false
     pagination.page = 1
     tableData.value = []

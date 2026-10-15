@@ -54,7 +54,7 @@ describe('useTaskCenterView', () => {
     await nextTick()
     expect(view.filteredTasks.value).toEqual([newer])
     expect(view.selectedTaskId.value).toBe('')
-    view.selectTask('new')
+    view.selectedTaskId.value = 'new'
 
     view.statusFilter.value = 'completed'
     await nextTick()
@@ -68,23 +68,23 @@ describe('useTaskCenterView', () => {
       { viewId: 'u1', type: TaskType.UPLOAD, status: TaskStatus.UPLOADING }
     ])
     expect(view.selectedTaskId.value).toBe('')
-    view.setActiveTaskType('all')
+    view.activeTaskType.value = 'all'
     await nextTick()
     expect(view.filteredTasks.value).toHaveLength(2)
-    view.selectTask('d1')
-    view.setStatusFilter('active')
+    view.selectedTaskId.value = 'd1'
+    view.statusFilter.value = 'active'
     await nextTick()
     expect(view.filteredTasks.value.map((task) => task.viewId)).toEqual(['u1'])
     expect(view.selectedTaskId.value).toBe('')
-    view.setStatusFilter(TaskStatus.PENDING)
+    view.statusFilter.value = TaskStatus.PENDING
     await nextTick()
     expect(view.filteredTasks.value.map((task) => task.viewId)).toEqual(['d1'])
-    view.setStatusFilter('all')
+    view.statusFilter.value = 'all'
 
-    view.setActiveTaskType(TaskType.UPLOAD)
+    view.activeTaskType.value = TaskType.UPLOAD
     await nextTick()
-    view.selectTask('u1')
-    view.setSortOption('name')
+    view.selectedTaskId.value = 'u1'
+    view.sortOption.value = 'name'
     await nextTick()
     expect(view.selectedTaskId.value).toBe('u1')
 

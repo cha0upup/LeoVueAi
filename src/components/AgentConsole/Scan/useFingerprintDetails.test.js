@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, reactive } from 'vue'
+import { deferred } from '@/test-support/deferred.js'
 import { useFingerprintDetails } from './useFingerprintDetails.js'
 import { queryNetworkFingerprintMatchesApi, queryNetworkFingerprintEvidenceApi } from '@/services/api/scan.js'
 
@@ -7,14 +8,6 @@ vi.mock('@/services/api/scan.js', () => ({
   queryNetworkFingerprintMatchesApi: vi.fn(),
   queryNetworkFingerprintEvidenceApi: vi.fn()
 }))
-const deferred = () => {
-  let resolve
-  const promise = new Promise((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
-
 describe('component evidence requests', () => {
   let scope
   afterEach(() => {
@@ -66,6 +59,25 @@ describe('component evidence requests', () => {
     old.resolve({ data: { match: { ruleName: 'old' } } })
     await pending
     expect(view.evidence.value.match.ruleName).toBe('new')
+  })
+
+  it.each(['resolve', 'reject'])('ignores the current requests after disposal (%s)', async (settle) => {
+    const list = deferred()
+    const detail = deferred()
+    queryNetworkFingerprintMatchesApi.mockReturnValueOnce(list.promise)
+    queryNetworkFingerprintEvidenceApi.mockReturnValueOnce(detail.promise)
+    const { view } = fixture()
+    const pending = view.showEvidence({ matchKey: 'current' })
+    scope.stop()
+    const response = settle === 'resolve' ? { data: { matches: [{}], total: 1 } } : new Error('offline')
+    list[settle](response)
+    detail[settle](response)
+    await pending
+    expect(view.matches.value).toEqual([])
+    expect(view.total.value).toBe(0)
+    expect(view.evidence.value).toBeNull()
+    expect(view.error.value).toBe('')
+    expect(view.evidenceError.value).toBe('')
   })
 
   it('reports failed loads and allows retry with pagination', async () => {

@@ -149,7 +149,7 @@ export function createScanTask({
     scanPorts: options.scanPorts || [],
     reachableHostList: [],
     reachableHostCount: 0,
-    reachabilityLoaded: false,
+    detailsLoaded: false,
     stages: [],
     currentStage: null,
     createdAt: Date.now(),

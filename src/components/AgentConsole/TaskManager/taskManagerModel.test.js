@@ -62,6 +62,18 @@ describe('taskManagerModel', () => {
     })
   })
 
+  it.each([true, false])('requires a server id to pause, but not resume, a local upload (id=%s)', (hasServerId) => {
+    const task = {
+      type: TaskType.UPLOAD,
+      status: TaskStatus.UPLOADING,
+      isManagedLocally: true,
+      serverTaskId: hasServerId ? 'upload' : null
+    }
+    expect(getPrimaryTaskAction(task, icons)?.key || null).toBe(hasServerId ? 'pause' : null)
+    task.status = TaskStatus.PAUSED
+    expect(getPrimaryTaskAction(task, icons)).toMatchObject({ key: 'resume', label: '继续上传' })
+  })
+
   it('merges server snapshots and keeps unrelated tasks', () => {
     const localDownload = {
       id: 'local-download',
@@ -71,8 +83,13 @@ describe('taskManagerModel', () => {
       fileName: 'local.txt'
     }
     const scan = { id: 'scan-1', type: TaskType.SCAN, status: TaskStatus.SCANNING }
+    const upload = { id: 'local-upload', type: TaskType.UPLOAD, serverTaskId: 'd1' }
+    const sqlExport = { id: 'local-export', type: TaskType.DB_EXPORT, serverTaskId: 'd1' }
+    const unmatched = { id: 'unmatched-download', type: TaskType.DOWNLOAD }
     const tasks = buildTaskList({
-      localTasks: [localDownload, scan],
+      localTasks: [localDownload, scan, sqlExport, upload, unmatched],
+      serverUploadTasks: [{ serverTaskId: 'd1', type: TaskType.UPLOAD }],
+      serverSqlExportTasks: [{ serverTaskId: 'd1', type: TaskType.DB_EXPORT }],
       serverDownloadTasks: [
         {
           viewId: 'server:d1',
@@ -84,14 +101,17 @@ describe('taskManagerModel', () => {
       ]
     })
 
-    expect(tasks.map((task) => task.viewId)).toEqual(['scan-1', 'local-download'])
-    expect(tasks[1]).toMatchObject({
+    expect(tasks.map((task) => task.viewId)).toEqual([
+      'scan-1', 'local-upload', 'local-download', 'unmatched-download', 'local-export'
+    ])
+    expect(tasks[2]).toMatchObject({
       taskId: 'local-download',
       serverTaskId: 'd1',
       status: TaskStatus.DOWNLOADING,
       fileName: 'server.txt',
       isManagedLocally: true
     })
+    expect(tasks[3]).toMatchObject({ serverTaskId: null, isManagedLocally: true })
   })
 
   it.each(['FAILED', 'CANCELLED', 'PAUSED'])(

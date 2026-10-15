@@ -1,16 +1,29 @@
 <template>
   <div class="content-header">
-    <div class="content-header-card chain-summary-card">
+    <div
+      class="content-header-card chain-summary-card"
+      aria-label="连接路径"
+    >
       <div class="card-topline">
-        <el-tag
-          effect="light"
-          type="primary"
-          class="summary-tag summary-tag-primary"
+        <span
+          v-if="hasConnectionPath"
+          class="connection-mode-tag"
         >
-          {{
-            chainCountLabel
-          }}
-        </el-tag>
+          {{ connectionModeLabel }}
+        </span>
+        <el-tooltip
+          v-else
+          :content="connectionPathMessage"
+          placement="bottom"
+          effect="dark"
+        >
+          <span
+            class="connection-path-placeholder"
+            role="status"
+            :aria-label="connectionPathMessage"
+            tabindex="0"
+          >{{ connectionPathStatus === 'loading' ? '读取中…' : '路径未知' }}</span>
+        </el-tooltip>
         <el-tooltip
           v-if="cacheMode"
           content="缓存模式 — 当前展示的是离线缓存数据，部分功能不可用"
@@ -24,94 +37,72 @@
         </el-tooltip>
       </div>
       <div class="connection-chain">
-        <el-tooltip
-          content="云端服务器"
-          placement="top"
-          effect="dark"
-        >
-          <el-icon class="cloud-icon">
-            <Icon :icon="iconMap.cloud" />
-          </el-icon>
-        </el-tooltip>
-
-        <template v-if="displayConnLinkChain?.length">
-          <el-icon class="chain-arrow">
-            <Icon :icon="iconMap.arrowRight" />
-          </el-icon>
+        <template v-if="hasConnectionPath">
           <el-tooltip
-            v-for="(link, index) in displayConnLinkChain"
-            :key="`${link}-${index}`"
-            :content="getChainItemTooltip(index, displayConnLinkChain.length)"
+            content="发起连接的控制服务端"
             placement="top"
             effect="dark"
           >
             <span
-              class="chain-item"
-              :class="{
-                'chain-item--target': index === displayConnLinkChain.length - 1,
-                'chain-item--relay': index < displayConnLinkChain.length - 1
-              }"
+              class="control-server"
+              aria-label="控制服务端"
+              tabindex="0"
             >
-              <el-icon class="link-icon">
-                <Icon :icon="getChainIcon(index, displayConnLinkChain.length)" />
-              </el-icon>
-              <span
-                class="chain-link"
-                :title="link"
-              >{{ link }}</span>
-              <el-icon
-                v-if="index < displayConnLinkChain.length - 1"
-                class="chain-arrow"
-              >
-                <Icon :icon="iconMap.arrowRight" />
-              </el-icon>
+              <el-icon><Icon :icon="iconMap.server" /></el-icon>
             </span>
           </el-tooltip>
+          <template
+            v-for="(link, index) in displayConnLinkChain"
+            :key="`${link}-${index}`"
+          >
+            <span
+              class="chain-arrow"
+              aria-hidden="true"
+            >
+              <svg viewBox="0 0 28 12">
+                <path d="M1 6h24m-4-4 4 4-4 4" />
+              </svg>
+            </span>
+            <el-tooltip
+              :content="getChainItemTooltip(index, link)"
+              placement="top"
+              effect="dark"
+            >
+              <span
+                class="chain-item"
+                :class="{
+                  'chain-item--target': index === displayConnLinkChain.length - 1,
+                  'chain-item--relay': index < displayConnLinkChain.length - 1
+                }"
+                :aria-label="getChainItemTooltip(index, link)"
+                tabindex="0"
+              >
+                <el-icon class="link-icon">
+                  <Icon :icon="getChainIcon(index, displayConnLinkChain.length)" />
+                </el-icon>
+                <span class="chain-link">{{ link }}</span>
+              </span>
+            </el-tooltip>
+          </template>
         </template>
 
         <template v-else-if="connLink">
-          <el-icon class="chain-arrow">
-            <Icon :icon="iconMap.arrowRight" />
-          </el-icon>
+          <!-- A known target address alone does not establish a direct path. -->
           <el-tooltip
-            content="连接地址"
+            :content="`当前主机连接地址 · ${connLink}；${connectionPathMessage}`"
             placement="top"
             effect="dark"
           >
-            <span class="chain-item">
-              <el-icon class="link-icon"><Icon :icon="iconMap.link" /></el-icon>
-              <span
-                class="chain-link"
-                :title="connLink"
-              >{{ connLink }}</span>
+            <span
+              class="chain-item chain-item--pending"
+              :aria-label="`当前主机连接地址 · ${connLink}；${connectionPathMessage}`"
+              tabindex="0"
+            >
+              <el-icon class="link-icon"><Icon :icon="iconMap.server" /></el-icon>
+              <span class="chain-link">{{ connLink }}</span>
             </span>
           </el-tooltip>
         </template>
-      </div>
-    </div>
-
-    <div class="content-header-card hostid-summary-card">
-      <div class="hostid-summary">
-        <el-icon class="hostid-summary-icon">
-          <Icon :icon="iconMap.server" />
-        </el-icon>
-        <div class="hostid-summary-info">
-          <span
-            v-if="agentName"
-            class="hostid-summary-name"
-          >{{ agentName }}</span>
-          <span
-            v-if="currentHostId"
-            class="hostid-summary-value"
-            :title="currentHostId"
-          >
-            {{ currentHostId }}
-          </span>
-          <span
-            v-else
-            class="hostid-summary-empty"
-          >未设置</span>
-        </div>
       </div>
     </div>
 
@@ -151,6 +142,33 @@
         <span class="task-chip-count">{{ taskSummary.completed }}</span>
       </button>
     </div>
+
+    <div
+      class="content-header-card hostid-summary-card"
+      aria-label="主机标识"
+    >
+      <el-tooltip
+        :content="hostIdentityTooltip"
+        placement="bottom-end"
+        effect="dark"
+      >
+        <span
+          class="hostid-summary-value"
+          :aria-label="hostIdentityTooltip"
+          tabindex="0"
+        >
+          <span class="hostid-summary-label">ID</span>
+          <template v-if="currentHostId">
+            <span class="hostid-summary-id-full">{{ currentHostId }}</span>
+            <span class="hostid-summary-id-compact">{{ compactHostId }}</span>
+          </template>
+          <span
+            v-else
+            class="hostid-summary-empty"
+          >—</span>
+        </span>
+      </el-tooltip>
+    </div>
   </div>
 </template>
 
@@ -174,6 +192,11 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  connectionPathStatus: {
+    type: String,
+    default: 'unavailable',
+    validator: (value) => ['loading', 'ready', 'unavailable'].includes(value)
+  },
   cacheMode: {
     type: Boolean,
     default: false
@@ -196,12 +219,29 @@ const hasTasks = computed(() =>
   (props.taskSummary?.failed || 0) > 0
 )
 
-const chainCountLabel = computed(() => {
-  if (props.displayConnLinkChain?.length) {
-    return `${props.displayConnLinkChain.length + 1} 节点`
-  }
-  return props.connLink ? '直连' : '未连接'
+const hasConnectionPath = computed(() =>
+  props.connectionPathStatus === 'ready' && props.displayConnLinkChain.length > 0
+)
+
+// Only intermediate hosts count as relays; the control server and target do not.
+const connectionModeLabel = computed(() => {
+  const relayCount = props.displayConnLinkChain.length - 1
+  return relayCount > 0 ? `经 ${relayCount} 个中转` : '直连'
 })
+
+const connectionPathMessage = computed(() =>
+  props.connectionPathStatus === 'loading' ? '读取连接路径…' : '连接路径暂未获取'
+)
+
+const compactHostId = computed(() => {
+  const id = props.currentHostId
+  return id.length > 18 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id
+})
+
+const hostIdentityTooltip = computed(() => [
+  props.agentName,
+  props.currentHostId ? `主机标识 · ${props.currentHostId}` : '主机标识暂未获取'
+].filter(Boolean).join(' · '))
 
 const getChainIcon = (index, totalLength) => {
   if (index === totalLength - 1) {
@@ -211,51 +251,238 @@ const getChainIcon = (index, totalLength) => {
   return index === 0 ? props.iconMap.link : props.iconMap.connection
 }
 
-const getChainItemTooltip = (index, totalLength) => {
-  if (index === totalLength - 1) {
-    return '当前节点（目标服务器）'
-  }
-
-  return '中转节点'
+const getChainItemTooltip = (index, link) => {
+  const role = index === props.displayConnLinkChain.length - 1
+    ? '当前主机'
+    : `中转主机 ${index + 1}`
+  return `${role} · ${link}`
 }
 </script>
 
 <style scoped>
 .content-header {
-  flex-shrink: 0;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
+  gap: 10px;
+  min-height: 34px;
+  padding: 4px 12px;
+  box-sizing: border-box;
+  background: var(--app-container-background);
+  border-bottom: 1px solid var(--app-divider-color);
+}
+
+.content-header-card {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.chain-summary-card {
+  flex: 1;
   gap: 8px;
-  padding: 6px 0 8px;
   overflow: hidden;
-  flex-wrap: nowrap;
-  border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 22%, transparent);
 }
 
 .card-topline {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   flex-shrink: 0;
+  gap: 6px;
+}
+
+.connection-mode-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-tag);
+  color: var(--el-text-color-secondary);
+  background: var(--app-control-background);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.connection-path-placeholder {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .cache-mode-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-tag);
+  font-size: 11px;
+  font-weight: 500;
   color: var(--el-color-warning-dark-2);
-  background: color-mix(in srgb, var(--el-color-warning) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--el-color-warning) 28%, transparent);
+  background: color-mix(in srgb, var(--el-color-warning) 10%, var(--app-container-background));
   cursor: help;
   white-space: nowrap;
 }
 
-.cache-mode-chip .el-icon {
+.connection-chain {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+.control-server {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
+  height: 24px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.control-server .el-icon {
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
+}
+
+.chain-arrow {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 16px;
+  color: color-mix(in srgb, var(--el-text-color-secondary) 50%, var(--app-container-background));
+}
+
+.chain-arrow svg {
+  display: block;
+  width: 100%;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chain-item {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.chain-link {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--el-text-color-regular);
+  font-family: var(--el-font-family-mono);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.link-icon {
+  flex-shrink: 0;
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+}
+
+.chain-item--relay {
+  background: var(--app-control-background-soft);
+}
+
+.chain-item--relay .chain-link {
+  max-width: 140px;
+  color: var(--el-text-color-secondary);
+}
+
+.chain-item--target {
+  background: color-mix(in srgb, var(--el-color-primary) 5%, var(--app-container-background));
+  border-color: color-mix(in srgb, var(--el-color-primary) 18%, var(--app-container-background));
+}
+
+.chain-item--target .chain-link {
+  max-width: 400px;
+  color: color-mix(in srgb, var(--el-color-primary) 78%, var(--el-text-color-primary));
+}
+
+.chain-item--target .link-icon {
+  color: var(--el-color-primary);
+}
+
+.chain-item--pending {
+  background: var(--app-control-background-soft);
+}
+
+.chain-item--pending .chain-link {
+  max-width: 320px;
+  color: var(--el-text-color-secondary);
+}
+
+.chain-item:hover {
+  border-color: color-mix(in srgb, var(--el-color-primary) 28%, var(--app-container-background));
+  background: var(--app-hover-background);
+}
+
+.chain-item:focus-visible,
+.control-server:focus-visible,
+.connection-path-placeholder:focus-visible,
+.hostid-summary-value:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-control);
+}
+
+.hostid-summary-card {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: 10px;
+  border-left: 1px solid var(--app-divider-color);
+}
+
+.hostid-summary-value,
+.hostid-summary-empty {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 5px;
+  color: var(--el-text-color-secondary);
   font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.hostid-summary-value {
+  font-family: var(--el-font-family-mono);
+  cursor: help;
+}
+
+.hostid-summary-id-compact {
+  display: none;
+}
+
+.hostid-summary-label {
+  color: var(--el-text-color-placeholder);
+  font-family: var(--el-font-family);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
 }
 
 /* Task summary chips */
@@ -264,7 +491,6 @@ const getChainItemTooltip = (index, totalLength) => {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  margin-left: 6px;
 }
 
 .task-chip {
@@ -331,250 +557,39 @@ const getChainItemTooltip = (index, totalLength) => {
   50%      { opacity: 0.55; transform: scale(0.7); }
 }
 
-.content-header-card {
-  min-width: 0;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  --header-soft-border: color-mix(in srgb, var(--el-border-color) 12%, transparent);
-}
-
-.chain-summary-card {
-  flex: 1;
-  overflow: hidden;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-}
-
-.hostid-summary-card {
-  flex: 0 0 auto;
-  max-width: 220px;
-  flex-shrink: 0;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-}
-
-.cloud-icon {
-  font-size: 13px;
-  color: var(--el-text-color-placeholder);
-  flex-shrink: 0;
-  margin-right: 1px;
-}
-
-.connection-chain {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  min-width: 0;
-  flex: 1;
-  flex-wrap: nowrap;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.chain-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 5px;
-  border-radius: 6px;
-  background: transparent;
-  border: 1px solid var(--header-soft-border);
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.chain-item--relay {
-  opacity: 0.5;
-}
-
-.chain-item--relay .chain-link {
-  color: var(--el-text-color-secondary);
-  font-weight: 500;
-  font-size: 9px;
-  max-width: 72px;
-}
-
-.chain-item--relay .link-icon {
-  font-size: 10px;
-  color: var(--el-text-color-placeholder);
-}
-
-.chain-item--target {
-  background: color-mix(in srgb, var(--el-color-primary) 9%, transparent);
-  border-color: color-mix(in srgb, var(--el-color-primary) 36%, transparent);
-  padding: 3px 8px;
-}
-
-.chain-item--target .chain-link {
-  color: var(--el-color-primary);
-  font-weight: 700;
-  font-size: 11px;
-  max-width: 160px;
-}
-
-.chain-item--target .link-icon {
-  color: var(--el-color-primary);
-  font-size: 12px;
-}
-
-.chain-item:hover {
-  background: color-mix(in srgb, var(--el-text-color-primary) 3%, transparent);
-  box-shadow: none;
-}
-
-.link-icon {
-  font-size: 11px;
-  color: var(--el-color-primary);
-  flex-shrink: 0;
-}
-
-.chain-link {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  letter-spacing: 0.02em;
-  max-width: 112px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chain-arrow {
-  font-size: 10px;
-  color: var(--el-text-color-placeholder);
-  margin: 0;
-  flex-shrink: 0;
-}
-
-.hostid-summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 2px 0;
-  flex: 1;
-  justify-content: flex-start;
-  border-radius: 0;
-  background: transparent;
-  border: 0;
-}
-
-.hostid-summary-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 1px;
-}
-
-.hostid-summary-name {
-  min-width: 0;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hostid-summary-icon {
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--el-color-primary) 8%, transparent);
-  color: var(--el-color-primary);
-  font-size: 12px;
-  flex-shrink: 0;
-  box-shadow: none;
-}
-
-:global(html.dark .content-header-card),
-:global(html[data-theme='dark'] .content-header-card) {
-  --header-soft-border: color-mix(in srgb, var(--el-border-color) 16%, transparent);
-}
-
-.hostid-summary-value,
-.hostid-summary-empty {
-  min-width: 0;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--el-text-color-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hostid-summary-value {
-  font-family: 'Courier New', monospace;
-  letter-spacing: 0.01em;
-}
-
-.hostid-summary-empty {
-  color: var(--el-text-color-placeholder);
-}
-
-@media (max-width: 768px) {
-  .content-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    padding: 8px 0;
-    flex-wrap: wrap;
+@media (max-width: 1100px) {
+  .chain-item--target .chain-link,
+  .chain-item--pending .chain-link {
+    max-width: 240px;
   }
 
-  .content-header-card {
-    padding: 0;
+  .hostid-summary-id-full {
+    display: none;
+  }
+
+  .hostid-summary-id-compact {
+    display: inline;
+  }
+}
+
+@media (max-width: 640px) {
+  .content-header {
+    gap: 8px;
+    padding-inline: 8px;
   }
 
   .chain-summary-card {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
+    flex: 1;
+    gap: 6px;
   }
 
-  .connection-chain {
-    gap: 4px;
-  }
-
-  .chain-item {
-    padding: 2px 4px;
-  }
-
-  .chain-link {
-    max-width: 120px;
-    font-size: 12px;
-  }
-
-  .link-icon {
-    font-size: 12px;
-  }
-
-  .chain-arrow {
-    font-size: 11px;
+  .chain-item--target .chain-link,
+  .chain-item--pending .chain-link {
+    max-width: 52vw;
   }
 
   .hostid-summary-card {
-    width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-  }
-
-  .hostid-summary {
-    justify-content: flex-start;
+    padding-left: 8px;
   }
 }
 </style>

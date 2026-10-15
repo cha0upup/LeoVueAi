@@ -19,12 +19,12 @@ const task = (id, sessionId, status = TaskStatus.SCANNING) => ({
   createdAt: 1
 })
 
-function fixture(initialTasks) {
+function fixture(initialTasks, options = {}) {
   const listeners = new Map()
   const engine = {
     tasks: initialTasks,
     getTasksBySession: (sessionId) => engine.tasks.filter((item) => item.sessionId === sessionId),
-    syncNetworkWorkflowTasks: vi.fn().mockResolvedValue([]),
+    syncNetworkWorkflowTasks: vi.fn().mockResolvedValue({ tasks: [], hasMore: false, nextCursor: '' }),
     queryScanTask: vi.fn().mockResolvedValue({}),
     on: (name, listener) => listeners.set(name, listener),
     off: (name) => listeners.delete(name),
@@ -34,7 +34,7 @@ function fixture(initialTasks) {
   const scope = effectScope()
   const errors = vi.fn()
   const view = scope.run(() =>
-    useAssetDiscoveryTasks({ sessionId, taskEngine: engine, onError: errors })
+    useAssetDiscoveryTasks({ sessionId, taskEngine: engine, onError: errors, ...options })
   )
   return { scope, engine, sessionId, view, errors, listeners }
 }
@@ -56,11 +56,12 @@ describe('asset discovery task synchronization', () => {
     await vi.advanceTimersByTimeAsync(6000)
     expect(current.engine.syncNetworkWorkflowTasks).toHaveBeenCalledTimes(1)
     expect(current.engine.queryScanTask).not.toHaveBeenCalled()
-    waiting.resolve([])
+    waiting.resolve({ tasks: [], hasMore: false, nextCursor: '' })
     await first
     await vi.advanceTimersByTimeAsync(2000)
     expect(current.engine.queryScanTask).toHaveBeenCalledTimes(2)
-    expect(current.engine.syncNetworkWorkflowTasks).toHaveBeenCalledTimes(1)
+    expect(current.engine.syncNetworkWorkflowTasks.mock.calls.map(([, options]) => options.scope))
+      .toEqual(['history', 'active', 'active'])
     current.scope.stop()
     expect(vi.getTimerCount()).toBe(0)
     expect(current.listeners.size).toBe(0)
@@ -78,7 +79,7 @@ describe('asset discovery task synchronization', () => {
     expect(current.view.selectedTaskId.value).toBe('new')
     expect(current.view.tasks.value.map((item) => item.id)).toEqual(['new'])
     current.scope.stop()
-    waiting.resolve([])
+    waiting.resolve({ tasks: [], hasMore: false, nextCursor: '' })
     await old
     expect(current.engine.queryScanTask.mock.calls.map(([item]) => item.id)).toEqual(['new'])
     expect(current.errors).not.toHaveBeenCalled()
@@ -115,4 +116,95 @@ describe('asset discovery task synchronization', () => {
     expect(current.view.loadError.value).toBe('')
     expect(current.view.tasks.value).toEqual([])
   })
+  it('loads history on demand without reloading it during live polling', async () => {
+    vi.useFakeTimers()
+    current = fixture([task('selected', 'one', TaskStatus.COMPLETED)])
+    current.engine.tasks[0].detailsLoaded = true
+    current.engine.syncNetworkWorkflowTasks.mockResolvedValueOnce({
+      tasks: [], hasMore: true, nextCursor: 'older'
+    })
+    await current.view.syncTasks()
+    expect(current.view.hasMoreHistory.value).toBe(true)
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(current.engine.syncNetworkWorkflowTasks.mock.calls.map(([, options]) => options.scope))
+      .toEqual(['history', 'active', 'active'])
+    current.engine.syncNetworkWorkflowTasks.mockImplementationOnce(async () => {
+      current.engine.tasks.push(task('history', 'one', TaskStatus.COMPLETED))
+      return { tasks: [], hasMore: false, nextCursor: '' }
+    })
+    const more = current.view.loadMoreTasks()
+    expect(current.view.loadMoreTasks()).toBe(more)
+    expect(current.view.loadingMore.value).toBe(true)
+    await more
+    expect(current.view.loadingMore.value).toBe(false)
+    expect(current.engine.syncNetworkWorkflowTasks).toHaveBeenLastCalledWith('one', {
+      scope: 'history', cursor: 'older'
+    })
+    expect(current.view.tasks.value.map(item => item.id)).toEqual(['selected', 'history'])
+    expect(current.view.selectedTaskId.value).toBe('selected')
+    expect(current.view.hasMoreHistory.value).toBe(false)
+  })
+
+  it('retries a failed history page without advancing its cursor', async () => {
+    current = fixture([])
+    current.engine.syncNetworkWorkflowTasks.mockResolvedValueOnce({ tasks: [], hasMore: true, nextCursor: 'retry' })
+    await current.view.syncTasks()
+    current.engine.syncNetworkWorkflowTasks.mockRejectedValueOnce(new Error('page failed'))
+    await current.view.loadMoreTasks()
+    expect(current.view.loadError.value).toBe('page failed')
+    expect(current.view.hasMoreHistory.value).toBe(true)
+    await current.view.loadMoreTasks()
+    expect(current.engine.syncNetworkWorkflowTasks.mock.calls.slice(-2).map(([, options]) => options.cursor))
+      .toEqual(['retry', 'retry'])
+  })
+
+  it('discovers every live page and queries details only for selection and terminal transitions', async () => {
+    current = fixture([task('selected', 'one'), task('finished', 'one')])
+    const background = task('background', 'one')
+    current.engine.syncNetworkWorkflowTasks
+      .mockResolvedValueOnce({ tasks: [], hasMore: false, nextCursor: '' })
+      .mockImplementationOnce(async () => {
+        current.engine.tasks.push(background)
+        return { tasks: [current.engine.tasks[0]], hasMore: true, nextCursor: 'live-next' }
+      })
+      .mockResolvedValueOnce({ tasks: [background], hasMore: false, nextCursor: '' })
+    await current.view.syncTasks()
+    expect(current.engine.queryScanTask.mock.calls.map(([item]) => item.id)).toEqual(['selected', 'finished'])
+    expect(current.engine.syncNetworkWorkflowTasks).toHaveBeenLastCalledWith('one', {
+      scope: 'active', cursor: 'live-next'
+    })
+    expect(current.view.tasks.value.map(item => item.id)).toContain('background')
+  })
+
+  it('drops a late history cursor and queued load-more request after session changes', async () => {
+    current = fixture([])
+    const waiting = deferred()
+    current.engine.syncNetworkWorkflowTasks.mockReturnValueOnce(waiting.promise)
+    const old = current.view.syncTasks()
+    const more = current.view.loadMoreTasks()
+    await Promise.resolve()
+    current.sessionId.value = 'two'
+    await current.view.syncTasks()
+    waiting.resolve({ tasks: [], hasMore: true, nextCursor: 'stale' })
+    await Promise.all([old, more])
+    expect(current.view.hasMoreHistory.value).toBe(false)
+    expect(current.engine.syncNetworkWorkflowTasks.mock.calls.filter(([session]) => session === 'one')).toHaveLength(1)
+  })
+
+  it('supports task-center selection and an externally owned polling timer', async () => {
+    vi.useFakeTimers()
+    const scan = task('scan', 'one')
+    current = fixture([scan], { autoSelect: false, pollIntervalMs: 0 })
+    current.engine.syncNetworkWorkflowTasks.mockImplementation(async () => ({
+      tasks: [scan], hasMore: false, nextCursor: ''
+    }))
+    await current.view.syncTasks()
+    expect(current.view.selectedTaskId.value).toBeNull()
+    expect(current.engine.queryScanTask).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+    current.view.selectTask('scan')
+    await nextTick()
+    expect(current.engine.queryScanTask).toHaveBeenCalledWith(expect.objectContaining({ id: 'scan' }))
+  })
+
 })

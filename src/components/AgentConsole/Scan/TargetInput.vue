@@ -194,16 +194,14 @@ function parseTargets() {
 
   lines.forEach((line, index) => {
     const trimmed = line.trim()
-    if (!trimmed) return
-
-    const result = parseTargetLine(trimmed)
-    if (result.valid) {
-      newTargets.push(result.target)
+    const type = getTargetType(trimmed)
+    if (type) {
+      newTargets.push({ input: trimmed, type, resolved: trimmed })
     } else {
       newErrors.push({
         line: trimmed,
         lineNumber: index + 1,
-        reason: result.error
+        reason: '无法识别的目标格式'
       })
     }
   })
@@ -212,88 +210,58 @@ function parseTargets() {
   errors.value = newErrors
 }
 
-function parseTargetLine(line) {
+function getTargetType(line) {
   // IPv4
   if (isValidIpv4(line)) {
-    return {
-      valid: true,
-      target: { input: line, type: 'IPV4', resolved: line }
-    }
+    return 'IPV4'
   }
 
   // IPv4 CIDR
   const ipv4Cidr = line.match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/)
   if (ipv4Cidr && isValidIpv4(ipv4Cidr[1]) && Number(ipv4Cidr[2]) <= 32) {
-    return {
-      valid: true,
-      target: { input: line, type: 'CIDR', resolved: line }
-    }
+    return 'CIDR'
   }
 
   // IPv6 CIDR
   const cidrParts = line.split('/')
   if (cidrParts.length === 2 && isLikelyIpv6(cidrParts[0]) && /^\d{1,3}$/.test(cidrParts[1]) && Number(cidrParts[1]) <= 128) {
-    return {
-      valid: true,
-      target: { input: line, type: 'CIDR', resolved: line }
-    }
+    return 'CIDR'
   }
 
   // IP Range
   const range = line.match(/^(\d{1,3}(?:\.\d{1,3}){3})-(\d{1,3}(?:\.\d{1,3}){3})$/)
   if (range && isValidIpv4(range[1]) && isValidIpv4(range[2])) {
-    return {
-      valid: true,
-      target: { input: line, type: 'IP_RANGE', resolved: line }
-    }
+    return 'IP_RANGE'
   }
 
   // Bracketed IPv6 with port
   const bracketedIpv6Port = line.match(/^\[([^\]]+)]:(\d{1,5})$/)
   if (bracketedIpv6Port && isLikelyIpv6(bracketedIpv6Port[1]) && isValidPort(bracketedIpv6Port[2])) {
-    return {
-      valid: true,
-      target: { input: line, type: 'HOST_PORT', resolved: line }
-    }
+    return 'HOST_PORT'
   }
 
   // IPv6
   if (isLikelyIpv6(line)) {
-    return {
-      valid: true,
-      target: { input: line, type: 'IPV6', resolved: line }
-    }
+    return 'IPV6'
   }
 
   // URL
   if (/^https?:\/\/.+/.test(line)) {
-    return {
-      valid: true,
-      target: { input: line, type: 'URL', resolved: line }
-    }
+    return 'URL'
   }
 
   // Host:Port
   const hostPort = line.match(/^[a-zA-Z0-9.-]+:(\d{1,5})$/)
   if (hostPort && isValidPort(hostPort[1])) {
-    return {
-      valid: true,
-      target: { input: line, type: 'HOST_PORT', resolved: line }
-    }
+    return 'HOST_PORT'
   }
 
   // Domain
   if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(line)) {
-    return {
-      valid: true,
-      target: { input: line, type: 'DOMAIN', resolved: line }
-    }
+    return 'DOMAIN'
   }
 
-  return {
-    valid: false,
-    error: '无法识别的目标格式'
-  }
+  return null
 }
 
 function isValidIpv4(value) {
@@ -333,30 +301,22 @@ function handleClear() {
   emitTargets()
 }
 
+const TARGET_TYPES = {
+  IPV4: { label: 'IPv4', tagType: 'primary' },
+  IPV6: { label: 'IPv6', tagType: 'primary' },
+  CIDR: { label: 'CIDR', tagType: 'success' },
+  IP_RANGE: { label: 'IP范围', tagType: 'success' },
+  DOMAIN: { label: '域名', tagType: 'warning' },
+  URL: { label: 'URL', tagType: 'info' },
+  HOST_PORT: { label: '主机端口', tagType: 'info' }
+}
+
 function getTypeLabel(type) {
-  const labels = {
-    'IPV4': 'IPv4',
-    'IPV6': 'IPv6',
-    'CIDR': 'CIDR',
-    'IP_RANGE': 'IP范围',
-    'DOMAIN': '域名',
-    'URL': 'URL',
-    'HOST_PORT': '主机端口'
-  }
-  return labels[type] || type
+  return TARGET_TYPES[type]?.label || type
 }
 
 function getTypeTagType(type) {
-  const types = {
-    'IPV4': 'primary',
-    'IPV6': 'primary',
-    'CIDR': 'success',
-    'IP_RANGE': 'success',
-    'DOMAIN': 'warning',
-    'URL': 'info',
-    'HOST_PORT': 'info'
-  }
-  return types[type] || ''
+  return TARGET_TYPES[type]?.tagType || ''
 }
 
 function formatResolved(target) {

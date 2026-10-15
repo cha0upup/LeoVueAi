@@ -6,12 +6,32 @@ import {
   listNetworkProbeWorkflowTasksApi
 } from '@/services/api/scan.js'
 import { TERMINAL_TASK_STATUSES, TaskStatus, TaskType } from '@/constants/task.js'
+import { clampProgress } from '@/utils/format.js'
+
+const STATUS_EVENTS = {
+  [TaskStatus.COMPLETED]: 'taskCompleted',
+  [TaskStatus.FAILED]: 'taskFailed',
+  [TaskStatus.CANCELLED]: 'taskCancelled',
+  [TaskStatus.PAUSED]: 'taskPaused'
+}
+
+function mapScanStatus(status, snapshot = {}) {
+  if (status === 'RUNNING') return TaskStatus.SCANNING
+  if (status === 'PAUSED') return TaskStatus.PAUSED
+  if (status === 'FAILED') return TaskStatus.FAILED
+  if (status !== 'STOPPED') return TaskStatus.PENDING
+  return {
+    COMPLETED: TaskStatus.COMPLETED,
+    FAILED: TaskStatus.FAILED,
+    CANCELLED: TaskStatus.CANCELLED
+  }[snapshot.outcome] || TaskStatus.CANCELLED
+}
 
 export function applyScanExecutor(TaskEngine) {
-  // Keep request revisions outside the task data exposed to the task center.
+  // Request state follows the task object without being exposed to the task center.
   const requestStates = new WeakMap()
   const stateFor = task => {
-    if (!requestStates.has(task)) requestStates.set(task, { revision: 0, controlling: false })
+    if (!requestStates.has(task)) requestStates.set(task, { revision: 0, controlling: false, query: null })
     return requestStates.get(task)
   }
 
@@ -26,7 +46,7 @@ export function applyScanExecutor(TaskEngine) {
     if (state.controlling) throw new Error('扫描任务正在执行控制操作')
     state.controlling = true
     state.revision += 1
-    engine.scanQueryRequests?.delete(task.id)
+    state.query = null
     try {
       await api({ sessionId: task.sessionId, taskId: backendTaskId })
     } finally {
@@ -56,32 +76,15 @@ export function applyScanExecutor(TaskEngine) {
     this.emit('taskProgress', task)
   }
 
-  TaskEngine.prototype.clampProgress = function (progress) {
-    const value = Number(progress || 0)
-    if (!Number.isFinite(value)) return 0
-    return Math.max(0, Math.min(100, value))
-  }
-
-  TaskEngine.prototype.mapScanStatus = function (status, snapshot = {}) {
-    if (status === 'RUNNING') return TaskStatus.SCANNING
-    if (status === 'PAUSED') return TaskStatus.PAUSED
-    if (status !== 'STOPPED') return TaskStatus.PENDING
-    return {
-      COMPLETED: TaskStatus.COMPLETED,
-      FAILED: TaskStatus.FAILED,
-      CANCELLED: TaskStatus.CANCELLED
-    }[snapshot.outcome] || TaskStatus.CANCELLED
-  }
-
   TaskEngine.prototype.hydrateScanTask = function (taskId, snapshot) {
     const task = this.getTaskById(taskId)
     if (!task || task.type !== TaskType.SCAN || !snapshot) return
 
     const previousStatus = task.status
-    const nextStatus = snapshot.status ? this.mapScanStatus(snapshot.status, snapshot) : task.status
+    const nextStatus = snapshot.status ? mapScanStatus(snapshot.status, snapshot) : task.status
     const targetCount = Number(snapshot.targetCount ?? task.targetCount)
     const processedCount = nextStatus === TaskStatus.COMPLETED ? targetCount : task.processedCount
-    const progress = this.clampProgress(snapshot.progress ?? task.progress)
+    const progress = clampProgress(snapshot.progress ?? task.progress)
 
     task.backendTaskId = snapshot.taskId || task.backendTaskId
     task.status = nextStatus
@@ -96,10 +99,9 @@ export function applyScanExecutor(TaskEngine) {
     task.scanPorts = snapshot.ports ?? task.scanPorts
     task.reachableHostList = snapshot.reachableHostList ?? task.reachableHostList
     task.reachableHostCount = Number(snapshot.reachableHostCount ?? task.reachableHostCount)
-    if (snapshot.reachableHostList !== undefined || snapshot.reachableHostCount !== undefined) {
-      task.reachabilityLoaded = true
-    }
     task.stages = snapshot.stages ?? task.stages
+    const stages = Array.isArray(task.stages) ? task.stages : []
+    task.probeCompleted = stages.reduce((total, stage) => total + Math.max(0, Number(stage.completed) || 0), 0)
     // A terminal workflow deliberately returns currentStage=null. Do not
     // retain the previous live stage when hydrating a completed history item.
     if (snapshot.currentStage !== undefined) {
@@ -118,34 +120,22 @@ export function applyScanExecutor(TaskEngine) {
     task.startTime =
       snapshot.startTime ||
       task.startTime ||
-      (nextStatus === TaskStatus.SCANNING ? Date.now() : null)
+      (nextStatus === TaskStatus.SCANNING ? task.createdAt || Date.now() : null)
     task.endTime =
       snapshot.finishedAt ||
       (TERMINAL_TASK_STATUSES.includes(nextStatus) ? task.endTime || Date.now() : null)
-    task.error = snapshot.error || null
+    if (snapshot.error !== undefined) task.error = snapshot.error || null
 
-    if (nextStatus === TaskStatus.COMPLETED && previousStatus !== TaskStatus.COMPLETED) {
-      this.emit('taskCompleted', task)
-      return
+    let event = 'taskProgress'
+    if (nextStatus !== previousStatus) {
+      event = STATUS_EVENTS[nextStatus] ||
+        (previousStatus === TaskStatus.PAUSED && nextStatus === TaskStatus.SCANNING ? 'taskResumed' : 'taskProgress')
     }
-    if (nextStatus === TaskStatus.FAILED && previousStatus !== TaskStatus.FAILED) {
-      this.emit('taskFailed', task, new Error(task.error || '扫描任务失败'))
-      return
+    if (event === 'taskFailed') {
+      this.emit(event, task, new Error(task.error || '扫描任务失败'))
+    } else {
+      this.emit(event, task)
     }
-    if (nextStatus === TaskStatus.CANCELLED && previousStatus !== TaskStatus.CANCELLED) {
-      this.emit('taskCancelled', task)
-      return
-    }
-    if (nextStatus === TaskStatus.PAUSED && previousStatus !== TaskStatus.PAUSED) {
-      this.emit('taskPaused', task)
-      return
-    }
-    if (nextStatus === TaskStatus.SCANNING && previousStatus === TaskStatus.PAUSED) {
-      this.emit('taskResumed', task)
-      return
-    }
-
-    this.emit('taskProgress', task)
   }
 
   TaskEngine.prototype.queryScanTask = async function (task) {
@@ -154,10 +144,8 @@ export function applyScanExecutor(TaskEngine) {
     if (!backendTaskId || !task?.sessionId) return null
     const state = stateFor(task)
     if (state.controlling) return null
+    if (state.query) return state.query
     const revision = state.revision
-    if (!this.scanQueryRequests) this.scanQueryRequests = new Map()
-    const existing = this.scanQueryRequests.get(task.id)
-    if (existing) return existing
     if (task.scanKind !== 'network_workflow') {
       throw new Error('未知的扫描任务类型')
     }
@@ -166,37 +154,40 @@ export function applyScanExecutor(TaskEngine) {
       const result = response?.data
       if (this.getTaskById(task.id) !== task || state.controlling || state.revision !== revision) return null
       if (result && typeof result === 'object') {
+        state.revision += 1
+        task.detailsLoaded = true
         this.hydrateScanTask(task.id, result)
       }
       return result
     })()
-    this.scanQueryRequests.set(task.id, request)
+    state.query = request
     try {
       return await request
     } finally {
-      if (this.scanQueryRequests.get(task.id) === request) this.scanQueryRequests.delete(task.id)
+      if (state.query === request) state.query = null
     }
   }
 
-  TaskEngine.prototype.syncNetworkWorkflowTasks = async function (sessionId) {
-    if (!sessionId) return []
+  TaskEngine.prototype.syncNetworkWorkflowTasks = async function (sessionId, { scope = 'history', cursor = '' } = {}) {
+    const emptyPage = { tasks: [], hasMore: false, nextCursor: '' }
+    if (!sessionId) return emptyPage
     const sessionTasks = this.getSessionTasks(sessionId)
-    const revisions = new Map([...sessionTasks.values()].map(task => [task.id, stateFor(task).revision]))
     const previousTasks = new Map([...sessionTasks.values()]
       .filter(task => task.scanKind === 'network_workflow')
-      .map(task => [task.backendTaskId, task]))
-    const response = await listNetworkProbeWorkflowTasksApi({ sessionId })
-    if (this.sessionTasks.get(sessionId) !== sessionTasks) return []
+      .map(task => [task.backendTaskId, { task, revision: stateFor(task).revision }]))
+    const response = await listNetworkProbeWorkflowTasksApi({ sessionId, scope, cursor, pageSize: scope === 'active' ? 100 : 20 })
+    if (this.sessionTasks.get(sessionId) !== sessionTasks) return emptyPage
     const snapshots = Array.isArray(response?.data?.tasks) ? response.data.tasks : []
     const result = []
+    const tasksByBackendId = new Map(this.getTasksBySession(sessionId)
+      .filter(task => task.scanKind === 'network_workflow')
+      .map(task => [task.backendTaskId, task]))
     for (const snapshot of snapshots) {
       const backendTaskId = snapshot?.taskId
       if (!backendTaskId) continue
-      const previousTask = previousTasks.get(backendTaskId)
-      if (previousTask && this.getTaskById(previousTask.id) !== previousTask) continue
-      let task = this.getTasksBySession(sessionId).find(item =>
-        item.scanKind === 'network_workflow' && item.backendTaskId === backendTaskId
-      )
+      const previous = previousTasks.get(backendTaskId)
+      if (previous && this.getTaskById(previous.task.id) !== previous.task) continue
+      let task = tasksByBackendId.get(backendTaskId)
       if (!task) {
         const taskId = this.createScanTask(
           sessionId,
@@ -210,12 +201,20 @@ export function applyScanExecutor(TaskEngine) {
         )
         task = this.getTaskById(taskId)
       }
+      tasksByBackendId.set(backendTaskId, task)
       const state = stateFor(task)
-      if (!state.controlling && state.revision === (revisions.get(task.id) ?? 0)) {
+      if (!state.controlling && state.revision === (previous?.revision ?? 0)) {
+        if (snapshot.status && mapScanStatus(snapshot.status, snapshot) !== task.status) {
+          task.detailsLoaded = false
+        }
         this.hydrateScanTask(task.id, snapshot)
       }
       result.push(task)
     }
-    return result
+    return {
+      tasks: result,
+      hasMore: response?.data?.hasMore === true,
+      nextCursor: response?.data?.nextCursor || ''
+    }
   }
 }

@@ -1,5 +1,12 @@
 import { ACTIVE_TASK_STATUSES, TASK_STATUS_TEXT, TaskStatus, TaskType } from '@/constants/task.js'
 
+const TASK_TYPE_META = {
+  [TaskType.DOWNLOAD]: { label: '下载任务', actionLabel: '下载', icon: 'download', runningStatus: TaskStatus.DOWNLOADING },
+  [TaskType.UPLOAD]: { label: '上传任务', actionLabel: '上传', icon: 'upload', runningStatus: TaskStatus.UPLOADING },
+  [TaskType.DB_EXPORT]: { label: '数据库导出', actionLabel: '导出', icon: 'database', runningStatus: TaskStatus.DB_EXPORTING },
+  [TaskType.SCAN]: { label: '扫描任务', actionLabel: '扫描', icon: 'scan', runningStatus: TaskStatus.SCANNING }
+}
+
 const STATUS_BY_ENGINE_STATE = {
   PAUSED: TaskStatus.PAUSED,
   CANCELLED: TaskStatus.CANCELLED,
@@ -130,12 +137,12 @@ const prepareLocalTask = (task, serverTaskId) => ({
   isManagedLocally: true
 })
 
-const mergeSnapshots = ({ localTasks, serverTasks, getLocalServerId }) => {
-  const localByServerId = new Map(
-    localTasks
-      .map((task) => [getLocalServerId(task), task])
-      .filter(([serverTaskId]) => Boolean(serverTaskId))
-  )
+const mergeSnapshots = ({ localTasks, serverTasks, serverIdField }) => {
+  const localByServerId = new Map()
+  for (const task of localTasks) {
+    const serverTaskId = task[serverIdField]
+    if (serverTaskId) localByServerId.set(serverTaskId, task)
+  }
   const matchedLocalIds = new Set()
 
   const merged = serverTasks.map((serverTask) => {
@@ -148,7 +155,7 @@ const mergeSnapshots = ({ localTasks, serverTasks, getLocalServerId }) => {
       ...serverTask,
       viewId: local.viewId,
       taskId: local.taskId,
-      serverTaskId: serverTask.serverTaskId || getLocalServerId(localTask) || null,
+      serverTaskId: serverTask.serverTaskId || localTask[serverIdField] || null,
       fileName: serverTask.fileName || local.fileName,
       status: serverTask.status,
       isManagedLocally: true
@@ -157,7 +164,7 @@ const mergeSnapshots = ({ localTasks, serverTasks, getLocalServerId }) => {
 
   const unmatchedLocal = localTasks
     .filter((task) => !matchedLocalIds.has(task.id))
-    .map((task) => prepareLocalTask(task, getLocalServerId(task)))
+    .map((task) => prepareLocalTask(task, task[serverIdField]))
 
   return [...merged, ...unmatchedLocal]
 }
@@ -168,34 +175,18 @@ export const buildTaskList = ({
   serverUploadTasks = [],
   serverSqlExportTasks = []
 } = {}) => {
-  const downloads = localTasks.filter((task) => task.type === TaskType.DOWNLOAD)
-  const uploads = localTasks.filter((task) => task.type === TaskType.UPLOAD)
-  const sqlExports = localTasks.filter((task) => task.type === TaskType.DB_EXPORT)
-  const otherTasks = localTasks
-    .filter(
-      (task) =>
-        ![TaskType.DOWNLOAD, TaskType.UPLOAD, TaskType.DB_EXPORT].includes(task.type)
-    )
-    .map((task) => prepareLocalTask(task, task.serverTaskId || task.backendTaskId))
-
-  return [
-    ...otherTasks,
-    ...mergeSnapshots({
-      localTasks: uploads,
-      serverTasks: serverUploadTasks,
-      getLocalServerId: (task) => task.serverTaskId
-    }),
-    ...mergeSnapshots({
-      localTasks: downloads,
-      serverTasks: serverDownloadTasks,
-      getLocalServerId: (task) => task.engineTaskId
-    }),
-    ...mergeSnapshots({
-      localTasks: sqlExports,
-      serverTasks: serverSqlExportTasks,
-      getLocalServerId: (task) => task.serverTaskId
-    })
-  ]
+  const groups = new Map([
+    [TaskType.UPLOAD, { localTasks: [], serverTasks: serverUploadTasks, serverIdField: 'serverTaskId' }],
+    [TaskType.DOWNLOAD, { localTasks: [], serverTasks: serverDownloadTasks, serverIdField: 'engineTaskId' }],
+    [TaskType.DB_EXPORT, { localTasks: [], serverTasks: serverSqlExportTasks, serverIdField: 'serverTaskId' }]
+  ])
+  const otherTasks = []
+  localTasks.forEach(task => {
+    const group = groups.get(task.type)
+    if (group) group.localTasks.push(task)
+    else otherTasks.push(prepareLocalTask(task, task.serverTaskId || task.backendTaskId))
+  })
+  return [...otherTasks, ...[...groups.values()].flatMap(mergeSnapshots)]
 }
 
 export const getStatusText = (status) => TASK_STATUS_TEXT[status] || status || '-'
@@ -221,26 +212,17 @@ export const getProgressStatus = (status) => {
   return ''
 }
 
-export const getTaskTypeLabel = (type) =>
-  ({
-    [TaskType.DOWNLOAD]: '下载任务',
-    [TaskType.UPLOAD]: '上传任务',
-    [TaskType.DB_EXPORT]: '数据库导出',
-    [TaskType.SCAN]: '扫描任务'
-  })[type] || '任务'
+export const getTaskTypeLabel = (type) => TASK_TYPE_META[type]?.label || '任务'
 
 export const getScanKindLabel = (scanKind) =>
   ({
     network_workflow: '一键扫描'
   })[scanKind] || '扫描'
 
-export const getTaskTypeIcon = (type, iconMap) =>
-  ({
-    [TaskType.DOWNLOAD]: iconMap.download,
-    [TaskType.UPLOAD]: iconMap.upload,
-    [TaskType.DB_EXPORT]: iconMap.database,
-    [TaskType.SCAN]: iconMap.scan
-  })[type] || iconMap.task
+export const getTaskTypeIcon = (type, iconMap) => {
+  const icon = TASK_TYPE_META[type]?.icon
+  return (icon && iconMap[icon]) || iconMap.task
+}
 
 const isCommittingUpload = task => task.type === TaskType.UPLOAD &&
   task.currentStage === 'COMMITTING' && task.status === TaskStatus.UPLOADING
@@ -248,15 +230,13 @@ const isCommittingUpload = task => task.type === TaskType.UPLOAD &&
 export const getPrimaryTaskAction = (task, iconMap) => {
   if (!task) return null
   if (isCommittingUpload(task)) return null
-  if (
-    task.status === TaskStatus.FAILED &&
-    [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type) &&
-    (task.isManagedLocally || task.serverTaskId)
-  ) {
+  const metadata = TASK_TYPE_META[task.type]
+  const isTransfer = [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type)
+  const canControl =
+    (task.isManagedLocally && (task.type !== TaskType.SCAN || task.canControl !== false)) ||
+    (isTransfer && task.serverTaskId)
+  if (task.status === TaskStatus.FAILED && isTransfer && canControl) {
     return { key: 'retry', label: '重试', icon: 'mdi:refresh' }
-  }
-  if (task.type === TaskType.UPLOAD && task.status === TaskStatus.UPLOADING && task.serverTaskId) {
-    return { key: 'pause', label: '暂停上传', icon: iconMap.videoPause }
   }
   if (
     task.status === TaskStatus.PENDING &&
@@ -265,51 +245,12 @@ export const getPrimaryTaskAction = (task, iconMap) => {
   ) {
     return { key: 'start', label: '开始执行', icon: iconMap.play }
   }
-  if (
-    task.type === TaskType.SCAN &&
-    task.status === TaskStatus.SCANNING &&
-    task.isManagedLocally &&
-    task.canControl !== false
-  ) {
-    return { key: 'pause', label: '暂停扫描', icon: iconMap.videoPause }
-  }
-  if (
-    task.type === TaskType.SCAN &&
-    task.status === TaskStatus.PAUSED &&
-    task.isManagedLocally &&
-    task.canControl !== false
-  ) {
-    return { key: 'resume', label: '继续扫描', icon: iconMap.play }
-  }
-  if (
-    task.type === TaskType.DOWNLOAD &&
-    task.status === TaskStatus.DOWNLOADING &&
-    (task.isManagedLocally || task.serverTaskId)
-  ) {
-    return { key: 'pause', label: '暂停下载', icon: iconMap.videoPause }
-  }
-  if (
-    task.type === TaskType.DB_EXPORT &&
-    task.status === TaskStatus.DB_EXPORTING &&
-    task.isManagedLocally
-  ) {
-    return { key: 'pause', label: '暂停导出', icon: iconMap.videoPause }
-  }
-  if (
-    [TaskType.DOWNLOAD, TaskType.UPLOAD, TaskType.DB_EXPORT].includes(task.type) &&
-    task.status === TaskStatus.PAUSED &&
-    (task.isManagedLocally ||
-      ([TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type) && task.serverTaskId))
-  ) {
-    return {
-      key: 'resume',
-      label:
-        task.type === TaskType.DOWNLOAD
-          ? '继续下载'
-          : task.type === TaskType.UPLOAD
-            ? '继续上传'
-            : '继续导出',
-      icon: iconMap.play
+  if (canControl && metadata?.actionLabel) {
+    if (task.status === metadata.runningStatus && (task.type !== TaskType.UPLOAD || task.serverTaskId)) {
+      return { key: 'pause', label: `暂停${metadata.actionLabel}`, icon: iconMap.videoPause }
+    }
+    if (task.status === TaskStatus.PAUSED) {
+      return { key: 'resume', label: `继续${metadata.actionLabel}`, icon: iconMap.play }
     }
   }
   if (

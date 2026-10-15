@@ -75,3 +75,8 @@ export function joinFilePath(basePath, name) {
   const base = normalizeDirectoryPath(basePath)
   return formatFilePath(`${base}${base.endsWith('/') ? '' : '/'}${name}`)
 }
+
+export function clampProgress(progress) {
+  const value = Number(progress || 0)
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0
+}

@@ -59,7 +59,6 @@ export function useFingerprintDetails(props) {
   watch(
     () => [props.sessionId, props.taskId, props.endpointId],
     () => {
-      listSequence += 1
       evidenceSequence += 1
       matches.value = []
       total.value = 0
@@ -79,8 +78,6 @@ export function useFingerprintDetails(props) {
   )
   onScopeDispose(() => {
     disposed = true
-    listSequence += 1
-    evidenceSequence += 1
   })
   return {
     matches,

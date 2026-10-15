@@ -1,11 +1,6 @@
 import { computed, watch } from 'vue'
 import { TaskStatus } from '@/constants/task.js'
-
-const clampTaskProgress = (progress) => {
-  const value = Number(progress || 0)
-  if (!Number.isFinite(value)) return 0
-  return Math.max(0, Math.min(100, value))
-}
+import { clampProgress } from '@/utils/format.js'
 
 const getSortTime = (task) => {
   const value = task?.endTime || task?.startTime || task?.createdAt || task?.createdTime
@@ -17,7 +12,7 @@ const getSortTime = (task) => {
 }
 
 const sortTasks = (a, b, mode) => {
-  if (mode === 'progress') return clampTaskProgress(b?.progress) - clampTaskProgress(a?.progress)
+  if (mode === 'progress') return clampProgress(b?.progress) - clampProgress(a?.progress)
   if (mode === 'name') {
     return String(a?.fileName || '').localeCompare(String(b?.fileName || ''), 'zh-Hans-CN')
   }
@@ -99,30 +94,10 @@ export function useTaskCenterView({
     { immediate: true }
   )
 
-  const countTasksByType = (type) =>
-    (tasks.value || []).filter((task) => task.type === type).length
-
   return {
     activeTypeTasks,
     filteredTasks,
     selectedTask,
-    countTasksByType,
-    isActiveStatus,
-    setActiveTaskType: (value) => {
-      activeTaskType.value = value
-    },
-    setStatusFilter: (value) => {
-      statusFilter.value = value
-    },
-    setSearchKeyword: (value) => {
-      searchKeyword.value = value
-    },
-    setSortOption: (value) => {
-      sortOption.value = value
-    },
-    selectTask: (viewId) => {
-      selectedTaskId.value = viewId
-    },
-    clampProgress: clampTaskProgress
+    isActiveStatus
   }
 }

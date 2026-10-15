@@ -16,12 +16,17 @@ const isDiscoveryTask = (task) =>
 const isActive = (task) => !TERMINAL_TASK_STATUSES.includes(task.status)
 
 /** The task engine owns snapshots and controls; this view owns selection and polling. */
-export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollIntervalMs = 2000 }) {
+export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollIntervalMs = 2000, autoSelect = true }) {
   const tasks = shallowRef([])
   const selectedTaskId = ref(null)
-  const loading = ref(false)
+  const inFlight = shallowRef(null)
+  const moreRequest = shallowRef(null)
+  const loading = computed(() => Boolean(inFlight.value))
+  const loadingMore = computed(() => Boolean(moreRequest.value))
   const hasLoaded = ref(false)
   const loadError = ref('')
+  const historyCursor = ref('')
+  const hasMoreHistory = computed(() => Boolean(historyCursor.value))
   const resultRefreshToken = ref(0)
   const activeTask = computed(
     () => tasks.value.find((task) => task.id === selectedTaskId.value) || null
@@ -29,7 +34,6 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
   let generation = 0
   let disposed = false
   let timer = null
-  let inFlight = null
 
   const isCurrent = (token) => !disposed && token === generation
   const clearTimer = () => {
@@ -43,18 +47,18 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
       ? taskEngine
           .getTasksBySession(sessionId.value)
           .filter(isDiscoveryTask)
+          .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0) ||
+            String(b.backendTaskId).localeCompare(String(a.backendTaskId)))
           .map((task) => ({ ...task }))
       : []
     if (!tasks.value.some((task) => task.id === selectedTaskId.value)) {
-      selectedTaskId.value =
-        [...tasks.value].sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0]
-          ?.id || null
+      selectedTaskId.value = autoSelect ? tasks.value[0]?.id || null : null
     }
   }
 
   function scheduleRefresh() {
     clearTimer()
-    if (!disposed && !inFlight && tasks.value.some(isActive)) {
+    if (!disposed && !inFlight.value && sessionId.value && pollIntervalMs > 0) {
       timer = setTimeout(() => {
         timer = null
         void syncTasks({ discover: false })
@@ -62,22 +66,42 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
     }
   }
 
-  function syncTasks({ discover = true } = {}) {
+  function syncTasks({ discover = true, more = false } = {}) {
     if (disposed || !sessionId.value) return Promise.resolve()
-    if (inFlight) return inFlight
+    if (inFlight.value) return inFlight.value
     clearTimer()
     const token = generation
     const currentSession = sessionId.value
-    loading.value = true
     // Defer work until inFlight is assigned, including synchronous task-engine events.
     const request = Promise.resolve().then(async () => {
       try {
         if (!isCurrent(token)) return
-        if (discover) await taskEngine.syncNetworkWorkflowTasks(currentSession)
-        if (!isCurrent(token)) return
+        if (discover || more) {
+          const page = await taskEngine.syncNetworkWorkflowTasks(currentSession, {
+            scope: 'history', cursor: more ? historyCursor.value : ''
+          })
+          if (!isCurrent(token)) return
+          historyCursor.value = page.hasMore ? page.nextCursor : ''
+        }
+        // Discover live tasks independently of how much history is loaded.
+        const liveIds = new Set()
+        if (!more) {
+          let cursor = ''
+          do {
+            const page = await taskEngine.syncNetworkWorkflowTasks(currentSession, { scope: 'active', cursor })
+            if (!isCurrent(token)) return
+            page.tasks.forEach(task => liveIds.add(task.id))
+            if (!page.hasMore) break
+            if (!page.nextCursor || page.nextCursor === cursor) throw new Error('活跃任务分页游标异常')
+            cursor = page.nextCursor
+          } while (isCurrent(token))
+        }
         refreshTaskList()
-        const activeTasks = tasks.value.filter(task => isActive(task) ||
-          (task.id === selectedTaskId.value && !task.reachabilityLoaded))
+        // Only the selected task needs full details. Query missing live tasks once
+        // more to observe terminal transitions that no longer appear in the live list.
+        const activeTasks = tasks.value.filter(task =>
+          (task.id === selectedTaskId.value && (isActive(task) || !task.detailsLoaded)) ||
+          (!more && isActive(task) && !liveIds.has(task.id)))
         const results = await Promise.allSettled(
           activeTasks.map((task) => taskEngine.queryScanTask(task))
         )
@@ -89,7 +113,7 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
         if (failed) {
           loadError.value = failed.reason?.message || '部分任务状态同步失败'
           if (discover) onError?.(failed.reason)
-        } else if (discover || !loadError.value) {
+        } else {
           loadError.value = ''
         }
       } catch (error) {
@@ -98,15 +122,26 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
           if (discover || !tasks.value.length) onError?.(error)
         }
       } finally {
-        if (isCurrent(token) && inFlight === request) {
-          inFlight = null
-          loading.value = false
+        if (isCurrent(token) && inFlight.value === request) {
+          inFlight.value = null
           hasLoaded.value = true
           scheduleRefresh()
         }
       }
     })
-    inFlight = request
+    inFlight.value = request
+    return request
+  }
+
+  function loadMoreTasks() {
+    if (moreRequest.value) return moreRequest.value
+    const token = generation
+    const request = Promise.resolve(inFlight.value).then(() => {
+      if (isCurrent(token) && hasMoreHistory.value) return syncTasks({ discover: false, more: true })
+    }).finally(() => {
+      if (moreRequest.value === request) moreRequest.value = null
+    })
+    moreRequest.value = request
     return request
   }
 
@@ -116,7 +151,7 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
 
   watch(selectedTaskId, async (taskId) => {
     const task = activeTask.value
-    if (!task || isActive(task) || task.reachabilityLoaded) return
+    if (!task || inFlight.value || (!isActive(task) && task.detailsLoaded)) return
     const token = generation
     try {
       await taskEngine.queryScanTask(task)
@@ -139,10 +174,11 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
     sessionId,
     () => {
       generation += 1
-      inFlight = null
-      loading.value = false
+      inFlight.value = null
       hasLoaded.value = false
       loadError.value = ''
+      historyCursor.value = ''
+      moreRequest.value = null
       selectedTaskId.value = null
       resultRefreshToken.value = 0
       clearTimer()
@@ -166,6 +202,9 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
     loading,
     hasLoaded,
     loadError,
+    hasMoreHistory,
+    loadingMore,
+    loadMoreTasks,
     resultRefreshToken,
     selectTask,
     syncTasks,

@@ -44,7 +44,6 @@ class TaskEngine {
     this.sessionTasks.clear()
     this.activeTasks.clear()
     this.eventListeners.clear()
-    this.scanQueryRequests?.clear()
   }
 
   // 任务存储与查询
@@ -76,10 +75,7 @@ class TaskEngine {
 
   removeTaskById(taskId) {
     for (const sessionTaskMap of this.sessionTasks.values()) {
-      if (sessionTaskMap.has(taskId)) {
-        sessionTaskMap.delete(taskId)
-        return true
-      }
+      if (sessionTaskMap.delete(taskId)) return true
     }
     return false
   }
@@ -359,28 +355,21 @@ class TaskEngine {
   }
 
   off(event, callback) {
-    if (this.eventListeners.has(event)) {
-      const listeners = this.eventListeners.get(event)
-      const index = listeners.indexOf(callback)
-      if (index > -1) {
-        listeners.splice(index, 1)
-      }
-    }
+    const listeners = this.eventListeners.get(event)
+    if (!listeners) return
+    const index = listeners.indexOf(callback)
+    if (index > -1) listeners.splice(index, 1)
   }
 
   emit(event, ...args) {
     if (args[0]?.isDetached) return
-    if (this.eventListeners.has(event)) {
-      const listeners = this.eventListeners.get(event)
-
-      listeners.forEach((callback) => {
-        try {
-          callback(...args)
-        } catch {
-          // 静默处理事件监听器执行失败
-        }
-      })
-    }
+    this.eventListeners.get(event)?.forEach((callback) => {
+      try {
+        callback(...args)
+      } catch {
+        // 静默处理事件监听器执行失败
+      }
+    })
   }
 
 }

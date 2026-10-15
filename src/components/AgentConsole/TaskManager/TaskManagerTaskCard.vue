@@ -87,7 +87,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import { formatFileSize, formatDate as formatDateTime } from '@/utils/format.js'
+import { clampProgress, formatFileSize, formatDate as formatDateTime } from '@/utils/format.js'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 const props = defineProps({
   task: { type: Object, required: true },
@@ -101,10 +101,7 @@ const props = defineProps({
   secondaryActions: { type: Array, default: () => [] }
 })
 defineEmits(['select', 'action'])
-const normalizedProgress = computed(() => {
-  const value = Number(props.task.progress || 0)
-  return Number.isFinite(value) ? Math.round(Math.max(0, Math.min(100, value)) * 10) / 10 : 0
-})
+const normalizedProgress = computed(() => Math.round(clampProgress(props.task.progress) * 10) / 10)
 </script>
 
 <style scoped>

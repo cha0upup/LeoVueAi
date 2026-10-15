@@ -11,16 +11,16 @@
       :search-keyword="searchKeyword"
       :sort-option="sortOption"
       :result-count="filteredTasks.length"
-      @update:type="setActiveTaskType"
-      @update:status="setStatusFilter"
-      @update:search="setSearchKeyword"
-      @update:sort="setSortOption"
+      @update:type="activeTaskType = $event"
+      @update:status="statusFilter = $event"
+      @update:search="searchKeyword = $event"
+      @update:sort="sortOption = $event"
     >
       <template #sync>
         <span
           v-if="lastSyncedAt"
           class="sync-time"
-          :title="`上次完整同步：${new Date(lastSyncedAt).toLocaleString()}`"
+          :title="`上次任务状态同步：${new Date(lastSyncedAt).toLocaleString()}`"
         >
           更新于 {{ new Date(lastSyncedAt).toLocaleTimeString('zh-CN', { hour12: false }) }}
         </span>
@@ -95,6 +95,17 @@
             @action="handleTaskAction($event, task)"
           />
         </div>
+        <el-button
+          v-if="hasMoreScanHistory && ['all', TaskType.SCAN].includes(activeTaskType)"
+          class="scan-history-more"
+          title="扫描筛选与搜索仅包含已加载的历史记录"
+          text
+          type="primary"
+          :loading="loadingMoreScans"
+          @click="loadMoreScanTasks"
+        >
+          加载更多扫描历史
+        </el-button>
       </section>
       <section
         v-if="selectedTask && !isCompact"
@@ -143,7 +154,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, toRef, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { confirmDelete } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
@@ -167,6 +178,7 @@ import {
 } from '@/services/api/agent-files.js'
 import { deleteNetworkProbeWorkflowApi } from '@/services/api/scan.js'
 import { getSqlExportTasksApi } from '@/services/api/sql.js'
+import { useAssetDiscoveryTasks } from '../Scan/useAssetDiscoveryTasks.js'
 import { useTaskCenterView } from '@/composables/useTaskCenterView.js'
 import { showError, showInfo, showSuccess } from '@/utils/messageUtils.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
@@ -209,29 +221,33 @@ const workspaceRef = ref(null)
 const isCompact = ref(false)
 let resizeObserver = null
 let detailTrigger = null
-let refreshRequest = null
-const isSyncing = ref(false)
+const refreshRequest = shallowRef(null)
+const isSyncing = computed(() => Boolean(refreshRequest.value))
 const initialSyncDone = ref(false)
 const lastSyncedAt = ref(0)
 const remoteErrors = ref([])
-const scanSyncFailed = ref(false)
+const {
+  tasks: scanTasks,
+  selectedTaskId: selectedScanTaskId,
+  loadError: scanLoadError,
+  hasMoreHistory: hasMoreScanHistory,
+  loadingMore: loadingMoreScans,
+  loadMoreTasks: loadMoreScanTasks,
+  syncTasks: syncScanTasks
+} = useAssetDiscoveryTasks({
+  sessionId: toRef(props, 'sessionId'), taskEngine, autoSelect: false, pollIntervalMs: 0
+})
 const syncError = computed(() =>
-  [...remoteErrors.value, ...(scanSyncFailed.value ? ['扫描'] : [])].join('、')
+  [...remoteErrors.value, ...(scanLoadError.value ? ['扫描'] : [])].join('、')
 )
 
 const {
   activeTypeTasks,
   filteredTasks,
   selectedTask,
-  countTasksByType,
-  isActiveStatus,
-  setActiveTaskType,
-  setStatusFilter,
-  setSearchKeyword,
-  setSortOption,
-  selectTask
+  isActiveStatus
 } = useTaskCenterView({
-  tasks: computed(() => tasks.value),
+  tasks,
   activeTaskType,
   statusFilter,
   searchKeyword,
@@ -240,29 +256,34 @@ const {
   activeStatuses: ACTIVE_TASK_STATUSES
 })
 
-const typeOptions = computed(() => [
-  { value: 'all', label: '全部类型', count: tasks.value.length },
-  { value: TaskType.DOWNLOAD, label: '下载', count: countTasksByType(TaskType.DOWNLOAD) },
-  { value: TaskType.UPLOAD, label: '上传', count: countTasksByType(TaskType.UPLOAD) },
-  { value: TaskType.DB_EXPORT, label: '数据库导出', count: countTasksByType(TaskType.DB_EXPORT) },
-  { value: TaskType.SCAN, label: '扫描', count: countTasksByType(TaskType.SCAN) }
-])
+const typeOptions = computed(() => {
+  const counts = new Map()
+  for (const { type } of tasks.value) counts.set(type, (counts.get(type) || 0) + 1)
+  return [
+    { value: 'all', label: '全部类型', count: tasks.value.length },
+    ...[
+      [TaskType.DOWNLOAD, '下载'], [TaskType.UPLOAD, '上传'],
+      [TaskType.DB_EXPORT, '数据库导出'], [TaskType.SCAN, '扫描']
+    ].map(([value, label]) => ({ value, label, count: counts.get(value) || 0 }))
+  ]
+})
 
-const statusOptions = computed(() => [
-  { value: 'all', label: '全部状态', count: activeTypeTasks.value.length },
-  { value: 'active', label: '进行中', count: activeTypeTasks.value.filter(isActiveStatus).length },
-  ...[
-    [TaskStatus.PENDING, '等待'],
-    [TaskStatus.PAUSED, '暂停'],
-    [TaskStatus.COMPLETED, '完成'],
-    [TaskStatus.FAILED, '失败'],
-    [TaskStatus.CANCELLED, '取消']
-  ].map(([value, label]) => ({
-    value,
-    label,
-    count: activeTypeTasks.value.filter((task) => task.status === value).length
-  }))
-])
+const statusOptions = computed(() => {
+  const counts = new Map()
+  let activeCount = 0
+  for (const task of activeTypeTasks.value) {
+    counts.set(task.status, (counts.get(task.status) || 0) + 1)
+    if (isActiveStatus(task)) activeCount += 1
+  }
+  return [
+    { value: 'all', label: '全部状态', count: activeTypeTasks.value.length },
+    { value: 'active', label: '进行中', count: activeCount },
+    ...[
+      [TaskStatus.PENDING, '等待'], [TaskStatus.PAUSED, '暂停'],
+      [TaskStatus.COMPLETED, '完成'], [TaskStatus.FAILED, '失败'], [TaskStatus.CANCELLED, '取消']
+    ].map(([value, label]) => ({ value, label, count: counts.get(value) || 0 }))
+  ]
+})
 
 const selectedPrimaryAction = computed(() => getPrimaryTaskAction(selectedTask.value, iconMap))
 const selectedSecondaryActions = computed(() =>
@@ -295,10 +316,10 @@ function resetFilters() {
 }
 function openDetail(viewId, event) {
   detailTrigger = event?.currentTarget
-  selectTask(viewId)
+  selectedTaskId.value = viewId
 }
 function closeDetail() {
-  selectTask('')
+  selectedTaskId.value = ''
   if (!isCompact.value) restoreDetailFocus()
 }
 function restoreDetailFocus() {
@@ -323,39 +344,22 @@ const syncRemoteTasks = (force = false) => {
   if (!force && remoteSyncRequests.has(sessionId)) return remoteSyncRequests.get(sessionId)
   const request = (async () => {
     const sequence = requestGuard.next('remote')
-    const [downloadResult, uploadResult, sqlResult] = await Promise.allSettled([
-      downloadEngineTasksApi({ sessionId }),
-      uploadEngineTasksApi({ sessionId }),
-      getSqlExportTasksApi({ sessionId })
-    ])
+    const sources = [
+      { label: '下载', api: downloadEngineTasksApi, tasks: serverDownloadTasks, normalize: normalizeServerDownloadTask },
+      { label: '上传', api: uploadEngineTasksApi, tasks: serverUploadTasks, normalize: normalizeServerUploadTask },
+      { label: '数据库导出', api: getSqlExportTasksApi, tasks: serverSqlExportTasks,
+        normalize: task => normalizeServerSqlExportTask(task, sessionId) }
+    ]
+    const results = await Promise.allSettled(sources.map(source => source.api({ sessionId })))
     if (!requestGuard.isCurrent('remote', sequence) || !isCurrentSession(sessionId)) return
-    remoteErrors.value = ['下载', '上传', '数据库导出'].filter(
-      (_, index) => [downloadResult, uploadResult, sqlResult][index].status === 'rejected'
-    )
-
-    if (downloadResult.status === 'fulfilled') {
-      const snapshots = Array.isArray(downloadResult.value?.data?.tasks)
-        ? downloadResult.value.data.tasks
-        : []
-      serverDownloadTasks.value = snapshots
-        .map((task) => normalizeServerDownloadTask(task))
-        .filter((task) => task.serverTaskId)
-    }
-    if (uploadResult.status === 'fulfilled') {
-      const snapshots = Array.isArray(uploadResult.value?.data?.tasks)
-        ? uploadResult.value.data.tasks
-        : []
-      serverUploadTasks.value = snapshots
-        .map((task) => normalizeServerUploadTask(task))
-        .filter((task) => task.serverTaskId)
-    }
-    if (sqlResult.status === 'fulfilled') {
-      const snapshots = Array.isArray(sqlResult.value?.data?.tasks)
-        ? sqlResult.value.data.tasks
-        : []
-      serverSqlExportTasks.value = snapshots
-        .map((task) => normalizeServerSqlExportTask(task, sessionId))
-        .filter((task) => task.serverTaskId)
+    remoteErrors.value = sources
+      .filter((_, index) => results[index].status === 'rejected')
+      .map(source => source.label)
+    for (const [index, source] of sources.entries()) {
+      const result = results[index]
+      if (result.status !== 'fulfilled') continue
+      const snapshots = Array.isArray(result.value?.data?.tasks) ? result.value.data.tasks : []
+      source.tasks.value = snapshots.map(source.normalize).filter(task => task.serverTaskId)
     }
     rebuildTaskList(sessionId)
   })()
@@ -366,41 +370,41 @@ const syncRemoteTasks = (force = false) => {
   return request
 }
 
-const refreshAll = () => {
-  if (refreshRequest) return refreshRequest
+watch(scanTasks, () => rebuildTaskList())
+watch(selectedTask, task => {
+  selectedScanTaskId.value = task?.type === TaskType.SCAN ? task.taskId : null
+})
+
+const refreshAll = ({ discover = true } = {}) => {
+  if (refreshRequest.value) return refreshRequest.value
   const sessionId = props.sessionId
   if (!sessionId) return
   const sequence = requestGuard.next('refresh')
-  isSyncing.value = true
   const request = Promise.allSettled([
     syncRemoteTasks(),
-    taskEngine.syncNetworkWorkflowTasks(sessionId)
+    syncScanTasks({ discover })
   ])
-    .then(([remote, scan]) => {
+    .then(([remote]) => {
       if (!requestGuard.isCurrent('refresh', sequence) || !isCurrentSession(sessionId)) return
       if (remote.status === 'rejected') remoteErrors.value = ['下载', '上传', '数据库导出']
-      scanSyncFailed.value = scan.status === 'rejected'
       initialSyncDone.value = true
-      isSyncing.value = false
       if (!syncError.value) lastSyncedAt.value = Date.now()
       rebuildTaskList(sessionId)
     })
     .finally(() => {
-      if (refreshRequest === request) refreshRequest = null
+      if (refreshRequest.value === request) refreshRequest.value = null
     })
-  refreshRequest = request
+  refreshRequest.value = request
   return request
 }
 
 const resetSessionState = () => {
   requestGuard.invalidate()
   remoteSyncRequests.clear()
-  refreshRequest = null
-  isSyncing.value = false
+  refreshRequest.value = null
   initialSyncDone.value = false
   lastSyncedAt.value = 0
   remoteErrors.value = []
-  scanSyncFailed.value = false
   selectedTaskId.value = ''
   tasks.value = []
   serverDownloadTasks.value = []
@@ -438,7 +442,7 @@ const removeTask = async (task) => {
       taskId: task.backendTaskId
     })
     if (task.taskId) taskEngine.removeTaskById(task.taskId)
-    await taskEngine.syncNetworkWorkflowTasks(task.sessionId || props.sessionId)
+    await syncScanTasks()
     rebuildTaskList()
     showSuccess('任务已删除')
     return
@@ -471,6 +475,28 @@ const downloadToLocal = async (task) => {
   }
 }
 
+const TASK_ACTIONS = {
+  start: { method: 'startTask', message: '任务已开始' },
+  retry: { method: 'retryTask', message: '任务已重新开始' },
+  pause: { method: 'pauseTask', message: '任务已暂停' },
+  resume: { method: 'resumeTask', message: '任务已继续' },
+  stop: { method: 'stopTask', message: '任务已停止' }
+}
+const SERVER_TRANSFER_ACTIONS = {
+  [TaskType.DOWNLOAD]: {
+    retry: downloadEngineRetryApi,
+    pause: downloadEnginePauseApi,
+    resume: downloadEngineResumeApi,
+    stop: downloadEngineCancelApi
+  },
+  [TaskType.UPLOAD]: {
+    retry: uploadEngineRetryApi,
+    pause: uploadEnginePauseApi,
+    resume: uploadEngineResumeApi,
+    stop: uploadEngineCancelApi
+  }
+}
+
 const handleTaskAction = async (action, task) => {
   if (!task) return
   const sessionId = task.sessionId || props.sessionId
@@ -480,73 +506,28 @@ const handleTaskAction = async (action, task) => {
       if (task.status === TaskStatus.COMPLETED) await downloadToLocal(task)
       return
     }
+    const taskAction = TASK_ACTIONS[action]
+    if (!taskAction) return
     if (
-      action === 'retry' &&
       !task.taskId &&
       [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type)
     ) {
-      const retryServerTask =
-        task.type === TaskType.DOWNLOAD ? downloadEngineRetryApi : uploadEngineRetryApi
-      await retryServerTask({
-        sessionId,
-        taskId: task.serverTaskId
-      })
+      const operation = SERVER_TRANSFER_ACTIONS[task.type][action]
+      if (!operation || (action !== 'retry' && !task.serverTaskId)) return
+      const parameters = { taskId: task.serverTaskId }
+      if (action === 'retry' || action === 'resume') parameters.sessionId = sessionId
+      await operation(parameters)
       if (isCurrentSession(sessionId)) {
-        showSuccess('任务已重新开始')
-        await syncRemoteTasks(true)
-      }
-      return
-    }
-    if (
-      !task.taskId &&
-      [TaskType.DOWNLOAD, TaskType.UPLOAD].includes(task.type) &&
-      task.serverTaskId
-    ) {
-      const isDownload = task.type === TaskType.DOWNLOAD
-      const serverOperation = {
-        pause: () =>
-          (isDownload ? downloadEnginePauseApi : uploadEnginePauseApi)({
-            taskId: task.serverTaskId
-          }),
-        resume: () =>
-          (isDownload ? downloadEngineResumeApi : uploadEngineResumeApi)({
-            sessionId,
-            taskId: task.serverTaskId
-          }),
-        stop: () =>
-          (isDownload ? downloadEngineCancelApi : uploadEngineCancelApi)({
-            taskId: task.serverTaskId
-          })
-      }[action]
-      if (!serverOperation) return
-      await serverOperation()
-      if (isCurrentSession(sessionId)) {
-        showSuccess({ pause: '任务已暂停', resume: '任务已继续', stop: '任务已停止' }[action])
+        showSuccess(taskAction.message)
         await syncRemoteTasks(true)
       }
       return
     }
     if (!task.taskId) return
 
-    const operation = {
-      start: () => taskEngine.startTask(task.taskId),
-      retry: () => taskEngine.retryTask(task.taskId),
-      pause: () => taskEngine.pauseTask(task.taskId),
-      resume: () => taskEngine.resumeTask(task.taskId),
-      stop: () => taskEngine.stopTask(task.taskId)
-    }[action]
-    if (!operation) return
-    await operation()
+    await taskEngine[taskAction.method](task.taskId)
     if (!isCurrentSession(sessionId)) return
-    showSuccess(
-      {
-        start: '任务已开始',
-        retry: '任务已重新开始',
-        pause: '任务已暂停',
-        resume: '任务已继续',
-        stop: '任务已停止'
-      }[action]
-    )
+    showSuccess(taskAction.message)
     rebuildTaskList(sessionId)
   } catch (error) {
     if (isCurrentSession(sessionId)) showError(error?.message || '任务操作失败')
@@ -573,7 +554,7 @@ onMounted(() => {
   })
   resizeObserver.observe(workspaceRef.value)
   taskEvents.forEach((event) => taskEngine.on(event, handleTaskEngineChange))
-  syncTimer = window.setInterval(refreshAll, 3000)
+  syncTimer = window.setInterval(() => refreshAll({ discover: false }), 3000)
 })
 
 onUnmounted(() => {
@@ -613,6 +594,10 @@ onUnmounted(() => {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+}
+.scan-history-more {
+  flex-shrink: 0;
+  margin: 4px 12px;
 }
 .task-list {
   flex: 1;

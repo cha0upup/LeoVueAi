@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TaskStatus } from '@/constants/task.js'
 import { createScanTask } from '../taskFactories.js'
+import { deferred } from '@/test-support/deferred.js'
 
 vi.mock('@/services/http.js', () => ({ default: { post: vi.fn() } }))
 vi.mock('@/services/api/scan.js', () => ({
@@ -36,9 +37,30 @@ describe('scan executor request lifecycle', () => {
     queryNetworkProbeWorkflowApi.mockImplementationOnce(() => new Promise(resolve => { finishQuery = resolve }))
     const pending = engine.queryScanTask(task)
     await engine.stopTask(task.id)
+    const next = deferred()
+    queryNetworkProbeWorkflowApi.mockReturnValueOnce(next.promise)
+    const current = engine.queryScanTask(task)
     finishQuery({ data: { status: 'RUNNING', progress: 10 } })
     await expect(pending).resolves.toBeNull()
+    const duplicate = engine.queryScanTask(task)
+    expect(queryNetworkProbeWorkflowApi).toHaveBeenCalledTimes(2)
+    next.resolve({ data: { status: 'STOPPED', outcome: 'CANCELLED' } })
+    await Promise.all([current, duplicate])
     expect(task.status).toBe(TaskStatus.CANCELLED)
+  })
+
+  it('coalesces failed queries and allows a fresh retry', async () => {
+    const { engine, task } = await fixture()
+    const waiting = deferred()
+    queryNetworkProbeWorkflowApi.mockReturnValueOnce(waiting.promise)
+    const results = Promise.allSettled([engine.queryScanTask(task), engine.queryScanTask(task)])
+    expect(queryNetworkProbeWorkflowApi).toHaveBeenCalledTimes(1)
+    waiting.reject(new Error('offline'))
+    expect(await results).toMatchObject([{ status: 'rejected' }, { status: 'rejected' }])
+    queryNetworkProbeWorkflowApi.mockResolvedValueOnce({ data: { status: 'RUNNING', progress: 25 } })
+    await engine.queryScanTask(task)
+    expect(queryNetworkProbeWorkflowApi).toHaveBeenCalledTimes(2)
+    expect(task.progress).toBe(25)
   })
 
   it('preserves a running task and surfaces a failed stop', async () => {
@@ -50,12 +72,13 @@ describe('scan executor request lifecycle', () => {
     expect(task.endTime).toBeNull()
   })
 
-  it('ignores a query after its local task was removed', async () => {
+  it.each(['removed', 'detached'])('ignores a query after its local task was %s', async (action) => {
     const { engine, task } = await fixture()
     let finishQuery
     queryNetworkProbeWorkflowApi.mockImplementationOnce(() => new Promise(resolve => { finishQuery = resolve }))
     const pending = engine.queryScanTask(task)
-    engine.removeTaskById(task.id)
+    if (action === 'detached') engine.detach()
+    else engine.removeTaskById(task.id)
     finishQuery({ data: { status: 'STOPPED', outcome: 'COMPLETED' } })
     await expect(pending).resolves.toBeNull()
     expect(task.status).toBe(TaskStatus.SCANNING)
@@ -68,7 +91,7 @@ describe('scan executor request lifecycle', () => {
     const pending = engine.syncNetworkWorkflowTasks('session')
     engine.sessionTasks.delete('session')
     finishList({ data: { tasks: [{ taskId: 'backend', status: 'RUNNING' }] } })
-    await expect(pending).resolves.toEqual([])
+    await expect(pending).resolves.toMatchObject({ tasks: [] })
     expect(engine.sessionTasks.has('session')).toBe(false)
   })
 
@@ -79,8 +102,48 @@ describe('scan executor request lifecycle', () => {
     const pending = engine.syncNetworkWorkflowTasks('session')
     engine.removeTaskById(task.id)
     finishList({ data: { tasks: [{ taskId: 'backend', status: 'RUNNING' }] } })
-    await expect(pending).resolves.toEqual([])
+    await expect(pending).resolves.toMatchObject({ tasks: [] })
     expect(engine.getTasksBySession('session')).toEqual([])
+  })
+
+  it('passes cursors and live scope while preserving already loaded pages', async () => {
+    const { engine, task } = await fixture()
+    listNetworkProbeWorkflowTasksApi.mockResolvedValueOnce({ data: {
+      tasks: [{ taskId: 'older', status: 'FAILED', reachableHostCount: 3 }],
+      hasMore: true, nextCursor: 'next'
+    } })
+    const page = await engine.syncNetworkWorkflowTasks('session', { scope: 'active', cursor: 'before' })
+    expect(listNetworkProbeWorkflowTasksApi).toHaveBeenCalledWith({
+      sessionId: 'session', scope: 'active', cursor: 'before', pageSize: 100
+    })
+    expect(page).toMatchObject({ hasMore: true, nextCursor: 'next', tasks: [{
+      backendTaskId: 'older', status: TaskStatus.FAILED, detailsLoaded: false
+    }] })
+    expect(engine.getTaskById(task.id)).toBe(task)
+  })
+
+  it('invalidates cached details when a list summary reports a terminal transition', async () => {
+    const { engine, task } = await fixture()
+    task.detailsLoaded = true
+    listNetworkProbeWorkflowTasksApi.mockResolvedValueOnce({ data: { tasks: [{
+      taskId: 'backend', status: 'STOPPED', outcome: 'COMPLETED'
+    }] } })
+    await engine.syncNetworkWorkflowTasks('session')
+    expect(task).toMatchObject({ status: TaskStatus.COMPLETED, detailsLoaded: false })
+  })
+
+  it('does not let an older summary overwrite newly loaded full details', async () => {
+    const { engine, task } = await fixture()
+    let finishList
+    listNetworkProbeWorkflowTasksApi.mockImplementationOnce(() => new Promise(resolve => { finishList = resolve }))
+    const pending = engine.syncNetworkWorkflowTasks('session')
+    queryNetworkProbeWorkflowApi.mockResolvedValueOnce({ data: {
+      status: 'STOPPED', outcome: 'FAILED', error: 'detail error', reachableHostList: []
+    } })
+    await engine.queryScanTask(task)
+    finishList({ data: { tasks: [{ taskId: 'backend', status: 'RUNNING' }] } })
+    await pending
+    expect(task).toMatchObject({ status: TaskStatus.FAILED, error: 'detail error', detailsLoaded: true })
   })
 
   it('restores a persisted workflow using target counts and canonical local state', async () => {
@@ -97,7 +160,7 @@ describe('scan executor request lifecycle', () => {
       createdAt
     }] } })
 
-    const [task] = await engine.syncNetworkWorkflowTasks('session')
+    const { tasks: [task] } = await engine.syncNetworkWorkflowTasks('session')
 
     expect(task).toMatchObject({
       backendTaskId: 'restored',
@@ -111,7 +174,7 @@ describe('scan executor request lifecycle', () => {
       currentStage: null,
       createdAt: Date.parse(createdAt),
       reachableHostCount: 0,
-      reachabilityLoaded: false
+      detailsLoaded: false
     })
   })
 })
@@ -176,6 +239,18 @@ describe('scan executor task hydration', () => {
     expect(task.processedCount).toBe(1)
   })
 
+  it('counts probe work separately from hosts and preserves it across partial snapshots', () => {
+    const { engine, task } = fixture()
+    engine.hydrateScanTask(task.id, {
+      status: 'RUNNING', targetCount: 2,
+      stages: [{ name: 'REACHABILITY', completed: 10, total: 10 }, { name: 'PORT_SCAN', completed: 60, total: 200 }]
+    })
+    expect(task).toMatchObject({ probeCompleted: 70, targetCount: 2 })
+    engine.hydrateScanTask(task.id, { status: 'PAUSED' })
+    expect(task.probeCompleted).toBe(70)
+    expect(task.stages[1].total).toBe(200)
+  })
+
   it('preserves progress and summary counts across partial pause and resume snapshots', () => {
     const { engine, task, events } = fixture()
     const hosts = ['10.0.0.1', '10.0.0.2']
@@ -200,7 +275,6 @@ describe('scan executor task hydration', () => {
       targetCount: 50,
       reachableHostCount: 40,
       reachableHostList: hosts,
-      reachabilityLoaded: true,
       openCount: 9,
       serviceCount: 5,
       fingerprintCount: 3,
@@ -228,7 +302,7 @@ describe('scan executor task hydration', () => {
     })
 
     expect(task).toMatchObject({
-      reachableHostCount: 0, reachableHostList: [], reachabilityLoaded: true,
+      reachableHostCount: 0, reachableHostList: [],
       openCount: 0, serviceCount: 0, fingerprintCount: 0,
       identifiedApplicationCount: 0
     })

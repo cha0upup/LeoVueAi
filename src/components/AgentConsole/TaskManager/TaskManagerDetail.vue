@@ -133,7 +133,6 @@
               <label>可达主机</label>
               <span>{{ task.reachableHostList.join(', ') }}</span>
             </div>
-            <TaskError :task="task" />
           </template>
           <template v-else>
             <div
@@ -170,8 +169,14 @@
               <label>落盘路径</label>
               <span>{{ task.downloadPath }}</span>
             </div>
-            <TaskError :task="task" />
           </template>
+          <div
+            v-if="errorMessage"
+            class="detail-info-item detail-info-item--full is-danger"
+          >
+            <label>{{ task.errorStage ? `错误阶段 · ${formatTransferStage(task.errorStage)}` : '错误信息' }}</label>
+            <span>{{ errorMessage }}</span>
+          </div>
         </div>
       </div>
     </template>
@@ -179,11 +184,11 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h } from 'vue'
+import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
 import { TaskType } from '@/constants/task.js'
-import { formatFileSize, formatDate as formatDateTime } from '@/utils/format.js'
+import { clampProgress, formatFileSize, formatDate as formatDateTime } from '@/utils/format.js'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import {
   getIndicatorStatus,
@@ -203,10 +208,8 @@ const props = defineProps({
 defineEmits(['action'])
 
 const iconMap = icons
-const normalizedProgress = computed(() => {
-  const value = Number(props.task?.progress || 0)
-  return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0
-})
+const normalizedProgress = computed(() => clampProgress(props.task?.progress))
+const errorMessage = computed(() => props.task?.error || props.task?.lastError)
 
 const formatSpeed = (bytes) => {
   const value = Number(bytes || 0)
@@ -224,25 +227,6 @@ const formatTransferStage = (stage) =>
     FINISHED: '已结束'
   })[stage] || stage
 
-const TaskError = defineComponent({
-  props: { task: { type: Object, required: true } },
-  setup(errorProps) {
-    return () => {
-      const message = errorProps.task.error || errorProps.task.lastError
-      return message
-        ? h('div', { class: 'detail-info-item detail-info-item--full is-danger' }, [
-            h(
-              'label',
-              errorProps.task.errorStage
-                ? `错误阶段 · ${formatTransferStage(errorProps.task.errorStage)}`
-                : '错误信息'
-            ),
-            h('span', message)
-          ])
-        : null
-    }
-  }
-})
 </script>
 
 <style scoped>
