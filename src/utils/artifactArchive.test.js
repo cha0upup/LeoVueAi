@@ -48,5 +48,10 @@ describe('artifactArchive', () => {
     expect(report).toContain('# 主机分析')
     expect(report).toContain('## 问题 1')
     expect(report).toContain('发现一项风险')
+    expect(report).toContain('对话范围：当前已加载内容')
+  })
+
+  it('labels a full conversation report explicitly', () => {
+    expect(buildAiReportMarkdown({ historyScope: 'full', messages: [] })).toContain('对话范围：完整会话')
   })
 })

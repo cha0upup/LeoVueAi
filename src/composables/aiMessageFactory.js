@@ -19,6 +19,8 @@ export function createAssistantMessage(overrides = {}) {
     loading: true,
     failed: false,
     retryText: null,
+    retryRequest: null,
+    retryConversationKey: null,
     errorMeta: null,
     review: null,
     usage: null,

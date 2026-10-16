@@ -48,6 +48,7 @@ export function nodeAiThreadRenameApi(params) {
  * @param {string} params.threadId
  * @param {number} [params.offset=0]
  * @param {number} [params.limit=50]
+ * @param {number} [params.beforeSequence] - 向前翻页游标，优先于 offset
  */
 export function nodeAiThreadMessagesApi(params) {
   return http.post('/agent-node/ai/thread/messages', params)

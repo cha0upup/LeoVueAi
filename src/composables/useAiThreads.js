@@ -178,7 +178,9 @@ export function useAiThreads({ sessionId }) {
       if (requestSessionId !== sessionId.value) return { messages: [], total: 0, stale: true }
       return {
         messages: res.data?.messages ?? [],
-        total:    res.data?.total    ?? 0
+        total:    res.data?.total    ?? 0,
+        nextBeforeSequence: res.data?.nextBeforeSequence ?? null,
+        hasMore: res.data?.hasMore === true
       }
     } catch (e) {
       if (requestSessionId === sessionId.value) {

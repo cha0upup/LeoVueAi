@@ -15,14 +15,14 @@
       </div>
       <div class="assistant-actions">
         <el-tooltip
-          content="归档当前分析报告"
+          content="归档完整对话报告"
           placement="bottom"
           :show-after="400"
         >
           <button
             type="button"
             class="header-action is-icon"
-            aria-label="归档当前分析报告"
+            aria-label="归档完整对话报告"
             :disabled="!canArchiveReport || archivingReport"
             @click="archiveCurrentReport"
           >
@@ -83,6 +83,18 @@
         class="messages-scroll"
       >
         <div class="thread">
+          <div
+            v-if="hasOlderMessages"
+            class="history-pagination"
+          >
+            <el-button
+              text
+              :loading="loadingOlder"
+              @click="loadOlderMessages"
+            >
+              加载更早消息
+            </el-button>
+          </div>
           <PlatformAiWelcome
             v-if="!messages.length && !historyLoading"
             :ready="agentReady"
@@ -98,7 +110,7 @@
 
           <template
             v-for="(msg, idx) in messages"
-            :key="idx"
+            :key="msg.id || msg.clientUserMessageId || `local-${idx}`"
           >
             <AiAssistantTurnUser
               v-if="msg.role === 'user'"
@@ -170,6 +182,9 @@ import {
   platformAiThreadActivateApi
 } from '@/services/api/platform-ai.js'
 import { useAiChat } from '@/composables/useAiChat.js'
+import { useAiHistory } from '@/composables/useAiHistory.js'
+import { useAiReportArchive } from '@/composables/useAiReportArchive.js'
+import { shouldRecoverAiConversation } from '@/composables/aiConversationRecovery.js'
 import { useAiChannelSelector } from '@/composables/useAiChannelSelector.js'
 import { ACTIVE_AI_STATUSES, normalizeAiStatus, getThreadStatus, isDefaultThreadTitle } from '@/utils/aiRuntime.js'
 import PlatformAiWelcome from './PlatformAiWelcome.vue'
@@ -178,7 +193,7 @@ import AiThreadSwitcher from '@/components/Ai/AiThreadSwitcher.vue'
 import AiAssistantTurnUser from '@/components/AiAssistant/AiAssistantTurnUser.vue'
 import AiAssistantTurnAssistant from '@/components/AiAssistant/AiAssistantTurnAssistant.vue'
 import PlanPopover from '@/components/AiAssistant/PlanPopover.vue'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { showError } from '@/utils/messageUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
 import {
   buildRequestAttachments,
@@ -187,11 +202,6 @@ import {
 } from '@/composables/aiHistoryModel.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { createLogger } from '@/utils/logger.js'
-import {
-  ARTIFACT_CATEGORY,
-  archiveTextArtifact,
-  buildAiReportMarkdown
-} from '@/utils/artifactArchive.js'
 
 defineEmits(['close'])
 
@@ -233,7 +243,6 @@ const activeThreadId = ref(null)
 const creatingThread = ref(false)
 const historyLoading = ref(false)
 const agentReady = ref(false)
-const archivingReport = ref(false)
 
 const activeThread = computed(() => {
   return threads.value.find(thread => thread.threadId === activeThreadId.value) || null
@@ -280,6 +289,7 @@ const {
   answerUserInput: answerUserInputViaChat,
   stopGeneration,
   setMessages,
+  prependMessages,
   hasLocalMessages,
   isConversationSending,
   resumeConversationStream,
@@ -304,6 +314,15 @@ const {
   errorLabel: '平台 AI 请求失败'
 })
 
+const { recordPage, hasOlderMessages, loadingOlder, loadOlderMessages, loadCompleteHistory, forgetHistory } = useAiHistory({
+  getConversationKey: () => activeThreadId.value,
+  loadPage: ({ threadId, beforeSequence, offset, limit }) =>
+    platformAiMessagesApi({ threadId, beforeSequence, offset, limit }),
+  onPrepend: (records, threadId) => prependMessages(mapPersistedMessages(records, { includeSubtasks: true }), threadId),
+  getScrollElement: () => scrollbarRef.value?.wrapRef,
+  onError: error => showError('加载更早消息失败：' + (error?.message || '未知错误'))
+})
+
 const onPickPrompt = value => {
   applyPrompt(value)
   nextTick(() => composerRef.value?.focus())
@@ -324,35 +343,17 @@ const waitingForUserInput = computed(() => Boolean(
   conversationStatus.value?.[activeThreadId.value]?.pendingUserInput
 ))
 
-const canArchiveReport = computed(() => {
-  return !composerSending.value && messages.value.some(message => message?.role === 'assistant')
+const { archivingReport, canArchiveReport, archiveCurrentReport } = useAiReportArchive({
+  sourceModule: 'platform-ai',
+  messages,
+  isBusy: () => composerSending.value || historyLoading.value || loadingOlder.value,
+  getContext: () => ({
+    title: activeThread.value?.title,
+    threadId: activeThreadId.value,
+    model: selectedConfigModel.value
+  }),
+  loadMessages: loadCompleteHistory
 })
-
-const archiveCurrentReport = async () => {
-  if (!canArchiveReport.value || archivingReport.value) return
-  const title = activeThread.value?.title || '平台 AI 分析'
-  archivingReport.value = true
-  try {
-    await archiveTextArtifact({
-      category: ARTIFACT_CATEGORY.AI_REPORTS,
-      name: `平台-${title}`,
-      metadata: { title, sourceModule: 'platform-ai', sourceId: activeThreadId.value },
-      extension: 'md',
-      content: buildAiReportMarkdown({
-        title,
-        scope: '平台 AI 分析',
-        threadId: activeThreadId.value,
-        model: selectedConfigModel.value,
-        messages: messages.value
-      })
-    })
-    showSuccess('分析报告已归档到成果库')
-  } catch (error) {
-    showError('归档分析报告失败：' + (error?.message || '未知错误'))
-  } finally {
-    archivingReport.value = false
-  }
-}
 
 // ── Thread API ────────────────────────────────────────────────────────────────
 
@@ -391,13 +392,7 @@ const fetchThreadsSilently = () => fetchThreads({ silent: true })
 const shouldRecoverThreadProgress = threadId => {
   const thread = threads.value.find(item => item.threadId === threadId)
   const localState = conversationStatus.value?.[threadId]
-  const status = normalizeAiStatus(localState?.status || thread?.runStatus || 'idle')
-  return ACTIVE_AI_STATUSES.includes(status) ||
-    status === 'waiting_for_user' ||
-    !!localState?.pendingUserInput ||
-    !!thread?.executing ||
-    !!localState?.sending ||
-    !!localState?.recovering
+  return shouldRecoverAiConversation(thread, localState)
 }
 
 const recoverActiveThreadProgress = async ({ force = false, allowDuringHistoryLoading = false } = {}) => {
@@ -460,6 +455,7 @@ const loadThreadHistory = async threadId => {
     if (!mounted || !requestGuard.isCurrent('history', sequence) || threadId !== activeThreadId.value) return
     if (isConversationSending(threadId) || hasLocalMessages(threadId)) return
     const serverMessages = response.data?.messages ?? []
+    recordPage(threadId, response)
     setMessages(mapPersistedMessages(serverMessages, { includeSubtasks: true }), threadId)
     await recoverActiveThreadProgress({ allowDuringHistoryLoading: true })
     if (requestGuard.isCurrent('history', sequence) && threadId === activeThreadId.value) scrollToBottom()
@@ -533,6 +529,7 @@ const onDeleteThread = async threadId => {
   try {
     await platformAiThreadDeleteApi({ threadId })
     if (!mounted) return
+    forgetHistory(threadId)
     requestGuard.invalidate(['threads', 'history', 'events', 'activate'])
     renameSequences.delete(threadId)
     const wasActive = activeThreadId.value === threadId
@@ -645,7 +642,7 @@ watch(selectedConfigId, async (newId, oldId) => {
 
 watch(
   () => messages.value.length,
-  () => { nextTick(() => scrollbarRef.value?.setScrollTop?.(999999)) }
+  () => { if (!loadingOlder.value) nextTick(() => scrollbarRef.value?.setScrollTop?.(999999)) }
 )
 
 // ── Thread status polling ────────────────────────────────────────────────────
@@ -726,6 +723,12 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.history-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 12px;
+}
+
 .platform-ai-assistant {
   --thread-max: 46rem;
   --accent-soft: var(--el-color-primary);

@@ -68,12 +68,14 @@ export function buildAiReportMarkdown({
   sessionId,
   hostName,
   model,
+  historyScope = 'loaded',
   messages = []
 }) {
   const lines = [
     `# ${title || 'AI 分析报告'}`,
     '',
     `- 报告类型：${scope || 'AI 分析'}`,
+    `- 对话范围：${historyScope === 'full' ? '完整会话' : '当前已加载内容'}`,
     `- 生成时间：${new Date().toLocaleString('zh-CN')}`,
     `- 对话线程：${threadId || '-'}`,
     `- 关联主机：${hostName || '-'}`,

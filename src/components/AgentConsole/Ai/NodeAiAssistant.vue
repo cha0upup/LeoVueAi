@@ -15,14 +15,14 @@
       </div>
       <div class="assistant-actions">
         <el-tooltip
-          content="归档当前分析报告"
+          content="归档完整对话报告"
           placement="bottom"
           :show-after="400"
         >
           <button
             type="button"
             class="header-action"
-            aria-label="归档当前分析报告"
+            aria-label="归档完整对话报告"
             :disabled="!canArchiveReport || archivingReport"
             @click="archiveCurrentReport"
           >
@@ -72,6 +72,18 @@
           class="messages-scroll"
         >
           <div class="thread">
+            <div
+              v-if="hasOlderMessages"
+              class="history-pagination"
+            >
+              <el-button
+                text
+                :loading="loadingOlder"
+                @click="loadOlderMessages"
+              >
+                加载更早消息
+              </el-button>
+            </div>
             <NodeAiAssistantWelcome
               v-if="!messages.length && !historyLoading"
               :recon-summary-exists="reconSummaryExists"
@@ -89,7 +101,7 @@
 
             <template
               v-for="(msg, idx) in messages"
-              :key="idx"
+              :key="msg.id || msg.clientUserMessageId || `local-${idx}`"
             >
               <AiAssistantTurnUser
                 v-if="msg.role === 'user'"
@@ -153,12 +165,16 @@ import {
   nodeAiStopApi,
   nodeAiThreadStreamApi,
   nodeAiThreadEventsApi,
+  nodeAiThreadMessagesApi,
   nodeAiSwitchChannelApi
 } from '@/services/api/node-ai.js'
 import { listAvailableAiModelsApi } from '@/services/api/platform-ai.js'
 import { getReconSummaryApi, generateReconSummaryDigestApi } from '@/services/api/sessions.js'
 
 import { useAiChat } from '@/composables/useAiChat.js'
+import { useAiHistory } from '@/composables/useAiHistory.js'
+import { useAiReportArchive } from '@/composables/useAiReportArchive.js'
+import { shouldRecoverAiConversation } from '@/composables/aiConversationRecovery.js'
 import { useAiThreads } from '@/composables/useAiThreads.js'
 import { useAiChannelSelector } from '@/composables/useAiChannelSelector.js'
 import { useAppEvent, emitAppEvent } from '@/composables/useAppEvent.js'
@@ -170,7 +186,7 @@ import AiAssistantTurnUser from '@/components/AiAssistant/AiAssistantTurnUser.vu
 import AiAssistantTurnAssistant from '@/components/AiAssistant/AiAssistantTurnAssistant.vue'
 import NodeAiAssistantComposer from './NodeAiAssistantComposer.vue'
 import PlanPopover from '@/components/AiAssistant/PlanPopover.vue'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { showError } from '@/utils/messageUtils.js'
 import { createLogger } from '@/utils/logger.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import {
@@ -178,11 +194,6 @@ import {
   findLatestAssistantPlan,
   mapPersistedMessages
 } from '@/composables/aiHistoryModel.js'
-import {
-  ARTIFACT_CATEGORY,
-  archiveTextArtifact,
-  buildAiReportMarkdown
-} from '@/utils/artifactArchive.js'
 
 const props = defineProps({
   sessionId: {
@@ -228,7 +239,6 @@ const busyThreadIds   = ref([])
 /** 当前正在发送的线程 ID（用于 onComplete 回调中精确清除 busy 状态）。 */
 const creatingThread  = ref(false)
 const historyLoading  = ref(false)
-const archivingReport = ref(false)
 let threadStatusTimer = null
 let statusSyncPromise = null
 const sendingSessionsByThread = new Map()
@@ -302,6 +312,7 @@ const {
   answerUserInput: answerUserInputViaChat,
   stopGeneration,
   setMessages,
+  prependMessages,
   hasLocalMessages,
   isConversationSending,
   resumeConversationStream,
@@ -342,6 +353,16 @@ const {
   errorLabel: 'AI 对话请求失败'
 })
 
+const { recordPage, hasOlderMessages, loadingOlder, loadOlderMessages, loadCompleteHistory, forgetHistory } = useAiHistory({
+  getConversationKey: () => activeThreadId.value,
+  getScopeKey: () => props.sessionId,
+  loadPage: ({ threadId, scopeKey, beforeSequence, offset, limit }) =>
+    nodeAiThreadMessagesApi({ sessionId: scopeKey, threadId, beforeSequence, offset, limit }),
+  onPrepend: (records, threadId) => prependMessages(mapPersistedMessages(records), threadId),
+  getScrollElement: () => scrollbarRef.value?.wrapRef,
+  onError: error => showError('加载更早消息失败：' + (error?.message || '未知错误'))
+})
+
 const onPickPrompt = (value) => {
   applyPrompt(value)
   nextTick(() => composerRef.value?.focus())
@@ -370,38 +391,19 @@ const composerSending = computed(() =>
     : activeThreadBusy.value
 )
 
-const canArchiveReport = computed(() => {
-  return !composerSending.value && messages.value.some(message => message?.role === 'assistant')
+const { archivingReport, canArchiveReport, archiveCurrentReport } = useAiReportArchive({
+  sourceModule: 'node-ai',
+  messages,
+  isBusy: () => composerSending.value || historyLoading.value || loadingOlder.value,
+  getContext: () => ({
+    title: activeThread.value?.title,
+    threadId: activeThreadId.value,
+    sessionId: props.sessionId,
+    hostName: props.basicInfo?.OSInfo?.HostName || props.sessionId,
+    model: selectedConfigModel.value
+  }),
+  loadMessages: loadCompleteHistory
 })
-
-const archiveCurrentReport = async () => {
-  if (!canArchiveReport.value || archivingReport.value) return
-  const hostName = props.basicInfo?.OSInfo?.HostName || props.sessionId
-  const title = activeThread.value?.title || '节点 AI 分析'
-  archivingReport.value = true
-  try {
-    await archiveTextArtifact({
-      category: ARTIFACT_CATEGORY.AI_REPORTS,
-      name: `节点-${hostName}-${title}`,
-      metadata: { title, sourceModule: 'node-ai', sourceId: activeThreadId.value, sessionId: props.sessionId, hostName },
-      extension: 'md',
-      content: buildAiReportMarkdown({
-        title,
-        scope: '节点 AI 分析',
-        threadId: activeThreadId.value,
-        sessionId: props.sessionId,
-        hostName,
-        model: selectedConfigModel.value,
-        messages: messages.value
-      })
-    })
-    showSuccess('分析报告已归档到成果库')
-  } catch (error) {
-    showError('归档分析报告失败：' + (error?.message || '未知错误'))
-  } finally {
-    archivingReport.value = false
-  }
-}
 
 // ── Send history (Composer ↑ recall) ─────────────────────────────────────────
 const sentHistory = ref([])
@@ -533,11 +535,12 @@ const loadThreadHistory = async (threadId) => {
   }
   historyLoading.value = true
   try {
-    const { messages: serverMessages } = await loadMessages(threadId, 0, 50)
+    const page = await loadMessages(threadId, 0, 50)
     if (!requestGuard.isCurrent('history', sequence)) return
     if (sessionId !== props.sessionId || threadId !== activeThreadId.value) return
     if (isConversationSending(threadId) || hasLocalMessages(threadId)) return
-    setMessages(mapPersistedMessages(serverMessages), threadId)
+    recordPage(threadId, page)
+    setMessages(mapPersistedMessages(page.messages), threadId)
     await recoverThreadProgress(threadId, { allowDuringHistoryLoading: true })
     if (requestGuard.isCurrent('history', sequence) && threadId === activeThreadId.value) {
       scrollToBottom()
@@ -585,6 +588,7 @@ const onDeleteThread = async (threadId) => {
     busyThreadIds.value = busyThreadIds.value.filter(id => id !== threadId)
   }
   await deleteThread(threadId)
+  if (!threads.value.some(thread => thread.threadId === threadId)) forgetHistory(threadId)
   // After deletion, activeThreadId may have changed — load new active thread's history
   if (activeThreadId.value && activeThreadId.value !== threadId) {
     await loadThreadHistory(activeThreadId.value)
@@ -600,11 +604,9 @@ const shouldRecoverThreadProgress = (threadId, { force = false } = {}) => {
   const localStatus = threadId === activeThreadId.value
     ? activeConversationStatus.value?.status
     : conversationStatus.value?.[threadId]?.status
-  const status = normalizeAiStatus(localStatus || threadMeta?.runStatus)
-  return (
-    ACTIVE_AI_STATUSES.includes(status) ||
-    !!threadMeta?.executing
-  )
+  return shouldRecoverAiConversation(threadMeta, {
+    ...conversationStatus.value?.[threadId], status: localStatus
+  })
 }
 
 const recoverThreadProgress = async (threadId, { force = false, allowDuringHistoryLoading = false } = {}) => {
@@ -682,7 +684,7 @@ watch(selectedConfigId, async (newId, oldId) => {
 // ── Scroll on new messages ────────────────────────────────────────────────────
 watch(
   () => messages.value.length,
-  () => { nextTick(() => scrollbarRef.value?.setScrollTop?.(999999)) }
+  () => { if (!loadingOlder.value) nextTick(() => scrollbarRef.value?.setScrollTop?.(999999)) }
 )
 
 // ── Session lifecycle ─────────────────────────────────────────────────────────
@@ -772,6 +774,12 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.history-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 12px;
+}
+
 .node-ai-assistant {
   --thread-max: min(76rem, 100%);
   --ai-panel-surface: var(--ai-dock-background, var(--app-surface-background));

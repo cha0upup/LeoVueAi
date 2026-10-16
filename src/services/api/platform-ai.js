@@ -71,8 +71,10 @@ export function platformAiStreamApi(params) {
 /**
  * 加载当前平台 AI 会话的历史消息（分页）。
  * @param {Object} [params]
+ * @param {string} params.threadId
  * @param {number} [params.offset]
  * @param {number} [params.limit]
+ * @param {number} [params.beforeSequence] - 向前翻页游标，优先于 offset
  */
 export function platformAiMessagesApi(params) {
   return http.post('/platform/ai/messages', params || {})

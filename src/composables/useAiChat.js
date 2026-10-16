@@ -7,6 +7,18 @@ import { createAssistantMessage, createUserMessage } from './aiMessageFactory.js
 import { createLogger } from '@/utils/logger.js'
 
 const logger = createLogger('AiChat')
+// 请求本身就是 JSON；快照与响应式附件/模型选择解耦，按实际线协议保留重试内容。
+const cloneRequest = value => JSON.parse(JSON.stringify(value))
+
+const userInputNodes = messages => messages
+  .flatMap(message => Array.isArray(message?.nodes) ? message.nodes : [])
+  .filter(node => node?.kind === 'user_input')
+
+function patchUserInputNodes(messages, questionId, patch) {
+  for (const node of userInputNodes(messages)) {
+    if (String(node.questionId) === String(questionId)) Object.assign(node, patch)
+  }
+}
 
 function createClientUserMessageId() {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
@@ -124,10 +136,9 @@ export function useAiChat({
     const status = normalizeAiStatus(state.status)
     // stop 是显式用户命令；即使刚刷新、尚未完成本地快照恢复，也交给后端解析
     // 当前 active Turn，不能依赖内存里的 activeTurnId 决定是否发送。
-    const shouldStopRemote = !!stopApi ||
-      state.sending || ACTIVE_AI_STATUSES.includes(status)
+    const hasActiveWork = state.sending || ACTIVE_AI_STATUSES.includes(status)
     let stopPromise = Promise.resolve(false)
-    if (stopApi && shouldStopRemote) {
+    if (stopApi) {
       state.interrupting = true
       state.interruptRequestSent = true
       transitionStatus(state, 'cancelling', 'interrupt-requested')
@@ -160,7 +171,7 @@ export function useAiChat({
       return stopPromise
     }
 
-    if (shouldStopRemote) transitionStatus(state, 'cancelled', 'local-stop')
+    if (hasActiveWork) transitionStatus(state, 'cancelled', 'local-stop')
     state.sending = false
     state.subscriptionAbort?.abort()
     return stopPromise
@@ -201,13 +212,10 @@ export function useAiChat({
       .map(String)
     state.pendingUserInput = snapshot?.pendingUserInput || null
     const pendingQuestionId = String(state.pendingUserInput?.questionId || '')
-    for (const message of state.messages) {
-      for (const node of (message?.nodes || [])) {
-        if (node?.kind !== 'user_input') continue
-        node.status = pendingQuestionId && String(node.questionId) === pendingQuestionId
-          ? 'pending'
-          : 'answered'
-      }
+    for (const node of userInputNodes(state.messages)) {
+      node.status = pendingQuestionId && String(node.questionId) === pendingQuestionId
+        ? 'pending'
+        : 'answered'
     }
 
     if (activeTurn?.id) {
@@ -428,143 +436,128 @@ export function useAiChat({
    * 提交命令只负责持久化 Turn。执行顺序、取消与后续唤醒全部由后端数据库队列决定；
    * 前端只追加乐观消息并维持一个线程级事件订阅。
    */
-  const send = (options = {}) => {
+  const send = async (options = {}) => {
     const key = activeKey.value
     const state = ensureState(key)
     const pendingInput = state.pendingUserInput
     const answerToQuestionId = String(
       options.answerToQuestionId || options.requestParams?.answerToQuestionId || ''
     ).trim() || null
-    if (pendingInput && !answerToQuestionId) return Promise.resolve(null)
+    if (pendingInput && !answerToQuestionId) return null
     const isQuestionAnswer = Boolean(answerToQuestionId)
     const text = String(options.text ?? state.draft).trim()
-    if (!text || !canSend(key)) return Promise.resolve()
+    if (!text || !canSend(key)) return
     if (!enqueueApi) {
-      return Promise.reject(new Error('未配置 Turn 提交接口'))
+      throw new Error('未配置 Turn 提交接口')
     }
 
-    let userMessageIdx = null
-    if (!isQuestionAnswer) {
+    const clientUserMessageId = options.requestSnapshot?.clientUserMessageId ||
+      options.clientUserMessageId || createClientUserMessageId()
+    const requestSnapshot = cloneRequest(options.requestSnapshot || {
+      message: text,
+      clientUserMessageId,
+      ...getExtraParams(key),
+      ...(options.requestParams || {}),
+      ...(answerToQuestionId ? { answerToQuestionId } : {})
+    })
+    const retryIndex = options.retryMessage ? state.messages.indexOf(options.retryMessage) : -1
+    let userMessage = null
+    if (!isQuestionAnswer && retryIndex < 0) {
       state.messages.push(createUserMessage({
         content: text,
         displayText: options.displayText,
         attachments: options.attachments
       }))
-      userMessageIdx = state.messages.length - 1
+      userMessage = state.messages.at(-1)
+      userMessage.clientUserMessageId = clientUserMessageId
+    } else if (!isQuestionAnswer) {
+      userMessage = state.messages.find(message => message.role === 'user' &&
+        message.clientUserMessageId === clientUserMessageId)
     }
     state.draft = ''
-    const assistantIdx = state.messages.length
-    state.messages.push(createAssistantMessage({
+    const queuedMessage = createAssistantMessage({
       answerToQuestionId,
       runtime: { phase: 'queued', status: 'queued' }
-    }))
-    const clientUserMessageId =
-      options.clientUserMessageId || createClientUserMessageId()
-    const assistant = state.messages[assistantIdx]
-    if (assistant?.role === 'assistant') {
-      assistant.retryClientUserMessageId = clientUserMessageId
+    })
+    let assistant
+    if (retryIndex >= 0) {
+      assistant = state.messages[retryIndex]
+      Object.assign(assistant, queuedMessage)
+    } else {
+      state.messages.push(queuedMessage)
+      assistant = state.messages.at(-1)
     }
+    assistant.retryClientUserMessageId = clientUserMessageId
     state.sending = true
     if (!ACTIVE_AI_STATUSES.includes(normalizeAiStatus(state.status))) {
       transitionStatus(state, 'queued', 'turn-submitted')
     }
     scrollToBottom()
 
-    const operation = (async () => {
-      try {
-        if (answerToQuestionId && pendingInput
-            && String(pendingInput.questionId) !== answerToQuestionId) {
-          throw new Error('该问题已更新，请回答最新问题')
-        }
-        if (answerToQuestionId) {
-          state.answeringQuestionId = answerToQuestionId
-          for (const message of state.messages) {
-            for (const node of (message?.nodes || [])) {
-              if (node?.kind === 'user_input' && String(node.questionId) === String(answerToQuestionId)) {
-                node.status = 'answering'
-                node.updatedAt = Date.now()
-              }
-            }
-          }
-        }
-        const turn = await enqueueApi({
-          message: text,
-          clientUserMessageId,
-          ...getExtraParams(key),
-          ...(options.requestParams || {}),
-          ...(answerToQuestionId ? { answerToQuestionId } : {})
+    try {
+      if (answerToQuestionId && pendingInput
+          && String(pendingInput.questionId) !== answerToQuestionId) {
+        throw new Error('该问题已更新，请回答最新问题')
+      }
+      if (answerToQuestionId) {
+        state.answeringQuestionId = answerToQuestionId
+        patchUserInputNodes(state.messages, answerToQuestionId, { status: 'answering', updatedAt: Date.now() })
+      }
+      const turn = await enqueueApi(cloneRequest(requestSnapshot))
+      if (answerToQuestionId) {
+        patchUserInputNodes(state.messages, answerToQuestionId, {
+          status: 'answered', answer: text, updatedAt: Date.now()
         })
-        const assistant = state.messages[assistantIdx]
-        if (answerToQuestionId) {
-          for (const message of state.messages) {
-            for (const node of (message?.nodes || [])) {
-              if (node?.kind === 'user_input' && String(node.questionId) === String(answerToQuestionId)) {
-                node.status = 'answered'
-                node.answer = text
-                node.updatedAt = Date.now()
-              }
-            }
-          }
-          state.pendingUserInput = null
-        }
-        const items = Array.isArray(turn?.items) ? turn.items : []
-        const userItem = items.find(item => item?.role === 'user')
-        const assistantItem = items.find(item => item?.role === 'assistant')
-        if (assistant?.role === 'assistant') {
-          if (assistantItem?.id) assistant.id = String(assistantItem.id)
-          assistant.turnId = turn?.id || null
-          assistant.runtime = {
-            ...(assistant.runtime || {}),
-            turnId: turn?.id || null,
-            phase: turn?.status || 'queued',
-            status: normalizeAiStatus(turn?.status || 'queued'),
-            updatedAt: Date.now()
-          }
-        }
-        const user = userMessageIdx != null ? state.messages[userMessageIdx] : null
-        if (user?.role === 'user') {
-          if (userItem?.id) user.id = String(userItem.id)
-          user.turnId = turn?.id || null
-        }
-        if (turn?.id && normalizeAiStatus(turn.status) === 'queued') {
-          state.queuedTurnIds = [
-            ...state.queuedTurnIds.filter(id => String(id) !== String(turn.id)),
-            String(turn.id)
-          ]
-        }
-        resumeConversationStream({ key })
-        return turn
-      } catch (error) {
-        if (answerToQuestionId && pendingInput) {
-          state.pendingUserInput = pendingInput
-          for (const message of state.messages) {
-            for (const node of (message?.nodes || [])) {
-              if (node?.kind === 'user_input' && String(node.questionId) === String(answerToQuestionId)) {
-                node.status = 'pending'
-                node.answer = null
-              }
-            }
-          }
-        }
-        const assistant = state.messages[assistantIdx]
-        if (assistant?.role === 'assistant') {
-          assistant.content = `调用失败：${error?.message || '指令提交失败'}`
-          assistant.failed = true
-          assistant.retryText = text
-          aiEventReducer.applyTerminalRuntime(assistant, 'failed')
-        }
-        state.sending = !!state.activeTurnId || state.queuedTurnIds.length > 0
-        state.answeringQuestionId = null
-        if (!state.sending) transitionStatus(state, 'failed', 'turn-submit-failed')
-        showError(errorLabel)
-        return null
-      } finally {
-        if (answerToQuestionId && state.answeringQuestionId === answerToQuestionId) {
-          state.answeringQuestionId = null
+        state.pendingUserInput = null
+      }
+      const items = Array.isArray(turn?.items) ? turn.items : []
+      const userItem = items.find(item => item?.role === 'user')
+      const assistantItem = items.find(item => item?.role === 'assistant')
+      if (assistant?.role === 'assistant') {
+        if (assistantItem?.id) assistant.id = String(assistantItem.id)
+        assistant.turnId = turn?.id || null
+        assistant.runtime = {
+          ...(assistant.runtime || {}),
+          turnId: turn?.id || null,
+          phase: turn?.status || 'queued',
+          status: normalizeAiStatus(turn?.status || 'queued'),
+          updatedAt: Date.now()
         }
       }
-    })()
-    return operation
+      if (userMessage?.role === 'user') {
+        if (userItem?.id) userMessage.id = String(userItem.id)
+        userMessage.turnId = turn?.id || null
+      }
+      if (turn?.id && normalizeAiStatus(turn.status) === 'queued') {
+        state.queuedTurnIds = [
+          ...state.queuedTurnIds.filter(id => String(id) !== String(turn.id)),
+          String(turn.id)
+        ]
+      }
+      resumeConversationStream({ key })
+      return turn
+    } catch (error) {
+      if (answerToQuestionId && pendingInput) {
+        state.pendingUserInput = pendingInput
+        patchUserInputNodes(state.messages, answerToQuestionId, { status: 'pending', answer: null })
+      }
+      if (assistant?.role === 'assistant') {
+        assistant.content = `调用失败：${error?.message || '指令提交失败'}`
+        assistant.failed = true
+        assistant.retryText = text
+        assistant.retryRequest = requestSnapshot
+        assistant.retryConversationKey = key
+        aiEventReducer.applyTerminalRuntime(assistant, 'failed')
+      }
+      state.sending = !!state.activeTurnId || state.queuedTurnIds.length > 0
+      if (!state.sending) transitionStatus(state, 'failed', 'turn-submit-failed')
+      showError(errorLabel)
+      return null
+    } finally {
+      if (answerToQuestionId && state.answeringQuestionId === answerToQuestionId) {
+        state.answeringQuestionId = null
+      }
+    }
   }
 
   // ── 重试 ────────────────────────────────────────────────────────────────────
@@ -572,8 +565,10 @@ export function useAiChat({
     const key = activeKey.value
     const state = ensureState(key)
     if (!msg?.retryText || state.sending || !canSend(key)) return
-    send({
+    if (msg.retryConversationKey && msg.retryConversationKey !== key) return
+    return send({
       text: msg.retryText,
+      ...(msg.retryRequest ? { requestSnapshot: msg.retryRequest, retryMessage: msg } : {}),
       ...(msg.retryClientUserMessageId
         ? { clientUserMessageId: msg.retryClientUserMessageId }
         : {}),
@@ -601,6 +596,18 @@ export function useAiChat({
     const state = ensureState(key)
     state.messages = Array.isArray(msgs) ? msgs : []
     state.lastEventSeq = 0
+  }
+
+  /** 插入旧页不重置实时事件游标，也不覆盖已接收的流式消息。 */
+  const prependMessages = (msgs, key = activeKey.value) => {
+    const state = ensureState(key)
+    const ids = new Set(state.messages.map(message => message.id).filter(Boolean))
+    const older = (Array.isArray(msgs) ? msgs : []).filter(message => {
+      if (message.id && ids.has(message.id)) return false
+      if (message.id) ids.add(message.id)
+      return true
+    })
+    state.messages.unshift(...older)
   }
 
   const hasLocalMessages = (key = activeKey.value) => {
@@ -642,6 +649,7 @@ export function useAiChat({
     answerUserInput,
     stopGeneration,
     setMessages,
+    prependMessages,
     hasLocalMessages,
     isConversationSending,
     applyRecoveredEvents,

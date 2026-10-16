@@ -30,6 +30,60 @@ function createChatAwaitingAnswer(enqueueApi) {
 }
 
 describe('useAiChat refresh recovery', () => {
+  it('replays the full immutable request and reuses optimistic messages on submission retry', async () => {
+    let configId = 1
+    const enqueueApi = vi.fn().mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({
+      id: 'turn-retry', status: 'queued',
+      items: [{ id: 'user-retry', role: 'user' }, { id: 'assistant-retry', role: 'assistant' }]
+    })
+    const chat = useAiChat({
+      enqueueApi, canSend: () => true, getConversationKey: () => 'thread-retry',
+      getExtraParams: threadId => ({ sessionId: 'session-1', threadId, configId })
+    })
+    const attachment = { name: 'fixture.txt', content: 'original', mimeType: 'text/plain', size: 8 }
+    await chat.send({ text: 'analyze', attachments: [{ name: attachment.name }],
+      requestParams: { reasoningEffort: 'high', attachments: [attachment] } })
+    const failed = chat.messages.value.at(-1)
+    const first = globalThis.structuredClone(enqueueApi.mock.calls[0][0])
+    attachment.content = 'mutated'
+    configId = 2
+
+    await chat.retry(failed)
+
+    expect(enqueueApi.mock.calls[1][0]).toEqual(first)
+    expect(chat.messages.value).toHaveLength(2)
+    expect(chat.messages.value[0]).toMatchObject({ id: 'user-retry', attachments: [{ name: 'fixture.txt' }] })
+    expect(chat.messages.value[1]).toMatchObject({ id: 'assistant-retry', failed: false, retryRequest: null })
+  })
+
+  it('keeps the in-flight message targets stable when older history is prepended', async () => {
+    let finish
+    const chat = useAiChat({
+      enqueueApi: () => new Promise(resolve => { finish = resolve }),
+      canSend: () => true, getConversationKey: () => 'thread-1'
+    })
+    const sending = chat.send({ text: 'new message' })
+    chat.prependMessages([{ id: 'older', role: 'assistant', content: 'old history' }])
+    finish({ id: 'turn-new', status: 'queued', items: [
+      { id: 'user-new', role: 'user' }, { id: 'assistant-new', role: 'assistant' }
+    ] })
+    await sending
+
+    expect(chat.messages.value[0]).toMatchObject({ id: 'older', content: 'old history' })
+    expect(chat.messages.value[1].id).toBe('user-new')
+    expect(chat.messages.value[2].id).toBe('assistant-new')
+  })
+
+  it('prepending history deduplicates message ids without resetting the event cursor', () => {
+    const chat = useAiChat({ canSend: () => true, getConversationKey: () => 'thread-1' })
+    chat.setMessages([{ id: 'current', role: 'assistant', content: 'live', nodes: [] }])
+    chat.applyRecoveredEvents({ events: [{ seq: 7, name: 'status', data: 'running' }], lastSeq: 7, runStatus: 'running' })
+    chat.prependMessages([{ id: 'older', role: 'user' }, { id: 'current', content: 'stale' }])
+    expect(chat.messages.value.map(message => message.id)).toEqual(['older', 'current'])
+    expect(chat.messages.value[1].content).toBe('live')
+    expect(chat.conversationStatus.value['thread-1'].lastEventSeq).toBe(7)
+  })
+
   it('submits a structured answer without rendering it as a user command', async () => {
     const enqueueApi = vi.fn(async () => ({
       id: 'turn-answer',
