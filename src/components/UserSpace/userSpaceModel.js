@@ -1,8 +1,8 @@
-const ARTIFACT_CATEGORY_LABELS = Object.freeze({
-  'script-builds': '脚本构建',
-  'ai-reports': 'AI 分析报告',
-  'task-results': '任务输出'
-})
+import { ARTIFACT_CATEGORIES, ARTIFACT_SOURCE_LABELS } from '@/constants/artifacts.js'
+
+const ARTIFACT_CATEGORY_LABELS = Object.fromEntries(ARTIFACT_CATEGORIES.map(item => [item.path, item.label]))
+
+export const resolveArtifactSourceLabel = source => ARTIFACT_SOURCE_LABELS[source] || ARTIFACT_SOURCE_LABELS.unrecorded
 
 const LANGUAGE_MAP = Object.freeze({
   js: 'javascript',
@@ -20,6 +20,7 @@ const LANGUAGE_MAP = Object.freeze({
   yml: 'yaml',
   yaml: 'yaml',
   md: 'markdown',
+  markdown: 'markdown',
   sql: 'sql',
   sh: 'shell',
   bash: 'shell',
@@ -46,18 +47,10 @@ const EXTENSION_KIND_GROUPS = [
   ['fileWord', new Set(['doc', 'docx'])],
   ['fileExcel', new Set(['xls', 'xlsx'])],
   ['filePowerPoint', new Set(['ppt', 'pptx'])],
-  ['markdown', new Set(['md'])],
+  ['markdown', new Set(['md', 'markdown'])],
   ['codeFile', new Set(['js', 'ts', 'json', 'vue', 'java', 'py', 'go', 'rs', 'sql'])],
   ['document', new Set(['txt', 'log'])]
 ]
-
-export function joinUserSpacePath(base, leaf) {
-  const normalizedBase = String(base || '').replace(/^\/+|\/+$/g, '')
-  const normalizedLeaf = String(leaf || '').replace(/^\/+|\/+$/g, '')
-  if (!normalizedBase) return normalizedLeaf
-  if (!normalizedLeaf) return normalizedBase
-  return `${normalizedBase}/${normalizedLeaf}`
-}
 
 export function getUserSpaceFileExtension(path) {
   const filename = String(path || '').split(/[\\/]/).pop() || ''
@@ -72,34 +65,6 @@ export function detectUserSpaceLanguage(path) {
 
 export function resolveArtifactCategoryLabel(name) {
   return ARTIFACT_CATEGORY_LABELS[name] || name
-}
-
-export function isArtifactCategoryPath(path) {
-  return Object.hasOwn(ARTIFACT_CATEGORY_LABELS, path)
-}
-
-export function filterUserSpaceEntries(entries, keyword) {
-  const list = Array.isArray(entries) ? entries : []
-  const normalizedKeyword = String(keyword || '')
-    .trim()
-    .toLowerCase()
-  if (!normalizedKeyword) return list
-  return list.filter((item) => {
-    const name = String(item?.name || '').toLowerCase()
-    const path = String(item?.path || '').toLowerCase()
-    return name.includes(normalizedKeyword) || path.includes(normalizedKeyword)
-  })
-}
-
-export function sortUserSpaceEntries(entries) {
-  return [...(Array.isArray(entries) ? entries : [])].sort((a, b) => {
-    if (Boolean(a?.isDirectory) !== Boolean(b?.isDirectory)) {
-      return a?.isDirectory ? -1 : 1
-    }
-    return String(a?.name || '').localeCompare(String(b?.name || ''), 'zh-Hans-CN', {
-      sensitivity: 'base'
-    })
-  })
 }
 
 export function getUserSpaceEntryIconKey(entry) {
@@ -122,6 +87,6 @@ export function normalizeWorkspaceOverview(data) {
     rootItems: toNumber(source.rootItems),
     updatedAt: toNumber(source.updatedAt),
     recentFiles: Array.isArray(source.recentFiles) ? source.recentFiles : [],
-    topDirectories: Array.isArray(source.topDirectories) ? source.topDirectories : []
+    categories: Array.isArray(source.categories) ? source.categories : []
   }
 }

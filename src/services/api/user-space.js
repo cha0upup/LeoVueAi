@@ -4,6 +4,10 @@ export function userFileListApi(params = {}) {
   return http.get('/platform/user/file/list', { params })
 }
 
+export function archiveUserArtifactApi(data) {
+  return http.post('/platform/user/file/archive', data)
+}
+
 export function userWorkspaceOverviewApi() {
   return http.get('/platform/user/file/overview')
 }

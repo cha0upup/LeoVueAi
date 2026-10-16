@@ -1,7 +1,8 @@
 <template>
   <AppHeader
     title="Leo"
-    subtitle="控制台"
+    :subtitle="versionLabel"
+    :subtitle-tooltip="versionTooltip"
     :username="username"
     :user-role-label="userRoleLabel"
     :menu-items="userMenuItems"
@@ -99,7 +100,7 @@
 
 <script setup>
 import { Icon } from '@iconify/vue'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import AppHeader from '@/components/common/AppHeader.vue'
@@ -108,6 +109,7 @@ import ProfileDialog from '@/components/common/ProfileDialog.vue'
 import PlatformAiEntry from '@/components/common/PlatformAiEntry.vue'
 import { MAIN_HOME_TAB_ID, ROUTE_PATHS } from '@/constants/app.js'
 import { useAppModeNavigation } from '@/composables/useAppModeNavigation.js'
+import { useAppVersion } from '@/composables/useAppVersion.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { useMainTabs } from '@/composables/useMainTabs.js'
 import { useUserMenuActions } from '@/composables/useUserMenuActions.js'
@@ -121,6 +123,9 @@ const router = useRouter()
 const route = useRoute()
 const changePasswordDialog = ref(null)
 const profileDialog = ref(null)
+const { versionLabel, versionTooltip, loadVersion } = useAppVersion()
+
+onMounted(loadVersion)
 
 const { isAdmin, isLeader } = useAuth()
 const { goToAdmin, rememberAdminRoute, rememberWorkspaceRoute } = useAppModeNavigation()

@@ -1,42 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import {
   detectUserSpaceLanguage,
-  filterUserSpaceEntries,
+  getUserSpaceEntryIconKey,
   getUserSpaceFileExtension,
-  joinUserSpacePath,
   normalizeWorkspaceOverview,
-  sortUserSpaceEntries
+  resolveArtifactCategoryLabel,
+  resolveArtifactSourceLabel
 } from './userSpaceModel.js'
 
 describe('userSpaceModel', () => {
-  it('joins relative workspace paths without duplicate edge separators', () => {
-    expect(joinUserSpacePath('/reports/', '/daily/a.md/')).toBe('reports/daily/a.md')
-    expect(joinUserSpacePath('', '/a.txt')).toBe('a.txt')
-    expect(joinUserSpacePath('root', '')).toBe('root')
-  })
-
   it('detects extensions and Monaco languages case-insensitively', () => {
     expect(getUserSpaceFileExtension('Report.JSON')).toBe('json')
     expect(getUserSpaceFileExtension('folder.with.dot/README')).toBe('')
     expect(getUserSpaceFileExtension('folder.with.dot/file.')).toBe('')
     expect(getUserSpaceFileExtension('README')).toBe('')
     expect(detectUserSpaceLanguage('component.VUE')).toBe('html')
+    expect(detectUserSpaceLanguage('report.MARKDOWN')).toBe('markdown')
     expect(detectUserSpaceLanguage('archive.bin')).toBe('plaintext')
   })
 
-  it('filters by name or path and sorts directories first without mutating input', () => {
-    const entries = [
-      { name: 'z.txt', path: 'logs/z.txt', isDirectory: false },
-      { name: 'Alpha', path: 'Alpha', isDirectory: true },
-      { name: 'beta.txt', path: 'reports/beta.txt', isDirectory: false }
-    ]
-    expect(filterUserSpaceEntries(entries, ' REPORTS ')).toEqual([entries[2]])
-    expect(sortUserSpaceEntries(entries).map((item) => item.name)).toEqual([
-      'Alpha',
-      'beta.txt',
-      'z.txt'
-    ])
-    expect(entries[0].name).toBe('z.txt')
+  it('resolves artifact labels and file icons with fallbacks for old files', () => {
+    expect(resolveArtifactCategoryLabel('ai-reports')).toBe('AI 分析报告')
+    expect(resolveArtifactSourceLabel('node-ai')).toBe('节点 AI')
+    expect(resolveArtifactSourceLabel()).toBe('来源未记录')
+    expect(getUserSpaceEntryIconKey({ name: 'report.MD' })).toBe('markdown')
+    expect(getUserSpaceEntryIconKey({ name: 'output.bin' })).toBe('file')
   })
 
   it('normalizes incomplete overview payloads', () => {
@@ -50,7 +38,7 @@ describe('userSpaceModel', () => {
       rootItems: 0,
       updatedAt: 0,
       recentFiles: [],
-      topDirectories: []
+      categories: []
     })
   })
 })

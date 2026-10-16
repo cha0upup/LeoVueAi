@@ -383,8 +383,8 @@ const archiveCurrentReport = async () => {
     await archiveTextArtifact({
       category: ARTIFACT_CATEGORY.AI_REPORTS,
       name: `节点-${hostName}-${title}`,
+      metadata: { title, sourceModule: 'node-ai', sourceId: activeThreadId.value, sessionId: props.sessionId, hostName },
       extension: 'md',
-      mimeType: 'text/markdown;charset=utf-8',
       content: buildAiReportMarkdown({
         title,
         scope: '节点 AI 分析',

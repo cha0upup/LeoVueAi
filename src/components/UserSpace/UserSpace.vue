@@ -1,1069 +1,671 @@
 <template>
-  <ManagerLayout
-    title="成果库"
-    :icon="iconMap.folderOpened"
-    module-class="user-space-manager"
-    hide-toolbar
-    :initial-list-width="278"
-    :list-min="240"
-    :list-max="360"
-  >
-    <template #list>
-      <div class="artifact-nav">
-        <header class="artifact-nav__header">
-          <div>
-            <span>ARTIFACT INDEX</span>
-            <h2>成果导航</h2>
-          </div>
-          <el-tooltip
-            content="刷新成果库"
-            placement="top"
-          >
-            <button
-              class="u-icon-btn"
-              type="button"
-              aria-label="刷新成果库"
-              :disabled="loading"
-              @click="refreshWorkspace"
-            >
-              <el-icon :class="{ 'u-spin': loading }">
-                <Icon :icon="iconMap.refresh" />
-              </el-icon>
-            </button>
-          </el-tooltip>
-        </header>
-
-        <nav
-          class="artifact-nav__primary"
-          aria-label="成果库导航"
-        >
-          <button
-            type="button"
-            :class="{ active: isWorkspaceHome }"
-            @click="openWorkspaceHome"
-          >
-            <el-icon><Icon :icon="iconMap.homeFilled" /></el-icon>
-            <span><strong>成果概览</strong><small>关键数据与最近成果</small></span>
-          </button>
-          <button
-            type="button"
-            :class="{ active: !isWorkspaceHome && !currentPath }"
-            @click="goPath()"
-          >
-            <el-icon><Icon :icon="iconMap.folderOpened" /></el-icon>
-            <span><strong>全部成果</strong><small>{{ workspaceSummaryText }}</small></span>
-          </button>
-        </nav>
-
-        <section class="artifact-nav__categories">
-          <div class="artifact-nav__label">
-            <span>ARTIFACT TYPES</span><strong>成果类型</strong>
-          </div>
-          <button
-            v-for="category in artifactCategories"
-            :key="category.path"
-            type="button"
-            :class="{ active: currentPath === category.path }"
-            @click="goPath(category.path)"
-          >
-            <span class="category-icon"><el-icon><Icon :icon="category.icon" /></el-icon></span>
-            <span><strong>{{ category.label }}</strong><small>{{ category.files }} 项 · {{ formatFileSize(category.bytes) }}</small></span>
-            <el-icon class="category-arrow">
-              <Icon :icon="iconMap.arrowRight" />
-            </el-icon>
-          </button>
-        </section>
+  <section class="artifact-library module-shell">
+    <header class="library-header">
+      <div class="library-heading">
+        <el-icon><Icon :icon="iconMap.folderOpened" /></el-icon>
+        <div>
+          <h1>成果库</h1>
+          <p>保存脚本产物、分析报告与任务输出，便于查找和复用。</p>
+        </div>
       </div>
-    </template>
-
-    <template #detail>
-      <section class="artifact-detail">
-        <header class="artifact-detail__header">
-          <div>
-            <span>{{ isWorkspaceHome ? 'ARTIFACT LIBRARY' : 'ARTIFACT BROWSER' }}</span>
-            <div>
-              <h1>{{ isWorkspaceHome ? '成果库' : currentPathLabel }}</h1>
-              <small>{{
-                isWorkspaceHome ? workspaceSummaryText : `${filteredCount} / ${totalCount} 项`
-              }}</small>
-            </div>
-          </div>
-          <div class="artifact-detail__actions">
-            <el-button @click="createFileVisible = true">
-              <el-icon><Icon :icon="iconMap.documentAdd" /></el-icon>新建文档
-            </el-button>
-            <el-button @click="createDirVisible = true">
-              <el-icon><Icon :icon="iconMap.folderAdd" /></el-icon>新建目录
-            </el-button>
-            <el-button
-              type="primary"
-              :loading="uploading"
-              @click="triggerUpload"
-            >
-              <el-icon><Icon :icon="iconMap.upload" /></el-icon>导入成果
-            </el-button>
-          </div>
-        </header>
-
-        <div
-          v-if="isWorkspaceHome"
-          class="artifact-overview"
+      <div class="library-actions">
+        <span class="storage-summary">{{ overview.totalFiles }} 份成果 · {{ formatFileSize(overview.totalBytes) }}</span>
+        <el-button
+          type="primary"
+          :loading="uploading"
+          title="外部文件导入到「导入与其他」"
+          @click="triggerUpload"
         >
-          <section class="artifact-hero">
-            <div>
-              <span>KNOWLEDGE TO DELIVERY · 从分析到交付</span>
-              <h2>让每次分析与执行，都沉淀为可复用成果</h2>
-              <p>
-                脚本构建、AI
-                分析报告与任务输出统一归档，减少重复查找，让结果可以继续预览、下载和流转。
-              </p>
-            </div>
-            <el-button
-              type="primary"
-              @click="goPath()"
-            >
-              浏览全部成果<el-icon><Icon :icon="iconMap.arrowRight" /></el-icon>
-            </el-button>
-          </section>
-
-          <div class="artifact-metrics">
-            <article
-              v-for="stat in workspaceStats.slice(0, 3)"
-              :key="stat.label"
-            >
-              <span class="metric-icon"><el-icon><Icon :icon="stat.icon" /></el-icon></span>
-              <span><small>{{ stat.label }}</small><strong>{{ stat.value }}</strong></span>
-            </article>
-          </div>
-
-          <div class="artifact-overview__grid">
-            <section class="overview-panel">
-              <header>
-                <div>
-                  <span>RECENT ARTIFACTS</span>
-                  <h3>最近成果</h3>
-                </div>
+          <el-icon><Icon :icon="iconMap.upload" /></el-icon>
+          导入成果
+        </el-button>
+      </div>
+    </header>
+    <section
+      class="catalog-panel"
+      aria-label="成果列表"
+    >
+      <nav
+        class="category-nav"
+        aria-label="成果分类"
+      >
+        <button
+          v-for="category in categories"
+          :key="category.path"
+          type="button"
+          :class="{ active: currentPath === category.path }"
+          :aria-pressed="currentPath === category.path"
+          @click="currentPath = category.path"
+        >
+          {{ category.label }}<span>{{ category.files }}</span>
+        </button>
+      </nav>
+      <div class="catalog-toolbar">
+        <el-input
+          v-model="search"
+          placeholder="搜索标题、文件名、主机或来源标识"
+          clearable
+          class="catalog-search"
+        >
+          <template #prefix>
+            <el-icon><Icon :icon="iconMap.search" /></el-icon>
+          </template>
+        </el-input>
+        <el-select
+          v-model="source"
+          placeholder="全部来源"
+          aria-label="成果来源"
+          class="source-filter"
+        >
+          <el-option
+            label="全部来源"
+            value=""
+          />
+          <el-option
+            v-for="(label, key) in sourceLabels"
+            :key="key"
+            :label="label"
+            :value="key"
+          />
+        </el-select>
+        <el-button
+          v-if="hasFilters"
+          text
+          @click="clearFilters"
+        >
+          清空筛选
+        </el-button>
+        <span class="result-count">{{ loading ? '读取中…' : `共 ${total} 项` }}</span>
+        <el-button
+          :loading="loading"
+          aria-label="刷新成果库"
+          title="刷新成果库"
+          @click="refreshWorkspace"
+        >
+          <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
+        </el-button>
+      </div>
+      <div class="table-wrap">
+        <el-table
+          v-loading="loading"
+          :data="files"
+          row-key="path"
+          height="100%"
+          class="catalog-table"
+          @row-dblclick="previewFile"
+        >
+          <el-table-column
+            label="成果名称"
+            min-width="320"
+          >
+            <template #default="{ row }">
+              <button
+                type="button"
+                class="file-name-button"
+                :title="row.metadata?.title || row.name"
+                @click="previewFile(row)"
+              >
+                <span class="file-icon"><el-icon><Icon :icon="iconMap[getUserSpaceEntryIconKey(row)] || iconMap.file" /></el-icon></span>
+                <span class="file-copy">
+                  <strong>{{ row.metadata?.title || row.name }}</strong>
+                  <small>{{ getUserSpaceFileExtension(row.name).toUpperCase() || '文件' }}<template v-if="row.metadata?.title && row.metadata.title !== row.name"> · {{ row.name }}</template></small>
+                </span>
+              </button>
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="分类"
+            width="128"
+          >
+            <template #default="{ row }">
+              {{ resolveArtifactCategoryLabel(row.category) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="来源"
+            width="140"
+          >
+            <template #default="{ row }">
+              <span>{{ resolveArtifactSourceLabel(row.metadata?.sourceModule) }}</span>
+              <small
+                v-if="row.metadata?.hostName"
+                class="source-host"
+                :title="row.metadata.hostName"
+              >{{ row.metadata.hostName }}</small>
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="大小"
+            width="96"
+          >
+            <template #default="{ row }">
+              {{ formatFileSize(row.size) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="更新时间"
+            width="164"
+          >
+            <template #default="{ row }">
+              {{ formatDate(row.lastModified) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="操作"
+            width="172"
+            fixed="right"
+          >
+            <template #default="{ row }">
+              <div class="table-actions">
                 <el-button
-                  text
-                  @click="goPath()"
+                  link
+                  type="primary"
+                  @click="previewFile(row)"
                 >
-                  查看全部
+                  预览
                 </el-button>
-              </header>
-              <div
-                v-if="recentFiles.length"
-                class="recent-artifact-list"
-              >
-                <button
-                  v-for="file in recentFiles"
-                  :key="file.path"
-                  type="button"
-                  @click="selectRecentFile(file)"
+                <el-button
+                  link
+                  type="primary"
+                  @click="downloadFile(row)"
                 >
-                  <span class="recent-icon"><el-icon><Icon :icon="iconMap.document" /></el-icon></span>
-                  <span><strong>{{ file.name }}</strong><small>{{ resolveArtifactCategoryLabel(file.parentPath) }} ·
-                    {{ formatTimestamp(file.lastModified) }}</small></span>
-                  <el-icon><Icon :icon="iconMap.arrowRight" /></el-icon>
-                </button>
-              </div>
-              <div
-                v-else
-                class="artifact-empty"
-              >
-                <el-icon><Icon :icon="iconMap.documentAdd" /></el-icon><strong>还没有成果</strong><span>从脚本构建或 AI 分析归档第一份成果。</span>
-              </div>
-            </section>
-
-            <section class="overview-panel">
-              <header>
-                <div>
-                  <span>DELIVERY STREAMS</span>
-                  <h3>成果来源</h3>
-                </div>
-              </header>
-              <div class="artifact-streams">
-                <button
-                  v-for="category in artifactCategories"
-                  :key="category.path"
-                  type="button"
-                  @click="goPath(category.path)"
+                  下载
+                </el-button>
+                <el-dropdown
+                  trigger="click"
+                  @command="handleRowCommand($event, row)"
                 >
-                  <span class="stream-icon"><el-icon><Icon :icon="category.icon" /></el-icon></span>
-                  <span><strong>{{ category.label }}</strong><small>{{ category.description }}</small></span>
-                  <em>{{ category.files }}</em>
-                </button>
+                  <el-button
+                    text
+                    :aria-label="`更多成果操作：${row.metadata?.title || row.name}`"
+                  >
+                    <el-icon><Icon :icon="iconMap.more" /></el-icon>
+                  </el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="detail">
+                        查看详情
+                      </el-dropdown-item>
+                      <el-dropdown-item
+                        command="delete"
+                        divided
+                        class="danger-item"
+                      >
+                        删除成果
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
-            </section>
-          </div>
-        </div>
-
-        <div
-          v-else
-          class="artifact-browser-workbench"
-        >
-          <UserSpaceFileTree
-            ref="fileTreeRef"
-            :loading="loading"
-            :current-path="currentPath"
-            :file-list="fileList"
-            :search-keyword="searchKeyword"
-            :selected-entry="selectedEntry"
-            @fetch-list="refreshWorkspace"
-            @go-root="goPath()"
-            @go-path="goPath"
-            @trigger-upload="triggerUpload"
-            @handle-upload-change="handleUploadChange"
-            @select-entry="selectedEntry = $event"
-            @enter-directory="enterDirectory"
-            @preview-file="previewFile"
-            @search-keyword-change="searchKeyword = $event"
-            @clear-search="searchKeyword = ''"
-          />
-          <UserSpaceTable
-            :selected-entry="selectedEntry"
-            @enter-directory="enterDirectory"
-            @preview-file="previewFile"
-            @download-file="downloadFile"
-            @delete-entry="deleteEntry"
-          />
-        </div>
-      </section>
-    </template>
-
-    <UserSpaceCreateDialog
-      v-model="createDirVisible"
-      type="directory"
-      :current-path-label="currentPathLabel"
-      :loading="creatingDir"
-      @submit="submitCreateDir"
-    />
-    <UserSpaceCreateDialog
-      v-model="createFileVisible"
+            </template>
+          </el-table-column>
+          <template #empty>
+            <EmptyState
+              workbench
+              :title="emptyState.title"
+              :description="emptyState.description"
+              :icon="iconMap.folderOpened"
+              :action-label="emptyState.actionLabel"
+              @action="hasFilters ? clearFilters() : triggerUpload()"
+            />
+          </template>
+        </el-table>
+      </div>
+      <footer class="catalog-footer">
+        <span>按更新时间倒序 · 仅展示已归档与导入的文件</span>
+        <el-pagination
+          size="small"
+          :current-page="page"
+          :page-size="PAGE_SIZE"
+          :total="total"
+          :pager-count="5"
+          layout="prev, pager, next"
+          @current-change="changePage"
+        />
+      </footer>
+    </section>
+    <input
+      ref="uploadInputRef"
       type="file"
-      :current-path-label="currentPathLabel"
-      :loading="creatingFile"
-      @submit="submitCreateFile"
-    />
+      hidden
+      @change="uploadFile"
+    >
+    <el-drawer
+      v-model="detailVisible"
+      title="成果详情"
+      size="min(520px, 100vw)"
+      append-to-body
+      destroy-on-close
+    >
+      <UserSpaceDetail
+        v-if="detailEntry"
+        :entry="detailEntry"
+        @preview="previewFile"
+        @download="downloadFile"
+        @delete="deleteFile"
+      />
+    </el-drawer>
     <UserSpacePreviewDialog
       v-model="previewVisible"
       :data="previewData"
     />
-  </ManagerLayout>
+  </section>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
-import { confirmAction, confirmDelete } from '@/utils/confirmUtils.js'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ARTIFACT_CATEGORIES, ARTIFACT_SOURCE_LABELS } from '@/constants/artifacts.js'
 import { icons as iconMap } from '@/utils/icons.js'
+import { formatDate, formatFileSize } from '@/utils/format.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
-import {
-  userFileListApi,
-  userWorkspaceOverviewApi,
-  userFileUploadApi,
-  userFileDownloadApi,
-  userFileCreateFileApi,
-  userFileCreateDirApi,
-  userFilePreviewApi,
-  userFileDeleteApi
-} from '@/services/api/user-space.js'
-import ManagerLayout from '@/components/common/ManagerLayout.vue'
-import UserSpaceCreateDialog from './UserSpaceCreateDialog.vue'
-import UserSpaceFileTree from './UserSpaceFileTree.vue'
+import { confirmAction, confirmDelete } from '@/utils/confirmUtils.js'
+import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { userFileListApi, userWorkspaceOverviewApi, userFileUploadApi, userFileDownloadApi, userFilePreviewApi, userFileDeleteApi } from '@/services/api/user-space.js'
+import EmptyState from '@/components/common/EmptyState.vue'
+import UserSpaceDetail from './UserSpaceDetail.vue'
 import UserSpacePreviewDialog from './UserSpacePreviewDialog.vue'
-import UserSpaceTable from './UserSpaceTable.vue'
-import { formatDate as formatTimestamp, formatFileSize } from '@/utils/format.js'
-import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
-import {
-  filterUserSpaceEntries,
-  isArtifactCategoryPath,
-  joinUserSpacePath,
-  normalizeWorkspaceOverview,
-  resolveArtifactCategoryLabel
-} from './userSpaceModel.js'
+import { getUserSpaceEntryIconKey, getUserSpaceFileExtension, normalizeWorkspaceOverview, resolveArtifactCategoryLabel, resolveArtifactSourceLabel } from './userSpaceModel.js'
 
-const loading = ref(false)
-const workspaceMode = ref('home')
+const PAGE_SIZE = 50
+const sourceLabels = ARTIFACT_SOURCE_LABELS
 const currentPath = ref('')
-const fileList = ref([])
-const selectedEntry = ref(null)
-const searchKeyword = ref('')
-const fileTreeRef = ref(null)
-const workspaceOverview = ref(normalizeWorkspaceOverview())
-
-const createDirVisible = ref(false)
-const createFileVisible = ref(false)
-const creatingDir = ref(false)
-const creatingFile = ref(false)
+const source = ref('')
+const search = ref('')
+const page = ref(1)
+const total = ref(0)
+const files = ref([])
+const detailEntry = ref(null)
+const detailVisible = ref(false)
+const loading = ref(false)
 const uploading = ref(false)
-
+const uploadInputRef = ref(null)
+const overview = ref(normalizeWorkspaceOverview())
 const previewVisible = ref(false)
-const previewData = ref({
-  path: '',
-  size: 0,
-  previewSize: 0,
-  truncated: false,
-  content: ''
-})
-let listRequestSequence = 0
-let overviewRequestSequence = 0
-let previewRequestSequence = 0
-
-const filteredFileList = computed(() => filterUserSpaceEntries(fileList.value, searchKeyword.value))
-
-const totalCount = computed(() => fileList.value.length)
-const filteredCount = computed(() => filteredFileList.value.length)
-const directoryCount = computed(() => fileList.value.filter((item) => item.isDirectory).length)
-const fileCount = computed(() => fileList.value.filter((item) => !item.isDirectory).length)
-const currentPathLabel = computed(() => resolveArtifactCategoryLabel(currentPath.value) || '成果库根目录')
-const isWorkspaceHome = computed(() => workspaceMode.value === 'home' && !currentPath.value)
-const workspaceSummaryText = computed(() => {
-  const files = Number(workspaceOverview.value.totalFiles || 0)
-  const directories = Number(workspaceOverview.value.totalDirectories || 0)
-  return `${files} 个文件 · ${directories} 个文件夹`
-})
-const recentFiles = computed(() => workspaceOverview.value.recentFiles.slice(0, 5))
-const topDirectories = computed(() => workspaceOverview.value.topDirectories.slice(0, 5))
-const artifactCategories = computed(() => {
-  const meta = [
-    {
-      path: 'script-builds',
-      label: '脚本构建',
-      description: '可复用的构建与交付脚本',
-      icon: iconMap.codeFile
-    },
-    {
-      path: 'ai-reports',
-      label: 'AI 分析报告',
-      description: '平台与节点分析结论',
-      icon: iconMap.chatAi
-    },
-    {
-      path: 'task-results',
-      label: '任务输出',
-      description: '执行结果、错误与流转记录',
-      icon: iconMap.task
-    }
-  ]
-  const directoryMap = new Map(topDirectories.value.map((dir) => [dir.path || dir.name, dir]))
-  return meta.map((item) => {
-    const directory = directoryMap.get(item.path) || {}
-    return {
-      ...item,
-      files: Number(directory.files || 0),
-      bytes: Number(directory.bytes || 0)
-    }
-  })
-})
-const workspaceStats = computed(() => {
-  const stats = [
-    {
-      label: '文件',
-      value: Number(workspaceOverview.value.totalFiles || fileCount.value),
-      icon: iconMap.files
-    },
-    {
-      label: '目录',
-      value: Number(workspaceOverview.value.totalDirectories || directoryCount.value),
-      icon: iconMap.folder
-    },
-    {
-      label: '占用',
-      value: formatFileSize(workspaceOverview.value.totalBytes || 0),
-      icon: iconMap.hardDrive
-    },
-    {
-      label: '成果库根目录项',
-      value: Number(workspaceOverview.value.rootItems || totalCount.value),
-      icon: iconMap.grid
-    }
-  ]
-  const maxUploadBytes = Number(workspaceOverview.value.maxUploadBytes || 0)
-  if (maxUploadBytes > 0) {
-    stats.push({
-      label: '单文件上限',
-      value: formatFileSize(maxUploadBytes),
-      icon: iconMap.upload
-    })
+const previewData = ref({})
+let listSequence = 0
+let previewSequence = 0
+let overviewSequence = 0
+let searchTimer
+const categories = computed(() => [
+  { path: '', label: '全部成果', files: overview.value.totalFiles },
+  ...ARTIFACT_CATEGORIES.map(category => ({
+    ...category,
+    files: Number(overview.value.categories.find(item => item.path === category.path)?.files || 0)
+  }))
+])
+const hasFilters = computed(() => Boolean(currentPath.value || source.value || search.value.trim()))
+const emptyState = computed(() => {
+  if (source.value || search.value.trim()) return {
+    title: '没有匹配的成果', description: '尝试调整分类、来源或搜索关键词。', actionLabel: '清空筛选'
   }
-  return stats
+  if (currentPath.value) return {
+    title: currentPath.value === 'imports' ? '暂无导入文件' : `暂无${resolveArtifactCategoryLabel(currentPath.value)}`,
+    description: {
+      'script-builds': '在脚本构建中保存产物后，会自动收录到这里。',
+      'ai-reports': '在平台 AI 或节点 AI 对话中归档的分析报告会收录到这里。',
+      'task-results': '在任务详情中将输出文件归档后，会收录到这里，原始文件保留。',
+      imports: '通过「导入成果」收录已有文件，后续可统一检索和下载。'
+    }[currentPath.value],
+    actionLabel: '查看全部成果'
+  }
+  return {
+    title: '还没有归档成果',
+    description: '脚本构建、AI 对话和任务详情中的归档结果会显示在这里，也可导入已有文件。',
+    actionLabel: '导入成果'
+  }
 })
 
-const keepSelection = () => {
-  if (!fileList.value.length) {
-    selectedEntry.value = null
-    return
-  }
-  const prevPath = selectedEntry.value?.path
-  selectedEntry.value = (prevPath && fileList.value.find((item) => item.path === prevPath))
-    || filteredFileList.value[0] || fileList.value[0] || null
-}
-
-const fetchList = async () => {
-  const requestId = ++listRequestSequence
-  const requestedPath = currentPath.value
+async function fetchList() {
+  const sequence = ++listSequence
   loading.value = true
   try {
-    const res = await userFileListApi({ path: requestedPath || undefined })
-    if (requestId !== listRequestSequence || currentPath.value !== requestedPath) return
-    const data = res?.data || {}
-    fileList.value = Array.isArray(data.fileList) ? data.fileList : []
-    currentPath.value = String(data.path || requestedPath || '')
-    keepSelection()
-  } catch (error) {
-    if (requestId !== listRequestSequence || currentPath.value !== requestedPath) return
-    if (isArtifactCategoryPath(requestedPath)) {
-      fileList.value = []
-      selectedEntry.value = null
-      return
+    const response = await userFileListApi({ recursive: true, path: currentPath.value || undefined,
+      search: search.value, source: source.value, page: page.value, pageSize: PAGE_SIZE })
+    if (sequence !== listSequence) return
+    const data = response.data || {}
+    if (!Number.isInteger(data.page)) throw new Error('成果库接口尚未加载，请重启后端后刷新')
+    total.value = Number(data.count || 0)
+    const lastPage = Math.max(1, Math.ceil(total.value / PAGE_SIZE))
+    if (page.value > lastPage) {
+      page.value = lastPage
+      return fetchList()
     }
-    showError(`获取目录失败: ${error?.message || '未知错误'}`)
+    files.value = Array.isArray(data.fileList) ? data.fileList : []
+    if (detailVisible.value) {
+      detailEntry.value = files.value.find(file => file.path === detailEntry.value?.path) || null
+      if (!detailEntry.value) detailVisible.value = false
+    }
+  } catch (error) {
+    if (sequence === listSequence) showError(`读取成果失败：${error?.message || '未知错误'}`)
   } finally {
-    if (requestId === listRequestSequence) loading.value = false
+    if (sequence === listSequence) loading.value = false
   }
 }
 
-const fetchOverview = async () => {
-  const requestId = ++overviewRequestSequence
+async function fetchOverview() {
+  const sequence = ++overviewSequence
   try {
-    const res = await userWorkspaceOverviewApi()
-    if (requestId !== overviewRequestSequence) return
-    workspaceOverview.value = normalizeWorkspaceOverview(res?.data)
-  } catch {
-    // 概览是辅助信息，保留上一次成功结果，文件浏览仍可继续使用。
-  }
+    const response = await userWorkspaceOverviewApi()
+    if (sequence === overviewSequence && Array.isArray(response.data?.categories)) overview.value = normalizeWorkspaceOverview(response.data)
+  } catch { /* Keep the previous counters; the artifact list remains usable. */ }
 }
 
-const refreshWorkspace = async () => {
+async function refreshWorkspace() {
+  clearTimeout(searchTimer)
   await Promise.all([fetchList(), fetchOverview()])
 }
 
-const leaveCurrentPreviewContext = () => {
-  previewRequestSequence += 1
+function changePage(value) {
+  if (page.value === value) return
+  page.value = value
   previewVisible.value = false
+  detailVisible.value = false
+  ++previewSequence
+  fetchList()
 }
 
-const goPath = async (path) => {
-  leaveCurrentPreviewContext()
-  currentPath.value = path || ''
-  workspaceMode.value = 'files'
-  await fetchList()
-}
+watch([currentPath, source, search], () => {
+  ++listSequence
+  ++previewSequence
+  previewVisible.value = false
+  detailVisible.value = false
+  loading.value = true
+  files.value = []
+  total.value = 0
+  page.value = 1
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(fetchList, 250)
+})
 
-const enterDirectory = async (row) => {
-  leaveCurrentPreviewContext()
-  currentPath.value = row.path || joinUserSpacePath(currentPath.value, row.name)
-  workspaceMode.value = 'files'
-  await fetchList()
-}
-
-const selectRecentFile = async (file) => {
-  leaveCurrentPreviewContext()
-  workspaceMode.value = 'files'
-  const parentPath = file.parentPath || ''
-  if (parentPath !== currentPath.value) {
-    currentPath.value = parentPath
-    await fetchList()
-    if (currentPath.value !== parentPath) return
-  }
-  const found = fileList.value.find((item) => item.path === file.path)
-  selectedEntry.value = found || file
-}
-
-const openWorkspaceHome = async () => {
-  leaveCurrentPreviewContext()
+function clearFilters() {
   currentPath.value = ''
-  workspaceMode.value = 'home'
-  await refreshWorkspace()
+  source.value = ''
+  search.value = ''
 }
 
-const triggerUpload = async () => {
-  if (uploading.value) return
-  if (isWorkspaceHome.value) {
-    workspaceMode.value = 'files'
-    await nextTick()
-  }
-  fileTreeRef.value?.triggerUpload()
+function handleRowCommand(command, file) {
+  if (command === 'delete') return deleteFile(file)
+  detailEntry.value = file
+  detailVisible.value = true
 }
 
-const writeWithOverwrite = async (write, confirmOverwrite, errorPrefix) => {
-  try {
-    await write(false)
-  } catch (error) {
-    if (error?.code !== 409) {
-      showError(`${errorPrefix}: ${error?.message || '未知错误'}`)
-      return
-    }
-    const confirmed = await confirmOverwrite()
-    if (!confirmed) return
-    try {
-      await write(true)
-    } catch (overwriteError) {
-      showError(`${errorPrefix}: ${overwriteError?.message || '未知错误'}`)
-    }
-  }
+function triggerUpload() {
+  if (!uploadInputRef.value) return
+  uploadInputRef.value.value = ''
+  uploadInputRef.value.click()
 }
 
-const handleUploadChange = async (event) => {
+async function uploadFile(event) {
   const file = event?.target?.files?.[0]
   if (!file || uploading.value) return
-  const uploadPath = currentPath.value || undefined
+  const path = 'imports'
   uploading.value = true
   try {
-    await writeWithOverwrite(
-      async (overwrite) => {
-        await userFileUploadApi(file, {
-          path: uploadPath,
-          ...(overwrite ? { overwrite: true } : {})
-        })
-        showSuccess(overwrite ? '已覆盖上传' : '上传成功')
-        await refreshWorkspace()
-      },
-      () => confirmAction({
-        title: '覆盖同名文件',
-        message: `「${file.name}」已存在，覆盖后无法恢复原文件，是否继续？`,
-        confirmButtonText: '覆盖上传',
-        type: 'warning'
-      }),
-      '上传失败'
-    )
-  } finally {
-    uploading.value = false
-  }
-}
-
-const downloadFile = async (row) => {
-  try {
-    const res = await userFileDownloadApi({ path: row.path, filename: row.name })
-    downloadBlob(res.data, row.name)
-    showSuccess('下载已开始')
-  } catch (error) {
-    showError(`下载失败: ${error?.message || '未知错误'}`)
-  }
-}
-
-const previewFile = async (row) => {
-  const requestId = ++previewRequestSequence
-  try {
-    const res = await userFilePreviewApi({ path: row.path })
-    if (requestId !== previewRequestSequence) return
-    const data = res?.data || {}
-    previewData.value = {
-      path: data.path || row.path,
-      size: Number(data.size || 0),
-      previewSize: Number(data.previewSize || 0),
-      truncated: Boolean(data.truncated),
-      content: String(data.content || '')
+    try { await userFileUploadApi(file, { path }) }
+    catch (error) {
+      if (error?.code !== 409) throw error
+      if (!await confirmAction({ title: '覆盖同名成果', message: `确认覆盖「${file.name}」？`, type: 'warning' })) return
+      await userFileUploadApi(file, { path, overwrite: true })
     }
+    showSuccess('已导入到「导入与其他」')
+    if (currentPath.value !== path || source.value || search.value) {
+      currentPath.value = path
+      source.value = ''
+      search.value = ''
+      await fetchOverview()
+    } else {
+      page.value = 1
+      await refreshWorkspace()
+    }
+  } catch (error) { showError(`导入失败：${error?.message || '未知错误'}`) }
+  finally { uploading.value = false }
+}
+
+async function previewFile(file) {
+  detailVisible.value = false
+  const sequence = ++previewSequence
+  try {
+    const markdown = ['md', 'markdown'].includes(getUserSpaceFileExtension(file.name))
+    const response = await userFilePreviewApi({ path: file.path, size: markdown ? 1024 * 1024 : undefined })
+    if (sequence !== previewSequence) return
+    previewData.value = response.data
     previewVisible.value = true
   } catch (error) {
-    if (requestId !== previewRequestSequence) return
-    showError(`预览失败: ${error?.message || '未知错误'}`)
+    if (sequence === previewSequence) showError(`预览失败：${error?.message || '未知错误'}`)
   }
 }
 
-const deleteEntry = async (row) => {
+async function downloadFile(file) {
   try {
-    const recursive = Boolean(row.isDirectory)
-    const confirmed = await confirmDelete({
-      title: recursive ? '删除目录' : '删除文件',
-      message: recursive
-        ? `目录 "${row.name}" 删除需要递归删除，确认继续？`
-        : `确认删除文件 "${row.name}"？`
-    })
-    if (!confirmed) return
+    const response = await userFileDownloadApi({ path: file.path, filename: file.name })
+    downloadBlob(response.data, file.name)
+  } catch (error) { showError(`下载失败：${error?.message || '未知错误'}`) }
+}
 
-    await userFileDeleteApi({ path: row.path, recursive })
-    showSuccess('删除成功')
+async function deleteFile(file) {
+  if (!await confirmDelete({ title: '删除成果', message: `确认删除「${file.metadata?.title || file.name}」？` })) return
+  try {
+    await userFileDeleteApi({ path: file.path })
+    if (detailEntry.value?.path === file.path) detailVisible.value = false
+    previewVisible.value = false
+    ++previewSequence
     await refreshWorkspace()
-  } catch (error) {
-    showError(`删除失败: ${error?.message || '未知错误'}`)
-  }
+  } catch (error) { showError(`删除失败：${error?.message || '未知错误'}`) }
 }
 
-const submitCreateDir = async (form) => {
-  if (creatingDir.value) return
-  const name = String(form?.name || '').trim()
-  if (!name) {
-    showWarning('目录名不能为空')
-    return
-  }
-  const path = joinUserSpacePath(currentPath.value, name)
-  creatingDir.value = true
-  try {
-    await userFileCreateDirApi({ path })
-    showSuccess('目录创建成功')
-    createDirVisible.value = false
-    await refreshWorkspace()
-  } catch (error) {
-    showError(`创建目录失败: ${error?.message || '未知错误'}`)
-  } finally {
-    creatingDir.value = false
-  }
-}
-
-const submitCreateFile = async (form) => {
-  if (creatingFile.value) return
-  const name = String(form?.name || '').trim()
-  if (!name) {
-    showWarning('文件名不能为空')
-    return
-  }
-  const path = joinUserSpacePath(currentPath.value, name)
-  const content = String(form?.content || '')
-  creatingFile.value = true
-  try {
-    await writeWithOverwrite(
-      async (overwrite) => {
-        await userFileCreateFileApi({
-          path,
-          content,
-          ...(overwrite ? { overwrite: true } : {})
-        })
-        showSuccess(overwrite ? '已覆盖同名文件' : '文件创建成功')
-        createFileVisible.value = false
-        await refreshWorkspace()
-      },
-      () => confirmAction({
-        title: '覆盖同名文件',
-        message: `「${name}」已存在，覆盖后无法恢复原内容，是否继续？`,
-        confirmButtonText: '覆盖创建',
-        type: 'warning'
-      }),
-      '创建文件失败'
-    )
-  } finally {
-    creatingFile.value = false
-  }
-}
-
-onMounted(() => {
-  refreshWorkspace()
-})
+onMounted(refreshWorkspace)
+onUnmounted(() => { clearTimeout(searchTimer); ++listSequence; ++overviewSequence; ++previewSequence })
 </script>
 
 <style scoped>
-/* Artifact Library 2.0 — 与主机管理共用左右工作台节奏。 */
-.user-space-manager {
-  width: 100%;
-  min-height: 0;
-  --workspace-surface-raised: color-mix(
-    in srgb,
-    var(--app-control-background-soft) 88%,
-    var(--el-bg-color-overlay)
-  );
-  --workspace-surface-muted: color-mix(
-    in srgb,
-    var(--app-control-background) 94%,
-    var(--el-bg-color-overlay)
-  );
-  --workspace-border-soft: color-mix(in srgb, var(--el-border-color) 42%, transparent);
-  --workbench-surface-muted: var(--workspace-surface-muted);
-  --workbench-border-soft: var(--workspace-border-soft);
-}
+@import '@/styles/workbench-toolbar-shared.css';
 
-.artifact-nav,
-.artifact-detail {
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-}
-
-.artifact-nav {
+.artifact-library {
+  --workspace-border-soft: var(--app-divider-color);
   display: flex;
   flex-direction: column;
-  padding: 14px 12px;
-  overflow: auto;
-}
-
-.artifact-nav__header,
-.artifact-detail__header,
-.overview-panel > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  height: 100%;
+  min-height: 0;
   gap: 12px;
 }
-
-.artifact-nav__header {
-  padding: 0 4px 13px;
-  border-bottom: 1px solid var(--workspace-border-soft);
+.library-header,
+.library-heading,
+.library-actions,
+.catalog-toolbar,
+.catalog-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-
-.artifact-nav__header span,
-.artifact-nav__label > span,
-.artifact-detail__header > div:first-child > span,
-.artifact-hero > div > span,
-.overview-panel > header span {
-  display: block;
-  color: var(--el-text-color-placeholder);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  line-height: 1.2;
+.library-header {
+  justify-content: space-between;
+  padding: 4px 2px;
+  flex-shrink: 0;
 }
-
-.artifact-nav__header h2,
-.artifact-detail__header h1,
-.overview-panel h3 {
-  margin: 3px 0 0;
-  color: var(--el-text-color-primary);
+.library-heading > .el-icon {
+  font-size: 22px;
+  color: var(--el-color-primary);
 }
-
-.artifact-nav__header h2 {
-  font-size: 15px;
+.library-heading h1 {
+  margin: 0;
+  font-size: var(--font-size-page-title);
 }
-
-.artifact-nav__primary,
-.artifact-nav__categories,
-.recent-artifact-list,
-.artifact-streams {
+.library-heading p {
+  margin: 5px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.storage-summary,
+.result-count,
+.catalog-footer {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.catalog-panel {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--app-surface-border-strong);
+  border-radius: var(--radius-container);
+  background: var(--app-container-background);
 }
-
-.artifact-nav__primary {
-  gap: 5px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--workspace-border-soft);
+.category-nav {
+  display: flex;
+  gap: 24px;
+  padding: 0 16px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--app-divider-color);
+  flex-shrink: 0;
 }
-
-.artifact-nav__primary button,
-.artifact-nav__categories button,
-.recent-artifact-list button,
-.artifact-streams button {
+.category-nav button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 2px;
   border: 0;
-  color: var(--el-text-color-primary);
+  border-bottom: 2px solid transparent;
   background: transparent;
+  color: var(--el-text-color-secondary);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.category-nav button.active {
+  color: var(--el-color-primary);
+  border-bottom-color: var(--el-color-primary);
+  font-weight: 600;
+}
+.category-nav button:focus-visible,
+.file-name-button:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: -2px;
+}
+.category-nav button span {
+  font-size: 11px;
+  opacity: 0.8;
+}
+.catalog-toolbar {
+  padding: 12px 16px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.catalog-search {
+  flex: 1;
+  min-width: 220px;
+  max-width: 420px;
+}
+.source-filter {
+  width: 150px;
+}
+.result-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.table-wrap {
+  flex: 1;
+  min-height: 0;
+  padding: 0 16px;
+}
+.catalog-table {
+  --el-table-header-bg-color: var(--app-control-background-soft);
+  font-size: 12px;
+}
+.catalog-table :deep(th.el-table__cell) {
+  color: var(--el-text-color-secondary);
+  font-weight: 600;
+}
+.catalog-table :deep(td.el-table__cell) {
+  padding: 12px 0;
+}
+.file-name-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--el-text-color-primary);
   text-align: left;
   cursor: pointer;
 }
-
-.artifact-nav__primary button {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
-  align-items: center;
-  gap: 9px;
-  min-height: 52px;
-  padding: 8px 10px;
-  border-radius: var(--radius-control);
-}
-
-.artifact-nav__primary button:hover,
-.artifact-nav__primary button.active,
-.artifact-nav__categories button:hover,
-.artifact-nav__categories button.active {
-  background: color-mix(in srgb, var(--el-color-primary) 8%, transparent);
-}
-
-.artifact-nav__primary button.active,
-.artifact-nav__categories button.active {
+.file-name-button:hover strong {
   color: var(--el-color-primary);
-  box-shadow: inset 3px 0 0 var(--el-color-primary);
 }
-
-.artifact-nav button strong,
-.artifact-nav button small,
-.recent-artifact-list strong,
-.recent-artifact-list small,
-.artifact-streams strong,
-.artifact-streams small {
-  display: block;
+.file-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 34px;
+  border-radius: var(--radius-control);
+  flex-shrink: 0;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  font-size: 18px;
+}
+.file-copy {
   min-width: 0;
+}
+.file-copy strong,
+.file-copy small,
+.source-host {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.artifact-nav button strong {
-  font-size: 12.5px;
-}
-.artifact-nav button small {
-  margin-top: 3px;
-  color: var(--el-text-color-secondary);
-  font-size: 10.5px;
-}
-
-.artifact-nav__categories {
-  gap: 5px;
-  padding-top: 15px;
-}
-.artifact-nav__label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 6px 6px;
-}
-.artifact-nav__label > strong {
-  font-size: 12px;
-}
-.artifact-nav__categories button {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 16px;
-  align-items: center;
-  gap: 9px;
-  min-height: 55px;
-  padding: 8px 9px;
-  border-radius: var(--radius-control);
-}
-
-.category-icon,
-.metric-icon,
-.recent-icon,
-.stream-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 10%, var(--app-control-background));
-}
-
-.category-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-control);
-}
-.category-arrow {
-  color: var(--el-text-color-placeholder);
-}
-
-.artifact-detail {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--app-surface-border-strong);
-  border-radius: var(--app-panel-radius);
-  background: color-mix(in srgb, var(--app-card-background) 96%, var(--app-surface-background));
-  box-shadow: none;
-  overflow: hidden;
-}
-
-.artifact-detail__header {
-  min-height: 70px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--workspace-border-soft);
-  background: var(--app-container-background);
-}
-
-.artifact-detail__header > div:first-child > div {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-}
-.artifact-detail__header h1 {
-  font-size: 16px;
-}
-.artifact-detail__header small {
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-}
-.artifact-detail__actions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-.artifact-detail__actions :deep(.el-button) {
-  margin: 0;
-}
-
-.artifact-overview {
-  flex: 1;
-  min-height: 0;
-  padding: 14px;
-  overflow: auto;
-}
-
-.artifact-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 20px 22px;
-  border: 1px solid var(--workspace-border-soft);
-  border-radius: var(--radius-container);
-  background: var(--app-container-background);
-}
-
-.artifact-hero h2 {
-  margin: 6px 0;
-  font-size: 20px;
-  line-height: 1.35;
-}
-.artifact-hero p {
-  max-width: 720px;
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 12.5px;
-  line-height: 1.7;
-}
-.artifact-hero > .el-button {
-  flex-shrink: 0;
-}
-
-.artifact-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.artifact-metrics article {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 68px;
-  padding: 11px 13px;
-  border: 1px solid var(--workspace-border-soft);
-  border-radius: var(--radius-container);
-  background: var(--el-bg-color-overlay);
-}
-
-.metric-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-control);
-  font-size: 17px;
-}
-.artifact-metrics small {
-  display: block;
-  color: var(--el-text-color-secondary);
-  font-size: 10.5px;
-}
-.artifact-metrics strong {
-  display: block;
-  margin-top: 3px;
-  font-size: 16px;
-}
-
-.artifact-overview__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.overview-panel {
-  min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--workspace-border-soft);
-  border-radius: var(--radius-container);
-  background: var(--el-bg-color-overlay);
-}
-
-.overview-panel h3 {
-  font-size: 14px;
-}
-.recent-artifact-list,
-.artifact-streams {
-  gap: 7px;
-  margin-top: 12px;
-}
-.recent-artifact-list button,
-.artifact-streams button {
-  display: grid;
-  align-items: center;
-  gap: 10px;
-  min-height: 54px;
-  padding: 8px 9px;
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 36%, transparent);
-  border-radius: var(--radius-control);
-  background: var(--workspace-surface-raised);
-}
-.recent-artifact-list button {
-  grid-template-columns: 32px minmax(0, 1fr) 16px;
-}
-.artifact-streams button {
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-}
-.recent-artifact-list button:hover,
-.artifact-streams button:hover {
-  border-color: color-mix(in srgb, var(--el-color-primary) 48%, var(--el-border-color));
-}
-.recent-icon,
-.stream-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-control);
-}
-.recent-artifact-list strong,
-.artifact-streams strong {
-  font-size: 12px;
-}
-.recent-artifact-list small,
-.artifact-streams small {
-  margin-top: 3px;
-  color: var(--el-text-color-secondary);
-  font-size: 10.5px;
-}
-.artifact-streams em {
-  min-width: 24px;
-  padding: 3px 7px;
-  border-radius: 99px;
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
-  font-size: 11px;
-  font-style: normal;
-  text-align: center;
-}
-
-.artifact-empty {
-  min-height: 190px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: var(--el-text-color-secondary);
-  text-align: center;
-}
-.artifact-empty .el-icon {
-  color: var(--el-color-primary);
-  font-size: 24px;
-}
-.artifact-empty strong {
-  color: var(--el-text-color-primary);
+.file-copy strong {
   font-size: 13px;
+  font-weight: 600;
 }
-.artifact-empty span {
+.file-copy small,
+.source-host {
+  color: var(--el-text-color-secondary);
   font-size: 11px;
+  margin-top: 3px;
 }
-
-.artifact-browser-workbench {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
-  gap: 10px;
-  padding: 10px;
-  overflow: hidden;
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-
-@media (max-width: 1100px) {
-  .artifact-browser-workbench {
-    grid-template-columns: minmax(0, 1fr) 260px;
-  }
-  .artifact-overview__grid {
-    grid-template-columns: 1fr;
-  }
+.table-actions .el-button {
+  margin: 0;
+  font-size: 12px;
 }
-
-@media (max-width: 768px) {
-  .artifact-detail__header,
-  .artifact-hero {
+.table-actions :deep(.el-button.is-link) {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.catalog-footer {
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--app-divider-color);
+}
+@media (max-width: 900px) {
+  .library-header {
     align-items: flex-start;
-    flex-direction: column;
   }
-  .artifact-detail__actions {
-    justify-content: flex-start;
+  .library-actions {
+    flex-shrink: 0;
   }
-  .artifact-metrics {
-    grid-template-columns: 1fr;
+  .storage-summary,
+  .library-heading p {
+    display: none;
   }
-  .artifact-browser-workbench {
-    grid-template-columns: 1fr;
-    overflow: auto;
+  .catalog-footer {
+    flex-wrap: wrap;
   }
 }
 </style>

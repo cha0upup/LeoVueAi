@@ -12,7 +12,18 @@
           </span>
           <span class="logo-copy">
             <strong class="logo-text">{{ title }}</strong>
-            <small class="logo-subtitle">{{ subtitle }}</small>
+            <el-tooltip
+              :disabled="!subtitleTooltip"
+              placement="bottom-start"
+            >
+              <template #content>
+                <span class="logo-tooltip">{{ subtitleTooltip }}</span>
+              </template>
+              <small
+                class="logo-subtitle"
+                :tabindex="subtitleTooltip ? 0 : undefined"
+              >{{ subtitle }}</small>
+            </el-tooltip>
           </span>
         </div>
 
@@ -108,6 +119,10 @@ defineProps({
   subtitle: {
     type: String,
     default: '主工作台'
+  },
+  subtitleTooltip: {
+    type: String,
+    default: ''
   },
   userRoleLabel: {
     type: String,
@@ -230,11 +245,19 @@ const iconMap = icons
 }
 
 .logo-subtitle {
+  max-width: 88px;
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0;
-  text-transform: uppercase;
   color: var(--el-text-color-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logo-tooltip {
+  white-space: pre-line;
+  line-height: 1.7;
 }
 
 .mode-switcher {

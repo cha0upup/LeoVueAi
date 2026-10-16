@@ -336,8 +336,8 @@ const archiveCurrentReport = async () => {
     await archiveTextArtifact({
       category: ARTIFACT_CATEGORY.AI_REPORTS,
       name: `平台-${title}`,
+      metadata: { title, sourceModule: 'platform-ai', sourceId: activeThreadId.value },
       extension: 'md',
-      mimeType: 'text/markdown;charset=utf-8',
       content: buildAiReportMarkdown({
         title,
         scope: '平台 AI 分析',

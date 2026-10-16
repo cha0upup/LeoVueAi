@@ -1,4 +1,4 @@
-import { userFileCreateDirApi, userFileUploadApi } from '@/services/api/user-space.js'
+import { archiveUserArtifactApi } from '@/services/api/user-space.js'
 
 export const ARTIFACT_CATEGORY = Object.freeze({
   SCRIPT_BUILDS: 'script-builds',
@@ -38,16 +38,17 @@ export async function archiveTextArtifact({
   name,
   extension = 'txt',
   content,
-  mimeType = 'text/plain;charset=utf-8'
+  metadata = {}
 }) {
   if (!category) throw new Error('成果分类不能为空')
   if (!String(content || '').trim()) throw new Error('成果内容不能为空')
 
   const filename = `${formatArtifactTimestamp()}-${sanitizeArtifactName(name)}.${normalizeExtension(extension)}`
-  await userFileCreateDirApi({ path: category })
-  const file = new File([content], filename, { type: mimeType })
-  await userFileUploadApi(file, { path: category })
-  return { category, filename, path: `${category}/${filename}` }
+  const response = await archiveUserArtifactApi({
+    category, filename, content,
+    metadata: { title: name, ...metadata }
+  })
+  return response.data
 }
 
 const extractAssistantContent = (message) => {

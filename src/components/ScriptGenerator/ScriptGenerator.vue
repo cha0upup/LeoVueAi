@@ -786,7 +786,8 @@ const saveArtifact = async () => {
       category: ARTIFACT_CATEGORY.SCRIPT_BUILDS,
       name: buildArtifactName(),
       extension: resolveArtifactExtension(),
-      content: outputResult.value
+      content: outputResult.value,
+      metadata: { sourceModule: 'script-generator', title: buildArtifactName() }
     })
     showSuccess(`成果已保存至 ${artifact.path}`)
   } catch (error) {
