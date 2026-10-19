@@ -178,6 +178,15 @@
         </div>
       </section>
 
+      <div
+        v-if="activeTask.error"
+        class="scan-error"
+        role="alert"
+      >
+        <strong>{{ activeTask.status === TaskStatus.FAILED ? '扫描失败' : '扫描已中断' }}</strong>
+        <span>{{ activeTask.error }}</span>
+      </div>
+
       <p
         v-if="fingerprintStats?.networkRequestCount != null"
         class="stage-output-empty"
@@ -208,7 +217,19 @@
         <span
           v-else
           class="stage-output-empty"
-        >{{ isRunning(activeTask) || isPaused(activeTask) ? '确认可达的主机会在这里显示，未确认主机仍会参与端口扫描' : '尚未确认可达主机' }}</span>
+        >{{ isRunning(activeTask) || isPaused(activeTask) ? '确认可达的主机会在这里显示，未知主机不参与端口扫描' : '尚未确认可达主机' }}</span>
+        <p
+          v-if="activeTask.unknownHostCount != null"
+          class="stage-output-empty"
+        >
+          未确认 {{ formatCount(activeTask.unknownHostCount) }} 台 · 解析或路径异常 {{ formatCount(activeTask.unreachableHostCount) }} 台 · 待确认 {{ formatCount(activeTask.pendingHostCount) }} 台
+        </p>
+        <p
+          v-if="activeTask.skippedHostCount != null && displayStages.some(stage => stage.name === 'PORT_SCAN')"
+          class="stage-output-empty"
+        >
+          仅扫描已确认可达主机；未知及解析或路径异常主机已跳过 {{ formatCount(activeTask.skippedHostCount) }} 台。
+        </p>
       </section>
 
       <p
@@ -320,7 +341,7 @@ import { clampProgress } from '@/utils/format.js'
 import AssetResultTable from './AssetResultTable.vue'
 import ScanComposer from './ScanComposer.vue'
 import FingerprintScanComposer from './FingerprintScanComposer.vue'
-import { selectScanStages } from './scanStages.js'
+import { selectScanStages, terminalScanStageText } from './scanStages.js'
 import { taskEngine } from '../File/TaskEngine.js'
 import { TASK_STATUS_TEXT, TERMINAL_TASK_STATUSES, TaskStatus } from '@/constants/task.js'
 import { useAssetDiscoveryTasks } from './useAssetDiscoveryTasks.js'
@@ -385,6 +406,7 @@ const currentStageLabel = computed(() => {
   const status = activeTask.value?.status
   if (status === TaskStatus.COMPLETED) return '已完成'
   if (status === TaskStatus.FAILED) return '扫描失败'
+  if (status === TaskStatus.CANCELLED) return '已取消'
   return (
     displayStages.value.find((stage) => stage.name === activeTask.value?.currentStage)?.label ||
     '准备扫描'
@@ -512,7 +534,10 @@ function timestampValue(value) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 function stageStatusText(task, name, stage) {
+  const terminalText = terminalScanStageText(task?.status, stage?.status)
+  if (terminalText) return terminalText
   if (stage) {
+    if (stage.reason === 'NO_REACHABLE_HOSTS') return '未确认可达，已跳过'
     if (stage.reason === 'NO_HTTP_APPLICATIONS') return '无 HTTP 应用，已跳过'
     if (stage.reason === 'DISABLED' || stage.status === 'SKIPPED') return '已跳过'
     if (name === 'REACHABILITY' && task?.reachableHostList)
@@ -598,6 +623,7 @@ function stageStatusText(task, name, stage) {
 .page-empty h2 { margin: 16px 0 0; font-size: 18px; font-weight: 600; }
 .page-empty p { margin: 10px 0 20px; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .load-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 8px 12px; color: var(--el-color-danger); background: var(--el-color-danger-light-9); border-radius: 4px; font-size: 12px; overflow-wrap: anywhere; }
+.scan-error { display: grid; gap: 6px; padding: 12px 14px; color: var(--el-color-danger); background: var(--el-color-danger-light-9); border: 1px solid var(--el-color-danger-light-7); border-radius: 6px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 :deep(.scan-composer-dialog.el-dialog) { padding: 0; overflow: hidden; border-radius: 10px; }
 :deep(.scan-composer-dialog .el-dialog__header) { margin: 0; padding: 17px 20px; border-bottom: 1px solid var(--el-border-color-lighter); }
 :deep(.scan-composer-dialog .el-dialog__title) { font-size: 16px; font-weight: 600; }

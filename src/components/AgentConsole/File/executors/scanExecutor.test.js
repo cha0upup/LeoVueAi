@@ -31,6 +31,21 @@ describe('scan executor request lifecycle', () => {
     return { engine, task: engine.getTaskById(id) }
   }
 
+  it('corrects historical interrupted progress and retains the failure detail', async () => {
+    const { engine, task } = await fixture()
+    engine.hydrateScanTask(task.id, {
+      status: 'STOPPED', outcome: 'FAILED', progress: 33,
+      error: '工作流阶段失败: REACHABILITY · worker fixture failure',
+      stages: [{ name: 'REACHABILITY', status: 'FAILED', progress: 0 },
+        { name: 'PORT_SCAN', status: 'PENDING', progress: 0 },
+        { name: 'SERVICE_PROBE', status: 'PENDING', progress: 0 }]
+    })
+    expect(task).toMatchObject({ status: TaskStatus.FAILED, progress: 0,
+      error: '工作流阶段失败: REACHABILITY · worker fixture failure' })
+    engine.hydrateScanTask(task.id, { status: 'STOPPED', outcome: 'FAILED', progress: 33 })
+    expect(task.progress).toBe(0)
+  })
+
   it('does not overwrite a successful stop with an older query', async () => {
     const { engine, task } = await fixture()
     let finishQuery
@@ -216,6 +231,15 @@ describe('scan executor task hydration', () => {
     expect(task.backendTaskId).toBe('backend-task')
     expect(task.status).toBe(TaskStatus.SCANNING)
     expect(events.at(-1)?.[0]).toBe('taskProgress')
+  })
+
+  it('preserves strict discovery counts across partial task summaries', () => {
+    const { engine, task } = fixture()
+    engine.hydrateScanTask(task.id, { status: 'RUNNING', unknownHostCount: 3, unreachableHostCount: 2,
+      skippedHostCount: 5, pendingHostCount: 0, portScanHostCount: 4 })
+    engine.hydrateScanTask(task.id, { status: 'PAUSED' })
+    expect(task).toMatchObject({ unknownHostCount: 3, unreachableHostCount: 2, skippedHostCount: 5,
+      pendingHostCount: 0, portScanHostCount: 4 })
   })
 
   it('clears the current stage and completes target progress from a durable terminal snapshot', () => {

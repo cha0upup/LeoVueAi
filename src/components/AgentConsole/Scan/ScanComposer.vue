@@ -98,7 +98,7 @@
           class="preview-stats"
         >
           <div><span>主机</span><strong>{{ Number(previewData.hostCount || 0).toLocaleString('zh-CN') }}</strong></div>
-          <div><span>{{ scansPorts ? '扫描端口' : '探活请求' }}</span><strong>{{ Number((scansPorts ? previewData.portCount : previewData.reachabilityProbeCount) || 0).toLocaleString('zh-CN') }}</strong></div>
+          <div><span>{{ scansPorts ? '扫描端口' : '探活请求上限' }}</span><strong>{{ Number((scansPorts ? previewData.portCount : previewData.reachabilityProbeCount) || 0).toLocaleString('zh-CN') }}</strong></div>
           <div v-if="scansPorts">
             <span>检测组合</span><strong>{{ Number(previewData.combinationCount || 0).toLocaleString('zh-CN') }}</strong>
           </div>
@@ -201,8 +201,8 @@ const identifiesComponents = computed(() => formData.stages.includes('FINGERPRIN
 const scansPorts = computed(() => formData.stages.includes('PORT_SCAN'))
 const stageHint = computed(() => {
   if (!formData.stages.length) return '请至少选择一个扫描阶段。'
-  if (!scansPorts.value) return '仅探活：使用常用 TCP 端口；输入主机:端口可指定探活端口。'
-  const scope = formData.stages.includes('REACHABILITY') ? '先探活，仅扫描存活主机。' : '跳过探活，直接扫描所有输入目标。'
+  if (!scansPorts.value) return '仅探活：Java 节点先执行可达性检测，再分轮 TCP 补探；指定端口时直接探测该端口。'
+  const scope = formData.stages.includes('REACHABILITY') ? '先探活，仅扫描已确认可达主机，未知主机跳过。' : '跳过探活，直接扫描所有输入目标。'
   if (identifiesComponents.value) return scope + '读取所选指纹规则，识别 HTTP/HTTPS 应用组件。'
   return scope + (formData.stages.includes('SERVICE_PROBE') ? '识别开放端口上的服务。' : '仅检查端口开放状态。')
 })

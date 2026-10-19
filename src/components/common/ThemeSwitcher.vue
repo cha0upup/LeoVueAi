@@ -8,18 +8,14 @@
       <button
         class="theme-switcher-button"
         type="button"
+        :aria-label="themeButtonLabel"
+        :title="themeButtonLabel"
       >
-        <span class="theme-icon-shell">
-          <el-icon :size="16">
-            <Icon :icon="currentThemeIcon" />
-          </el-icon>
-        </span>
-        <span class="theme-copy">
-          <span class="theme-label">主题</span>
-          <span class="theme-current">{{ currentThemeMeta?.name || '主题' }}</span>
-        </span>
-        <el-icon class="theme-arrow">
-          <Icon :icon="iconMap.arrowDown" />
+        <el-icon
+          :size="18"
+          aria-hidden="true"
+        >
+          <Icon :icon="currentThemeIcon" />
         </el-icon>
       </button>
       <template #dropdown>
@@ -68,6 +64,7 @@ const themeStore = useTheme()
 const { currentTheme } = themeStore
 const availableThemes = themeStore.getAvailableThemes()
 const currentThemeMeta = computed(() => themeStore.getCurrentTheme())
+const themeButtonLabel = computed(() => `切换主题（当前：${currentThemeMeta.value?.name || '默认主题'}）`)
 const iconMap = icons
 
 const themeDescriptions = {
@@ -87,73 +84,33 @@ const currentThemeIcon = computed(() => currentTheme.value === 'light' ? iconMap
 .theme-switcher {
   display: inline-flex;
   align-items: center;
-  min-width: 0;
-  max-width: 100%;
+  flex-shrink: 0;
 }
 
 .theme-switcher-button {
-  min-width: 0;
-  max-width: 100%;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px 0 8px;
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 76%, transparent);
-  border-radius: 12px;
-  background: var(--app-control-background);
+  justify-content: center;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: var(--app-control-radius);
+  background: transparent;
   color: var(--el-text-color-regular);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .theme-switcher-button:hover {
   background: var(--app-control-background-hover);
-  border-color: color-mix(in srgb, var(--el-color-primary-light-5) 40%, transparent);
-  color: var(--el-color-primary);
-  transform: translateY(-1px);
-}
-
-.theme-icon-shell {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--el-color-primary) 12%, var(--app-control-background));
   color: var(--el-color-primary);
 }
 
-.theme-copy {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-}
-
-.theme-label {
-  font-size: 10px;
-  line-height: 1.1;
-  color: var(--el-text-color-secondary);
-}
-
-.theme-current {
-  font-size: 12px;
-  line-height: 1.2;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.theme-arrow {
-  color: var(--el-text-color-placeholder);
-  font-size: 12px;
+.theme-switcher-button:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
 }
 
 .theme-menu {

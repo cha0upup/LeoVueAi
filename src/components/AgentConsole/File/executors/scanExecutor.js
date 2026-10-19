@@ -7,6 +7,7 @@ import {
 } from '@/services/api/scan.js'
 import { TERMINAL_TASK_STATUSES, TaskStatus, TaskType } from '@/constants/task.js'
 import { clampProgress } from '@/utils/format.js'
+import { interruptedScanProgress } from '../../Scan/scanStages.js'
 
 const STATUS_EVENTS = {
   [TaskStatus.COMPLETED]: 'taskCompleted',
@@ -84,7 +85,9 @@ export function applyScanExecutor(TaskEngine) {
     const nextStatus = snapshot.status ? mapScanStatus(snapshot.status, snapshot) : task.status
     const targetCount = Number(snapshot.targetCount ?? task.targetCount)
     const processedCount = nextStatus === TaskStatus.COMPLETED ? targetCount : task.processedCount
-    const progress = clampProgress(snapshot.progress ?? task.progress)
+    const interruptedProgress = [TaskStatus.FAILED, TaskStatus.CANCELLED].includes(nextStatus)
+      ? interruptedScanProgress(snapshot.stages ?? task.stages) : null
+    const progress = interruptedProgress ?? clampProgress(snapshot.progress ?? task.progress)
 
     task.backendTaskId = snapshot.taskId || task.backendTaskId
     task.status = nextStatus
@@ -99,6 +102,9 @@ export function applyScanExecutor(TaskEngine) {
     task.scanPorts = snapshot.ports ?? task.scanPorts
     task.reachableHostList = snapshot.reachableHostList ?? task.reachableHostList
     task.reachableHostCount = Number(snapshot.reachableHostCount ?? task.reachableHostCount)
+    for (const key of ['unknownHostCount', 'unreachableHostCount', 'pendingHostCount', 'skippedHostCount', 'portScanHostCount']) {
+      if (snapshot[key] != null) task[key] = Math.max(0, Number(snapshot[key]) || 0)
+    }
     task.stages = snapshot.stages ?? task.stages
     const stages = Array.isArray(task.stages) ? task.stages : []
     task.probeCompleted = stages.reduce((total, stage) => total + Math.max(0, Number(stage.completed) || 0), 0)

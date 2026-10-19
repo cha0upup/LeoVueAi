@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { selectScanStages, toggleScanStage } from './scanStages.js'
+import { interruptedScanProgress, selectScanStages, terminalScanStageText, toggleScanStage } from './scanStages.js'
 
 describe('scan stage selection', () => {
+  it('shows interrupted stage states before success counters and pending labels', () => {
+    expect(terminalScanStageText('failed', 'FAILED')).toBe('扫描失败')
+    expect(terminalScanStageText('cancelled', 'CANCELLED')).toBe('已取消')
+    expect(terminalScanStageText('failed', 'PENDING')).toBe('未执行')
+    expect(terminalScanStageText('cancelled', undefined)).toBe('未执行')
+    expect(terminalScanStageText('scanning', 'PENDING')).toBeNull()
+    expect(terminalScanStageText('completed', 'COMPLETED')).toBeNull()
+  })
+
+  it('does not count failed or cancelled stages as completed progress', () => {
+    const stages = [{ status: 'FAILED', progress: 0 }, { status: 'PENDING' }, { status: 'PENDING' }]
+    expect(interruptedScanProgress(stages)).toBe(0)
+    expect(interruptedScanProgress([{ status: 'COMPLETED' }, { status: 'CANCELLED', progress: 50 }, stages[1]])).toBe(50)
+    expect(interruptedScanProgress([])).toBeNull()
+  })
   it('enables component dependencies and removes components when a dependency is disabled', () => {
     const selected = toggleScanStage([], 'FINGERPRINT', true)
     expect(selected).toEqual(['PORT_SCAN', 'SERVICE_PROBE', 'FINGERPRINT'])
