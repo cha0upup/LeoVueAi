@@ -84,7 +84,33 @@ export function exportTsv(data, filename, columns) {
   )
 }
 
+/** 导出 UTF-8 CSV；BOM 兼容 Excel，保留字段中的逗号、引号和换行。 */
+export function exportCsv(data, filename, columns) {
+  if (!data?.length) return
+
+  const exportColumns = columns?.length
+    ? columns
+    : [...new Set(data.flatMap((row) => Object.keys(row)))].map((key) => ({ label: key, key }))
+  const lines = [exportColumns.map(({ label }) => csvCell(label)).join(',')]
+  for (const row of data) {
+    lines.push(exportColumns.map(({ key }) =>
+      csvCell(typeof key === 'function' ? key(row) : row[key])
+    ).join(','))
+  }
+  downloadBlob(
+    new Blob(['\uFEFF', lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }),
+    /\.csv$/i.test(filename) ? filename : `${filename}.csv`
+  )
+}
+
 // ────── internal ──────
+
+function csvCell(value) {
+  let text = String(value ?? '')
+  // 页面标题、Banner 等远端文本在表格软件中应作为数据，而非公式执行。
+  if (typeof value === 'string' && /^(?:[\t\r\n]|\s*[=+@-])/.test(text)) text = `'${text}`
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
 
 function sanitize(val) {
   return String(val).replace(/[\t\n\r]/g, ' ')

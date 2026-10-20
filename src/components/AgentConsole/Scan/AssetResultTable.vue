@@ -40,10 +40,22 @@
         </el-button>
         <el-button
           :icon="Download"
-          :disabled="!tableData.length || loading || Boolean(loadError)"
+          :disabled="!tableData.length || loading || exporting || Boolean(loadError)"
+          title="导出本页或已选记录（CSV）"
           @click="handleExport"
         >
           {{ selectedRows.length ? `导出已选 ${selectedRows.length} 项` : '导出本页' }}
+        </el-button>
+        <el-button
+          type="primary"
+          plain
+          :icon="Download"
+          :loading="exporting"
+          :disabled="!total || loading || Boolean(loadError)"
+          :title="hasActiveFilters ? '导出当前筛选条件下的全部结果（CSV）' : '导出当前扫描的全部结果（CSV）'"
+          @click="handleExportAll"
+        >
+          {{ exporting ? `正在导出 ${exportProgress}/${exportTotal}` : '导出全部' }}
         </el-button>
       </div>
     </div>
@@ -387,7 +399,7 @@ import { Search, Filter, Download, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { queryNetworkProbeWorkflowResultsApi } from '@/services/api/scan.js'
 import FingerprintResults from './FingerprintResults.vue'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportCsv } from '@/utils/exportUtils.js'
 
 const props = defineProps({
   taskId: {
@@ -417,6 +429,9 @@ const searchText = ref('')
 const tableData = ref([])
 const total = ref(0)
 const selectedRows = ref([])
+const exporting = ref(false)
+const exportProgress = ref(0)
+const exportTotal = ref(0)
 const showFilterDrawer = ref(false)
 const serviceOptions = ['http', 'https', 'ssh', 'ftp', 'mysql', 'redis', 'mongodb', 'postgresql']
 
@@ -463,6 +478,28 @@ const activeFilterTags = computed(() => {
 const hasActiveFilters = computed(() => Object.keys(activeFilterTags.value).length > 0)
 
 // 方法
+function buildResultQuery() {
+  const { field, order } = sortBy.value
+  return {
+    sessionId: props.sessionId,
+    taskId: props.taskId,
+    sort: { field: field === 'target' ? 'host' : field, order },
+    filter: {
+      searchText: searchText.value.trim(),
+      services: filters.services.map((service) => service.toLowerCase()),
+      portMin: filters.portMin,
+      portMax: filters.portMax,
+      hasService: filters.hasService,
+      hasTitle: filters.hasTitle,
+      hasFingerprint: filters.hasFingerprint,
+      component: filters.component.trim(),
+      responseTimeMin: filters.responseTimeRange[0],
+      responseTimeMax:
+        filters.responseTimeRange[1] >= 300000 ? null : filters.responseTimeRange[1]
+    }
+  }
+}
+
 async function loadData({ silent = false } = {}) {
   if (!props.taskId || !props.sessionId) return
   if (searchTimer) window.clearTimeout(searchTimer)
@@ -474,26 +511,10 @@ async function loadData({ silent = false } = {}) {
   loadingMode.value = silent ? 'silent' : 'visible'
   if (!silent) resultTable.value?.clearSelection()
   try {
-    const { field, order } = sortBy.value
     const response = await queryNetworkProbeWorkflowResultsApi({
-      sessionId: props.sessionId,
-      taskId: props.taskId,
+      ...buildResultQuery(),
       page: pagination.page,
-      pageSize: pagination.pageSize,
-      sort: { field: field === 'target' ? 'host' : field, order },
-      filter: {
-        searchText: filters.keyword.trim(),
-        services: filters.services.map((service) => service.toLowerCase()),
-        portMin: filters.portMin,
-        portMax: filters.portMax,
-        hasService: filters.hasService,
-        hasTitle: filters.hasTitle,
-        hasFingerprint: filters.hasFingerprint,
-        component: filters.component.trim(),
-        responseTimeMin: filters.responseTimeRange[0],
-        responseTimeMax:
-          filters.responseTimeRange[1] >= 300000 ? null : filters.responseTimeRange[1]
-      }
+      pageSize: pagination.pageSize
     })
     const payload = response?.data || {}
     if (sequence !== requestSequence) return
@@ -597,7 +618,7 @@ function openInBrowser(row) {
 
 function exportEvidence(row) {
   if (!row) return
-  exportTsv([row], `network-evidence-${row.host}-${row.port}`, endpointColumns)
+  exportCsv([row], `network-evidence-${row.host}-${row.port}`, endpointColumns)
 }
 
 function handleExport() {
@@ -606,8 +627,54 @@ function handleExport() {
     ElMessage.warning('当前没有可导出的记录')
     return
   }
-  exportTsv(rows, `network-results-page-${pagination.page}`, endpointColumns)
+  const scope = selectedRows.value.length ? 'selected' : `page-${pagination.page}`
+  exportCsv(rows, `network-results-${scope}`, endpointColumns)
   ElMessage.success(`已导出 ${rows.length} 条记录`)
+}
+
+async function handleExportAll() {
+  if (exporting.value || loading.value || loadError.value || !props.taskId || !props.sessionId || !total.value) return
+  const sequence = ++exportSequence
+  // 固定本次导出的任务、筛选与排序；分页查询不影响当前表格和勾选项。
+  const query = buildResultQuery()
+  exporting.value = true
+  exportProgress.value = 0
+  exportTotal.value = total.value
+  const rows = []
+  let page = 1
+  let pageSize = 200 // 与结果接口的单页上限保持一致。
+  try {
+    do {
+      const response = await queryNetworkProbeWorkflowResultsApi({ ...query, page, pageSize })
+      if (sequence !== exportSequence) return
+      const payload = response?.data
+      if (!Array.isArray(payload?.endpoints) || !Number.isSafeInteger(Number(payload.total)) || Number(payload.total) < 0) {
+        throw new Error('导出数据格式异常，请刷新后重试')
+      }
+      if (page === 1) {
+        exportTotal.value = Number(payload.total)
+        if (Number.isInteger(payload.pageSize) && payload.pageSize > 0) pageSize = payload.pageSize
+      }
+      if (!exportTotal.value) {
+        ElMessage.warning('当前没有可导出的记录')
+        return
+      }
+      if (!payload.endpoints.length) throw new Error('结果已变化，请刷新后重新导出')
+      rows.push(...payload.endpoints.slice(0, exportTotal.value - rows.length))
+      exportProgress.value = rows.length
+      if (rows.length < exportTotal.value && payload.hasMore === false) {
+        throw new Error('结果已变化，请刷新后重新导出')
+      }
+      page += 1
+    } while (rows.length < exportTotal.value)
+
+    exportCsv(rows, `network-results-${query.taskId}-all`, endpointColumns)
+    ElMessage.success(`已导出 ${rows.length} 条记录`)
+  } catch (error) {
+    if (sequence === exportSequence) ElMessage.error(`导出失败：${error?.message || '请稍后重试'}`)
+  } finally {
+    if (sequence === exportSequence) exporting.value = false
+  }
 }
 
 const endpointColumns = [
@@ -659,18 +726,22 @@ function formatBytes(value) {
 // 生命周期
 onUnmounted(() => {
   requestSequence += 1
+  exportSequence += 1
   if (searchTimer) window.clearTimeout(searchTimer)
   searchTimer = null
 })
 
 let searchTimer = null
 let requestSequence = 0
+let exportSequence = 0
 let refreshPending = false
 
 watch(
   () => [props.sessionId, props.taskId],
   () => {
     requestSequence += 1
+    exportSequence += 1
+    exporting.value = false
     if (searchTimer) window.clearTimeout(searchTimer)
     searchTimer = null
     loadingMode.value = null
