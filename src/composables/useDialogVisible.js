@@ -12,14 +12,11 @@ import { computed } from 'vue'
  *
  * @param {Object} props 来源组件 props，必须包含 `modelValue: Boolean`
  * @param {Function} emit 来源组件 `defineEmits` 返回的 emit 函数
- * @param {string} [propName='modelValue'] 自定义 prop 名
- * @param {string} [eventName] emit 的事件名，默认 `update:${propName}`
  * @returns {import('vue').WritableComputedRef<boolean>}
  */
-export function useDialogVisible(props, emit, propName = 'modelValue', eventName) {
-  const event = eventName || `update:${propName}`
+export function useDialogVisible(props, emit) {
   return computed({
-    get: () => Boolean(props[propName]),
-    set: (value) => emit(event, Boolean(value))
+    get: () => Boolean(props.modelValue),
+    set: (value) => emit('update:modelValue', Boolean(value))
   })
 }

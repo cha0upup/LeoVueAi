@@ -18,11 +18,9 @@ import { toValue } from 'vue'
  *   - 字符串字面量
  */
 export function useSessionParams(sessionRef) {
-  const readSessionId = () => toValue(sessionRef)
-
   function withSession(extra = {}) {
-    return { sessionId: readSessionId(), ...extra }
+    return { sessionId: toValue(sessionRef), ...extra }
   }
 
-  return { withSession, sessionId: readSessionId }
+  return { withSession }
 }

@@ -92,7 +92,6 @@ export function useAgentImportBatch() {
   return {
     batchAgents,
     batchSelectedIndices,
-    batchSelectedTargetIds,
     batchAllSelected,
     batchIndeterminate,
     batchSelectionSummary,
