@@ -12,8 +12,6 @@ function applyDownloadSnapshot(task, payload = {}) {
   task.engineTaskId = snap.taskId || task.engineTaskId
   task.fileSize = Number(snap.expectedLength ?? task.fileSize ?? 0)
   task.expectedMd5 = snap.expectedMd5 ?? task.expectedMd5
-  task.totalChunks = Number(snap.totalChunks ?? task.totalChunks ?? 0)
-  task.completedChunksCount = Number(snap.doneChunks ?? task.completedChunksCount ?? 0)
   task.downloadedSize = Number(snap.downloadedBytes ?? task.downloadedSize ?? 0)
   task.speed = Number(snap.speedBytesPerSec ?? 0)
   task.downloadPath = snap.downloadPath ?? task.downloadPath
@@ -28,7 +26,7 @@ function applyDownloadSnapshot(task, payload = {}) {
 export function applyDownloadExecutor(TaskEngine) {
   TaskEngine.prototype.executeDownloadTask = async function (task) {
     if (task.isDetached) return
-    // 新逻辑：使用后端 Download Engine（断点续传 + 服务端落盘）
+    // 后端 Download Engine 负责断点续传与落盘；浏览器只观察任务状态。
     const { chunkSize, concurrency } = task.options
 
     const remotePath = formatFilePath(task.filePath + task.fileName)
@@ -100,7 +98,6 @@ export function applyDownloadExecutor(TaskEngine) {
         task.status = TaskStatus.FAILED
         task.endTime = Date.now()
         task.error = task.lastError || '下载失败'
-        this.emit('taskFailed', task, new Error(task.error))
         throw new Error(task.error)
       }
 

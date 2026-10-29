@@ -86,8 +86,6 @@ describe('download finalization', () => {
         status: TaskStatus.PAUSED,
         fileSize: 0,
         downloadedSize: 0,
-        totalChunks: 0,
-        completedChunksCount: 0,
         speed: 0,
         progress: 0,
         lastError: null,

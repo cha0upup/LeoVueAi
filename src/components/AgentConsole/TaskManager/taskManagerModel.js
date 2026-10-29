@@ -1,22 +1,10 @@
-import { ACTIVE_TASK_STATUSES, TASK_STATUS_TEXT, TaskStatus, TaskType } from '@/constants/task.js'
+import { ACTIVE_TASK_STATUSES, normalizeEngineTaskStatus, TASK_STATUS_TEXT, TaskStatus, TaskType } from '@/constants/task.js'
 
 const TASK_TYPE_META = {
   [TaskType.DOWNLOAD]: { label: '下载任务', actionLabel: '下载', icon: 'download', runningStatus: TaskStatus.DOWNLOADING },
   [TaskType.UPLOAD]: { label: '上传任务', actionLabel: '上传', icon: 'upload', runningStatus: TaskStatus.UPLOADING },
   [TaskType.DB_EXPORT]: { label: '数据库导出', actionLabel: '导出', icon: 'database', runningStatus: TaskStatus.DB_EXPORTING },
   [TaskType.SCAN]: { label: '扫描任务', actionLabel: '扫描', icon: 'scan', runningStatus: TaskStatus.SCANNING }
-}
-
-const STATUS_BY_ENGINE_STATE = {
-  PAUSED: TaskStatus.PAUSED,
-  CANCELLED: TaskStatus.CANCELLED,
-  FAILED: TaskStatus.FAILED,
-  COMPLETED: TaskStatus.COMPLETED
-}
-
-const normalizeStatus = (value, runningStatus) => {
-  const state = String(value || '').toUpperCase()
-  return state === 'RUNNING' ? runningStatus : STATUS_BY_ENGINE_STATE[state] || TaskStatus.PENDING
 }
 
 const basename = (path) => {
@@ -34,7 +22,7 @@ export const getDownloadRelativePath = (downloadPath) => {
 export const normalizeServerDownloadTask = (snapshot = {}) => {
   const expectedLength = Number(snapshot.expectedLength || 0)
   const downloadedBytes = Number(snapshot.downloadedBytes || 0)
-  const mappedStatus = normalizeStatus(snapshot.state, TaskStatus.DOWNLOADING)
+  const mappedStatus = normalizeEngineTaskStatus(snapshot.state, TaskStatus.DOWNLOADING)
 
   return {
     viewId: `server:${snapshot.taskId || ''}`,
@@ -69,7 +57,7 @@ export const normalizeServerSqlExportTask = (snapshot, sessionId = '') => {
     taskId: null,
     serverTaskId: task.taskId || '',
     type: TaskType.DB_EXPORT,
-    status: normalizeStatus(task.status, TaskStatus.DB_EXPORTING),
+    status: normalizeEngineTaskStatus(task.status, TaskStatus.DB_EXPORTING),
     progress: Number(task.progress || 0),
     fileSize: Number(task.fileSize || 0),
     speed: 0,
@@ -104,7 +92,7 @@ export const normalizeServerUploadTask = (snapshot) => {
     taskId: null,
     serverTaskId: task.taskId || '',
     type: TaskType.UPLOAD,
-    status: normalizeStatus(task.state, TaskStatus.UPLOADING),
+    status: normalizeEngineTaskStatus(task.state, TaskStatus.UPLOADING),
     progress:
       task.progress !== undefined
         ? Number(task.progress || 0)

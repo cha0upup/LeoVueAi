@@ -300,6 +300,7 @@ class TaskEngine {
     task.isPaused = false
     task.status = TaskStatus.CANCELLED
     task.endTime = Date.now()
+    if (task.type === TaskType.UPLOAD) task.fileData = null
     if (isScanTask) task.canControl = false
     this.emit('taskCancelled', task)
   }

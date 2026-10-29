@@ -233,7 +233,6 @@ const startUpload = async () => {
           chunkSize: form.chunkSize,
           concurrency: form.concurrency,
           maxRetries: 3,
-          background: true
         }
       )
       currentTaskIds.value.set(file.uid, taskId)

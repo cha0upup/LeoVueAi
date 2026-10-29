@@ -166,7 +166,6 @@ const startDownload = async () => {
       {
         chunkSize: form.chunkSize,
         concurrency: form.concurrency,
-        background: true
       }
     )
     downloadVisible.value = false

@@ -63,6 +63,7 @@ describe('upload commit lifecycle', () => {
     expect(moveFileApi).not.toHaveBeenCalled()
     expect(deleteFileApi).toHaveBeenCalledOnce()
     expect(task.status).toBe(TaskStatus.CANCELLED)
+    expect(task.fileData).toBeNull()
   })
   it('waits for every pending write before removing a failed upload', async () => {
     const { engine, task } = fixture('ab')
@@ -85,6 +86,7 @@ describe('upload commit lifecycle', () => {
     expect(deleteFileApi).toHaveBeenCalledOnce()
     expect(moveFileApi).not.toHaveBeenCalled()
     expect(task.status).toBe(TaskStatus.FAILED)
+    expect(task.fileData).toBeInstanceOf(Blob)
   })
   it('commits an empty file only after verification', async () => {
     const { engine, task } = fixture('')
@@ -94,6 +96,15 @@ describe('upload commit lifecycle', () => {
     expect(moveFileApi).toHaveBeenCalledOnce()
     expect(engine.uploadChunk).not.toHaveBeenCalled()
     expect(task.status).toBe(TaskStatus.COMPLETED)
+    expect(task.fileData).toBeNull()
+  })
+  it('updates byte progress without retaining per-chunk records after completion', async () => {
+    const { engine, task } = fixture()
+    getFileMd5Api.mockResolvedValue({ data: { md5: '900150983cd24fb0d6963f7d28e17f72' } })
+    await engine.executeUploadTask(task)
+    expect(engine.uploadChunk).toHaveBeenCalledTimes(3)
+    expect(task).toMatchObject({ status: TaskStatus.COMPLETED, uploadedSize: 3, progress: 100, fileData: null })
+    for (const key of ['chunks', 'activeUploads', 'retryCount', 'totalChunks']) expect(task).not.toHaveProperty(key)
   })
   it('hashes blobs in bounded slices and respects typed-array offsets', async () => {
     const { engine } = fixture()

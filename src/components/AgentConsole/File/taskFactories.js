@@ -28,21 +28,12 @@ export function createDownloadTask({
     lastError: null,
     currentStage: 'CREATED',
     errorStage: null,
-    totalChunks: 0,
-    completedChunksCount: 0,
-    failedChunksCount: 0,
-    chunks: [],
-    activeDownloads: new Set(),
     isPaused: false,
     isCancelled: false,
-    retryCount: 0,
     error: null,
     options: {
-      chunkSize: options.chunkSize || 524288,
-      concurrency: options.concurrency || 5,
-      maxRetries: options.maxRetries || 3,
-      background: options.background !== false,
-      ...options
+      chunkSize: options.chunkSize ?? 524288,
+      concurrency: options.concurrency ?? 5,
     }
   }
 }
@@ -71,18 +62,13 @@ export function createUploadTask({
     startTime: null,
     endTime: null,
     speed: 0,
-    chunks: [],
-    activeUploads: new Set(),
     isPaused: false,
     isCancelled: false,
-    retryCount: 0,
     error: null,
     options: {
-      chunkSize: options.chunkSize || 524288,
-      concurrency: options.concurrency || 3,
-      maxRetries: options.maxRetries || 3,
-      background: options.background !== false,
-      ...options
+      chunkSize: options.chunkSize ?? 524288,
+      concurrency: options.concurrency ?? 3,
+      maxRetries: options.maxRetries ?? 3,
     }
   }
 }
@@ -109,15 +95,11 @@ export function createDbExportTask({ taskId, sessionId, databaseName, tableCount
     endTime: null,
     isPaused: false,
     isCancelled: false,
-    retryCount: 0,
     error: null,
-    result: null,
     options: {
       exportFormat: options.exportFormat || 'zip',
       includeData: options.includeData !== false,
       includeStructure: options.includeStructure !== false,
-      background: options.background !== false,
-      ...options
     }
   }
 }

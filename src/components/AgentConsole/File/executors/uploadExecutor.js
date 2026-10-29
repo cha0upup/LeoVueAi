@@ -12,11 +12,8 @@ export function applyUploadExecutor(TaskEngine) {
     task.progress = 0
     task.uploadedSize = 0
     task.speed = 0
-    task.chunks = []
-    task.activeUploads = new Set()
     task.isPaused = false
     task.isCancelled = false
-    task.retryCount = 0
     task.error = null
     task.errorStage = null
     task.currentStage = 'PREPARING'
@@ -46,7 +43,6 @@ export function applyUploadExecutor(TaskEngine) {
       // 计算分块数量
       const chunkSize = task.options.chunkSize
       const totalChunks = Math.ceil(task.fileSize / chunkSize)
-      task.totalChunks = totalChunks
 
       // 创建分块任务
       const createChunkTask = async (chunkIndex, retryAttempt = 0) => {
@@ -64,13 +60,6 @@ export function applyUploadExecutor(TaskEngine) {
 
           checkCancelled()
           if (result && !task.isCancelled) {
-            task.chunks[chunkIndex] = {
-              offset: offset,
-              size: size,
-              index: chunkIndex,
-              uploaded: true
-            }
-
             task.uploadedSize += size
             task.progress = (task.uploadedSize / task.fileSize) * 100
 
@@ -149,6 +138,7 @@ export function applyUploadExecutor(TaskEngine) {
       task.endTime = Date.now()
       task.progress = 100
       task.uploadedSize = task.fileSize
+      task.fileData = null
 
       const duration = (task.endTime - task.startTime) / 1000
       const avgSpeed = task.fileSize / duration
@@ -174,6 +164,7 @@ export function applyUploadExecutor(TaskEngine) {
       task.errorStage = task.currentStage
       if (task.isCancelled) {
         task.status = TaskStatus.CANCELLED
+        task.fileData = null
         this.emit('taskCancelled', task)
       } else {
         task.status = TaskStatus.FAILED

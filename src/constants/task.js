@@ -43,6 +43,19 @@ export const TASK_STATUS_TEXT = {
   [TaskStatus.CANCELLED]: '已取消'
 }
 
+const STATUS_BY_ENGINE_STATE = {
+  PAUSED: TaskStatus.PAUSED,
+  CANCELLED: TaskStatus.CANCELLED,
+  FAILED: TaskStatus.FAILED,
+  COMPLETED: TaskStatus.COMPLETED
+}
+
+/** Server transfer/export states share terminal states but have distinct running labels. */
+export function normalizeEngineTaskStatus(value, runningStatus) {
+  const state = String(value || '').toUpperCase()
+  return state === 'RUNNING' ? runningStatus : STATUS_BY_ENGINE_STATE[state] || TaskStatus.PENDING
+}
+
 export const FILE_TRANSFER_CHUNK_OPTIONS = Object.freeze([
   { label: '64KB', value: 65536 },
   { label: '128KB', value: 131072 },
