@@ -24,6 +24,7 @@
           >
             <AgentConsoleView
               v-if="tab.isLoaded"
+              :active="currentTab === tab.id && route.name === ROUTE_NAMES.mainAgent"
               :conn-link="tab.connLink"
               :session-id="tab.sessionId"
               :agent-name="tab.title"

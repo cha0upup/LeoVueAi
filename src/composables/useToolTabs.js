@@ -113,6 +113,7 @@ export function useToolTabs(moduleDefinitions, { getSessionId = () => '', isModu
       _evictLRU()
     }
     tabKeys.value = [...tabKeys.value, key]
+    _touchLRU(key)
   }
 
   /** Close a tab. If it's the last tab, keep it. */

@@ -105,7 +105,7 @@
 
           <template v-if="isInitialized && sessionId">
             <template
-              v-for="entry in availableModuleEntries.filter(e => e.key !== 'ai')"
+              v-for="entry in tabs.filter(e => e.key !== 'ai')"
               :key="entry.key"
             >
               <div
@@ -158,7 +158,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue'
 
 import { icons } from '@/utils/icons.js'
 import { getConnLinkChainApi, getCurrentHostIdApi } from '@/services/api/sessions.js'
@@ -205,6 +205,10 @@ const TASK_EVENTS = [
 
 // Props
 const props = defineProps({
+  active: {
+    type: Boolean,
+    default: false
+  },
   sessionId: {
     type: String,
     required: false,
@@ -242,7 +246,7 @@ const isInitialized = ref(false)
 const hasError = ref(false)
 const errorMessage = ref('')
 const initStep = ref('')
-// Tracks which module components have been mounted at least once (lazy).
+// Tracks visited modules among the currently open tabs (lazy).
 // 'ai' is now in the dock — exclude it from the tool tab area.
 const initializedModules = reactive({ info: true })
 const serverConnLinkChain = ref([])
@@ -254,6 +258,8 @@ const runtimeProfile = ref(null)
 let initializationVersion = 0
 const iconMap = icons
 const paletteVisible = ref(false)
+const viewActive = ref(false)
+const shortcutsActive = computed(() => props.active && viewActive.value)
 const sessionCapabilities = computed(() => (
   serverCapabilities.value.length ? serverCapabilities.value : props.capabilities
 ))
@@ -401,6 +407,7 @@ provide('switchTab', handlePaletteOpen)
 
 // ── Keyboard shortcut ─────────────────────────────────────────────────────
 const onGlobalKeydown = (e) => {
+  if (!shortcutsActive.value || e.defaultPrevented || e.isComposing) return
   const isCmd = e.metaKey || e.ctrlKey
   if (isCmd && e.key === 'k') {
     e.preventDefault()
@@ -409,14 +416,15 @@ const onGlobalKeydown = (e) => {
   }
 }
 
-// Also listen at window level to catch events that don't bubble into this component
-const onWindowKeydown = (e) => {
-  const isCmd = e.metaKey || e.ctrlKey
-  if (isCmd && e.key === 'k') {
-    e.preventDefault()
-    paletteVisible.value = !paletteVisible.value
+// Only the foreground console owns the window shortcut, including teleported UI.
+watch(shortcutsActive, (active) => {
+  if (active) {
+    window.addEventListener('keydown', onGlobalKeydown)
+  } else {
+    window.removeEventListener('keydown', onGlobalKeydown)
+    paletteVisible.value = false
   }
-}
+}, { flush: 'sync' })
 
 // ── Session & initialization ───────────────────────────────────────────────
 const fetchConnLinkChain = async (sessionId, isCurrent) => {
@@ -510,7 +518,7 @@ const initializeComponent = async () => {
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────
 onMounted(() => {
-  window.addEventListener('keydown', onWindowKeydown)
+  viewActive.value = true
   TASK_EVENTS.forEach((event) => taskEngine.on(event, _onTaskEvent))
   if (props.sessionId) {
     loadForSession()
@@ -523,8 +531,19 @@ onMounted(() => {
 
 onUnmounted(() => {
   initializationVersion += 1
-  window.removeEventListener('keydown', onWindowKeydown)
+  window.removeEventListener('keydown', onGlobalKeydown)
   TASK_EVENTS.forEach((event) => taskEngine.off(event, _onTaskEvent))
+})
+
+onActivated(() => { viewActive.value = true })
+onDeactivated(() => { viewActive.value = false })
+
+// Closing or evicting a tab disposes its view; taskEngine owns background jobs.
+watch(tabs, (openTabs) => {
+  const openKeys = new Set(openTabs.map(tab => tab.key))
+  for (const key of Object.keys(initializedModules)) {
+    if (!openKeys.has(key)) delete initializedModules[key]
+  }
 })
 
 // Lazy-initialize modules on first activation
