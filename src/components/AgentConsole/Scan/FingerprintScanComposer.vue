@@ -1,6 +1,12 @@
 <template>
   <div>
     <p>对已选 {{ selection.endpoints.length }} 个 HTTP/HTTPS 资产执行组件识别，结果保存为独立任务。</p>
+    <el-alert
+      v-if="selection.endpoints.length > 256"
+      type="warning"
+      :closable="false"
+      title="已选资产较多，仅提示，不限制任务总量；组件识别将分批执行。"
+    />
     <p class="targets">
       {{ selection.endpoints.map(row => `${row.host}:${row.port}`).join('、') }}
     </p>

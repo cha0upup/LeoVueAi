@@ -98,7 +98,7 @@
           class="preview-stats"
         >
           <div><span>主机</span><strong>{{ Number(previewData.hostCount || 0).toLocaleString('zh-CN') }}</strong></div>
-          <div><span>{{ scansPorts ? '扫描端口' : '探活请求上限' }}</span><strong>{{ Number((scansPorts ? previewData.portCount : previewData.reachabilityProbeCount) || 0).toLocaleString('zh-CN') }}</strong></div>
+          <div><span>{{ scansPorts ? '扫描端口' : '预计探活请求' }}</span><strong>{{ Number((scansPorts ? previewData.portCount : previewData.reachabilityProbeCount) || 0).toLocaleString('zh-CN') }}</strong></div>
           <div v-if="scansPorts">
             <span>检测组合</span><strong>{{ Number(previewData.combinationCount || 0).toLocaleString('zh-CN') }}</strong>
           </div>
@@ -122,6 +122,9 @@
         >
           填写目标后生成预览，确认扫描范围与探测规模。
         </p>
+        <p class="preview-hint preview-policy">
+          单个任务不设扫描总量上限；规模较大时仅提示，任务按批次执行，并发设置仍生效。
+        </p>
         <el-alert
           v-if="previewData?.warnings?.length"
           type="warning"
@@ -142,7 +145,7 @@
 
     <footer class="composer-footer">
       <div class="footer-actions">
-        <el-button @click="handleCancel">
+        <el-button @click="emit('cancel')">
           取消
         </el-button>
         <el-button
@@ -296,10 +299,6 @@ async function handleStart() {
   }
 }
 
-function handleCancel() {
-  emit('cancel')
-}
-
 function validateTargets() {
   if (identifiesComponents.value && !fingerprintValid.value) {
     ElMessage.warning('请选择有效的指纹规则')
@@ -341,10 +340,6 @@ function buildScanConfig() {
     }
   }
 }
-
-defineExpose({
-  validate: () => formRef.value.validate()
-})
 </script>
 
 <style scoped lang="scss">
@@ -430,6 +425,7 @@ defineExpose({
 .preview-heading > span { color: var(--el-text-color-secondary); font-size: 11px; }
 .ready .preview-heading > span { color: var(--el-color-success); }
 .preview-hint { margin: 0; color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.6; }
+.preview-policy { grid-column: 1 / -1; margin-top: 12px; }
 .preview-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 12px; }
 .preview-stats > div { display: grid; gap: 5px; }
 .preview-stats span { color: var(--el-text-color-secondary); font-size: 11px; }

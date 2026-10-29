@@ -33,7 +33,7 @@
           刷新
         </el-button>
         <el-button
-          :disabled="!selectedRows.length || selectedRows.length > 256 || selectedRows.some(row => !['http', 'https'].includes(row.service))"
+          :disabled="!selectedRows.length || selectedRows.some(row => !['http', 'https'].includes(row.service))"
           @click="emit('fingerprint-scan', { sourceTaskId: taskId, endpoints: [...selectedRows] })"
         >
           补扫组件{{ selectedRows.length ? ` (${selectedRows.length})` : '' }}

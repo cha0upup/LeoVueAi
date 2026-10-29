@@ -74,6 +74,17 @@ afterEach(() => {
 })
 
 describe('asset result CSV export', () => {
+  it('allows more than 256 HTTP assets to be selected for a supplemental task', async () => {
+    const view = mount()
+    await flush()
+    view.table().props.onSelectionChange(Array.from({ length: 300 }, (_, index) => endpoint(index)))
+    await nextTick()
+    expect(view.button('补扫组件 (300)').props.disabled).toBe(false)
+    view.table().props.onSelectionChange([{ ...endpoint(1), service: 'ssh' }])
+    await nextTick()
+    expect(view.button('补扫组件 (1)').props.disabled).toBe(true)
+  })
+
   it('exports the current page and selection using CSV and the existing endpoint columns', async () => {
     const view = mount()
     await flush()
