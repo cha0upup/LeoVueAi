@@ -1,9 +1,27 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchCompleteAiHistory, mergeAiHistoryRecords } from './aiHistoryPagination.js'
+import { fetchCompleteAiHistory, mergeAiHistoryRecords, normalizeAiHistoryPage } from './aiHistoryPagination.js'
 
 const record = sequence => ({ messageId: `message-${sequence}`, sequence, role: 'assistant', content: `answer ${sequence}` })
 
 describe('AI history cursor pagination', () => {
+  it.each([undefined, {}, { messages: [] }, { messages: {}, hasMore: false }, { messages: [], hasMore: 'false' }])(
+    'rejects malformed current page responses: %j', page => {
+      expect(() => normalizeAiHistoryPage(page)).toThrow('分页响应格式异常')
+    }
+  )
+
+  it('keeps only cursor metadata and accepts the current HTTP envelope or its page', () => {
+    const page = { messages: [record(3)], hasMore: false, nextBeforeSequence: 3, total: 99, offset: 0, limit: 50 }
+    const expected = { messages: [record(3)], hasMore: false, nextBeforeSequence: 3 }
+    expect(normalizeAiHistoryPage(page)).toEqual(expected)
+    expect(normalizeAiHistoryPage({ data: page })).toEqual(expected)
+  })
+
+  it('rejects string cursors instead of coercing them', () => {
+    expect(() => normalizeAiHistoryPage({ messages: [record(3)], hasMore: true, nextBeforeSequence: '3' }))
+      .toThrow('游标异常')
+  })
+
   it('reads every page in chronological order without including later appends', async () => {
     const loadPage = vi.fn()
       .mockResolvedValueOnce({ data: { messages: [record(201), record(202)], hasMore: true, nextBeforeSequence: 201 } })
@@ -23,9 +41,9 @@ describe('AI history cursor pagination', () => {
     await expect(fetchCompleteAiHistory(loadPage)).rejects.toThrow('page unavailable')
   })
 
-  it('does not label a legacy truncated response as complete history', async () => {
+  it('rejects responses without the current cursor contract', async () => {
     await expect(fetchCompleteAiHistory(async () => ({ messages: [record(201)], total: 201 })))
-      .rejects.toThrow('分页信息不完整')
+      .rejects.toThrow('分页响应格式异常')
   })
 
   it.each([

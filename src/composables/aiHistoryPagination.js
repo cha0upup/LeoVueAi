@@ -2,13 +2,16 @@ export const AI_HISTORY_PAGE_SIZE = 50
 
 export function normalizeAiHistoryPage(response) {
   const page = response?.data ?? response ?? {}
-  return {
-    messages: Array.isArray(page.messages) ? page.messages : [],
-    total: Number(page.total || 0),
-    hasCursorPagination: typeof page.hasMore === 'boolean',
-    nextBeforeSequence: page.nextBeforeSequence == null ? null : Number(page.nextBeforeSequence),
-    hasMore: page.hasMore === true
+  if (!Array.isArray(page.messages) || typeof page.hasMore !== 'boolean') {
+    throw new Error('历史消息分页响应格式异常')
   }
+  const result = {
+    messages: page.messages,
+    nextBeforeSequence: page.nextBeforeSequence ?? null,
+    hasMore: page.hasMore
+  }
+  if (result.hasMore) requireOlderCursor(result)
+  return result
 }
 
 export function mergeAiHistoryRecords(records) {
@@ -38,9 +41,6 @@ export async function fetchCompleteAiHistory(loadPage) {
       limit: 200,
       ...(beforeSequence != null ? { beforeSequence } : { offset: 0 })
     }))
-    if (!page.hasCursorPagination && page.total > page.messages.length) {
-      throw new Error('服务端历史分页信息不完整，请更新服务后重新归档')
-    }
     records.push(...page.messages)
     if (!page.hasMore) return mergeAiHistoryRecords(records)
     beforeSequence = requireOlderCursor(page, beforeSequence)

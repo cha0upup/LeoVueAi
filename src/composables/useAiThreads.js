@@ -8,6 +8,7 @@ import {
 } from '@/services/api/node-ai.js'
 import { showError } from '@/utils/messageUtils.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
+import { normalizeAiHistoryPage } from './aiHistoryPagination.js'
 
 /**
  * AI 对话线程管理 composable。
@@ -163,10 +164,10 @@ export function useAiThreads({ sessionId }) {
    * @param {string} threadId
    * @param {number} [offset=0]
    * @param {number} [limit=50]
-   * @returns {Promise<{messages: object[], total: number}>}
+   * @returns {Promise<{messages: object[], nextBeforeSequence: number|null, hasMore: boolean}>}
    */
   const loadMessages = async (threadId, offset = 0, limit = 50) => {
-    if (!sessionId.value || !threadId) return { messages: [], total: 0 }
+    if (!sessionId.value || !threadId) return { messages: [], nextBeforeSequence: null, hasMore: false }
     const requestSessionId = sessionId.value
     try {
       const res = await nodeAiThreadMessagesApi({
@@ -175,13 +176,8 @@ export function useAiThreads({ sessionId }) {
         offset,
         limit
       })
-      if (requestSessionId !== sessionId.value) return { messages: [], total: 0, stale: true }
-      return {
-        messages: res.data?.messages ?? [],
-        total:    res.data?.total    ?? 0,
-        nextBeforeSequence: res.data?.nextBeforeSequence ?? null,
-        hasMore: res.data?.hasMore === true
-      }
+      if (requestSessionId !== sessionId.value) return { messages: [], nextBeforeSequence: null, hasMore: false, stale: true }
+      return normalizeAiHistoryPage(res)
     } catch (e) {
       if (requestSessionId === sessionId.value) {
         showError('加载历史消息失败：' + (e?.message || '未知错误'))

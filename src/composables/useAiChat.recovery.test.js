@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 import { useAiChat } from './useAiChat.js'
 
 function createChatAwaitingAnswer(enqueueApi) {
@@ -239,10 +240,9 @@ describe('useAiChat refresh recovery', () => {
   })
 
   it('submits the next command immediately while the previous turn is cancelling', async () => {
-    let resolveStop
     let resolveSubscription
     let streamHandlers
-    const stopGate = new Promise(resolve => { resolveStop = resolve })
+    const { promise: stopGate, resolve: resolveStop } = deferred()
     const turns = [
       {
         id: 'turn-1',
