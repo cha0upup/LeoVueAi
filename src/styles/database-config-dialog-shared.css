@@ -25,10 +25,6 @@
   padding: 16px 20px;
 }
 
-.dialect-capability-alert {
-  margin: -2px 0 14px 104px;
-}
-
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
@@ -110,20 +106,8 @@
   font-size: var(--el-font-size-extra-small);
 }
 
-.url-examples {
-  margin-top: var(--el-spacing-base);
-  padding: 8px 10px;
-  background: var(--database-config-muted-surface);
-  border-radius: var(--el-border-radius-small);
-  border-left: 0.1875rem solid var(--el-color-primary);
-}
-
 @media (max-width: 640px) {
   .config-form-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .dialect-capability-alert {
-    margin-left: 0;
   }
 }

@@ -76,13 +76,6 @@
   color: var(--el-text-color-primary);
 }
 
-.detail-status-tag {
-  background: color-mix(in srgb, var(--el-color-primary-light-8) 82%, white);
-  border-color: color-mix(in srgb, var(--el-color-primary) 36%, transparent);
-  color: var(--el-color-primary-dark-2);
-  font-weight: 700;
-}
-
 .detail-actions .el-button,
 .action-row .el-button {
   font-weight: 600;

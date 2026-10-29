@@ -222,19 +222,6 @@ html,
   box-shadow: none;
 }
 
-.surface-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid color-mix(in srgb, var(--el-border-color-lighter) 46%, transparent);
-  font-size: var(--el-font-size-medium);
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  background: color-mix(in srgb, var(--el-bg-color-page) 54%, transparent);
-  border-radius: var(--el-border-radius-large) var(--el-border-radius-large) 0 0;
-}
-
 /* 滚动条样式 - 全局统一 */
 ::-webkit-scrollbar {
   width: var(--app-scrollbar-width);
@@ -266,74 +253,6 @@ html,
 /* 通用工具类 */
 .flex {
   display: flex;
-}
-
-.flex-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.flex-between {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.flex-column {
-  display: flex;
-  flex-direction: column;
-}
-
-.text-center {
-  text-align: center;
-}
-
-.text-left {
-  text-align: left;
-}
-
-.text-right {
-  text-align: right;
-}
-
-.w-full {
-  width: 100%;
-}
-
-.h-full {
-  height: 100%;
-}
-
-.wh-full {
-  width: 100%;
-  height: 100%;
-}
-
-/* 动画类 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.slide-fade-enter-from {
-  transform: translateX(-20px);
-  opacity: 0;
-}
-
-.slide-fade-leave-to {
-  transform: translateX(20px);
-  opacity: 0;
 }
 
 /* 卡片样式 - 现代化设计 */
@@ -372,11 +291,6 @@ html,
   color: var(--el-text-color-primary);
 }
 
-.card-header-icon {
-  font-size: clamp(1.125rem, 1.25vw, 1.25rem); /* 18px - 20px，基于视口宽度自适应 */
-  color: var(--el-color-primary);
-}
-
 .card-header-actions {
   display: flex;
   gap: var(--el-spacing-small);
@@ -407,19 +321,6 @@ html,
   box-shadow: var(--app-shell-shadow);
 }
 
-.page-header-left {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.page-header-right {
-  display: flex;
-  gap: var(--el-spacing-small);
-  flex-shrink: 0;
-}
-
 .title-row {
   display: flex;
   align-items: center;
@@ -430,19 +331,6 @@ html,
 .title-icon {
   font-size: clamp(1.375rem, 1.5vw, 1.5rem); /* 22px - 24px，基于视口宽度自适应 */
   color: var(--el-color-primary);
-}
-
-.page-title {
-  margin: 0;
-  font-size: clamp(1.375rem, 1.5vw, 1.5rem); /* 22px - 24px，基于视口宽度自适应 */
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-}
-
-.page-desc {
-  margin: 0;
-  color: var(--el-text-color-regular);
-  font-size: var(--el-font-size-small);
 }
 
 /* 统一菜单模块风格（主机/会话/用户空间/脚本生成/伪装/插件/指纹/设置） */
@@ -460,8 +348,6 @@ html,
   backdrop-filter: none;
 }
 
-.module-shell .module-panel,
-.module-shell .table-card,
 .module-shell .content-split > section {
   border: 1px solid color-mix(in srgb, var(--el-border-color) 14%, transparent);
   border-radius: var(--el-border-radius-large);
@@ -474,31 +360,12 @@ html,
   background: color-mix(in srgb, var(--el-bg-color-page) 62%, transparent);
 }
 
-.module-shell .table-compact .el-table__header th {
-  background: color-mix(
-    in srgb,
-    var(--app-surface-background-muted) 84%,
-    var(--el-bg-color-overlay)
-  );
-  font-weight: 600;
-}
-
-.module-shell .table-compact .el-table__cell {
-  padding-top: 10px;
-  padding-bottom: 10px;
-}
-
-.module-shell .table-compact .el-table__row:hover > td {
-  background: color-mix(in srgb, var(--el-color-primary) 5%, var(--app-surface-background));
-}
-
 .module-shell .search-input .el-input__wrapper {
   border-radius: 10px;
   background: var(--app-control-background);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--el-color-white) 6%, transparent);
 }
 
-.module-shell .page-header-right .el-button,
 .module-shell .toolbar-right .el-button {
   border-radius: 10px;
 }
@@ -814,26 +681,11 @@ html,
   border-bottom: 1px solid color-mix(in srgb, var(--el-border-color-lighter) 18%, transparent);
 }
 
-.section-icon {
-  font-size: var(--el-font-size-large);
-  color: var(--el-color-primary);
-}
-
 .section-title {
   font-size: var(--el-font-size-medium);
   font-weight: 600;
   color: var(--el-text-color-primary);
   margin: 0;
-}
-
-/* 表单操作按钮区域 */
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--el-spacing-base);
-  padding-top: var(--el-spacing-xl);
-  border-top: 1px solid color-mix(in srgb, var(--el-border-color-lighter) 18%, transparent);
-  margin-top: var(--el-spacing-xl);
 }
 
 .form-tip {
@@ -886,22 +738,6 @@ html,
   display: flex;
   justify-content: flex-end;
   gap: var(--el-spacing-base);
-}
-
-/* 加载状态 */
-.loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: color-mix(in srgb, var(--app-surface-background) 90%, transparent);
-  opacity: 0.94;
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
 }
 
 /* Tag 样式增强 - 确保图标和文字不换行 */
@@ -1050,17 +886,6 @@ html,
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.required-mark {
-  color: var(--el-color-danger);
-  font-size: 14px;
-}
-
-.optional-mark {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-  font-weight: normal;
 }
 
 .form-tip {

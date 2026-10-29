@@ -120,24 +120,6 @@
   line-height: 1.6;
 }
 
-.intro-tags {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.intro-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--dialog-surface-muted);
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
 .host-form {
   max-height: calc(100vh - 250px);
   overflow-y: auto;

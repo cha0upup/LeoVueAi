@@ -56,37 +56,6 @@
   flex-wrap: wrap;
 }
 
-.database-info-card {
-  margin: 0 6px 10px;
-  border-radius: 14px;
-  background: var(--database-inspector-panel-surface);
-  border: 1px solid var(--database-inspector-soft-border);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--el-text-color-primary) 3%, transparent);
-}
-
-.database-info-card:last-child {
-  margin-bottom: 0;
-}
-
-.database-info-card .el-card__header {
-  background: color-mix(in srgb, var(--database-inspector-muted-surface) 90%, transparent);
-  border-bottom: 1px solid var(--database-inspector-soft-border);
-}
-
-.database-info-card .el-card__body {
-  background: var(--database-inspector-panel-surface);
-}
-
-.database-info-card-header {
-  font-weight: 600;
-  font-size: var(--el-font-size-base);
-  color: var(--el-text-color-primary);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--el-spacing-base);
-}
-
 .database-info-descriptions {
   margin: 0 6px 10px;
 }
@@ -168,10 +137,6 @@
   justify-content: space-between;
   gap: var(--el-spacing-base);
   margin-bottom: var(--el-spacing-base);
-}
-
-.database-info-mono-text {
-  font-family: var(--el-font-family-mono, monospace);
 }
 
 @media (max-width: 768px) {

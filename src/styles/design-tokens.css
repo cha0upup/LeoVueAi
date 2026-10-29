@@ -209,26 +209,6 @@
   --icon-btn-color-hover: var(--el-color-primary);
 }
 
-/* ============================================================
- * 动效工具类——直接挂在元素上，省去重复写 transition 声明
- * ============================================================ */
-
-.u-transition-color {
-  transition:
-    color var(--motion-fast) var(--motion-easing),
-    background-color var(--motion-fast) var(--motion-easing);
-}
-
-.u-transition-border {
-  transition:
-    border-color var(--motion-base) var(--motion-easing),
-    background var(--motion-base) var(--motion-easing);
-}
-
-.u-transition-all {
-  transition: all var(--motion-base) var(--motion-easing);
-}
-
 /* 旋转动画（刷新按钮 loading 等） */
 .u-spin {
   animation: u-spin 0.9s linear infinite;
@@ -278,32 +258,9 @@
   outline-offset: var(--focus-outline-offset);
 }
 
-.u-icon-btn--sm {
-  width: var(--icon-btn-size-sm);
-  height: var(--icon-btn-size-sm);
-}
-
 .u-icon-btn--danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--el-color-danger) 12%, transparent);
   color: var(--el-color-danger);
-}
-
-/* ============================================================
- * 焦点辅助——给 role="button" 的 div 用
- * ============================================================ */
-
-.u-focusable:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: var(--focus-outline-offset);
-}
-
-/* ============================================================
- * 禁用态视觉降权——通用类，挂在卡片/列表项根上
- * ============================================================ */
-
-.u-disabled {
-  opacity: var(--disabled-opacity);
-  filter: saturate(var(--disabled-saturation));
 }
 
 /* ============================================================
@@ -322,39 +279,4 @@
   background: var(--status-badge-bg);
   color: var(--status-badge-color);
   box-shadow: none;
-}
-
-.status-badge--primary {
-  --status-badge-color: var(--status-primary-color);
-  --status-badge-bg: var(--status-primary-bg);
-  --status-badge-border: var(--status-primary-border);
-}
-
-.status-badge--success {
-  --status-badge-color: var(--status-success-color);
-  --status-badge-bg: var(--status-success-bg);
-  --status-badge-border: var(--status-success-border);
-}
-
-.status-badge--warning {
-  --status-badge-color: var(--status-warning-color);
-  --status-badge-bg: var(--status-warning-bg);
-  --status-badge-border: var(--status-warning-border);
-}
-
-.status-badge--danger {
-  --status-badge-color: var(--status-danger-color);
-  --status-badge-bg: var(--status-danger-bg);
-  --status-badge-border: var(--status-danger-border);
-}
-
-.status-badge--info {
-  --status-badge-color: var(--status-info-color);
-  --status-badge-bg: var(--status-info-bg);
-  --status-badge-border: var(--status-info-border);
-}
-
-.u-disabled:hover {
-  opacity: var(--disabled-opacity-hover);
-  filter: saturate(var(--disabled-saturation-hover));
 }
