@@ -165,7 +165,6 @@ export function useFileLoader({
     codeLanguage,
     originalContent,
     isModified,
-    getFileExtension,
     setFileType,
     loadFile,
     resetFileState

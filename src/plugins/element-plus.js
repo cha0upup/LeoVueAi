@@ -57,7 +57,6 @@ import {
   ElSegmented,
   ElSelect,
   ElSkeleton,
-  ElSlider,
   ElStatistic,
   ElSwitch,
   ElTabPane,
@@ -65,8 +64,6 @@ import {
   ElTableColumn,
   ElTabs,
   ElTag,
-  ElTimeline,
-  ElTimelineItem,
   ElTooltip,
   ElTree,
   ElUpload
@@ -141,7 +138,6 @@ import 'element-plus/theme-chalk/el-scrollbar.css'
 import 'element-plus/theme-chalk/el-segmented.css'
 import 'element-plus/theme-chalk/el-select.css'
 import 'element-plus/theme-chalk/el-skeleton.css'
-import 'element-plus/theme-chalk/el-slider.css'
 import 'element-plus/theme-chalk/el-statistic.css'
 import 'element-plus/theme-chalk/el-switch.css'
 import 'element-plus/theme-chalk/el-tab-pane.css'
@@ -150,12 +146,11 @@ import 'element-plus/theme-chalk/el-table-column.css'
 import 'element-plus/theme-chalk/el-tabs.css'
 import 'element-plus/theme-chalk/el-tag.css'
 import 'element-plus/theme-chalk/el-time-picker.css'
-import 'element-plus/theme-chalk/el-timeline.css'
 import 'element-plus/theme-chalk/el-tooltip.css'
 import 'element-plus/theme-chalk/el-tree.css'
 import 'element-plus/theme-chalk/el-upload.css'
 
-export const elementPlusComponents = [
+const elementPlusComponents = [
   ElAlert,
   ElAvatar,
   ElBadge,
@@ -204,7 +199,6 @@ export const elementPlusComponents = [
   ElSegmented,
   ElSelect,
   ElSkeleton,
-  ElSlider,
   ElStatistic,
   ElSwitch,
   ElTabPane,
@@ -212,8 +206,6 @@ export const elementPlusComponents = [
   ElTableColumn,
   ElTabs,
   ElTag,
-  ElTimeline,
-  ElTimelineItem,
   ElTooltip,
   ElTree,
   ElUpload

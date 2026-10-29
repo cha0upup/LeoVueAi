@@ -57,7 +57,6 @@ export function useFileEncoding() {
     encodingOptions,
     decodeBase64ToString,
     detectEncoding,
-    resetEncoding,
-    DEFAULT_ENCODING
+    resetEncoding
   }
 }

@@ -4,7 +4,7 @@ const INITIAL_LEVEL = 0
 
 const normalize = (value) => (value ? String(value).toLowerCase() : '')
 
-// 更新接口会全量覆盖配置，快捷开关也必须保留所有持久化字段。
+// 快捷开关保留可编辑配置；服务端连接时间不参与更新。
 const AGENT_UPDATE_FIELDS = [
   'agentId',
   'parentAgentId',
@@ -24,8 +24,6 @@ const AGENT_UPDATE_FIELDS = [
   'proxyPort',
   'protocol',
   'type',
-  'lastHeartbeat',
-  'heartbeatInterval',
   'remark',
   'urlStrategy',
   'paddingStrategy',
@@ -35,16 +33,14 @@ const AGENT_UPDATE_FIELDS = [
 ]
 
 export const buildAgentUpdatePayload = (row, overrides = {}) => {
+  const source = { ...row, ...overrides }
   const payload = {}
   AGENT_UPDATE_FIELDS.forEach((field) => {
-    if (Object.prototype.hasOwnProperty.call(row, field)) {
-      payload[field] = row[field]
+    if (Object.prototype.hasOwnProperty.call(source, field)) {
+      payload[field] = source[field]
     }
   })
-  return {
-    ...payload,
-    ...overrides
-  }
+  return payload
 }
 
 export const normalizeAgentList = (list = [], level = INITIAL_LEVEL) => {

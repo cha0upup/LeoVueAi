@@ -32,7 +32,6 @@ export const AGENT_TYPES = [
 /** 最大请求数表示一次操作的请求总数，包含首次请求。 */
 export const AGENT_MIN_REQUEST_COUNT = 1
 export const AGENT_MAX_REQUEST_COUNT = 10
-export const AGENT_DEFAULT_MAX_REQUEST_COUNT = AGENT_MIN_REQUEST_COUNT
 
 /**
  * Agent 对象的默认值
@@ -49,13 +48,12 @@ const DEFAULT_AGENT = {
   headers: '',
   permission: 'private',
   proxyEnabled: 0,
-  maxReqCount: AGENT_DEFAULT_MAX_REQUEST_COUNT,
+  maxReqCount: AGENT_MIN_REQUEST_COUNT,
   proxyType: 'direct',
   proxyHost: '127.0.0.1',
   proxyPort: 8080,
   protocol: 'http',
   type: 'java',
-  heartbeatInterval: 30000,
   remark: '',
   urlStrategy: '',
   paddingStrategy: '',

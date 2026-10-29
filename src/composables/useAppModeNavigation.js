@@ -4,12 +4,10 @@ import { ROUTE_PATHS } from '@/constants/app.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 import { registerSessionCleanup } from '@/services/sessionLifecycle.js'
 
-const LAST_WORKSPACE_ROUTE_KEY = 'leovue-last-workspace-route'
 const LAST_ADMIN_ROUTE_KEY = 'leovue-last-admin-route'
 const DEFAULT_ADMIN_ROUTE = `${ROUTE_PATHS.admin}?tab=users`
 
 const unregister = registerSessionCleanup('app-navigation', () => {
-  safeLocalStorage.removeItem(LAST_WORKSPACE_ROUTE_KEY)
   safeLocalStorage.removeItem(LAST_ADMIN_ROUTE_KEY)
 })
 if (import.meta.hot) import.meta.hot.dispose(unregister)
@@ -39,12 +37,6 @@ export function useAppModeNavigation() {
   const router = useRouter()
   const route = useRoute()
 
-  const rememberWorkspaceRoute = (value = route.fullPath) => {
-    if (typeof value === 'string' && isRouteInSpace(value, ROUTE_PATHS.main)) {
-      safeLocalStorage.setItem(LAST_WORKSPACE_ROUTE_KEY, value)
-    }
-  }
-
   const rememberAdminRoute = (value = route.fullPath) => {
     if (typeof value === 'string' && isRouteInSpace(value, ROUTE_PATHS.admin)) {
       safeLocalStorage.setItem(LAST_ADMIN_ROUTE_KEY, value)
@@ -52,7 +44,6 @@ export function useAppModeNavigation() {
   }
 
   const goToAdmin = ({ tab } = {}) => {
-    rememberWorkspaceRoute()
     if (tab) {
       return router.push({
         path: ROUTE_PATHS.admin,
@@ -62,15 +53,8 @@ export function useAppModeNavigation() {
     return router.push(readStoredRoute(LAST_ADMIN_ROUTE_KEY, ROUTE_PATHS.admin, DEFAULT_ADMIN_ROUTE))
   }
 
-  const goToWorkspace = () => {
-    rememberAdminRoute()
-    return router.push(readStoredRoute(LAST_WORKSPACE_ROUTE_KEY, ROUTE_PATHS.main))
-  }
-
   return {
     goToAdmin,
-    goToWorkspace,
-    rememberAdminRoute,
-    rememberWorkspaceRoute
+    rememberAdminRoute
   }
 }

@@ -196,7 +196,7 @@ const getConnectionStatusText = (row) => {
 }
 
 const getConnectionStatusTitle = (row) =>
-  `连接测试：${getConnectionStatusText(row)} · 最近心跳：${formatHeartbeat(row.lastHeartbeat)}`
+  `连接测试：${getConnectionStatusText(row)} · 最近连接成功：${formatLastConnection(row.lastConnectedAt)}`
 
 const publishVisibleAgents = async () => {
   await nextTick()
@@ -236,8 +236,8 @@ const handleCheck = (data, checkedInfo = {}) => {
   emit('toggle-selection', data, (checkedInfo.checkedKeys || []).includes(data.agentId))
 }
 
-const formatHeartbeat = (ts) => {
-  if (!ts) return '从未心跳'
+const formatLastConnection = (ts) => {
+  if (!ts) return '暂无成功记录'
   const date = new Date(ts)
   if (isNaN(date.getTime())) return '—'
   const delta = Date.now() - date.getTime()

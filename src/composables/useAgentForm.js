@@ -20,15 +20,19 @@ export function useAgentForm() {
     requirePayloadKeyForJava: () => agent.type === 'java'
   })
 
-  const buildAgentPayload = () => ({
-    ...agent,
-    proxyEnabled: proxyEnabled.value ? 1 : 0,
-    headers: stringifyHeadersForSubmit(agent.headers),
-    urlStrategy: strategies.buildUrlStrategyJson(),
-    paddingStrategy: strategies.buildPaddingStrategyJson(),
-    headerNoiseStrategy: strategies.buildHeaderNoiseStrategyJson(),
-    tlsFingerprintStrategy: strategies.buildTlsFingerprintStrategyJson()
-  })
+  const buildAgentPayload = () => {
+    const payload = {
+      ...agent,
+      proxyEnabled: proxyEnabled.value ? 1 : 0,
+      headers: stringifyHeadersForSubmit(agent.headers),
+      urlStrategy: strategies.buildUrlStrategyJson(),
+      paddingStrategy: strategies.buildPaddingStrategyJson(),
+      headerNoiseStrategy: strategies.buildHeaderNoiseStrategyJson(),
+      tlsFingerprintStrategy: strategies.buildTlsFingerprintStrategyJson()
+    }
+    delete payload.lastConnectedAt
+    return payload
+  }
   const validateCurrentForm = () => validateForm(formRef)
   const {
     testing: testingConnection,

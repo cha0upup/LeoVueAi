@@ -91,9 +91,13 @@ export function useProxyListener({ sessionId, emit, label, defaultPort, statusFi
           })
           if (!isCurrent(request)) return
           const data = response.data
+          if (!Number.isInteger(data?.connectionCount) || data.connectionCount < 0 ||
+              (includeConnections && !Array.isArray(data.connections))) {
+            throw new Error('代理统计响应格式异常')
+          }
           const lastPage = Math.max(
             1,
-            Math.ceil((data.connectionCount ?? data.activeConnections ?? 0) / pageSize)
+            Math.ceil(data.connectionCount / pageSize)
           )
           if (connectionPage.value > lastPage) {
             connectionPage.value = lastPage

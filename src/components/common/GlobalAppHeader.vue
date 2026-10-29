@@ -128,7 +128,7 @@ const { versionLabel, versionTooltip, loadVersion } = useAppVersion()
 onMounted(loadVersion)
 
 const { isAdmin, isLeader } = useAuth()
-const { goToAdmin, rememberAdminRoute, rememberWorkspaceRoute } = useAppModeNavigation()
+const { goToAdmin, rememberAdminRoute } = useAppModeNavigation()
 const { currentTab, tabs, closeTab, getTabRoute, goToHome, switchTab } = useMainTabs({
   confirmAction,
   iconMap
@@ -181,12 +181,8 @@ const handleCloseAgentTab = async (tabId, index) => {
     return
   }
 
+  if (route.path === ROUTE_PATHS.admin) return
   const nextRoute = getTabRoute(result.nextTab)
-
-  if (route.path === ROUTE_PATHS.admin) {
-    rememberWorkspaceRoute(nextRoute)
-    return
-  }
 
   if (wasActiveWorkspaceTab && route.fullPath !== nextRoute) {
     router.replace(nextRoute)

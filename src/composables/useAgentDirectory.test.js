@@ -63,8 +63,7 @@ describe('proxy quick-toggle update payload', () => {
       proxyPort: 8080,
       maxReqCount: 3,
       permission: 'team',
-      lastHeartbeat: '2026-09-20 12:00:00',
-      heartbeatInterval: 30000,
+      lastConnectedAt: '2026-09-20 12:00:00',
       remark: 'Keep existing settings',
       urlStrategy: '{"enabled":true,"pool":["/host"]}',
       paddingStrategy: '{"enabled":true,"minBytes":32,"maxBytes":64}',
@@ -83,9 +82,19 @@ describe('proxy quick-toggle update payload', () => {
       updateTime: '2026-09-19 12:00:00'
     }, { proxyEnabled: next })
 
-    expect(payload).toEqual({ ...host, proxyEnabled: next })
+    const editable = { ...host, proxyEnabled: next }
+    delete editable.lastConnectedAt
+    expect(payload).toEqual(editable)
+    expect(payload).not.toHaveProperty('lastConnectedAt')
     expect(payload).not.toHaveProperty('id')
     expect(host.proxyEnabled).toBe(current)
+  })
+
+  it('filters server-owned fields from explicit overrides too', () => {
+    const payload = buildAgentUpdatePayload({ agentId: 'node', lastConnectedAt: '2026-01-01' }, {
+      remark: 'edited', createTime: '2000-01-01', lastConnectedAt: '2000-01-01'
+    })
+    expect(payload).toEqual({ agentId: 'node', remark: 'edited' })
   })
 })
 

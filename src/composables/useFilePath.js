@@ -34,15 +34,6 @@ export function extractDriveName(text) {
 }
 
 /**
- * 判断路径是否为 Windows 路径
- * @param {string} path - 路径
- * @returns {boolean}
- */
-function isWindowsPath(path) {
-  return path?.includes(':') || /^[A-Za-z]:/.test(path || '') || /^(?:\\\\|\/\/)/.test(path || '')
-}
-
-/**
  * 规范化路径（确保以分隔符结尾，用于树形组件）
  * @param {string} path - 原始路径
  * @returns {string} 规范化后的路径
@@ -158,19 +149,6 @@ export function useFilePath(options = {}) {
   const canGoBack = computed(() => Boolean(currentPath?.value))
 
   return {
-    // 常量
-    WINDOWS_DISK_REGEX,
-
-    // 工具函数
-    isWindowsDisk,
-    extractDriveName,
-    isWindowsPath,
-    normalizePathForTree,
-    buildChildPath,
-    buildFullPath,
-    parseAbsolutePath,
-
-    // 计算属性
     breadcrumbs,
     currentFullPath,
     canGoBack

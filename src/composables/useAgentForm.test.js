@@ -70,6 +70,18 @@ describe('useAgentForm', () => {
     expect(add.formRef.value.scrollToTop).toHaveBeenCalledOnce()
   })
 
+  it('keeps server-owned connection timestamps out of edit and connection-test payloads', () => {
+    const form = mountForm()
+    form.loadAgent({
+      ...createDefaultAgent(), agentId: 'node',
+      lastConnectedAt: '2000-01-01'
+    })
+    const payload = form.buildAgentPayload()
+    expect(payload.agentId).toBe('node')
+    expect(payload).not.toHaveProperty('lastConnectedAt')
+    expect(form.agent.lastConnectedAt).toBe('2000-01-01')
+  })
+
   it('serializes the live form for both submission and connection tests without mutating it', async () => {
     const form = mountForm()
     form.agent.headers = 'X-Token: value:with:colons\nX-Mode: test'

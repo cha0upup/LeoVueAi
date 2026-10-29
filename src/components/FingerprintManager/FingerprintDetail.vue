@@ -602,7 +602,6 @@ function formatHeaders(headers) {
 }
 
 @media (max-width: 1200px) {
-  .summary-strip,
   .info-grid {
     grid-template-columns: 1fr;
   }
@@ -623,7 +622,6 @@ function formatHeaders(headers) {
     justify-content: flex-start;
   }
 
-  .summary-strip,
   .kv-list {
     grid-template-columns: 1fr;
   }

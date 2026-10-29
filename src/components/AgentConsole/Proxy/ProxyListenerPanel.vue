@@ -287,7 +287,7 @@ const port = defineModel('port', { type: Number, default: undefined })
 const detailsVisible = defineModel('detailsVisible', { type: Boolean, default: true })
 const connectionPage = defineModel('connectionPage', { type: Number, default: 1 })
 const connectionCount = computed(
-  () => props.statistics?.connectionCount ?? props.statistics?.connections?.length ?? 0
+  () => props.statistics?.connectionCount ?? 0
 )
 const emit = defineEmits(['start', 'stop', 'refresh'])
 

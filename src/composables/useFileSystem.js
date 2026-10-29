@@ -81,11 +81,6 @@ export function useFileSystem(options = {}) {
     isLoading,
 
     // 方法
-    loadDisks,
-    buildDiskList,
-
-    // 工具函数
-    isWindowsDisk,
-    extractDriveName
+    loadDisks
   }
 }

@@ -9,7 +9,7 @@ const EXPORT_OMIT_FIELDS = new Set([
   'hasChildren',
   'level',
   'children',
-  'lastHeartbeat',
+  'lastConnectedAt',
   'createTime',
   'updateTime'
 ])

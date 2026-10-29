@@ -28,7 +28,6 @@ export function useMonacoTheme() {
 
   return {
     monacoTheme,
-    syncTheme,
     watchMonacoTheme,
     disposeMonacoEditors
   }

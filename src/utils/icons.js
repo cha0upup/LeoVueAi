@@ -24,6 +24,7 @@ export const icons = {
   folder: 'mdi:folder',
   files: 'mdi:file-multiple',
   document: 'mdi:file-document',
+  inbox: 'mdi:inbox',
 
   // 系统功能
   settings: 'mdi:cog',
@@ -35,7 +36,6 @@ export const icons = {
 
   // 代码相关
   code: 'mdi:code-tags',
-  codeEdit: 'mdi:code-json',
   codeView: 'mdi:code-braces',
   codeFile: 'mdi:file-code',
   format: 'mdi:code-braces-box',
@@ -61,15 +61,12 @@ export const icons = {
 
   // 主机/服务器
   server: 'mdi:server',
-  computer: 'mdi:computer',
   network: 'mdi:network',
   platform: 'mdi:server-network',
-  hardDrive: 'mdi:harddisk',
 
   // 数据库
   database: 'mdi:database',
   table: 'mdi:table',
-  dataBoard: 'mdi:database',
 
   // 终端/命令行
   terminal: 'mdi:console',
@@ -90,20 +87,16 @@ export const icons = {
   networkShare: 'mdi:folder-network',
   installedSoftware: 'mdi:package-variant-closed',
   docker: 'mdi:docker',
-  suidCaps: 'mdi:shield-alert',
   persistence: 'mdi:shield-search',
   networkConnection: 'mdi:lan-connect',
-  coin: 'mdi:coin',
 
   // 安全/权限
   lock: 'mdi:lock',
-  unlock: 'mdi:lock-open',
   shield: 'mdi:shield',
   key: 'mdi:key',
 
   // 状态图标
   info: 'mdi:information',
-  infoFilled: 'mdi:information',
   warning: 'mdi:alert',
   error: 'mdi:alert-circle',
   success: 'mdi:check-circle',
@@ -116,7 +109,6 @@ export const icons = {
   loading: 'mdi:loading',
   clock: 'mdi:clock',
   timer: 'mdi:timer',
-  star: 'mdi:star',
   filter: 'mdi:filter',
   arrowDown: 'mdi:chevron-down',
   arrowUp: 'mdi:chevron-up',
@@ -126,23 +118,17 @@ export const icons = {
   arrowRight: 'mdi:chevron-right',
 
   // 特殊图标
-  postcard: 'mdi:postcard',
   sort: 'mdi:sort',
   cpu: 'mdi:cpu-64-bit',
-  videoPlay: 'mdi:play',
   paperclip: 'mdi:paperclip',
   magicStick: 'mdi:magic-staff',
-  partlyCloudy: 'mdi:weather-partly-cloudy',
-  bell: 'mdi:bell',
   switchButton: 'mdi:power',
   homeFilled: 'mdi:home',
   more: 'mdi:dots-horizontal',
-  moreFilled: 'mdi:dots-vertical',
 
   // 主题相关
   sunny: 'mdi:weather-sunny',
   moon: 'mdi:weather-night',
-  brush: 'mdi:palette',
 
   // 上传相关
   uploadFilled: 'mdi:upload',

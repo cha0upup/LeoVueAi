@@ -23,10 +23,8 @@ export function useAiChannelSelector({ loadConfigs = listAvailableAiModelsApi } 
   const configs = ref([])
   /** 当前选中的通道 ID；null 表示使用激活通道 */
   const selectedConfigId = ref(null)
-  const configsLoading = ref(false)
 
   const fetchConfigs = async () => {
-    configsLoading.value = true
     try {
       const res = await loadConfigs()
       const list = res?.data ?? []
@@ -43,15 +41,12 @@ export function useAiChannelSelector({ loadConfigs = listAvailableAiModelsApi } 
       // 维持当前状态，但记录原因，避免静默失败让上层"永远拿到空数组"难以排查
       // eslint-disable-next-line no-console
       console.warn('[useAiChannelSelector] 加载 AI 通道失败：', err?.message || err)
-    } finally {
-      configsLoading.value = false
     }
   }
 
   return {
     configs,
     selectedConfigId,
-    configsLoading,
     fetchConfigs
   }
 }

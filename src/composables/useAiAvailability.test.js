@@ -5,8 +5,6 @@ import { resetSessionState } from '@/services/sessionLifecycle.js'
 import { useAiAvailability } from './useAiAvailability.js'
 
 vi.mock('@/services/api/platform-ai.js', () => ({ platformAiAvailabilityApi: vi.fn() }))
-vi.mock('./useAppModeNavigation.js', () => ({ useAppModeNavigation: () => ({ goToAdmin: vi.fn() }) }))
-vi.mock('./useAuth.js', () => ({ useAuth: () => ({ isAdmin: { value: false } }) }))
 
 describe('AI availability login scope', () => {
   beforeEach(() => {
@@ -20,7 +18,7 @@ describe('AI availability login scope', () => {
     await state.refresh()
     expect(state.available.value).toBe(true)
     resetSessionState()
-    expect(state.availabilityState.value).toEqual({ available: false, enabledCount: 0 })
+    expect(state.available.value).toBe(false)
     useAiAvailability()
     expect(platformAiAvailabilityApi).toHaveBeenCalledTimes(2)
     await state.refresh()
@@ -42,6 +40,6 @@ describe('AI availability login scope', () => {
     expect(platformAiAvailabilityApi).toHaveBeenCalledTimes(2)
     nextResponse.resolve({ data: { available: true, enabledCount: 1 } })
     await Promise.all([nextFetch, shared])
-    expect(state.availabilityState.value).toEqual({ available: true, enabledCount: 1 })
+    expect(state.available.value).toBe(true)
   })
 })

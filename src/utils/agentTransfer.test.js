@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createDefaultAgent } from './constants.js'
 
 import {
   buildAgentTransferBundle,
@@ -26,6 +27,17 @@ describe('agent transfer bundle', () => {
   it('round-trips unicode content through base64', () => {
     const bundle = buildAgentTransferBundle(agents, ['leaf-c'])
     expect(decodeAgentTransferPayload(encodeAgentTransferPayload(bundle))).toEqual(bundle)
+  })
+
+  it('exports configuration without server-owned connection timestamps', () => {
+    const bundle = buildAgentTransferBundle([{
+      ...agents[0], lastConnectedAt: '2000-01-01'
+    }], ['root-a'])
+    const decoded = decodeAgentTransferPayload(encodeAgentTransferPayload(bundle))
+    const parsed = parseAgentTransferPayload(decoded)
+    expect(bundle.version).toBe(2)
+    expect(parsed.records[0].config).not.toHaveProperty('lastConnectedAt')
+    expect(createDefaultAgent(parsed.records[0].config).agentName).toBe('根主机')
   })
 
   it('selects all required ancestors for a target', () => {

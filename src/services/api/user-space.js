@@ -30,14 +30,6 @@ export function userFileDownloadApi(params) {
   })
 }
 
-export function userFileCreateFileApi(params) {
-  return http.post('/platform/user/file/create-file', null, { params })
-}
-
-export function userFileCreateDirApi(params) {
-  return http.post('/platform/user/file/create-dir', null, { params })
-}
-
 export function userFilePreviewApi(params) {
   return http.get('/platform/user/file/preview', { params })
 }

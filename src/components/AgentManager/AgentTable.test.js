@@ -50,7 +50,9 @@ describe('AgentTable directory interactions', () => {
       tree: () => findNodes(renderer.root, node => node.type === 'tree')[0].props,
       cards: () => findNodes(renderer.root, node => node.props.class?.includes('node-card')),
       rowContent: () => findNodes(renderer.root, node => node.props.class === 'tree-node'),
-      quickEnter: () => findNodes(renderer.root, node => node.props.class === 'quick-enter')
+      quickEnter: () => findNodes(renderer.root, node => node.props.class === 'quick-enter'),
+      statusTitles: () => findNodes(renderer.root, node => node.props.class?.includes('node-test'))
+        .map(node => node.props.title)
     }
   }
   afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
@@ -59,6 +61,12 @@ describe('AgentTable directory interactions', () => {
     const view = await mount()
     expect(view.tree().treeProps.isLeaf(rows[0])).toBe(false)
     expect(view.tree().treeProps.isLeaf(rows[1])).toBe(true)
+  })
+
+  it('describes connection success history rather than a scheduled heartbeat', async () => {
+    const view = await mount()
+    expect(view.statusTitles()).toHaveLength(2)
+    expect(view.statusTitles().every(title => title.includes('最近连接成功：暂无成功记录'))).toBe(true)
   })
 
   it('does not issue lazy child requests for a leaf', async () => {

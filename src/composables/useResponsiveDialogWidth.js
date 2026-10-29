@@ -15,7 +15,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
  * @param {object} [options]
  * @param {Array<{minWidth: number, width: string}>} [options.breakpoints]
  * @param {string} [options.fallback] 视口小于最小档位时使用的宽度，默认 '92vw'
- * @returns {{ dialogWidth: import('vue').ComputedRef<string>, viewportWidth: import('vue').Ref<number> }}
+ * @returns {{ dialogWidth: import('vue').ComputedRef<string> }}
  */
 export function useResponsiveDialogWidth(options = {}) {
   const breakpoints = options.breakpoints ?? [
@@ -50,5 +50,5 @@ export function useResponsiveDialogWidth(options = {}) {
     return fallback
   })
 
-  return { dialogWidth, viewportWidth }
+  return { dialogWidth }
 }
