@@ -101,13 +101,15 @@ dist/
 
 然后在后端仓库执行 Maven 打包，最终由 Spring Boot 内置静态资源服务提供前端页面。
 
-发布构建请使用：
+发布前在后端仓库执行完整检查入口：
 
 ```bash
-./mvnw clean package
+python3 tools/verify_release.py --frontend ../LeoVueAi
 ```
 
-`clean` 会先移除 `target/classes/static/` 中上一次构建遗留的哈希资源，避免新旧前端 bundle 同时进入 JAR。
+入口会执行前端 lint、测试和构建，逐文件核对 `dist/` 与后端静态目录，检查组件产物，然后执行后端 `clean verify`。静态目录不一致时先同步并审阅差异，再重新运行；检查器保持后端静态文件原样。
+
+`clean` 会先移除 `target/classes/static/` 中上一次构建遗留的哈希资源，避免新旧前端 bundle 同时进入 JAR。本地已准备依赖时可添加 `--skip-install`，CI 从 lockfile 安装。
 
 ## 常用命令
 

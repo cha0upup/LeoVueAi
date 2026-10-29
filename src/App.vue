@@ -7,7 +7,13 @@
       v-if="showAppHeader"
       :key="sessionGeneration"
     />
-    <router-view v-slot="{ Component }">
+    <StartupCheckView
+      v-if="authLoading && !authFetched && route.path !== ROUTE_PATHS.startup"
+    />
+    <router-view
+      v-else
+      v-slot="{ Component }"
+    >
       <KeepAlive
         v-if="currentUser && route.meta.requiresAuth"
         :key="sessionGeneration"
@@ -31,13 +37,14 @@ import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 
 import GlobalAppHeader from '@/components/common/GlobalAppHeader.vue'
+import StartupCheckView from '@/views/StartupCheckView.vue'
 import { ROUTE_PATHS } from '@/constants/app.js'
 import { useTheme } from '@/stores/theme'
 import { sessionGeneration } from '@/services/sessionLifecycle.js'
 import { useAuth } from '@/composables/useAuth.js'
 
 const { initTheme } = useTheme()
-const { currentUser } = useAuth()
+const { currentUser, authLoading, authFetched } = useAuth()
 const route = useRoute()
 
 const showAppHeader = computed(() =>

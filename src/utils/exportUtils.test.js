@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 
 const mocks = vi.hoisted(() => ({
   downloadBlob: vi.fn(),
@@ -20,8 +21,7 @@ describe('executeBlobDownload', () => {
   it('downloads the original Blob before reporting success and completing the request', async () => {
     const response = { data: new Blob(['archive']) }
     const loadingRef = ref(false)
-    let finishRequest
-    const pending = new Promise((resolve) => { finishRequest = resolve })
+    const { promise: pending, resolve: finishRequest } = deferred()
     const request = vi.fn(() => pending)
     const onSuccess = vi.fn(() => {
       expect(mocks.downloadBlob).toHaveBeenCalledExactlyOnceWith(response.data, 'result.zip')

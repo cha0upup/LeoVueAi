@@ -1,8 +1,7 @@
 /* eslint-disable vue/one-component-per-file -- Fixture components render the real dialog templates. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick } from 'vue'
-import * as Vue from 'vue'
-import { compileTestComponent, findNode } from '@/test-support/vueComponent.js'
+import { compileClientComponent, findNode } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { icons } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
@@ -44,7 +43,6 @@ const ParentHostSummary = defineComponent({
   }
 })
 const modules = {
-  vue: Vue,
   '@/utils/icons.js': { icons },
   '@/utils/dialogUtils.js': { useDialog },
   '@/utils/apiUtils.js': { executeRequest },
@@ -55,7 +53,7 @@ const modules = {
   './ParentHostSummary.vue': { default: ParentHostSummary }
 }
 
-const compileDialog = name => compileTestComponent(new URL(`./${name}.vue`, import.meta.url), modules, `${name}-test`)
+const compileDialog = name => compileClientComponent(new URL(`./${name}.vue`, import.meta.url), modules, `${name}-test`)
 const AddAgent = compileDialog('AddAgent')
 const EditAgent = compileDialog('EditAgent')
 

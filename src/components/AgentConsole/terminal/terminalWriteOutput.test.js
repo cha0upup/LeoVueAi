@@ -1,15 +1,8 @@
+import { deferred } from '@/test-support/deferred.js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTerminalSessionController } from './createTerminalSessionController.js'
 import { createTerminalSession } from './terminalWorkspaceModel.js'
 
-const deferred = () => {
-  let resolve, reject
-  const promise = new Promise((yes, no) => {
-    resolve = yes
-    reject = no
-  })
-  return { promise, resolve, reject }
-}
 const output = (sequence, data = '', extra = {}) => ({
   code: 200,
   instanceId: 'instance',

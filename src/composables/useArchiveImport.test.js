@@ -1,3 +1,4 @@
+import { deferred } from '@/test-support/deferred.js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ handleError: vi.fn(), showSuccess: vi.fn() }))
@@ -8,11 +9,6 @@ vi.mock('@/utils/messageUtils.js', () => ({ showSuccess: mocks.showSuccess }))
 import { useArchiveImport } from './useArchiveImport.js'
 
 const createFile = (name = 'items.zip') => new File(['archive'], name)
-const deferred = () => {
-  let resolve
-  const promise = new Promise((done) => { resolve = done })
-  return { promise, resolve }
-}
 
 beforeEach(() => vi.clearAllMocks())
 

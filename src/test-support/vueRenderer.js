@@ -2,7 +2,7 @@ import { createRenderer } from 'vue'
 
 // A minimal in-memory host for lifecycle tests, without a browser dependency.
 export function createTestRenderer() {
-  const node = (type, text = '') => ({ type, text, children: [], props: {}, parent: null })
+  const node = (type, text = '') => ({ type, text, children: [], props: {}, style: {}, parent: null })
   const remove = child => {
     if (!child.parent) return
     const siblings = child.parent.children

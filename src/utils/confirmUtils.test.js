@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 
 const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -181,9 +182,8 @@ describe('delete request lifecycle', () => {
     ['single', options => executeDeleteWithConfirm(async () => 'deleted', options), 'deleted'],
     ['batch', options => executeBatchDelete(['a'], async () => {}, options), { successCount: 1, failCount: 0 }]
   ])('keeps loading active until the %s deletion refresh completes', async (_name, run, expected) => {
-    let startRefresh, finishRefresh
-    const started = new Promise(resolve => { startRefresh = resolve })
-    const refresh = new Promise(resolve => { finishRefresh = resolve })
+    const { promise: started, resolve: startRefresh } = deferred()
+    const { promise: refresh, resolve: finishRefresh } = deferred()
     const loadingRef = { value: false }
     const onSuccess = vi.fn(() => {
       startRefresh()

@@ -1,15 +1,8 @@
+import { deferred } from '@/test-support/deferred.js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTerminalSessionController } from './createTerminalSessionController.js'
 import { testTerminalTransport } from './test-support/terminalTransport.js'
 import { createTerminalSession } from './terminalWorkspaceModel.js'
-
-const deferred = () => {
-  let resolve
-  const promise = new Promise((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
 
 describe('terminal input batching and polling', () => {
   const controllers = []

@@ -1,3 +1,4 @@
+import { deferred } from '@/test-support/deferred.js'
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -15,14 +16,6 @@ vi.mock('./messageUtils.js', () => ({
 }))
 
 import { executeRequest, withLoading } from './apiUtils.js'
-
-const deferred = () => {
-  let resolve
-  const promise = new Promise((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
 
 describe('apiUtils', () => {
   beforeEach(() => {

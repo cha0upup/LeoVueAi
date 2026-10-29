@@ -57,4 +57,54 @@ describe('login identity cache', () => {
     expect(auth.isAdmin.value).toBe(false)
     expect(auth.authFetched.value).toBe(false)
   })
+
+  it('reads the first-deployment state and server password policy without creating an identity', async () => {
+    getLoginStatusApi.mockResolvedValue({ data: {
+      isLoggedIn: false, initializationRequired: true, passwordMinLength: 12, passwordMaxLength: 256
+    } })
+    const auth = useAuth()
+    await auth.fetchAuth()
+    expect(auth.currentUser.value).toBeNull()
+    expect(auth.initializationRequired.value).toBe(true)
+    expect(auth.passwordMinLength.value).toBe(12)
+    expect(auth.passwordMaxLength.value).toBe(256)
+    getLoginStatusApi.mockResolvedValue({ data: { isLoggedIn: false, initializationRequired: false } })
+    await auth.fetchAuth({ force: true })
+    expect(auth.initializationRequired.value).toBe(false)
+  })
+
+  it('discards stale setup status after a session reset', async () => {
+    const response = deferred()
+    getLoginStatusApi.mockReturnValue(response.promise)
+    const auth = useAuth()
+    const request = auth.fetchAuth()
+    auth.resetAuth()
+    response.resolve({ data: { initializationRequired: true, passwordMinLength: 12 } })
+    await request
+    expect(auth.initializationRequired.value).toBe(false)
+    expect(auth.passwordMinLength.value).toBe(8)
+  })
+
+  it('does not cache a failed check as a configured or anonymous deployment and can retry', async () => {
+    const auth = useAuth()
+    getLoginStatusApi.mockRejectedValue({ response: { data: { msg: '系统正在准备' }, status: 503 } })
+    await auth.fetchAuth()
+    expect(auth.authFetched.value).toBe(false)
+    expect(auth.authCheckState.value).toBe('error')
+    expect(auth.authError.value).toBe('系统正在准备')
+    getLoginStatusApi.mockResolvedValue({ data: { isLoggedIn: false, initializationRequired: true } })
+    await auth.fetchAuth()
+    expect(auth.authCheckState.value).toBe('required')
+    expect(auth.authError.value).toBe('')
+    expect(auth.authFetched.value).toBe(true)
+    expect(getLoginStatusApi).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects malformed status responses instead of guessing a login state', async () => {
+    getLoginStatusApi.mockResolvedValue({ data: {} })
+    const auth = useAuth()
+    await auth.fetchAuth()
+    expect(auth.authCheckState.value).toBe('error')
+    expect(auth.authFetched.value).toBe(false)
+  })
 })

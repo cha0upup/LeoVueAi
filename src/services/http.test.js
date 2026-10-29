@@ -135,7 +135,7 @@ describe('HTTP response redirect handling', () => {
           status: 403,
           data: {
             code: 403,
-            msg: '首次登录需先修改密码',
+            msg: '请先更新密码后继续使用',
             data: { passwordChangeRequired: true }
           }
         }

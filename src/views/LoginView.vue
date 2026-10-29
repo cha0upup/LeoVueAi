@@ -184,7 +184,7 @@ const getLoginRedirectTarget = (user) => {
     return ROUTE_PATHS.main
   }
 
-  if (rawRedirect.startsWith(ROUTE_PATHS.login)) {
+  if (rawRedirect.startsWith(ROUTE_PATHS.login) || rawRedirect.startsWith(ROUTE_PATHS.setup)) {
     return ROUTE_PATHS.main
   }
 

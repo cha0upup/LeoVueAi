@@ -9,9 +9,9 @@
           >
         </span>
         <div>
-          <span class="page-kicker">首次登录安全设置</span>
-          <h1>请先修改初始密码</h1>
-          <p>为保护账户安全，完成密码修改后才能进入 Leo 控制台。</p>
+          <span class="page-kicker">账号安全设置</span>
+          <h1>请先更新密码</h1>
+          <p>账户创建或密码被管理员重置后，请设置自己的密码，再进入 Leo 控制台。</p>
         </div>
       </header>
 
@@ -38,7 +38,7 @@
           <el-input
             v-model="form.oldPassword"
             type="password"
-            placeholder="请输入当前使用的初始密码"
+            placeholder="请输入当前密码"
             :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
             size="large"
             show-password
@@ -159,6 +159,7 @@ const getRedirectTarget = () => {
   }
   if (
     rawRedirect.startsWith(ROUTE_PATHS.login) ||
+    rawRedirect.startsWith(ROUTE_PATHS.setup) ||
     rawRedirect.startsWith(ROUTE_PATHS.changePassword)
   ) {
     return ROUTE_PATHS.main

@@ -6,6 +6,8 @@ export const ROUTE_PATHS = {
   mainAgentBase: '/main/agent',
   mainAgent: '/main/agent/:tabKey',
   login: '/login',
+  setup: '/setup',
+  startup: '/startup',
   changePassword: '/change-password',
   admin: '/admin'
 }
@@ -14,6 +16,8 @@ export const ROUTE_NAMES = {
   main: 'Main',
   mainAgent: 'MainAgent',
   login: 'Login',
+  setup: 'Setup',
+  startup: 'Startup',
   changePassword: 'ChangePassword',
   admin: 'AdminConsole'
 }

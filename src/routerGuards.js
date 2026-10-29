@@ -7,11 +7,13 @@ const getRequestedRedirect = (to) => {
   const queryRedirect = Array.isArray(to.query?.redirect)
     ? to.query.redirect[0]
     : to.query?.redirect
-  const candidate = to.path === ROUTE_PATHS.login ? queryRedirect : to.fullPath
+  const candidate = [ROUTE_PATHS.login, ROUTE_PATHS.startup].includes(to.path) ? queryRedirect : to.fullPath
 
   if (!isSafeLocalRedirect(candidate)) return null
   if (candidate.startsWith(ROUTE_PATHS.login)) return null
   if (candidate.startsWith(ROUTE_PATHS.changePassword)) return null
+  if (candidate.startsWith(ROUTE_PATHS.setup)) return null
+  if (candidate.startsWith(ROUTE_PATHS.startup)) return null
   return candidate
 }
 
@@ -25,9 +27,23 @@ const passwordChangeTarget = (to) => {
 /**
  * 返回路由守卫应跳转到的位置；返回 null 表示允许当前导航。
  */
-export function resolveAuthNavigation(to, currentUser) {
-  if (to.path === ROUTE_PATHS.login) {
-    if (!currentUser) return null
+export function resolveAuthNavigation(to, currentUser, initializationRequired = false, checkState = 'ready') {
+  if (!['ready', 'required'].includes(checkState)) {
+    if (to.path === ROUTE_PATHS.startup) return null
+    const redirect = getRequestedRedirect(to)
+    return { path: ROUTE_PATHS.startup, ...(redirect ? { query: { redirect } } : {}) }
+  }
+  if (initializationRequired) {
+    return to.path === ROUTE_PATHS.setup ? null : { path: ROUTE_PATHS.setup }
+  }
+  if (to.path === ROUTE_PATHS.startup) {
+    if (currentUser?.passwordChangeRequired) return passwordChangeTarget(to)
+    const redirect = getRequestedRedirect(to)
+    return currentUser ? { path: redirect || ROUTE_PATHS.main }
+      : { path: ROUTE_PATHS.login, ...(redirect ? { query: { redirect } } : {}) }
+  }
+  if (to.path === ROUTE_PATHS.login || to.path === ROUTE_PATHS.setup) {
+    if (!currentUser) return to.path === ROUTE_PATHS.setup ? { path: ROUTE_PATHS.login } : null
     if (currentUser.passwordChangeRequired) return passwordChangeTarget(to)
     return { path: ROUTE_PATHS.main }
   }

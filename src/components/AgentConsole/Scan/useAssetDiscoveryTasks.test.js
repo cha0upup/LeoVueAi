@@ -1,15 +1,9 @@
+import { deferred } from '@/test-support/deferred.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, ref } from 'vue'
 import { TaskStatus, TaskType } from '@/constants/task.js'
 import { useAssetDiscoveryTasks } from './useAssetDiscoveryTasks.js'
 
-const deferred = () => {
-  let resolve
-  const promise = new Promise((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
 const task = (id, sessionId, status = TaskStatus.SCANNING) => ({
   id,
   sessionId,

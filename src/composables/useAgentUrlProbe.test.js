@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 
 vi.mock('@/services/api/agent-manage.js', () => ({
   probeUrlPathsApi: vi.fn()
@@ -50,10 +51,7 @@ describe('useAgentUrlProbe', () => {
   })
 
   it('ignores a response after the dialog invalidates the request', async () => {
-    let resolveRequest
-    const request = new Promise((resolve) => {
-      resolveRequest = resolve
-    })
+    const { promise: request, resolve: resolveRequest } = deferred()
     const messages = createMessages()
     const mergePaths = vi.fn()
     const probe = useAgentUrlProbe({

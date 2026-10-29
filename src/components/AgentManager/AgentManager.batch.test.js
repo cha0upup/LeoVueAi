@@ -1,7 +1,7 @@
 /* eslint-disable vue/one-component-per-file -- Fixture children expose the actual manager's UI events. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref, watch } from 'vue'
-import { compileClientComponent } from '@/test-support/compileClientComponent.js'
+import { compileClientComponent, findNode } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
 import { icons } from '@/utils/icons.js'
@@ -84,14 +84,6 @@ for (const name of ['AddChildAgent', 'AddAgent', 'EditAgent', 'ImportAgent', 'Sh
   modules[`./${name}.vue`] = { default: nullView }
 }
 const Manager = compileClientComponent(new URL('./AgentManager.vue', import.meta.url), modules)
-const findNode = (node, type) => {
-  if (node.type === type) return node
-  for (const child of node.children) {
-    const found = findNode(child, type)
-    if (found) return found
-  }
-  return null
-}
 
 describe('AgentManager batch workflow', () => {
   const apps = []

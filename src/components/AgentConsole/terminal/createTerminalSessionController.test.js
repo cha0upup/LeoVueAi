@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 import { createTerminalSessionController } from './createTerminalSessionController.js'
 import { testTerminalTransport } from './test-support/terminalTransport.js'
 import { createTerminalSession } from './terminalWorkspaceModel.js'
@@ -61,10 +62,7 @@ describe('terminal session controller lifecycle', () => {
   })
 
   it('compensates for a late initialization and shares repeated disposal', async () => {
-    let releaseInit
-    const pending = new Promise((resolve) => {
-      releaseInit = resolve
-    })
+    const { promise: pending, resolve: releaseInit } = deferred()
     const executeCommand = vi.fn((p) =>
       p.type === 'init' ? pending : Promise.resolve({ data: { code: 200 } })
     )

@@ -1,5 +1,9 @@
 import http from '../http.js'
 
+export function initializeSystemApi(params) {
+  return http.post('/platform/setup', params)
+}
+
 export function loginApi(params) {
   return http.post('/platform/user/login', params)
 }

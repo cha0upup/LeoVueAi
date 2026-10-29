@@ -1,7 +1,7 @@
 /* eslint-disable vue/one-component-per-file -- In-memory Element Plus fixtures exercise the real table template. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, reactive } from 'vue'
-import { compileClientComponent } from '@/test-support/compileClientComponent.js'
+import { compileClientComponent } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
 
