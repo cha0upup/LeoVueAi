@@ -7,6 +7,14 @@ describe('file write encoding contract', () => {
     expect(encodingOptions.map((option) => option.value)).toEqual(['utf-8', 'utf-8-bom'])
   })
 
+  it('resets the active encoding without retaining a duplicate baseline', () => {
+    const state = useFileEncoding()
+    expect(state).not.toHaveProperty('originalEncoding')
+    state.currentEncoding.value = 'utf-8-bom'
+    state.resetEncoding()
+    expect(state.currentEncoding.value).toBe('utf-8')
+  })
+
   it('adds and removes the UTF-8 BOM without changing content', () => {
     const withBom = encodeFileText('hello世界', 'utf-8-bom')
 

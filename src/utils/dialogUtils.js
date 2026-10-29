@@ -7,28 +7,25 @@ import { ref } from 'vue'
 
 /**
  * 创建对话框状态管理
- * @param {boolean} initialValue - 初始状态，默认false
- * @returns {Object} 包含visible、open、close、toggle方法的对象
+ * @returns {Object} 包含visible、open、close方法的对象
  */
-export function useDialog(initialValue = false) {
-  const visible = ref(initialValue)
+export function useDialog() {
+  const visible = ref(false)
 
   return {
     visible,
     open: () => { visible.value = true },
-    close: () => { visible.value = false },
-    toggle: () => { visible.value = !visible.value }
+    close: () => { visible.value = false }
   }
 }
 
 /**
  * 创建编辑对话框状态管理（包含当前编辑项）
- * @param {*} initialItem - 初始编辑项，默认null
- * @returns {Object} 包含visible、currentItem、open、close、reset方法的对象
+ * @returns {Object} 包含visible、currentItem、open、close方法的对象
  */
-export function useEditDialog(initialItem = null) {
+export function useEditDialog() {
   const visible = ref(false)
-  const currentItem = ref(initialItem)
+  const currentItem = ref(null)
 
   const open = (item = null) => {
     currentItem.value = item
@@ -37,18 +34,13 @@ export function useEditDialog(initialItem = null) {
 
   const close = () => {
     visible.value = false
-    currentItem.value = initialItem
-  }
-
-  const reset = () => {
-    currentItem.value = initialItem
+    currentItem.value = null
   }
 
   return {
     visible,
     currentItem,
     open,
-    close,
-    reset
+    close
   }
 }

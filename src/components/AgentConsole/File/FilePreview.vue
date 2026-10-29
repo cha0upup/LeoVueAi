@@ -141,7 +141,6 @@ const iconMap = icons
 // ── Composables ──
 const {
   currentEncoding,
-  originalEncoding,
   encodingOptions,
   decodeBase64ToString,
   detectEncoding,
@@ -157,7 +156,7 @@ const {
   setFileType,
   loadFile,
   resetFileState
-} = useFileLoader({ decodeBase64ToString, detectEncoding, currentEncoding, originalEncoding })
+} = useFileLoader({ decodeBase64ToString, detectEncoding, currentEncoding })
 
 const {
   isLargeFileMode,
@@ -450,7 +449,6 @@ const {
   onSaved: ({ content, encoding, lineEnding: savedLineEnding }) => {
     // 只推进已保存基线，保留请求等待期间继续输入的内容。
     originalContent.value = content
-    originalEncoding.value = encoding
     activeDisplayEncoding.value = encoding
     originalLineEnding.value = savedLineEnding
     updateStatsFromContent(getEditorContent())
@@ -524,7 +522,6 @@ const preView = async (
         originalContent.value = text
         isModified.value = false
         currentEncoding.value = detectEncoding(text)
-        originalEncoding.value = currentEncoding.value
       }
 
       if (fileType.value === 'text') {

@@ -29,7 +29,6 @@ export function encodeFileText(content, encoding = DEFAULT_ENCODING) {
  */
 export function useFileEncoding() {
   const currentEncoding = ref(DEFAULT_ENCODING)
-  const originalEncoding = ref(DEFAULT_ENCODING)
 
   const encodingOptions = [
     { value: 'utf-8', label: 'UTF-8' },
@@ -48,12 +47,10 @@ export function useFileEncoding() {
 
   const resetEncoding = () => {
     currentEncoding.value = DEFAULT_ENCODING
-    originalEncoding.value = DEFAULT_ENCODING
   }
 
   return {
     currentEncoding,
-    originalEncoding,
     encodingOptions,
     decodeBase64ToString,
     detectEncoding,

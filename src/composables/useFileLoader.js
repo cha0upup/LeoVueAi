@@ -51,8 +51,7 @@ const LANGUAGE_MAP = {
 export function useFileLoader({
   decodeBase64ToString,
   detectEncoding,
-  currentEncoding,
-  originalEncoding
+  currentEncoding
 }) {
   const fileContent = ref('')
   const fileType = ref('text')
@@ -143,8 +142,7 @@ export function useFileLoader({
       originalContent.value = fileContent.value
       isModified.value = false
 
-      originalEncoding.value = detectEncoding(content)
-      currentEncoding.value = options.encoding === undefined ? originalEncoding.value : encoding
+      currentEncoding.value = options.encoding === undefined ? detectEncoding(content) : encoding
     }
 
     return { truncated: false, responseData }

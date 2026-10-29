@@ -14,6 +14,22 @@ const response = (text) => ({ data: { data: btoa(text), size: text.length } })
 beforeEach(() => vi.resetAllMocks())
 
 describe('file preview loading', () => {
+  it.each([
+    ['aGVsbG8=', undefined, 'utf-8', 'hello'],
+    ['77u/aGVsbG8=', undefined, 'utf-8-bom', '\uFEFFhello'],
+    ['77u/aGVsbG8=', 'utf-8', 'utf-8', '\uFEFFhello'],
+    ['aGVsbG8=', 'utf-8-bom', 'utf-8-bom', 'hello']
+  ])('detects BOMs while preserving an explicit encoding choice: %s / %s', async (data, requested, expected, content) => {
+    const encoding = useFileEncoding()
+    const loader = useFileLoader(encoding)
+    previewFileApi.mockResolvedValueOnce({ data: { data, size: 8 } })
+    await loader.loadFile('session', '/file.txt', { encoding: requested })
+    expect(encoding.currentEncoding.value).toBe(expected)
+    expect(loader.fileContent.value).toBe(content)
+    expect(loader.originalContent.value).toBe(content)
+    expect(loader.isModified.value).toBe(false)
+  })
+
   it('ignores stale content without ending an ongoing refresh', async () => {
     const stale = deferred()
     const latest = deferred()
