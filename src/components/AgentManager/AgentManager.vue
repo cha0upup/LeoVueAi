@@ -767,7 +767,9 @@ const createNewSession = async (row) => {
     {
       successMessage: null,
       errorMessage: null,
-      onError: async () => {
+      onError: async (error) => {
+        if (error?.code === 'SESSION_CHANGED' || error?.code === 401) return
+        const message = error?.message || '主机初始化失败'
         // 连接失败时检查是否有本地缓存
         try {
           cacheCheckLoading.value = true
@@ -778,16 +780,19 @@ const createNewSession = async (row) => {
             saveTime: cacheResp.data?.saveTime || null
           }
           if (!cacheResp.data?.hasCache) {
-            showError('主机初始化失败')
+            showError(message)
           }
         } catch {
-          showError('主机初始化失败')
+          showError(message)
         } finally {
           cacheCheckLoading.value = false
         }
       }
     }
-  )
+  ).catch(() => {
+    // onError already displayed the connection failure or exposed the cache entry.
+    // Finish the UI event here instead of leaking a rejected initialization promise.
+  })
 }
 
 const openAgentConsole = (row) => {

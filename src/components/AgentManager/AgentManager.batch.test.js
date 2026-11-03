@@ -1,7 +1,7 @@
 /* eslint-disable vue/one-component-per-file -- Fixture children expose the actual manager's UI events. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref, watch } from 'vue'
-import { compileClientComponent, findNode } from '@/test-support/vueComponent.js'
+import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
 import { icons } from '@/utils/icons.js'
@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => ({
   agents: vi.fn(), children: vi.fn(), sessions: vi.fn(), cache: vi.fn(), memberships: vi.fn(),
   test: vi.fn(), export: vi.fn(), delete: vi.fn(), detach: vi.fn(),
   confirm: vi.fn(), download: vi.fn(), assign: vi.fn(), warn: vi.fn(),
-  showError: vi.fn(), showWarning: vi.fn(), showSuccess: vi.fn()
+  showError: vi.fn(), showWarning: vi.fn(), showSuccess: vi.fn(),
+  init: vi.fn(), selectHost: vi.fn(), openConsole: vi.fn()
 }))
 vi.mock('element-plus', () => ({ ElMessageBox: { confirm: mocks.confirm } }))
 vi.mock('@/utils/messageUtils.js', () => mocks)
@@ -52,7 +53,7 @@ const modules = {
   '@/services/api/agent-manage.js': {
     getAgentsApi: mocks.agents, deleteAgentApi: mocks.delete, exportAgentsApi: mocks.export
   },
-  '@/services/api/agent-node.js': { checkAgentCacheApi: mocks.cache, testAgentConnectionApi: mocks.test },
+  '@/services/api/agent-node.js': { checkAgentCacheApi: mocks.cache, testAgentConnectionApi: mocks.test, initAgentApi: mocks.init },
   '@/services/api/sessions.js': { getSessionsApi: mocks.sessions },
   '@/services/api/projects.js': {
     getProjectAgentsApi: mocks.agents, getUnassignedAgentsApi: mocks.agents,
@@ -66,7 +67,7 @@ const modules = {
   './ProjectAssignmentDialog.vue': { default: defineComponent({
     setup(_props, { expose }) { expose({ open: mocks.assign }); return () => null }
   }) },
-  './useHostSelection.js': { useHostSelection: () => ({ open: () => Promise.resolve(null) }) },
+  './useHostSelection.js': { useHostSelection: () => ({ open: mocks.selectHost }) },
   './agentSessionEntry.js': { resolveAgentSessionEntry: () => ({ action: 'create' }) },
   './agentRuntimeStatus.js': { resolveAgentRuntimeStatus: () => ({}) },
   '@/composables/useAgentDirectory.js': { useAgentDirectory, buildAgentUpdatePayload, normalizeAgentList },
@@ -92,12 +93,9 @@ describe('AgentManager batch workflow', () => {
   }))
   const mount = async () => {
     const renderer = createTestRenderer()
-    const app = renderer.createApp(Manager)
+    const app = renderer.createApp(Manager, { onOpenAgentConsole: mocks.openConsole })
     for (const name of ['ElDropdown', 'ElDropdownMenu', 'ElDropdownItem', 'ElInput', 'ElSelect', 'ElOption', 'ElTooltip', 'ElIcon']) {
-      app.component(name, defineComponent({
-        inheritAttrs: false,
-        setup(_props, { attrs, slots }) { return () => h(name, attrs, slots.default?.()) }
-      }))
+      app.component(name, createSlotStub(name))
     }
     app.mount(renderer.root)
     apps.push(app)
@@ -125,6 +123,7 @@ describe('AgentManager batch workflow', () => {
     mocks.agents.mockResolvedValue({ data: rows })
     mocks.sessions.mockResolvedValue({ data: [] })
     mocks.cache.mockResolvedValue({ data: { hasCache: false } })
+    mocks.selectHost.mockResolvedValue(null)
     mocks.memberships.mockResolvedValue({ data: {} })
     mocks.confirm.mockResolvedValue()
     mocks.delete.mockResolvedValue({})
@@ -133,6 +132,35 @@ describe('AgentManager batch workflow', () => {
   afterEach(() => {
     for (const app of apps.splice(0)) app.unmount()
     vi.unstubAllGlobals()
+  })
+
+  it('handles a failed console initialization and allows another attempt', async () => {
+    const view = await mount()
+    mocks.selectHost.mockResolvedValue({ selectedHostId: 'host-instance' })
+    mocks.init.mockRejectedValueOnce(new Error('Agent初始化失败，无主机回复'))
+
+    await expect(view.node('AgentDetailPanel').props.onNewSession(rows[0])).resolves.toBeUndefined()
+    expect(mocks.showError).toHaveBeenCalledExactlyOnceWith('Agent初始化失败，无主机回复')
+    expect(mocks.openConsole).not.toHaveBeenCalled()
+    await nextTick()
+    expect(view.node('AgentDetailPanel').props['cache-check-loading']).toBe(false)
+    expect(view.node('AgentDetailPanel').props['cache-check-result']).toMatchObject({ hasCache: false })
+
+    mocks.init.mockResolvedValueOnce({ data: { sessionId: 'connected', capabilities: [] } })
+    await view.node('AgentDetailPanel').props.onNewSession(rows[0])
+    expect(mocks.openConsole).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ sessionId: 'connected' }))
+  })
+
+  it.each([401, 'SESSION_CHANGED'])('ends initialization without cache requests after login changes (%s)', async code => {
+    const view = await mount()
+    mocks.cache.mockClear()
+    mocks.selectHost.mockResolvedValue({ selectedHostId: 'host-instance' })
+    mocks.init.mockRejectedValueOnce(Object.assign(new Error('登录会话已更新'), { code }))
+
+    await expect(view.node('AgentDetailPanel').props.onNewSession(rows[0])).resolves.toBeUndefined()
+    expect(mocks.cache).not.toHaveBeenCalled()
+    expect(mocks.showError).not.toHaveBeenCalled()
+    expect(mocks.openConsole).not.toHaveBeenCalled()
   })
 
   it('keeps selection through filtering and toggles only currently visible hosts', async () => {

@@ -31,7 +31,7 @@
     </div>
     <el-link
       class="refresh-link"
-      :underline="false"
+      underline="never"
       :disabled="loading"
       @click="$emit('refresh')"
     >
