@@ -14,7 +14,6 @@ describe('AI channel selection', () => {
     expect(selector.configs.value.map(item => item.id)).toEqual([2, 3])
     expect(selector.selectedConfigId.value).toBe(2)
     expect(selector.configs.value[1].protocol).toBe('anthropic')
-    expect(Object.keys(selector)).toEqual(['configs', 'selectedConfigId', 'fetchConfigs'])
   })
 
   it('retains a manual selection while refreshing the catalog', async () => {

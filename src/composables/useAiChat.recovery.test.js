@@ -58,9 +58,9 @@ describe('useAiChat refresh recovery', () => {
   })
 
   it('keeps the in-flight message targets stable when older history is prepended', async () => {
-    let finish
+    const { promise, resolve: finish } = deferred()
     const chat = useAiChat({
-      enqueueApi: () => new Promise(resolve => { finish = resolve }),
+      enqueueApi: () => promise,
       canSend: () => true, getConversationKey: () => 'thread-1'
     })
     const sending = chat.send({ text: 'new message' })

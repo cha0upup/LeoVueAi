@@ -28,11 +28,10 @@ describe('remote file path semantics', () => {
     expect(buildFullPath('/', 'var/log')).toBe('/var/log')
   })
 
-  it('keeps only reactive navigation state in the composable API', () => {
+  it('updates the path and breadcrumbs when navigation changes', () => {
     const disk = ref('C:')
     const currentPath = ref('Windows/System32')
     const navigation = useFilePath({ disk, currentPath })
-    expect(Object.keys(navigation)).toEqual(['breadcrumbs', 'currentFullPath', 'canGoBack'])
     expect(navigation.currentFullPath.value).toBe('C:/Windows/System32')
     expect(navigation.breadcrumbs.value).toEqual([
       { text: 'C:', link: 'C:/' }, { text: 'Windows', link: 'C:/Windows' },

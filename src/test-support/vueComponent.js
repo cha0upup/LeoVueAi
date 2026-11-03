@@ -26,3 +26,22 @@ export function findNode(node, type) {
   }
   return null
 }
+
+export function findNodes(node, predicate = () => true) {
+  return [
+    ...(predicate(node) ? [node] : []),
+    ...node.children.flatMap(child => findNodes(child, predicate))
+  ]
+}
+
+// Forward attributes and only the slots exercised by the fixture, in order.
+export function createSlotStub(name, slotNames = ['default']) {
+  return Vue.defineComponent({
+    inheritAttrs: false,
+    setup(_props, { attrs, slots }) {
+      return () => Vue.h(name, attrs, slotNames.length === 1
+        ? slots[slotNames[0]]?.()
+        : slotNames.map(slot => slots[slot]?.()))
+    }
+  })
+}

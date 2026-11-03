@@ -1,7 +1,6 @@
-/* eslint-disable vue/one-component-per-file -- Element Plus fixtures exercise the real composer templates. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick } from 'vue'
-import { compileClientComponent } from '@/test-support/vueComponent.js'
+import { compileClientComponent, createSlotStub as stub, findNodes as findAll } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import * as stages from './scanStages.js'
 
@@ -10,10 +9,6 @@ const start = vi.fn()
 const supplemental = vi.fn()
 const validate = vi.fn()
 const message = { warning: vi.fn(), error: vi.fn() }
-const stub = (name) => defineComponent({
-  inheritAttrs: false,
-  setup(_props, { attrs, slots }) { return () => h(name, attrs, slots.default?.()) }
-})
 const TargetInput = stub('TargetInput')
 const RuleSelector = stub('RuleSelector')
 const api = { previewNetworkProbeWorkflowApi: preview, startNetworkProbeWorkflowApi: start, startNetworkFingerprintScanApi: supplemental }
@@ -30,10 +25,6 @@ const FingerprintComposer = compileClientComponent(new URL('./FingerprintScanCom
   './FingerprintRuleSelector.vue': { default: RuleSelector },
   '@/services/api/scan.js': api
 })
-const findAll = (node, predicate) => [
-  ...(predicate(node) ? [node] : []),
-  ...node.children.flatMap((child) => findAll(child, predicate))
-]
 const text = (node) => [node.text, ...node.children.map(text)].join('').trim()
 const apps = []
 function mount(component = Composer, props = {}) {

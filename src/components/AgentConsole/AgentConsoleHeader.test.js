@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, reactive } from 'vue'
-import { compileClientComponent } from '@/test-support/vueComponent.js'
+import { h, nextTick, reactive } from 'vue'
+import { compileClientComponent, createSlotStub, findNodes as nodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { icons } from '@/utils/icons.js'
 
 const Header = compileClientComponent(new URL('./AgentConsoleHeader.vue', import.meta.url), {})
-const nodes = (node) => [node, ...node.children.flatMap(nodes)]
 const textContent = (node) => node.type === 'comment'
   ? ''
   : node.text + node.children.map(textContent).join('')
@@ -25,12 +24,7 @@ describe('AgentConsoleHeader connection path semantics', () => {
     const renderer = createTestRenderer()
     const app = renderer.createApp({ render: () => h(Header, props) })
     for (const name of ['ElTooltip', 'ElIcon', 'Icon']) {
-      app.component(name, defineComponent({
-        inheritAttrs: false,
-        setup(_props, { attrs, slots }) {
-          return () => h(name, attrs, slots.default?.())
-        }
-      }))
+      app.component(name, createSlotStub(name))
     }
     app.mount(renderer.root)
     apps.push(app)

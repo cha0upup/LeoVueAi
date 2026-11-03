@@ -1,5 +1,6 @@
 import { effectScope } from 'vue'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 import { getBasicInfoApi } from '@/services/api/agent-node.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { useBasicInfo } from './useBasicInfo.js'
@@ -18,18 +19,11 @@ beforeEach(() => {
 afterEach(() => scope.stop())
 
 it('ignores an older host response while the current request is loading', async () => {
-  let finishOld, finishNew
+  const { promise: oldResponse, resolve: finishOld } = deferred()
+  const { promise: newResponse, resolve: finishNew } = deferred()
   getBasicInfoApi
-    .mockReturnValueOnce(
-      new Promise((resolve) => {
-        finishOld = resolve
-      })
-    )
-    .mockReturnValueOnce(
-      new Promise((resolve) => {
-        finishNew = resolve
-      })
-    )
+    .mockReturnValueOnce(oldResponse)
+    .mockReturnValueOnce(newResponse)
   const oldLoad = info.load('old-session')
   const newLoad = info.load('new-session')
   finishOld({ data: { BasicInfo: { OSInfo: { HostName: 'old' } } } })
@@ -43,12 +37,8 @@ it('ignores an older host response while the current request is loading', async 
 })
 
 it('discards pending errors when the view is disposed', async () => {
-  let fail
-  getBasicInfoApi.mockReturnValueOnce(
-    new Promise((_, reject) => {
-      fail = reject
-    })
-  )
+  const { promise, reject: fail } = deferred()
+  getBasicInfoApi.mockReturnValueOnce(promise)
   const pending = info.load('session')
   scope.stop()
   fail(new Error('disconnected'))

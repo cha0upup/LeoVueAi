@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
+import { deferred } from '@/test-support/deferred.js'
 import { useAiReportArchive } from './useAiReportArchive.js'
 import { archiveUserArtifactApi } from '@/services/api/user-space.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
@@ -54,8 +55,8 @@ describe('shared AI report archive', () => {
 
   it('captures context before awaiting history and ignores duplicate archive clicks', async () => {
     const { archive, context, loadMessages } = fixture('node-ai')
-    let resolve
-    loadMessages.mockImplementation(() => new Promise(done => { resolve = done }))
+    const { promise, resolve } = deferred()
+    loadMessages.mockReturnValue(promise)
     const pending = archive.archiveCurrentReport()
     expect(archive.archivingReport.value).toBe(true)
     Object.assign(context, { title: 'other', threadId: 'thread-2', sessionId: 'session-2', hostName: 'host-2', model: 'model-2' })

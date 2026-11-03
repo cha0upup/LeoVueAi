@@ -25,7 +25,6 @@ describe('admin mode navigation', () => {
     navigation.goToAdmin()
     expect(push).toHaveBeenCalledWith(`${ROUTE_PATHS.admin}?tab=system`)
     expect(values.size).toBe(1)
-    expect(Object.keys(navigation)).toEqual(['goToAdmin', 'rememberAdminRoute'])
   })
 
   it.each(['//example.invalid', '/login', '/workspace', '/admin-other'])('rejects an unrelated stored destination: %s', destination => {

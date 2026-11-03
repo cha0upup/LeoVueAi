@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, ref } from 'vue'
-import { compileClientComponent } from '@/test-support/vueComponent.js'
+import { nextTick, ref } from 'vue'
+import { compileClientComponent, createSlotStub, findNodes as nodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { icons } from '@/utils/icons.js'
 
@@ -13,7 +13,6 @@ const ThemeSwitcher = compileClientComponent(new URL('./ThemeSwitcher.vue', impo
   '@/utils/icons.js': { icons },
   '@/stores/theme': { useTheme: () => fixture.store }
 })
-const nodes = (node) => [node, ...node.children.flatMap(nodes)]
 const textContent = (node) => node.type === 'comment'
   ? ''
   : node.text + node.children.map(textContent).join('')
@@ -34,12 +33,7 @@ describe('ThemeSwitcher compact icon trigger', () => {
     const renderer = createTestRenderer()
     const app = renderer.createApp(ThemeSwitcher)
     for (const name of ['ElDropdown', 'ElDropdownMenu', 'ElDropdownItem', 'ElIcon', 'Icon']) {
-      app.component(name, defineComponent({
-        inheritAttrs: false,
-        setup(_props, { attrs, slots }) {
-          return () => h(name, attrs, [slots.default?.(), slots.dropdown?.()])
-        }
-      }))
+      app.component(name, createSlotStub(name, ['default', 'dropdown']))
     }
     app.mount(renderer.root)
     apps.push(app)

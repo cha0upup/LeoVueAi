@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 import { createTerminalSessionController } from './createTerminalSessionController.js'
 import { testTerminalTransport } from './test-support/terminalTransport.js'
 import { createTerminalSession } from './terminalWorkspaceModel.js'
@@ -107,16 +108,13 @@ describe('adaptive terminal polling', () => {
     const { controller, read, executeCommand } = setup()
     await controller.poll()
     for (const delay of [3000, 5000, 10000]) await expectNextReadAfter(controller, read, delay)
-    let complete
-    read.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          complete = resolve
-        })
-    )
+    const { promise, resolve: complete } = deferred()
+    read.mockReturnValueOnce(promise)
+    const readsBeforePending = read.mock.calls.length
     await vi.advanceTimersByTimeAsync(20000)
     const pending = controller.poll()
     await flush()
+    expect(read).toHaveBeenCalledTimes(readsBeforePending + 1)
     await controller.write('a')
     expect(executeCommand.mock.calls.some(([params]) => params.type === 'write-line')).toBe(false)
     complete(response())

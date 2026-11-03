@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 import { useAiHistory } from './useAiHistory.js'
 
 const record = sequence => ({ messageId: `message-${sequence}`, sequence })
 
 describe('shared AI history state', () => {
   it('prepends previous pages, serializes duplicate clicks and preserves scroll position', async () => {
-    let resolve
+    const { promise, resolve } = deferred()
     const wrap = { scrollHeight: 100, scrollTop: 10 }
     const onPrepend = vi.fn(() => { wrap.scrollHeight = 180 })
-    const loadPage = vi.fn(() => new Promise(done => { resolve = done }))
+    const loadPage = vi.fn().mockReturnValue(promise)
     const history = useAiHistory({
       getConversationKey: () => 'thread-1', getScopeKey: () => 'session-1', loadPage, onPrepend,
       getScrollElement: () => wrap
@@ -28,15 +29,17 @@ describe('shared AI history state', () => {
   })
 
   it('discards stale pages after switching thread or node session', async () => {
-    let resolve
+    const { promise, resolve } = deferred()
     let scope = 'session-1'
     const onPrepend = vi.fn()
+    const loadPage = vi.fn().mockReturnValue(promise)
     const history = useAiHistory({
       getConversationKey: () => 'thread-1', getScopeKey: () => scope,
-      loadPage: () => new Promise(done => { resolve = done }), onPrepend
+      loadPage, onPrepend
     })
     history.recordPage('thread-1', { messages: [record(3)], hasMore: true, nextBeforeSequence: 3 })
     const loading = history.loadOlderMessages()
+    expect(loadPage).toHaveBeenCalledOnce()
     scope = 'session-2'
     resolve({ messages: [record(1)], hasMore: false, nextBeforeSequence: 1 })
     expect(await loading).toBe(false)

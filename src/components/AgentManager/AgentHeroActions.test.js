@@ -1,5 +1,4 @@
-import { defineComponent, h } from 'vue'
-import { compileClientComponent, findNode } from '@/test-support/vueComponent.js'
+import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createTestRenderer } from '../../test-support/vueRenderer.js'
 import { icons } from '@/utils/icons.js'
@@ -17,12 +16,7 @@ describe('AgentHeroActions semantic events', () => {
       agent, liveSessionCount: 1, onAddChildAgent, onNewSession
     })
     for (const name of ['ElButton', 'ElDropdown', 'ElDropdownMenu', 'ElDropdownItem', 'ElIcon', 'Icon']) {
-      app.component(name, defineComponent({
-        inheritAttrs: false,
-        setup(_props, { attrs, slots }) {
-          return () => h(name, attrs, [slots.default?.(), slots.dropdown?.()])
-        }
-      }))
+      app.component(name, createSlotStub(name, ['default', 'dropdown']))
     }
     app.mount(renderer.root)
     try {

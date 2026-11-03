@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope } from 'vue'
+import { deferred } from '@/test-support/deferred.js'
 import { useFingerprintDebug } from './useFingerprintDebug.js'
 import {
   debugNetworkFingerprintApi,
@@ -42,10 +43,11 @@ describe('fingerprint debug task lifecycle', () => {
   })
 
   it('ignores a delayed start response after disposal', async () => {
-    let resolve
-    debugNetworkFingerprintApi.mockReturnValue(new Promise(done => { resolve = done }))
+    const { promise, resolve } = deferred()
+    debugNetworkFingerprintApi.mockReturnValue(promise)
     const debug = fixture()
     const pending = debug.start(input)
+    expect(debugNetworkFingerprintApi).toHaveBeenCalledWith(input)
     scope.stop()
     resolve({ data: { taskId: 'late' } })
     await pending

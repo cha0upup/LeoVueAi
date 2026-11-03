@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 import { useFileSave } from './useFileSave.js'
 import { editFileApi } from '@/services/api/agent-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
@@ -44,13 +45,8 @@ function fixture() {
 beforeEach(() => vi.resetAllMocks())
 describe('saving a preview', () => {
   it('preserves edits made while the save request is pending', async () => {
-    let finish
-    editFileApi.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve
-        })
-    )
+    const { promise, resolve: finish } = deferred()
+    editFileApi.mockReturnValue(promise)
     const { save, content, modified, state, isSaving } = fixture()
     const pending = save()
     content.value = 'second revision'
@@ -95,25 +91,17 @@ describe('saving a preview', () => {
     ])
   })
   it('ignores an old save response after closing and reopening the preview', async () => {
-    let finishOld, finishNew
+    const { promise: oldResponse, resolve: finishOld } = deferred()
+    const { promise: newResponse, resolve: finishNew } = deferred()
     editFileApi
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            finishOld = resolve
-          })
-      )
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            finishNew = resolve
-          })
-      )
+      .mockReturnValueOnce(oldResponse)
+      .mockReturnValueOnce(newResponse)
     const { save, reset, isSaving, onSaved, content } = fixture()
     const oldSave = save()
     reset()
     content.value = 'reopened revision'
     const newSave = save()
+    expect(editFileApi).toHaveBeenCalledTimes(2)
     finishOld({})
     await oldSave
     expect(onSaved).not.toHaveBeenCalled()

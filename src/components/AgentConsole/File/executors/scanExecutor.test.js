@@ -48,8 +48,8 @@ describe('scan executor request lifecycle', () => {
 
   it('does not overwrite a successful stop with an older query', async () => {
     const { engine, task } = await fixture()
-    let finishQuery
-    queryNetworkProbeWorkflowApi.mockImplementationOnce(() => new Promise(resolve => { finishQuery = resolve }))
+    const { promise, resolve: finishQuery } = deferred()
+    queryNetworkProbeWorkflowApi.mockReturnValueOnce(promise)
     const pending = engine.queryScanTask(task)
     await engine.stopTask(task.id)
     const next = deferred()
@@ -89,9 +89,10 @@ describe('scan executor request lifecycle', () => {
 
   it.each(['removed', 'detached'])('ignores a query after its local task was %s', async (action) => {
     const { engine, task } = await fixture()
-    let finishQuery
-    queryNetworkProbeWorkflowApi.mockImplementationOnce(() => new Promise(resolve => { finishQuery = resolve }))
+    const { promise, resolve: finishQuery } = deferred()
+    queryNetworkProbeWorkflowApi.mockReturnValueOnce(promise)
     const pending = engine.queryScanTask(task)
+    expect(queryNetworkProbeWorkflowApi).toHaveBeenCalledOnce()
     if (action === 'detached') engine.detach()
     else engine.removeTaskById(task.id)
     finishQuery({ data: { status: 'STOPPED', outcome: 'COMPLETED' } })
@@ -101,9 +102,10 @@ describe('scan executor request lifecycle', () => {
 
   it('does not restore tasks into a destroyed session from a late list response', async () => {
     const { engine } = await fixture()
-    let finishList
-    listNetworkProbeWorkflowTasksApi.mockImplementationOnce(() => new Promise(resolve => { finishList = resolve }))
+    const { promise, resolve: finishList } = deferred()
+    listNetworkProbeWorkflowTasksApi.mockReturnValueOnce(promise)
     const pending = engine.syncNetworkWorkflowTasks('session')
+    expect(listNetworkProbeWorkflowTasksApi).toHaveBeenCalledOnce()
     engine.sessionTasks.delete('session')
     finishList({ data: { tasks: [{ taskId: 'backend', status: 'RUNNING' }] } })
     await expect(pending).resolves.toMatchObject({ tasks: [] })
@@ -112,9 +114,10 @@ describe('scan executor request lifecycle', () => {
 
   it('does not recreate a removed task from an earlier list response', async () => {
     const { engine, task } = await fixture()
-    let finishList
-    listNetworkProbeWorkflowTasksApi.mockImplementationOnce(() => new Promise(resolve => { finishList = resolve }))
+    const { promise, resolve: finishList } = deferred()
+    listNetworkProbeWorkflowTasksApi.mockReturnValueOnce(promise)
     const pending = engine.syncNetworkWorkflowTasks('session')
+    expect(listNetworkProbeWorkflowTasksApi).toHaveBeenCalledOnce()
     engine.removeTaskById(task.id)
     finishList({ data: { tasks: [{ taskId: 'backend', status: 'RUNNING' }] } })
     await expect(pending).resolves.toMatchObject({ tasks: [] })
@@ -149,9 +152,10 @@ describe('scan executor request lifecycle', () => {
 
   it('does not let an older summary overwrite newly loaded full details', async () => {
     const { engine, task } = await fixture()
-    let finishList
-    listNetworkProbeWorkflowTasksApi.mockImplementationOnce(() => new Promise(resolve => { finishList = resolve }))
+    const { promise, resolve: finishList } = deferred()
+    listNetworkProbeWorkflowTasksApi.mockReturnValueOnce(promise)
     const pending = engine.syncNetworkWorkflowTasks('session')
+    expect(listNetworkProbeWorkflowTasksApi).toHaveBeenCalledOnce()
     queryNetworkProbeWorkflowApi.mockResolvedValueOnce({ data: {
       status: 'STOPPED', outcome: 'FAILED', error: 'detail error', reachableHostList: []
     } })

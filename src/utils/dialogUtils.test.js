@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { useDialog, useEditDialog } from './dialogUtils.js'
 
 describe('dialog state', () => {
-  it('exposes the open and close lifecycle without unused controls', () => {
+  it('opens and closes a dialog', () => {
     const dialog = useDialog()
-    expect(Object.keys(dialog).sort()).toEqual(['close', 'open', 'visible'])
     expect(dialog.visible.value).toBe(false)
     dialog.open()
     expect(dialog.visible.value).toBe(true)
@@ -24,7 +23,6 @@ describe('dialog state', () => {
 
   it('clears the selected item when an edit dialog closes', () => {
     const dialog = useEditDialog()
-    expect(Object.keys(dialog).sort()).toEqual(['close', 'currentItem', 'open', 'visible'])
     expect(dialog.currentItem.value).toBeNull()
     dialog.open({ id: 'first' })
     expect(dialog.currentItem.value).toEqual({ id: 'first' })

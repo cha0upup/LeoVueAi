@@ -1,7 +1,7 @@
  
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import { compileClientComponent } from '@/test-support/vueComponent.js'
+import { compileClientComponent, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { icons } from '@/utils/icons.js'
 
@@ -9,10 +9,6 @@ const Toolbar = compileClientComponent(new URL('./AgentBatchToolbar.vue', import
   '@iconify/vue': { Icon: { render: () => null } }, '@/utils/icons.js': { icons }
 })
 
-const findNodes = (node, predicate) => [
-  ...(predicate(node) ? [node] : []),
-  ...node.children.flatMap(child => findNodes(child, predicate))
-]
 const nodeText = node => [node.text, ...node.children.map(nodeText)].join('').trim()
 
 describe('AgentBatchToolbar', () => {

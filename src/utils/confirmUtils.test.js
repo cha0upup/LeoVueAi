@@ -50,7 +50,7 @@ describe('confirmAction', () => {
     })
   })
 
-  it.each(['cancel', 'close'])('returns false without notifications when the dialog rejects with %s', async (reason) => {
+  it.each(['cancel', 'close', new Error('dialog fixture failed')])('returns false without notifications when the dialog rejects with %s', async (reason) => {
     mocks.confirm.mockRejectedValueOnce(reason)
 
     await expect(confirmAction({ message: '继续？' })).resolves.toBe(false)

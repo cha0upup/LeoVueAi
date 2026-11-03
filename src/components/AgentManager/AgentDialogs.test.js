@@ -1,7 +1,7 @@
 /* eslint-disable vue/one-component-per-file -- Fixture components render the real dialog templates. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick } from 'vue'
-import { compileClientComponent, findNode } from '@/test-support/vueComponent.js'
+import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { icons } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
@@ -64,12 +64,7 @@ describe('Agent dialog shared form integration', () => {
     const refresh = vi.fn()
     const app = renderer.createApp(component, { projectId: 'project-1', onRefresh: refresh })
     for (const name of ['ElDialog', 'ElButton', 'ElIcon', 'Icon']) {
-      app.component(name, defineComponent({
-        inheritAttrs: false,
-        setup(_props, { attrs, slots }) {
-          return () => h(name, attrs, [slots.header?.(), slots.default?.(), slots.footer?.()])
-        }
-      }))
+      app.component(name, createSlotStub(name, ['header', 'default', 'footer']))
     }
     const vm = app.mount(renderer.root)
     apps.push(app)

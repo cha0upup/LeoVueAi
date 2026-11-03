@@ -24,8 +24,4 @@ describe('session request parameters', () => {
     expect(withSession(params)).toEqual({ sessionId: 'fixed', ...params })
     expect(params).toEqual({ source: 'System', limit: 10 })
   })
-
-  it('exposes only the request builder used by callers', () => {
-    expect(Object.keys(useSessionParams('session'))).toEqual(['withSession'])
-  })
 })

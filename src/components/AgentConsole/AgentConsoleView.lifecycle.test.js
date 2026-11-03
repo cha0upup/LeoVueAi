@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Vue from 'vue'
-import { compileClientComponent } from '@/test-support/vueComponent.js'
+import { compileClientComponent, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { useToolTabs } from '@/composables/useToolTabs.js'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/constants/app.js'
@@ -89,7 +89,7 @@ const Console = compileClientComponent(new URL('./AgentConsoleView.vue', import.
 }, 'console-lifecycle')
 
 function findAll(node, type) {
-  return [...(node.type === type ? [node] : []), ...node.children.flatMap(child => findAll(child, type))]
+  return findNodes(node, child => child.type === type)
 }
 
 describe('console workspace lifecycle', () => {

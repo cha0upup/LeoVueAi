@@ -1,7 +1,7 @@
 /* eslint-disable vue/one-component-per-file -- The tree fixture exposes Element Plus events and lazy loading. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref } from 'vue'
-import { compileClientComponent } from '@/test-support/vueComponent.js'
+import { compileClientComponent, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { icons } from '@/utils/icons.js'
 import { getHostDisplayName, getHostIcon, isChildHost } from './agentDetailUtils.js'
@@ -14,9 +14,6 @@ const Table = compileClientComponent(new URL('./AgentTable.vue', import.meta.url
   './agentDetailUtils.js': { getHostDisplayName, getHostIcon, isChildHost },
   './agentTreeSelection.js': { collectVisibleAgents }
 })
-const findNodes = (node, predicate) => [
-  ...(predicate(node) ? [node] : []), ...node.children.flatMap(child => findNodes(child, predicate))
-]
 
 describe('AgentTable directory interactions', () => {
   const apps = []

@@ -1,7 +1,7 @@
 /* eslint-disable vue/one-component-per-file -- In-memory Element Plus fixtures exercise the real table template. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, reactive } from 'vue'
-import { compileClientComponent } from '@/test-support/vueComponent.js'
+import { compileClientComponent, createSlotStub, findNodes as findAll } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
 
@@ -17,10 +17,6 @@ const Table = compileClientComponent(new URL('./AssetResultTable.vue', import.me
   './FingerprintResults.vue': { default: icon }
 })
 
-const findAll = (node, predicate) => [
-  ...(predicate(node) ? [node] : []),
-  ...node.children.flatMap((child) => findAll(child, predicate))
-]
 const nodeText = (node) => [node.text, ...node.children.map(nodeText)].join('').trim()
 const flush = async () => { for (let i = 0; i < 6; i += 1) await nextTick() }
 const endpoint = (n) => ({ host: `host-${n}`, port: 80, protocol: 'tcp', service: 'http', state: 'open' })
@@ -32,10 +28,7 @@ function mount() {
   const renderer = createTestRenderer()
   const app = renderer.createApp(defineComponent({ setup: () => () => h(Table, props) }))
   for (const name of ['ElButton', 'ElInput', 'ElIcon', 'ElTag', 'ElPagination', 'ElForm', 'ElFormItem', 'ElSelect', 'ElOption', 'ElInputNumber', 'ElCheckbox']) {
-    app.component(name, defineComponent({
-      inheritAttrs: false,
-      setup(_props, { attrs, slots }) { return () => h(name, attrs, slots.default?.()) }
-    }))
+    app.component(name, createSlotStub(name))
   }
   app.component('ElDrawer', defineComponent({
     props: { modelValue: Boolean },

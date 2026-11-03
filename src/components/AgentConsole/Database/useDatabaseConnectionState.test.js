@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
+import { deferred } from '@/test-support/deferred.js'
 import {
   DATABASE_CONNECTION_STATUS,
   isDatabaseConnectionConfigured,
@@ -20,13 +21,9 @@ describe('useDatabaseConnectionState', () => {
   })
 
   it('moves from connecting to ready and records connection details', async () => {
-    let resolveRequest
+    const { promise, resolve: resolveRequest } = deferred()
     const sqlEngine = {
-      testConnection: vi.fn(
-        () => new Promise((resolve) => {
-          resolveRequest = resolve
-        })
-      )
+      testConnection: vi.fn().mockReturnValue(promise)
     }
     const connection = reactive({
       connectionId: 'c1',
