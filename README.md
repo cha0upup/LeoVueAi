@@ -13,7 +13,7 @@ LeoVueAI 是 LeoAI 的前端控制台，基于 Vue 3 + Vite 构建，负责平�
 | 编辑器 | Monaco Editor |
 | 终端 | @xterm/xterm、FitAddon、SearchAddon、WebLinksAddon |
 | 网络 | Axios、SSE |
-| 文档与导出 | marked、md-editor-v3、xlsx、jszip |
+| 文档与导出 | marked、DOMPurify、xlsx、CSV |
 | 工程质量 | ESLint 10、eslint-plugin-vue、Prettier |
 
 ## 主要模块
@@ -47,14 +47,15 @@ src/
 
 ### 环境要求
 
-- Node.js 20.19+
+- 推荐 Node.js 24.14.1（与 `.nvmrc` 和 GitHub Actions 一致）；兼容 Node.js 20.19+、22.13+ 及 24+
 - npm 9+
 - LeoAI 后端默认运行在 `http://127.0.0.1:8082`
 
 ### 安装依赖
 
 ```bash
-npm install
+nvm use # 已安装 nvm 时使用；否则直接安装 .nvmrc 指定的 Node.js
+npm ci
 ```
 
 ### 启动开发服务器
@@ -76,6 +77,8 @@ VITE_API_PORT=8082
 ```
 
 如后端端口有变化，修改该值后重启 Vite 即可。当前 Axios 基地址由 `src/services/http.js` 根据浏览器协议、主机名和 `VITE_API_PORT` 计算。
+
+`.env.development` 仅保存公开的本地开发端口。个人覆盖配置放入 `.env.development.local`，不要把密钥写入任何 `VITE_*` 变量：它们会进入浏览器构建产物。
 
 ## 构建与部署
 
@@ -111,6 +114,10 @@ python3 tools/verify_release.py --frontend ../LeoVueAi
 
 `clean` 会先移除 `target/classes/static/` 中上一次构建遗留的哈希资源，避免新旧前端 bundle 同时进入 JAR。本地已准备依赖时可添加 `--skip-install`，CI 从 lockfile 安装。
 
+两个仓库及各 Maven 子模块的版本必须一致；发布检查会在安装依赖前校验 `pom.xml`、`package.json` 和 lockfile 中的版本。依赖使用官方 npm registry 和 SheetJS 官方分发地址；本次整理不升级依赖版本。
+
+本仓库的 GitHub Actions 在推送到 `main`、Pull Request 和手动触发时执行 lint、测试与生产构建，不自动部署。
+
 ## 常用命令
 
 ```bash
@@ -125,6 +132,9 @@ npm run preview
 
 # ESLint 检查
 npm run lint
+
+# 回归测试
+npm test
 
 # ESLint 自动修复
 npm run lint:fix

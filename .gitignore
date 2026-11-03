@@ -2,6 +2,10 @@ node_modules/
 dist/
 .DS_Store
 .env
+.env.*
+!.env.development
+!.env.example
+!.env.*.example
 .env.local
 .env.*.local
 .idea/
@@ -13,3 +17,11 @@ pnpm-debug.log*
 .vite/
 .claude/
 .workbuddy/
+*.log
+*.log.*
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+coverage/
