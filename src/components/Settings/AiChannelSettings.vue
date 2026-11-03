@@ -43,6 +43,7 @@
       :inherited-endpoint-label="inheritedEndpointLabel"
       :model-limit-hint="modelLimitHint"
       :reasoning-capability-hint="reasoningCapabilityHint"
+      :temperature-configurable="requestControls.temperatureConfigurable"
       :save-loading="saveLoading"
       @apply-provider="applySelectedProvider"
       @submit="submit"
@@ -95,7 +96,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import {
   listAiModelConfigsApi,
@@ -118,8 +119,7 @@ import { useAiProviderManager } from '@/composables/useAiProviderManager.js'
 import {
   AI_PROTOCOL_OPTIONS as protocolOptions,
   DEFAULT_COMPLETIONS_PATH as DEFAULT_PATH,
-  REASONING_EFFORT_OPTIONS as reasoningOptions,
-  REASONING_MODE_OPTIONS as reasoningModeOptions,
+  modelRequestControls,
   createModelForm,
   defaultPathForProtocol,
   normalizeProtocol,
@@ -138,6 +138,19 @@ const probeResultDialogVisible = ref(false)
 const latestProbeReport = ref(null)
 const selectedModelId = ref(null)
 const modelHealthById = ref({})
+
+// Initialize dialog state before watchers evaluate their computed sources.
+const dialogVisible = ref(false)
+const editing = ref(null)
+const formRef = ref(null)
+const saveLoading = ref(false)
+const form = reactive(createModelForm())
+const rules = {
+  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+  providerId: [{ required: true, message: '请选择供应商', trigger: 'change' }],
+  model: [{ required: true, message: '请输入模型名称', trigger: 'blur' }]
+}
+
 const {
   capabilityDialogVisible,
   capabilityLoading,
@@ -210,7 +223,19 @@ const modelLimitHint = computed(() => {
     ? '自定义值会在后端按模型真实能力上限自动裁剪'
     : '默认使用系统能力库识别出的模型上限'
 })
+const requestControls = computed(() => modelRequestControls(
+  findCapabilityByModelName(form.model, form.providerKey), form.providerKey
+))
+const reasoningOptions = computed(() => requestControls.value.reasoningOptions)
+const reasoningModeOptions = computed(() => requestControls.value.reasoningModeOptions)
+watch(requestControls, (controls) => {
+  if (!controls.reasoningOptions.some(option => option.value === form.reasoningEffort)) form.reasoningEffort = 'auto'
+  if (controls.thinkingRequired && form.thinkingEnabled === 0) form.thinkingEnabled = null
+  if (!controls.temperatureConfigurable) form.temperature = null
+})
 const reasoningCapabilityHint = computed(() => {
+  if (requestControls.value.thinkingRequired) return '该模型始终开启思考；可用等级按官方参数约束显示。'
+  if (requestControls.value.responsesRequiredForTools) return '使用工具调用时请选择 Responses API。'
   if (form.thinkingEnabled === 1 && editing.value && !editing.value.supportsReasoning) {
     return '当前能力库认为该模型不支持 Reasoning，保存后可能会被后端忽略。'
   }
@@ -264,19 +289,7 @@ async function refreshAll() {
   }
 }
 
-// ── Dialog state ───────────────────────────────────────────────────────
-const dialogVisible = ref(false)
-const editing = ref(null)
-const formRef = ref(null)
-const saveLoading = ref(false)
-
-const form = reactive(createModelForm())
-const rules = {
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  providerId: [{ required: true, message: '请选择供应商', trigger: 'change' }],
-  model: [{ required: true, message: '请输入模型名称', trigger: 'blur' }]
-}
-
+// ── Dialog actions ─────────────────────────────────────────────────────
 function openEdit(row) {
   editing.value = row
   resetReactiveForm(form, {

@@ -197,12 +197,13 @@
               <el-form-item label="Temperature">
                 <el-input-number
                   v-model="form.temperature"
+                  :disabled="!temperatureConfigurable"
                   :min="0"
                   :max="2"
                   :step="0.1"
                   :precision="1"
                   :value-on-clear="null"
-                  placeholder="留空使用默认"
+                  :placeholder="temperatureConfigurable ? '留空使用默认' : '使用模型固定参数'"
                 />
               </el-form-item>
             </div>
@@ -249,6 +250,7 @@ const props = defineProps({
   fallbackCandidates: { type: Array, default: () => [] },
   reasoningModeOptions: { type: Array, default: () => [] },
   reasoningOptions: { type: Array, default: () => [] },
+  temperatureConfigurable: { type: Boolean, default: true },
   inheritedEndpointLabel: { type: String, default: '' },
   modelLimitHint: { type: String, default: '' },
   reasoningCapabilityHint: { type: String, default: '' },

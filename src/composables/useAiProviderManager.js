@@ -83,7 +83,8 @@ export function useAiProviderManager({
       (provider.key === 'openai' ? AI_PROTOCOL.responses : AI_PROTOCOL.chatCompletions)
     providerForm.completionsPath =
       provider.completionsPath || defaultPathForProtocol(providerForm.protocol)
-    providerForm.models = []
+    providerForm.models = (Array.isArray(provider.popularModels) ? provider.popularModels : [])
+      .map(model => ({ model, name: model, checked: false }))
     providerDefaultModelIndex.value = 0
   }
 
@@ -99,6 +100,8 @@ export function useAiProviderManager({
         await fetchAiModelListApi({
           baseUrl: providerForm.baseUrl,
           apiKey: providerForm.apiKey,
+          providerKey: providerForm.providerKey,
+          protocol: normalizeProtocol(providerForm.protocol),
           completionsPath: providerForm.completionsPath || DEFAULT_COMPLETIONS_PATH
         })
       ).data

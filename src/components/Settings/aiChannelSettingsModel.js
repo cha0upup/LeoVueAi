@@ -3,7 +3,7 @@ export const AI_PROTOCOL = Object.freeze({
   chatCompletions: 'chat_completions'
 })
 
-export const DEFAULT_COMPLETIONS_PATH = '/v1/chat/completions'
+export const DEFAULT_COMPLETIONS_PATH = '/chat/completions'
 const RESPONSES_PATH = '/responses'
 
 export const AI_PROTOCOL_OPTIONS = [
@@ -19,11 +19,26 @@ export const REASONING_MODE_OPTIONS = [
 
 export const REASONING_EFFORT_OPTIONS = [
   { label: '自动', value: 'auto' },
+  { label: '最小', value: 'minimal' },
   { label: '低', value: 'low' },
   { label: '中', value: 'medium' },
   { label: '高', value: 'high' },
-  { label: '极高', value: 'xhigh' }
+  { label: '极高', value: 'xhigh' },
+  { label: '最大', value: 'max' }
 ]
+
+export function modelRequestControls(capability, providerKey = '') {
+  const options = ['openrouter', 'ollama'].includes(normalizeCapabilityKey(providerKey))
+    ? null : capability?.requestOptions
+  return {
+    reasoningOptions: REASONING_EFFORT_OPTIONS.filter(option => option.value === 'auto' ||
+      !options || options.reasoningEfforts?.includes(option.value)),
+    reasoningModeOptions: REASONING_MODE_OPTIONS.filter(option => !options?.thinkingRequired || option.value !== 0),
+    temperatureConfigurable: options?.temperatureConfigurable !== false,
+    thinkingRequired: options?.thinkingRequired === true,
+    responsesRequiredForTools: options?.responsesRequiredForTools === true
+  }
+}
 
 const CAPABILITY_SOURCE_LABELS = {
   manual: '开发者维护',
@@ -157,6 +172,7 @@ export function normalizeModelNameForCapability(modelName, providerKey = '') {
     'dashscope',
     'mimo',
     'gemini',
+    'kimi',
     'moonshot',
     'zhipu'
   ]

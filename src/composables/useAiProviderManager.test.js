@@ -98,4 +98,50 @@ describe('useAiProviderManager', () => {
       })
     )
   })
+
+  it('loads the Kimi preset, discovers models and saves their inherited connection', async () => {
+    const preset = {
+      key: 'kimi', label: 'Kimi (Moonshot)', baseUrl: 'https://api.moonshot.cn/v1',
+      protocol: 'chat_completions', completionsPath: '/chat/completions',
+      popularModels: ['kimi-k3.1-pro', 'kimi-k2.6']
+    }
+    mocks.getPresets.mockResolvedValue({ data: [preset] })
+    mocks.fetchModels.mockResolvedValue({ data: ['kimi-k3.1-pro', 'kimi-k2.6'] })
+    const findCapabilityByModelName = vi.fn(() => ({ source: 'system' }))
+    const manager = useAiProviderManager({
+      modelRows: ref([]), loadModels: vi.fn(async () => {}),
+      ensureCapabilitiesLoaded: vi.fn(async () => {}), findCapabilityByModelName,
+      testConnection: vi.fn()
+    })
+    manager.openProviderCreate()
+    await manager.loadProviders()
+    manager.selectProviderPreset(manager.providers.value[0])
+    expect(manager.selectedProviderKey.value).toBe('kimi')
+    expect(manager.providerForm.models).toEqual([
+      { model: 'kimi-k3.1-pro', name: 'kimi-k3.1-pro', checked: false },
+      { model: 'kimi-k2.6', name: 'kimi-k2.6', checked: false }
+    ])
+    expect(manager.providerForm).toMatchObject({
+      providerKey: 'kimi', name: preset.label, baseUrl: preset.baseUrl,
+      protocol: 'chat_completions', completionsPath: '/chat/completions'
+    })
+    manager.providerForm.apiKey = 'test-key'
+    await manager.fetchProviderFormModels()
+    expect(mocks.fetchModels).toHaveBeenCalledExactlyOnceWith({
+      baseUrl: preset.baseUrl, apiKey: 'test-key', providerKey: 'kimi',
+      protocol: 'chat_completions', completionsPath: '/chat/completions'
+    })
+
+    expect(await manager.submitProvider()).toBe(true)
+    expect(mocks.createProvider).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      providerKey: 'kimi', baseUrl: preset.baseUrl, protocol: 'chat_completions',
+      completionsPath: '/chat/completions', apiKey: 'test-key',
+      models: [
+        expect.objectContaining({ model: 'kimi-k3.1-pro', isActive: 1, reasoningEffort: 'auto' }),
+        expect.objectContaining({ model: 'kimi-k2.6', isActive: 0, reasoningEffort: 'auto' })
+      ]
+    }))
+    expect(findCapabilityByModelName).toHaveBeenCalledWith('kimi-k3.1-pro', 'kimi')
+    expect(mocks.showError).not.toHaveBeenCalled()
+  })
 })
