@@ -1,6 +1,5 @@
 import { ref, toRaw } from 'vue'
 import { previewFileChunkApi } from '@/services/api/agent-files.js'
-import { formatFileSize } from '@/utils/format.js'
 import { createBase64StreamDecoder } from './useFileEncoding.js'
 
 const CHUNK_SIZE = 256 * 1024 // 256KB per chunk
@@ -148,8 +147,6 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
     initLargeFileMode,
     setupScrollListener,
     loadNextChunk,
-    resetLargeFile,
-    formatFileSize,
-    CHUNK_SIZE
+    resetLargeFile
   }
 }

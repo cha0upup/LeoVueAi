@@ -50,7 +50,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRaw, watch } from 'vue'
 
 import { monaco } from '@/utils/monaco.js'
-import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
+import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEditor.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
@@ -98,7 +98,6 @@ import {
   normalizeClassArtifacts
 } from './scriptGeneratorArtifacts.js'
 
-const { disposeEditorInstance, recreateEditorInstance } = useMonacoEditorInstance()
 const { monacoTheme, watchMonacoTheme } = useMonacoTheme()
 
 const COMMON_HEADER_NAMES = Object.freeze([

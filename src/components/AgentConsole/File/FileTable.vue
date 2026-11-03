@@ -286,7 +286,6 @@ onBeforeUnmount(() => {
 // 暴露方法给父组件
 defineExpose({
   getList,
-  refreshCurrentFolder,
   previewFile
 })
 </script>

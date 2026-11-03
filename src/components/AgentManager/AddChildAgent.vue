@@ -480,8 +480,7 @@ onMounted(async () => {
 })
 
 defineExpose({
-  openAddChildAgent,
-  close
+  openAddChildAgent
 })
 </script>
 

@@ -8,7 +8,7 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 
-import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
+import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEditor.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 
@@ -25,7 +25,6 @@ const containerRef = ref(null)
 const editorRef = ref(null)
 
 const { monacoTheme, watchMonacoTheme } = useMonacoTheme()
-const { disposeEditorInstance, recreateEditorInstance } = useMonacoEditorInstance()
 
 const buildOptions = () => createMonacoEditorOptions({
   value: props.modelValue,

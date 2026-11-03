@@ -26,7 +26,7 @@ describe('parseAiSseStream Turn protocol', () => {
       `id: ${index + 1}|turn-1|||\nevent: ${name}\ndata: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`
     ).join('')
 
-    await parseAiSseStream(new globalThis.Response(body), reducer.makeLogHandlers('thread-1', 0))
+    await parseAiSseStream(new globalThis.Response(body), reducer.makeRecoveryHandlers('thread-1'))
 
     expect(assistant.nodes.slice(0, 2)).toMatchObject([
       { kind: 'text', content: 'draft', streaming: false },

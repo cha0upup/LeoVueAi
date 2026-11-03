@@ -235,7 +235,6 @@ import { computed, onUnmounted, ref } from 'vue'
 import { formatElapsedLabel } from '@/utils/ai.js'
 import { formatRuntimeMs } from '@/utils/aiRuntime.js'
 import { groupConsecutiveToolNodes, isInternalToolNode } from '@/utils/aiProcessPresentation.js'
-// aiTurnModel node factories are no longer needed here — nodes are built upstream
 import TaskNode from './TaskNode.vue'
 import AiUserInputCard from './AiUserInputCard.vue'
 
@@ -243,16 +242,6 @@ const props = defineProps({
   msg: {
     type: Object,
     required: true
-  },
-  /** agent sessionId — 工具结果旁"追加到摘要"按钮需要；平台 AI 不传。 */
-  sessionId: {
-    type: String,
-    default: null
-  },
-  /** 当前线程 ID — 计划预批准等操作需要。 */
-  threadId: {
-    type: String,
-    default: null
   }
 })
 

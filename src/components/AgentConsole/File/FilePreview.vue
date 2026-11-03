@@ -60,7 +60,6 @@
       <PdfPreview
         v-else-if="fileType === 'pdf'"
         :pdf-src="fileContent"
-        :file-name="displayFileName"
       />
       <TextPreview
         v-else
@@ -110,7 +109,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { icons } from '@/utils/icons.js'
-import { formatFilePath } from '@/utils/format.js'
+import { formatFilePath, formatFileSize } from '@/utils/format.js'
 import { useFileSave } from '@/composables/useFileSave.js'
 import FileDownload from '@/components/AgentConsole/File/FileDownload.vue'
 import FilePreviewHeader from './FilePreviewHeader.vue'
@@ -165,8 +164,7 @@ const {
   isLoadingChunk,
   initLargeFileMode,
   setupScrollListener,
-  resetLargeFile,
-  formatFileSize
+  resetLargeFile
 } = useLargeFile({
   currentEncoding,
   onChunkError: (error) => showError(`文件分片加载失败：${error?.message || '未知错误'}`)

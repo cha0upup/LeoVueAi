@@ -431,8 +431,7 @@ const resetForm = () => {
 }
 
 defineExpose({
-  openImportAgent: dialog.open,
-  close
+  openImportAgent: dialog.open
 })
 </script>
 

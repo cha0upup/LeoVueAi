@@ -1,4 +1,4 @@
-import { computed, toRaw, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { monaco } from '@/utils/monaco.js'
 import { useTheme } from '@/stores/theme'
 
@@ -18,17 +18,8 @@ export function useMonacoTheme() {
       }
     })
 
-  const disposeMonacoEditors = (...editorRefs) => {
-    editorRefs.forEach((editorRef) => {
-      if (!editorRef?.value) return
-      toRaw(editorRef.value).dispose()
-      editorRef.value = null
-    })
-  }
-
   return {
     monacoTheme,
-    watchMonacoTheme,
-    disposeMonacoEditors
+    watchMonacoTheme
   }
 }

@@ -167,7 +167,7 @@ const handleEdit = async () => {
   )
 }
 
-defineExpose({ openEditAgentDialog, close })
+defineExpose({ openEditAgentDialog })
 </script>
 
 <style scoped>

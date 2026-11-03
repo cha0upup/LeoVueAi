@@ -333,8 +333,7 @@ const openShareAgent = async (agentData) => {
 }
 
 defineExpose({
-  openShareAgent,
-  close
+  openShareAgent
 })
 </script>
 

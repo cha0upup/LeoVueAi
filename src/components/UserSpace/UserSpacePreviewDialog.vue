@@ -71,7 +71,7 @@
 import { computed, nextTick, onUnmounted, ref, toRaw, watch } from 'vue'
 import { monaco } from '@/utils/monaco.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
-import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
+import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEditor.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { formatFileSize } from '@/utils/format.js'
@@ -93,7 +93,6 @@ const renderedMarkdown = computed(() => isReading.value ? renderArtifactMarkdown
 const editor = ref(null)
 const editorContainer = ref(null)
 const { monacoTheme, watchMonacoTheme } = useMonacoTheme()
-const { disposeEditorInstance, recreateEditorInstance } = useMonacoEditorInstance()
 
 const disposeEditor = () => disposeEditorInstance(editor, { disposeModel: true })
 

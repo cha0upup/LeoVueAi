@@ -192,6 +192,7 @@
 import { computed, nextTick, onBeforeUnmount, reactive, ref, toRaw, watch } from 'vue'
 
 import { monaco } from '@/utils/monaco.js'
+import { disposeEditorInstance } from '@/utils/monacoEditor.js'
 import { icons } from '@/utils/icons.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
@@ -373,7 +374,7 @@ const { isDirty, reset: resetDirtyBaseline } = useDirtyTracker(snapshotForm)
 
 const headersStatus = computed(() => resolveDisguiseHeadersStatus(formData.headersText))
 
-const { monacoTheme, disposeMonacoEditors, watchMonacoTheme } = useMonacoTheme()
+const { monacoTheme, watchMonacoTheme } = useMonacoTheme()
 const submitLabel = computed(() => (props.mode === 'add' ? '创建伪装' : '保存修改'))
 const autoIdPreview = computed(() => createDisguiseIdPreview(formData))
 
@@ -482,7 +483,8 @@ function syncEditors() {
 }
 
 function disposeEditors() {
-  disposeMonacoEditors(encodeEditor, decodeEditor)
+  disposeEditorInstance(encodeEditor)
+  disposeEditorInstance(decodeEditor)
 }
 
 function insertHeaderExample() {

@@ -14,7 +14,7 @@ describe('aiChatEventReducer Node AI subtask', () => {
       ensureState: () => state,
       getActiveKey: () => 'platform-thread'
     })
-    const handlers = reducer.makeLogHandlers('platform-thread', 0)
+    const handlers = reducer.makeRecoveryHandlers('platform-thread')
 
     handlers.onNode({
       kind: 'subtask',
@@ -79,7 +79,7 @@ describe('aiChatEventReducer Node AI subtask', () => {
       ensureState: () => state,
       getActiveKey: () => 'platform-thread'
     })
-    const handlers = reducer.makeLogHandlers('platform-thread', 0)
+    const handlers = reducer.makeRecoveryHandlers('platform-thread')
     handlers.onNode({ kind: 'subtask', subagentInvocationId: 'inv-2', status: 'running' }, 1)
     handlers.onSubagentEvent({
       subagentInvocationId: 'inv-2',

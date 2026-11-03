@@ -27,7 +27,9 @@ describe('AI Turn trace protocol', () => {
 
   it('binds trace, turn and run identities to the assistant runtime', () => {
     const state = {
-      messages: [createAssistantMessage()],
+      messages: [createAssistantMessage({ id: 'item-1', turnId: 'turn-1' })],
+      activeItemId: 'item-1',
+      activeTurnId: 'turn-1',
       status: 'running',
       lastEventSeq: 0,
       lastHeartbeatAt: null
@@ -36,7 +38,7 @@ describe('AI Turn trace protocol', () => {
       ensureState: () => state,
       getActiveKey: () => 'platform-thread'
     })
-    const handlers = reducer.makeLogHandlers('platform-thread', 0)
+    const handlers = reducer.makeRecoveryHandlers('platform-thread')
 
     handlers.onTrace({ traceId: 'trace-1', source: 'platform' }, 1)
     handlers.onTurn({

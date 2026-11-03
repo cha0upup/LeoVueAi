@@ -644,7 +644,6 @@ export function createAiChatEventReducer({
 }) {
   const resolveAssistantMessage = (
     state,
-    assistantIdx,
     createForRecovery = false,
     event = null
   ) => {
@@ -661,10 +660,6 @@ export function createAiChatEventReducer({
         String(message.turnId || message.runtime?.turnId || '') === String(turnId))
       if (byTurn) return byTurn
     }
-    if (assistantIdx != null) {
-      const m = state.messages[assistantIdx]
-      return m?.role === 'assistant' ? m : null
-    }
     if (!createForRecovery) return null
     const created = ensureAssistantTurnForRecovery(state)
     if (itemId) created.id = String(itemId)
@@ -677,9 +672,7 @@ export function createAiChatEventReducer({
 
   const applyAiEvent = ({
     key = getActiveKey(),
-    event,
-    assistantIdx = null,
-    createForRecovery = false
+    event
   } = {}) => {
     if (!event?.name) return false
     const state = ensureState(key)
@@ -694,12 +687,12 @@ export function createAiChatEventReducer({
     const handler = EVENT_HANDLERS[event.name]
     if (!handler) return false
 
-    const resolveMsg = (recover = createForRecovery) =>
-      resolveAssistantMessage(state, assistantIdx, recover, event)
+    const resolveMsg = (recover = true) =>
+      resolveAssistantMessage(state, recover, event)
     const ctx = {
       state,
       resolveMsg,
-      msg: handler.needsMsg ? resolveMsg(createForRecovery) : null
+      msg: handler.needsMsg ? resolveMsg() : null
     }
     if (handler.needsMsg && !ctx.msg) return false
 
@@ -711,12 +704,10 @@ export function createAiChatEventReducer({
     return handler.fn(ctx, normalizedEvent) === true
   }
 
-  const makeHandlers = (key, assistantIdx, createForRecovery) => {
+  const makeRecoveryHandlers = (key) => {
     const dispatch = (name, visible = false) => (data, seq, meta) => {
       applyAiEvent({
         key,
-        assistantIdx,
-        createForRecovery,
         event: { name, data, seq, ...(meta || {}) }
       })
       if (visible) onVisibleEvent(key)
@@ -743,12 +734,6 @@ export function createAiChatEventReducer({
     }
   }
 
-  const makeLogHandlers = (key, assistantIdx) =>
-    makeHandlers(key, assistantIdx, false)
-
-  const makeRecoveryHandlers = (key) =>
-    makeHandlers(key, null, true)
-
   const applyRecoveredEvents = ({
     key = getActiveKey(),
     events = [],
@@ -763,10 +748,10 @@ export function createAiChatEventReducer({
       : []
 
     for (const event of sortedEvents) {
-      applyAiEvent({ key, event, createForRecovery: true })
+      applyAiEvent({ key, event })
     }
 
-    let assistantMsg = resolveAssistantMessage(state, null, false, {
+    let assistantMsg = resolveAssistantMessage(state, false, {
       itemId: state.activeItemId,
       turnId: state.activeTurnId
     }) || [...state.messages].reverse().find((msg) => msg?.role === 'assistant')
@@ -807,10 +792,8 @@ export function createAiChatEventReducer({
   }
 
   return {
-    applyAiEvent,
     applyRecoveredEvents,
     applyTerminalRuntime,
-    makeLogHandlers,
     makeRecoveryHandlers
   }
 }

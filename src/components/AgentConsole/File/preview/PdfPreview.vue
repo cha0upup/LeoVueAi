@@ -2,7 +2,6 @@
   <div class="pdf-preview-wrap">
     <iframe
       v-if="pdfSrc && !error"
-      ref="iframeRef"
       :src="iframeSrc"
       class="pdf-iframe"
       title="PDF预览"
@@ -56,13 +55,11 @@ import { Icon } from '@iconify/vue'
 
 const props = defineProps({
   /** data:application/pdf;base64,... or object URL */
-  pdfSrc: { type: String, default: '' },
-  fileName: { type: String, default: 'document.pdf' }
+  pdfSrc: { type: String, default: '' }
 })
 
 const loading   = ref(false)
 const error     = ref('')
-const iframeRef = ref(null)
 const objectUrl = ref('')
 
 // Use a stable object URL when given a base64 data URI (avoids iframe length limits in some browsers)

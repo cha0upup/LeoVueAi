@@ -171,7 +171,7 @@ import { downloadBlob } from '@/utils/downloadBlob.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { saveSkillFileApi } from '@/services/api/skills.js'
 import { useTheme } from '@/stores/theme'
-import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
+import { disposeEditorInstance } from '@/utils/monacoEditor.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { formatFileSize as formatBytes } from '@/utils/format.js'
 
@@ -193,7 +193,6 @@ const emit = defineEmits(['saved', 'dirty-change'])
 
 const monacoContainer = ref(null)
 const editor = shallowRef(null)
-const { disposeEditorInstance } = useMonacoEditorInstance()
 const saving = ref(false)
 const isDirty = ref(false)
 const original = ref('')

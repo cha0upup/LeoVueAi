@@ -19,7 +19,7 @@ function fixture() {
     ensureState: () => state,
     getActiveKey: () => 'thread-1'
   })
-  return { state, assistant, handlers: reducer.makeLogHandlers('thread-1', 0) }
+  return { state, assistant, handlers: reducer.makeRecoveryHandlers('thread-1') }
 }
 
 describe('aiChatEventReducer Turn protocol', () => {

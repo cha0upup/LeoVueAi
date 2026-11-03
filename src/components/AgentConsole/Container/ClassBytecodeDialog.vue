@@ -117,7 +117,7 @@ import { icons } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { getClassBytecodeApi } from '@/services/api/container.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
-import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
+import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEditor.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { useResponsiveDialogWidth } from '@/composables/useResponsiveDialogWidth.js'
@@ -158,7 +158,6 @@ const monacoEditorContainer = ref(null)
 const { dialogWidth } = useResponsiveDialogWidth()
 
 const { monacoTheme, watchMonacoTheme } = useMonacoTheme()
-const { disposeEditorInstance, recreateEditorInstance } = useMonacoEditorInstance()
 
 // 方法
 /**

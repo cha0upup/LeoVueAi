@@ -9,12 +9,11 @@
 
 <script setup>
 import { onUnmounted, ref, toRaw, watch } from 'vue'
-import { useMonacoEditorInstance } from '@/composables/useMonacoEditorInstance.js'
+import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEditor.js'
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 
 const { monacoTheme, watchMonacoTheme } = useMonacoTheme()
-const { disposeEditorInstance, recreateEditorInstance } = useMonacoEditorInstance()
 
 const props = defineProps({
   content: {

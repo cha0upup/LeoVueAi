@@ -118,8 +118,6 @@
               <AiAssistantTurnAssistant
                 v-else
                 :msg="msg"
-                :session-id="sessionId"
-                :thread-id="activeThreadId"
                 @retry="retry"
                 @apply-action="applyAction"
                 @answer-user-input="answerUserInput"

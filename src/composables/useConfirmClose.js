@@ -20,32 +20,19 @@ import { confirmAction } from '@/utils/confirmUtils.js'
  * @param {import('vue').Ref<boolean>|import('vue').ComputedRef<boolean>} options.isDirty
  *        当前是否处于"未保存"状态
  * @param {() => void} options.onClose 真正执行关闭的动作
- * @param {Object} [options.confirmText] 自定义提示文案
- * @param {string} [options.confirmText.title]
- * @param {string} [options.confirmText.message]
- * @param {string} [options.confirmText.confirmButtonText]
- * @param {string} [options.confirmText.cancelButtonText]
  * @returns {{
  *   handleBeforeClose: (done?: Function) => Promise<void>,
  *   handleClose: () => Promise<void>
  * }}
  */
-export function useConfirmClose({ isDirty, onClose, confirmText = {} }) {
-  const text = {
-    title: '放弃修改？',
-    message: '当前修改尚未保存，关闭后会丢失。确认关闭？',
-    confirmButtonText: '放弃修改',
-    cancelButtonText: '继续编辑',
-    ...confirmText
-  }
-
+export function useConfirmClose({ isDirty, onClose }) {
   async function ensureCanClose() {
     if (!isDirty.value) return true
     return confirmAction({
-      title: text.title,
-      message: text.message,
-      confirmButtonText: text.confirmButtonText,
-      cancelButtonText: text.cancelButtonText,
+      title: '放弃修改？',
+      message: '当前修改尚未保存，关闭后会丢失。确认关闭？',
+      confirmButtonText: '放弃修改',
+      cancelButtonText: '继续编辑',
       type: 'warning'
     })
   }

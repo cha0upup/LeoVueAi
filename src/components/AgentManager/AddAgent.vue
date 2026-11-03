@@ -158,7 +158,7 @@ const openAddAgent = () => {
   resetForm()
 }
 
-defineExpose({ openAddAgent, close })
+defineExpose({ openAddAgent })
 </script>
 
 <style scoped>
