@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { ROUTE_PATHS } from '@/constants/app.js'
-import { resolveAuthNavigation } from './routerGuards.js'
+import { normalizeAuthRedirect, resolveAuthNavigation } from './routerGuards.js'
 
 const route = (path, options = {}) => ({
   path,
@@ -11,6 +11,14 @@ const route = (path, options = {}) => ({
 })
 
 describe('authentication route guard', () => {
+  it('normalizes shared redirect values without accepting external or authentication-page destinations', () => {
+    for (const value of [undefined, null, '', 42, {}, [], 'https://example.invalid', '//example.invalid',
+      '/login?redirect=/main', '/setup', '/change-password', '/startup']) {
+      expect(normalizeAuthRedirect(value)).toBeNull()
+    }
+    expect(normalizeAuthRedirect('/main?tab=agent#details')).toBe('/main?tab=agent#details')
+    expect(normalizeAuthRedirect(['/main?tab=agent', '/admin'])).toBe('/main?tab=agent')
+  })
   it.each(['unknown', 'checking', 'error'])('keeps %s status out of login/setup and protected views', state => {
     expect(resolveAuthNavigation(route(ROUTE_PATHS.admin), null, false, state)).toEqual({
       path: ROUTE_PATHS.startup, query: { redirect: ROUTE_PATHS.admin }

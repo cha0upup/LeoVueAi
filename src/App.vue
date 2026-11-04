@@ -7,15 +7,13 @@
       v-if="showAppHeader"
       :key="sessionGeneration"
     />
-    <StartupCheckView
-      v-if="authLoading && !authFetched && route.path !== ROUTE_PATHS.startup"
-    />
-    <router-view
-      v-else
-      v-slot="{ Component }"
-    >
+    <router-view v-slot="{ Component }">
+      <!-- Keep an already resolved public page mounted during identity refresh. -->
+      <StartupCheckView
+        v-if="authLoading && !authFetched && route.path !== ROUTE_PATHS.startup && (!Component || route.meta.requiresAuth)"
+      />
       <KeepAlive
-        v-if="currentUser && route.meta.requiresAuth"
+        v-else-if="currentUser && route.meta.requiresAuth"
         :key="sessionGeneration"
         include="MainView"
       >

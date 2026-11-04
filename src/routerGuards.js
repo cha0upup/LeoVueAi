@@ -1,21 +1,16 @@
 import { ROUTE_PATHS } from '@/constants/app.js'
 
-const isSafeLocalRedirect = (value) =>
-  typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
-
-const getRequestedRedirect = (to) => {
-  const queryRedirect = Array.isArray(to.query?.redirect)
-    ? to.query.redirect[0]
-    : to.query?.redirect
-  const candidate = [ROUTE_PATHS.login, ROUTE_PATHS.startup].includes(to.path) ? queryRedirect : to.fullPath
-
-  if (!isSafeLocalRedirect(candidate)) return null
-  if (candidate.startsWith(ROUTE_PATHS.login)) return null
-  if (candidate.startsWith(ROUTE_PATHS.changePassword)) return null
-  if (candidate.startsWith(ROUTE_PATHS.setup)) return null
-  if (candidate.startsWith(ROUTE_PATHS.startup)) return null
+export function normalizeAuthRedirect(value) {
+  const candidate = Array.isArray(value) ? value[0] : value
+  if (typeof candidate !== 'string' || !candidate.startsWith('/') || candidate.startsWith('//')) return null
+  if ([ROUTE_PATHS.login, ROUTE_PATHS.changePassword, ROUTE_PATHS.setup, ROUTE_PATHS.startup]
+    .some(path => candidate.startsWith(path))) return null
   return candidate
 }
+
+const getRequestedRedirect = (to) => normalizeAuthRedirect(
+  [ROUTE_PATHS.login, ROUTE_PATHS.startup].includes(to.path) ? to.query?.redirect : to.fullPath
+)
 
 const passwordChangeTarget = (to) => {
   const redirect = getRequestedRedirect(to)

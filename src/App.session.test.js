@@ -1,13 +1,13 @@
 /* eslint-disable vue/one-component-per-file -- Multiple fixture views exercise one app lifecycle. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, onMounted, onUnmounted, reactive } from 'vue'
+import { defineComponent, h, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { compileClientComponent, findNode } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { ROUTE_PATHS } from '@/constants/app.js'
 import { sessionGeneration } from '@/services/sessionLifecycle.js'
 
-const mocks = vi.hoisted(() => ({ route: null }))
+const mocks = vi.hoisted(() => ({ route: null, routeReady: null }))
 vi.mock('@/services/api/auth.js', () => ({ getLoginStatusApi: vi.fn() }))
 
 const modules = {
@@ -47,7 +47,8 @@ describe('app protected workspace lifecycle', () => {
     const RouterView = {
       setup(props, { slots }) {
         return () => slots.default({
-          Component: mocks.route.path === '/login' ? Login : mocks.route.path === '/admin' ? Admin : Main
+          Component: !mocks.routeReady.value ? null
+            : mocks.route.path === '/login' ? Login : mocks.route.path === '/admin' ? Admin : Main
         })
       }
     }
@@ -62,12 +63,14 @@ describe('app protected workspace lifecycle', () => {
     useAuth().resetAuth()
     vi.clearAllMocks()
     mocks.route = reactive({ path: '/main', meta: { requiresAuth: true } })
+    mocks.routeReady = ref(true)
   })
   afterEach(() => app?.unmount())
 
   it('shows the status check while the first request is pending rather than flashing login', async () => {
     mocks.route.path = '/login'
     mocks.route.meta = {}
+    mocks.routeReady.value = false
     const auth = useAuth()
     auth.authLoading.value = true
     const root = mount()
@@ -75,6 +78,7 @@ describe('app protected workspace lifecycle', () => {
     expect(loginMounted).not.toHaveBeenCalled()
     auth.authLoading.value = false
     auth.authFetched.value = true
+    mocks.routeReady.value = true
     await nextTick()
     expect(loginMounted).toHaveBeenCalledOnce()
   })
@@ -113,5 +117,27 @@ describe('app protected workspace lifecycle', () => {
     await nextTick()
     expect(loginMounted).toHaveBeenCalledOnce()
     expect(mounted).not.toHaveBeenCalled()
+  })
+
+  it('does not replace and remount an existing login form while verifying a successful login', async () => {
+    mocks.route.path = '/login'
+    mocks.route.meta = {}
+    const auth = useAuth()
+    auth.authFetched.value = true
+    const root = mount()
+    auth.resetAuth()
+    auth.authLoading.value = true
+    await nextTick()
+    expect(Boolean(findNode(root, 'loading-fixture'))).toBe(false)
+    expect(loginMounted).toHaveBeenCalledOnce()
+    auth.currentUser.value = { userId: 'a' }
+    auth.authFetched.value = true
+    auth.authLoading.value = false
+    await nextTick()
+    expect(loginMounted).toHaveBeenCalledOnce()
+    mocks.route.path = '/main'
+    mocks.route.meta = { requiresAuth: true }
+    await nextTick()
+    expect(mounted).toHaveBeenCalledExactlyOnceWith('a')
   })
 })

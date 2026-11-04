@@ -37,11 +37,6 @@ export const MAIN_TAB_STORAGE_KEYS = {
   currentTab: 'leovue-current-tab'
 }
 
-export const LOAD_DELAYS = {
-  tabContent: 800,
-  loginRedirect: 500
-}
-
 /** 与后端认证字段硬边界保持一致；密码最小长度仍可能由服务端配置提高。 */
 export const AUTH_FIELD_LIMITS = Object.freeze({
   usernameMaxLength: 100,

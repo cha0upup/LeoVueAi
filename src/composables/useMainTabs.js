@@ -5,11 +5,12 @@ import { safeLocalStorage } from '@/utils/browserStorage.js'
 import { isCurrentSession, registerSessionCleanup, sessionGeneration } from '@/services/sessionLifecycle.js'
 import {
   getAgentTabPath,
-  LOAD_DELAYS,
   MAIN_HOME_TAB_ID,
   MAIN_TAB_STORAGE_KEYS,
   ROUTE_PATHS
 } from '@/constants/app.js'
+
+const TAB_CONTENT_LOAD_DELAY = 800
 
 const TAB_STORAGE_FIELDS = [
   'cacheMode',
@@ -77,7 +78,7 @@ export function useMainTabs({ confirmAction, iconMap }) {
     const timer = window.setTimeout(() => {
       loadTimers.delete(timer)
       if (isCurrentSession(requestGeneration)) markTabAsLoaded(tab.id)
-    }, LOAD_DELAYS.tabContent)
+    }, TAB_CONTENT_LOAD_DELAY)
     loadTimers.add(timer)
   }
 

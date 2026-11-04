@@ -118,6 +118,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { AUTH_FIELD_LIMITS, ROUTE_PATHS } from '@/constants/app.js'
 import { useAuth } from '@/composables/useAuth.js'
+import { normalizeAuthRedirect } from '@/routerGuards.js'
 import { changePasswordApi, logoutApi } from '@/services/api/auth.js'
 import { createPasswordRules, createPasswordMatchValidator, validateForm } from '@/utils/formUtils.js'
 import { icons } from '@/utils/icons.js'
@@ -149,24 +150,6 @@ const rules = {
 const getErrorMessage = (error, fallback) =>
   error?.response?.data?.msg || error?.message || fallback
 
-const getRedirectTarget = () => {
-  const rawRedirect = Array.isArray(route.query.redirect)
-    ? route.query.redirect[0]
-    : route.query.redirect
-
-  if (!rawRedirect || !rawRedirect.startsWith('/') || rawRedirect.startsWith('//')) {
-    return ROUTE_PATHS.main
-  }
-  if (
-    rawRedirect.startsWith(ROUTE_PATHS.login) ||
-    rawRedirect.startsWith(ROUTE_PATHS.setup) ||
-    rawRedirect.startsWith(ROUTE_PATHS.changePassword)
-  ) {
-    return ROUTE_PATHS.main
-  }
-  return rawRedirect
-}
-
 const submitForm = async () => {
   if (submitting.value) return
   const isValid = await validateForm(formRef, { errorMessage: '请检查密码输入' })
@@ -180,7 +163,7 @@ const submitForm = async () => {
     })
     await fetchAuth({ force: true })
     showSuccess('密码修改成功')
-    await router.replace(getRedirectTarget())
+    await router.replace(normalizeAuthRedirect(route.query.redirect) || ROUTE_PATHS.main)
   } catch (error) {
     showError(getErrorMessage(error, '密码修改失败，请稍后重试'))
   } finally {

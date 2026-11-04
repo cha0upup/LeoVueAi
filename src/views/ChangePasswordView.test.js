@@ -6,18 +6,20 @@ import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { AUTH_FIELD_LIMITS, ROUTE_PATHS } from '@/constants/app.js'
 import { createPasswordRules, createPasswordMatchValidator } from '@/utils/formUtils.js'
 import { icons } from '@/utils/icons.js'
+import { normalizeAuthRedirect } from '@/routerGuards.js'
 
 describe('required password update page', () => {
   const apps = []
   afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
 
-  const mount = () => {
+  const mount = (query = {}) => {
     const changePassword = vi.fn().mockResolvedValue({})
     const fetchAuth = vi.fn().mockResolvedValue({ passwordChangeRequired: false })
     const replace = vi.fn().mockResolvedValue(undefined)
     const validate = vi.fn().mockResolvedValue(true)
     const View = compileClientComponent(new URL('./ChangePasswordView.vue', import.meta.url), {
-      'vue-router': { useRoute: () => ({ query: {} }), useRouter: () => ({ replace }) },
+      'vue-router': { useRoute: () => ({ query }), useRouter: () => ({ replace }) },
+      '@/routerGuards.js': { normalizeAuthRedirect },
       '@/constants/app.js': { AUTH_FIELD_LIMITS, ROUTE_PATHS },
       '@/composables/useAuth.js': { useAuth: () => ({ fetchAuth, resetAuth: vi.fn() }) },
       '@/services/api/auth.js': { changePasswordApi: changePassword, logoutApi: vi.fn() },
@@ -67,5 +69,16 @@ describe('required password update page', () => {
     await view.submit()
     expect(view.changePassword).not.toHaveBeenCalled()
     expect(view.replace).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['/main?tab=agent', '/main?tab=agent'],
+    [['/main?tab=agent'], '/main?tab=agent'],
+    ['/startup', ROUTE_PATHS.main],
+    [{ redirect: '/main' }, ROUTE_PATHS.main]
+  ])('normalizes the post-password redirect %j', async (redirect, expected) => {
+    const view = mount({ redirect })
+    await view.submit()
+    expect(view.replace).toHaveBeenCalledExactlyOnceWith(expected)
   })
 })

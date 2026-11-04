@@ -52,11 +52,12 @@
                 placeholder="请输入用户名"
                 :maxlength="AUTH_FIELD_LIMITS.usernameMaxLength"
                 size="large"
+                :disabled="loading"
                 clearable
                 class="login-input"
               >
                 <template #prefix>
-                  <el-icon><Icon :icon="iconMap.user" /></el-icon>
+                  <el-icon><Icon :icon="icons.user" /></el-icon>
                 </template>
               </el-input>
             </el-form-item>
@@ -68,12 +69,13 @@
                 type="password"
                 :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
                 size="large"
+                :disabled="loading"
                 clearable
                 show-password
                 class="login-input"
               >
                 <template #prefix>
-                  <el-icon><Icon :icon="iconMap.lock" /></el-icon>
+                  <el-icon><Icon :icon="icons.lock" /></el-icon>
                 </template>
               </el-input>
             </el-form-item>
@@ -107,24 +109,21 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { onBeforeUnmount, ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { version as appVersion } from '../../package.json'
 
 import {
   AUTH_FIELD_LIMITS,
-  LOAD_DELAYS,
   ROUTE_PATHS
 } from '@/constants/app.js'
 import { icons } from '@/utils/icons.js'
 import { validateForm } from '@/utils/formUtils.js'
 import { loginApi } from '@/services/api/auth.js'
 import { useAuth } from '@/composables/useAuth.js'
+import { normalizeAuthRedirect } from '@/routerGuards.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
-
-// ==================== 常量 ====================
-const iconMap = icons
 
 // ==================== 组件引用 ====================
 const loginFormRef = ref(null)
@@ -134,6 +133,8 @@ const { fetchAuth, resetAuth } = useAuth()
 
 // ==================== 响应式数据 ====================
 const loading = ref(false)
+let disposed = false
+onBeforeUnmount(() => { disposed = true })
 const loginForm = reactive({
   username: '',
   password: ''
@@ -160,70 +161,46 @@ const rules = {
 }
 
 // ==================== 方法 ====================
-/**
- * 获取错误消息
- * @param {Error} error - 错误对象
- * @returns {string} 错误消息
- */
-const getErrorMessage = (error) => {
-  if (error.response?.data?.msg) {
-    return error.response.data.msg
-  }
-  if (error.message) {
-    return error.message
-  }
-  return '网络错误，请稍后重试'
-}
-
 const getLoginRedirectTarget = (user) => {
-  const rawRedirect = Array.isArray(route.query.redirect)
-    ? route.query.redirect[0]
-    : route.query.redirect
-
-  if (!rawRedirect || !rawRedirect.startsWith('/') || rawRedirect.startsWith('//')) {
+  const redirect = normalizeAuthRedirect(route.query.redirect)
+  if (!redirect || (redirect.startsWith(ROUTE_PATHS.admin) && !['admin', 'leader'].includes(user?.privilege))) {
     return ROUTE_PATHS.main
   }
 
-  if (rawRedirect.startsWith(ROUTE_PATHS.login) || rawRedirect.startsWith(ROUTE_PATHS.setup)) {
-    return ROUTE_PATHS.main
-  }
-
-  if (rawRedirect.startsWith(ROUTE_PATHS.admin) && !['admin', 'leader'].includes(user?.privilege)) {
-    return ROUTE_PATHS.main
-  }
-
-  return rawRedirect
+  return redirect
 }
 
 /**
  * 处理登录
  */
 const handleLogin = async () => {
-  const isValid = await validateForm(loginFormRef, {
-    errorMessage: '表单验证失败，请检查输入'
-  })
-  if (!isValid) return
-
+  if (loading.value || disposed) return
   loading.value = true
+  let loginGeneration = sessionGeneration.value
 
   try {
+    const isValid = await validateForm(loginFormRef, {
+      errorMessage: '表单验证失败，请检查输入'
+    })
+    if (!isValid || disposed || !isCurrentSession(loginGeneration)) return
+
     await loginApi({
       username: loginForm.username,
       password: loginForm.password
     })
+    if (disposed || !isCurrentSession(loginGeneration)) return
     resetAuth()
-    const loginGeneration = sessionGeneration.value
+    loginGeneration = sessionGeneration.value
     const user = await fetchAuth({ force: true })
-    if (!isCurrentSession(loginGeneration)) return
+    if (disposed || !isCurrentSession(loginGeneration)) return
     if (!user) throw new Error('登录状态校验失败，请重试')
 
-    showSuccess('登录成功')
-
-    setTimeout(() => {
-      if (isCurrentSession(loginGeneration)) router.push(getLoginRedirectTarget(user))
-    }, LOAD_DELAYS.loginRedirect)
+    const failure = await router.replace(getLoginRedirectTarget(user))
+    if (!failure && isCurrentSession(loginGeneration)) showSuccess('登录成功')
   } catch (error) {
-    showError(getErrorMessage(error))
+    if (!disposed && error?.code !== 'SESSION_CHANGED') {
+      showError(error?.response?.data?.msg || error?.message || '网络错误，请稍后重试')
+    }
   } finally {
     loading.value = false
   }
