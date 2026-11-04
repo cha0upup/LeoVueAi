@@ -60,7 +60,7 @@
         >
           <article
             v-for="provider in filteredProviderRows"
-            :key="providerRowKey(provider)"
+            :key="provider.id"
             class="provider-card-row"
             :class="{ 'is-disabled': provider.enabled === 0 }"
           >
@@ -240,7 +240,6 @@ import {
   buildProviderRows,
   filterProviderRows,
   providerInitial,
-  providerRowKey,
   providerTestModelId,
   shortTokens
 } from './aiChannelSettingsModel.js'

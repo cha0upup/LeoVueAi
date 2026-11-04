@@ -94,7 +94,7 @@ const props = defineProps({
   /** 已发送历史，由父组件维护 */
   history:    { type: Array, default: () => [] },
   configId: { type: [Number, String], default: null },
-  reasoningEffort: { type: String, default: 'medium' },
+  reasoningEffort: { type: String, default: 'auto' },
   configs: { type: Array, default: () => [] },
   attachments: { type: Array, default: () => [] },
   waitingForUserInput: { type: Boolean, default: false }

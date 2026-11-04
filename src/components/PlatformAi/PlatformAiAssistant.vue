@@ -211,8 +211,7 @@ const renameSequences = new Map()
 let mounted = false
 let statusSyncPromise = null
 
-const { selectedConfigId, configs, fetchConfigs } = useAiChannelSelector()
-const reasoningEffort = ref('medium')
+const { selectedConfigId, configs, fetchConfigs, reasoningEffort } = useAiChannelSelector()
 const attachments = ref([])
 const composerRef = ref(null)
 const selectedConfigModel = computed(() => configs.value.find(c => c.id === selectedConfigId.value)?.model || '')
@@ -225,13 +224,13 @@ const onComposerConfigChange = (configId) => {
   selectedConfigId.value = configId
 }
 
-const reasoningEffortLabels = { low: '低', medium: '中', high: '高', xhigh: '极高' }
 const onReasoningEffortChange = (effort) => {
   if (!effort || effort === reasoningEffort.value) return
   reasoningEffort.value = effort
+  if (reasoningEffort.value !== effort) return
   messages.value.push({
     role: 'system-info',
-    content: `推理强度已切换至 ${reasoningEffortLabels[effort] || effort}`,
+    content: `推理强度已切换至 ${effort}`,
     timestamp: Date.now()
   })
 }

@@ -38,7 +38,7 @@
         >
           <span class="model-trigger__name">{{ selectedModelLabel }}</span>
           <span
-            v-if="supportsReasoning"
+            v-if="canAdjustReasoning"
             class="model-trigger__effort"
           >{{ effortLabel }}</span>
           <Icon icon="lucide:chevron-down" />
@@ -56,6 +56,7 @@
             :model-value="modelValue"
             class="settings-row__select"
             placeholder="选择模型"
+            :disabled="disabled"
             @update:model-value="emit('update:modelValue', $event)"
           >
             <el-option
@@ -73,14 +74,14 @@
         </label>
         <label
           class="settings-row"
-          :class="{ 'settings-row--disabled': !supportsReasoning }"
+          :class="{ 'settings-row--disabled': !canAdjustReasoning }"
         >
           <span class="settings-row__label">推理强度</span>
           <el-select
-            :model-value="reasoningEffort"
+            :model-value="effectiveEffort"
             class="settings-row__select"
-            :disabled="!supportsReasoning"
-            @update:model-value="emit('update:reasoningEffort', $event)"
+            :disabled="disabled || !canAdjustReasoning"
+            @update:model-value="onReasoningEffortChange"
           >
             <el-option
               v-for="option in reasoningOptions"
@@ -91,10 +92,10 @@
           </el-select>
         </label>
         <p
-          v-if="!supportsReasoning"
+          v-if="!canAdjustReasoning"
           class="reasoning-hint"
         >
-          当前模型不支持推理强度调节
+          {{ reasoningHint }}
         </p>
       </div>
     </el-popover>
@@ -104,6 +105,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { chatReasoningOptions } from '@/utils/aiReasoning.js'
 
 const MAX_FILE_SIZE = 1024 * 1024
 const MAX_TOTAL_SIZE = 3 * 1024 * 1024
@@ -111,7 +113,7 @@ const MAX_FILE_COUNT = 10
 
 const props = defineProps({
   modelValue: { type: [Number, String], default: null },
-  reasoningEffort: { type: String, default: 'medium' },
+  reasoningEffort: { type: String, default: 'auto' },
   configs: { type: Array, default: () => [] },
   attachments: { type: Array, default: () => [] },
   disabled: { type: Boolean, default: false },
@@ -124,17 +126,30 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'update:reasoningEffort', 'update:attachments'])
 const fileInputRef = ref(null)
 const menuVisible = ref(false)
-const reasoningOptions = [
-  { value: 'low', label: '低' },
-  { value: 'medium', label: '中' },
-  { value: 'high', label: '高' },
-  { value: 'xhigh', label: '极高' }
-]
-
-const selectedConfig = computed(() => props.configs.find(config => config.id === props.modelValue))
+const selectedConfig = computed(() => props.modelValue == null
+  ? props.configs.find(config => config.isActive === 1)
+  : props.configs.find(config => config.id === props.modelValue))
 const selectedModelLabel = computed(() => selectedConfig.value?.model || selectedConfig.value?.name || '选择模型')
-const supportsReasoning = computed(() => selectedConfig.value?.supportsReasoning === true || selectedConfig.value?.supportsReasoning === 1)
-const effortLabel = computed(() => reasoningOptions.find(option => option.value === props.reasoningEffort)?.label || '中')
+const reasoningOptions = computed(() => chatReasoningOptions(selectedConfig.value))
+const canAdjustReasoning = computed(() => reasoningOptions.value.length > 1)
+const effectiveEffort = computed(() => reasoningOptions.value.some(option => option.value === props.reasoningEffort)
+  ? props.reasoningEffort : 'auto')
+const effortLabel = computed(() => reasoningOptions.value.find(option => option.value === effectiveEffort.value)?.label)
+const reasoningHint = computed(() => {
+  const config = selectedConfig.value
+  if (!config) return '选择模型后显示可用推理等级'
+  if (config.thinkingEnabled === 0 && !config.requestOptions?.thinkingRequired) return '模型配置已关闭思考，推理强度沿用模型默认'
+  if (!config.requestOptions || ['conservative', 'gateway'].includes(config.requestOptions.source)) {
+    return '尚未确认该模型的具体推理等级，沿用模型默认'
+  }
+  return '当前模型未提供独立的推理强度调节，沿用模型默认'
+})
+
+function onReasoningEffortChange(effort) {
+  if (!props.disabled && reasoningOptions.value.some(option => option.value === effort)) {
+    emit('update:reasoningEffort', effort)
+  }
+}
 
 async function onFilesSelected(event) {
   const selected = Array.from(event.target.files || [])

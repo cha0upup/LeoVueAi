@@ -33,7 +33,6 @@
 
     <AiModelConfigDialog
       v-model="dialogVisible"
-      :editing="editing"
       :form-state="form"
       :rules="rules"
       :saved-providers="savedProviders"
@@ -44,8 +43,11 @@
       :model-limit-hint="modelLimitHint"
       :reasoning-capability-hint="reasoningCapabilityHint"
       :temperature-configurable="requestControls.temperatureConfigurable"
+      :parameter-rules="requestControls.parameterRules"
+      :request-preview="requestPreview"
+      :preview-loading="previewLoading"
+      :preview-error="previewError"
       :save-loading="saveLoading"
-      @apply-provider="applySelectedProvider"
       @submit="submit"
       @form-ready="formRef = $event"
     />
@@ -100,7 +102,6 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import {
   listAiModelConfigsApi,
-  createAiModelConfigApi,
   updateAiModelConfigApi,
   activateAiModelConfigApi,
   testAiModelConfigConnectionApi,
@@ -116,13 +117,13 @@ import AiProviderCatalog from './AiProviderCatalog.vue'
 import AiProviderDialog from './AiProviderDialog.vue'
 import { useAiCapabilityRegistry } from '@/composables/useAiCapabilityRegistry.js'
 import { useAiProviderManager } from '@/composables/useAiProviderManager.js'
+import { useAiModelRequestPreview } from '@/composables/useAiModelRequestPreview.js'
 import {
   AI_PROTOCOL_OPTIONS as protocolOptions,
   DEFAULT_COMPLETIONS_PATH as DEFAULT_PATH,
   modelRequestControls,
   createModelForm,
   defaultPathForProtocol,
-  normalizeProtocol,
   probeSummary,
   resetReactiveForm
 } from './aiChannelSettingsModel.js'
@@ -147,7 +148,6 @@ const saveLoading = ref(false)
 const form = reactive(createModelForm())
 const rules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  providerId: [{ required: true, message: '请选择供应商', trigger: 'change' }],
   model: [{ required: true, message: '请输入模型名称', trigger: 'blur' }]
 }
 
@@ -223,23 +223,26 @@ const modelLimitHint = computed(() => {
     ? '自定义值会在后端按模型真实能力上限自动裁剪'
     : '默认使用系统能力库识别出的模型上限'
 })
-const requestControls = computed(() => modelRequestControls(
-  findCapabilityByModelName(form.model, form.providerKey), form.providerKey
+const { preview: requestPreview, loading: previewLoading, error: previewError, refresh: previewRequest } =
+  useAiModelRequestPreview({ visible: dialogVisible, form })
+const baseRequestControls = computed(() => modelRequestControls(
+  findCapabilityByModelName(form.model, form.providerKey), form.providerKey, form.thinkingEnabled
 ))
+const requestControls = computed(() => requestPreview.value?.contract
+  ? modelRequestControls({ requestOptions: requestPreview.value.contract }, form.providerKey, form.thinkingEnabled)
+  : baseRequestControls.value)
 const reasoningOptions = computed(() => requestControls.value.reasoningOptions)
 const reasoningModeOptions = computed(() => requestControls.value.reasoningModeOptions)
 watch(requestControls, (controls) => {
-  if (!controls.reasoningOptions.some(option => option.value === form.reasoningEffort)) form.reasoningEffort = 'auto'
+  if (controls.reasoningContractAvailable && !controls.reasoningOptions.some(option => option.value === form.reasoningEffort)) {
+    form.reasoningEffort = 'auto'
+  }
   if (controls.thinkingRequired && form.thinkingEnabled === 0) form.thinkingEnabled = null
-  if (!controls.temperatureConfigurable) form.temperature = null
 })
 const reasoningCapabilityHint = computed(() => {
   if (requestControls.value.thinkingRequired) return '该模型始终开启思考；可用等级按官方参数约束显示。'
   if (requestControls.value.responsesRequiredForTools) return '使用工具调用时请选择 Responses API。'
-  if (form.thinkingEnabled === 1 && editing.value && !editing.value.supportsReasoning) {
-    return '当前能力库认为该模型不支持 Reasoning，保存后可能会被后端忽略。'
-  }
-  return '开启后仍受模型能力限制；不支持 Reasoning 的模型会被后端忽略。'
+  return '厂商默认不发送独立开关；显式开启或关闭的转换结果请查看下方实际生效参数。'
 })
 const fallbackCandidates = computed(() => rows.value.filter((candidate) => (
   candidate.id !== editing.value?.id
@@ -299,7 +302,6 @@ function openEdit(row) {
     providerName: row.providerName || '',
     baseUrl: row.baseUrl || '',
     model: row.model || '',
-    protocol: normalizeProtocol(row.protocol),
     completionsPath: row.completionsPath || defaultPathForProtocol(row.protocol),
     thinkingEnabled: row.thinkingEnabled ?? null,
     reasoningEffort: row.reasoningEffort || 'auto',
@@ -311,30 +313,14 @@ function openEdit(row) {
     enabledBool: row.enabled !== 0,
     isActiveBool: row.isActive === 1
   })
-  selectedProviderKey.value = row.providerKey || ''
   dialogVisible.value = true
-}
-
-function applySelectedProvider() {
-  const provider = savedProviders.value.find((p) => p.id === form.providerId)
-  if (!provider) return
-  form.providerKey = provider.providerKey || 'custom'
-  form.providerName = provider.name || ''
-  form.baseUrl = provider.baseUrl || ''
-  form.protocol = normalizeProtocol(provider.protocol)
-  form.completionsPath = provider.completionsPath || defaultPathForProtocol(provider.protocol)
 }
 
 function buildBody() {
   return {
     name: form.name.trim(),
     providerId: form.providerId,
-    providerKey: form.providerKey || 'custom',
-    providerName: form.providerName?.trim() || null,
-    baseUrl: form.baseUrl.trim(),
     model: form.model.trim(),
-    protocol: normalizeProtocol(form.protocol),
-    completionsPath: (form.completionsPath || defaultPathForProtocol(form.protocol)).trim(),
     thinkingEnabled: form.thinkingEnabled,
     reasoningEffort: form.reasoningEffort || 'auto',
     maxOutputTokens: form.maxOutputTokens || null,
@@ -348,6 +334,8 @@ function buildBody() {
 }
 
 async function submit() {
+  const editingId = editing.value?.id
+  if (editingId == null) return
   try {
     await formRef.value?.validate()
   } catch {
@@ -356,14 +344,20 @@ async function submit() {
   saveLoading.value = true
   try {
     await ensureCapabilitiesLoaded()
-    const unknownModel = !findCapabilityByModelName(form.model, form.providerKey)
-    if (editing.value) {
-      await updateAiModelConfigApi(editing.value.id, buildBody())
-      showSuccess(unknownModel ? '已保存；该模型将按保守默认能力调用' : '已保存')
-    } else {
-      await createAiModelConfigApi(buildBody())
-      showSuccess(unknownModel ? '已新增；该模型将按保守默认能力调用' : '已新增')
+    const preview = await previewRequest()
+    if (!dialogVisible.value || editingId !== editing.value?.id) return
+    if (!preview) {
+      if (previewError.value) showError(previewError.value)
+      return
     }
+    if (requestPreview.value !== preview) return
+    if (!preview.valid) {
+      showError(preview.errors?.[0]?.message || '请检查模型参数后再保存')
+      return
+    }
+    const unknownModel = !findCapabilityByModelName(form.model, form.providerKey)
+    await updateAiModelConfigApi(editingId, buildBody())
+    showSuccess(unknownModel ? '已保存；该模型将按保守默认能力调用' : '已保存')
     dialogVisible.value = false
     await loadList()
   } catch (e) {

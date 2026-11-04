@@ -1,3 +1,5 @@
+import { reasoningEffortOptions } from '@/utils/aiReasoning.js'
+
 export const AI_PROTOCOL = Object.freeze({
   responses: 'responses',
   chatCompletions: 'chat_completions'
@@ -12,31 +14,23 @@ export const AI_PROTOCOL_OPTIONS = [
 ]
 
 export const REASONING_MODE_OPTIONS = [
-  { label: '按模型默认', value: null },
+  { label: '厂商默认', value: null },
   { label: '开启', value: 1 },
   { label: '关闭', value: 0 }
 ]
 
-export const REASONING_EFFORT_OPTIONS = [
-  { label: '自动', value: 'auto' },
-  { label: '最小', value: 'minimal' },
-  { label: '低', value: 'low' },
-  { label: '中', value: 'medium' },
-  { label: '高', value: 'high' },
-  { label: '极高', value: 'xhigh' },
-  { label: '最大', value: 'max' }
-]
-
-export function modelRequestControls(capability, providerKey = '') {
-  const options = ['openrouter', 'ollama'].includes(normalizeCapabilityKey(providerKey))
-    ? null : capability?.requestOptions
+export function modelRequestControls(capability, providerKey = '', thinkingEnabled = null) {
+  const supplied = capability?.requestOptions
+  const options = ['openrouter', 'ollama', 'litellm', 'oneapi'].includes(normalizeCapabilityKey(providerKey))
+    && supplied?.source !== 'gateway' ? null : supplied
   return {
-    reasoningOptions: REASONING_EFFORT_OPTIONS.filter(option => option.value === 'auto' ||
-      !options || options.reasoningEfforts?.includes(option.value)),
+    reasoningOptions: reasoningEffortOptions(options, thinkingEnabled),
+    reasoningContractAvailable: Array.isArray(options?.reasoningEfforts),
     reasoningModeOptions: REASONING_MODE_OPTIONS.filter(option => !options?.thinkingRequired || option.value !== 0),
     temperatureConfigurable: options?.temperatureConfigurable !== false,
     thinkingRequired: options?.thinkingRequired === true,
-    responsesRequiredForTools: options?.responsesRequiredForTools === true
+    responsesRequiredForTools: options?.responsesRequiredForTools === true,
+    parameterRules: options?.parameters || {}
   }
 }
 
@@ -106,10 +100,9 @@ export function createModelForm() {
     providerId: null,
     providerKey: 'custom',
     providerName: '',
-    baseUrl: 'https://api.openai.com/v1',
+    baseUrl: '',
     model: '',
-    protocol: AI_PROTOCOL.responses,
-    completionsPath: RESPONSES_PATH,
+    completionsPath: '',
     thinkingEnabled: null,
     reasoningEffort: 'auto',
     maxOutputTokens: null,
@@ -276,10 +269,6 @@ export function filterProviderRows(providerRows, keyword) {
         )
       )
   )
-}
-
-export function providerRowKey(row) {
-  return row.id
 }
 
 export function providerTestModelId(provider) {

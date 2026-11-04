@@ -121,6 +121,11 @@ export function createAiModelConfigApi(body) {
   return http.post(AI_MODEL_ROUTE, body)
 }
 
+/** Resolves draft parameters locally on the backend; does not call the model vendor. */
+export function previewAiModelRequestApi(body, options = {}) {
+  return http.post(`${AI_MODEL_ROUTE}/request-preview`, body, options)
+}
+
 export function updateAiModelConfigApi(id, body) {
   return http.put(`${AI_MODEL_ROUTE}/${id}`, body)
 }

@@ -1,5 +1,6 @@
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { listAvailableAiModelsApi } from '@/services/api/platform-ai.js'
+import { chatReasoningOptions } from '@/utils/aiReasoning.js'
 
 /**
  * AI 通道选择器 composable。
@@ -23,15 +24,26 @@ export function useAiChannelSelector({ loadConfigs = listAvailableAiModelsApi } 
   const configs = ref([])
   /** 当前选中的通道 ID；null 表示使用激活通道 */
   const selectedConfigId = ref(null)
+  const selectedConfig = computed(() => selectedConfigId.value == null
+    ? configs.value.find(config => config.isActive === 1)
+    : configs.value.find(config => config.id === selectedConfigId.value))
+  const effortOptions = computed(() => chatReasoningOptions(selectedConfig.value))
+  const requestedEffort = ref('auto')
+  const acceptsEffort = value => effortOptions.value.some(option => option.value === value)
+  const reasoningEffort = computed({
+    get: () => acceptsEffort(requestedEffort.value) ? requestedEffort.value : 'auto',
+    set: value => { requestedEffort.value = acceptsEffort(value) ? value : 'auto' }
+  })
+  // Discard an incompatible selection, including changes delivered by catalog refresh.
+  watch(effortOptions, () => {
+    if (!acceptsEffort(requestedEffort.value)) requestedEffort.value = 'auto'
+  }, { flush: 'sync' })
 
   const fetchConfigs = async () => {
     try {
       const res = await loadConfigs()
       const list = res?.data ?? []
-      configs.value = list.filter((item) => item.enabled !== 0).map((item) => ({
-        ...item,
-        protocol: item.protocol || 'openai'
-      }))
+      configs.value = list.filter((item) => item.enabled !== 0)
       // 默认选中激活通道
       if (selectedConfigId.value == null) {
         const active = configs.value.find((c) => c.isActive === 1)
@@ -47,6 +59,7 @@ export function useAiChannelSelector({ loadConfigs = listAvailableAiModelsApi } 
   return {
     configs,
     selectedConfigId,
+    reasoningEffort,
     fetchConfigs
   }
 }

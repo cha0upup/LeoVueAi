@@ -31,15 +31,29 @@ describe('aiChannelSettingsModel', () => {
     } }, 'openai')
     expect(openai.reasoningOptions.map(option => option.value)).toEqual(['auto', 'low', 'medium', 'high', 'xhigh', 'max'])
     expect(openai.responsesRequiredForTools).toBe(true)
+    for (const controls of [kimi, gemini, openai]) {
+      expect(controls.reasoningOptions.map(option => option.label))
+        .toEqual(controls.reasoningOptions.map(option => option.value))
+    }
   })
 
   it.each(['openrouter', 'ollama'])('keeps %s controls tied to its gateway rather than a direct-vendor contract', provider => {
     const controls = modelRequestControls({ requestOptions: {
       thinkingRequired: true, reasoningEfforts: [], temperatureConfigurable: false
     } }, provider)
-    expect(controls.reasoningOptions.map(option => option.value)).toEqual(['auto', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+    expect(controls.reasoningOptions.map(option => option.value)).toEqual(['auto'])
     expect(controls.reasoningModeOptions.map(option => option.value)).toEqual([null, 1, 0])
     expect(controls.temperatureConfigurable).toBe(true)
+  })
+
+  it('shows no guessed levels before a contract arrives, through an unverified gateway, or while thinking is off', () => {
+    expect(modelRequestControls(null).reasoningOptions.map(option => option.value)).toEqual(['auto'])
+    expect(modelRequestControls({ requestOptions: {
+      source: 'gateway', reasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max']
+    } }, 'openrouter').reasoningOptions.map(option => option.value)).toEqual(['auto'])
+    expect(modelRequestControls({ requestOptions: {
+      source: 'official', reasoningEfforts: ['low', 'high', 'max']
+    } }, 'deepseek', 0).reasoningOptions.map(option => option.value)).toEqual(['auto'])
   })
   it('normalizes protocol values and their default paths', () => {
     expect(normalizeProtocol(AI_PROTOCOL.responses)).toBe(AI_PROTOCOL.responses)

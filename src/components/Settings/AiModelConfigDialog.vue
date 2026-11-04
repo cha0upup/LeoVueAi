@@ -1,17 +1,14 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="editing ? '编辑模型配置' : '新增模型配置'"
+    title="编辑模型配置"
     width="760px"
     class="ai-model-dialog model-config-dialog"
     :close-on-click-modal="false"
     destroy-on-close
   >
     <div class="ai-model-dialog__body">
-      <div
-        v-if="editing"
-        class="model-edit-summary"
-      >
+      <div class="model-edit-summary">
         <div>
           <span>所属供应商</span>
           <strong>{{ form.providerName || providerName || '未选择' }}</strong>
@@ -57,39 +54,6 @@
               />
             </el-form-item>
           </div>
-
-          <el-form-item
-            v-if="!editing"
-            label="供应商"
-            prop="providerId"
-          >
-            <el-select
-              v-model="form.providerId"
-              filterable
-              placeholder="选择已保存供应商"
-              style="width: 100%"
-              @change="$emit('apply-provider')"
-            >
-              <el-option
-                v-for="provider in savedProviders"
-                :key="provider.id"
-                :label="provider.name"
-                :value="provider.id"
-                :disabled="provider.enabled === 0"
-              >
-                <span>{{ provider.name }}</span>
-                <span class="provider-option-meta">{{ provider.baseUrl }}</span>
-              </el-option>
-            </el-select>
-          </el-form-item>
-
-          <div
-            v-if="!editing"
-            class="provider-inherit-box"
-          >
-            <span>接口地址继承自供应商</span>
-            <strong>{{ inheritedEndpointLabel }}</strong>
-          </div>
         </section>
 
         <section class="dialog-section">
@@ -106,7 +70,7 @@
               <el-input-number
                 v-model="form.contextWindowTokens"
                 :min="1"
-                :max="2000000"
+                :max="parameterRules.contextWindowTokens?.maximum ?? undefined"
                 :step="1024"
                 :value-on-clear="null"
                 placeholder="留空"
@@ -120,7 +84,7 @@
               <el-input-number
                 v-model="form.maxOutputTokens"
                 :min="1"
-                :max="500000"
+                :max="parameterRules.maxOutputTokens?.maximum ?? undefined"
                 :step="1024"
                 :value-on-clear="null"
                 placeholder="留空"
@@ -196,15 +160,29 @@
               </el-form-item>
               <el-form-item label="Temperature">
                 <el-input-number
+                  v-if="temperatureConfigurable"
                   v-model="form.temperature"
-                  :disabled="!temperatureConfigurable"
-                  :min="0"
-                  :max="2"
+                  :min="parameterRules.temperature?.minimum ?? 0"
+                  :max="parameterRules.temperature?.maximum ?? 2"
                   :step="0.1"
-                  :precision="1"
+                  :precision="parameterRules.temperature?.precision ?? 2"
                   :value-on-clear="null"
-                  :placeholder="temperatureConfigurable ? '留空使用默认' : '使用模型固定参数'"
+                  placeholder="留空使用厂商默认"
                 />
+                <el-input
+                  v-else
+                  :model-value="parameterRules.temperature?.fixedValue != null
+                    ? `${parameterRules.temperature.fixedValue}（厂商固定）` : '当前模式不发送此参数'"
+                  disabled
+                />
+                <el-button
+                  v-if="!temperatureConfigurable && form.temperature != null"
+                  link
+                  type="primary"
+                  @click="form.temperature = null"
+                >
+                  清除已配置采样值
+                </el-button>
               </el-form-item>
             </div>
             <el-form-item label="备注">
@@ -217,6 +195,74 @@
             </el-form-item>
           </el-collapse-item>
         </el-collapse>
+
+        <section
+          class="dialog-section request-preview"
+          aria-label="实际请求参数预览"
+        >
+          <div class="dialog-section__title">
+            <strong>实际生效参数</strong>
+            <span>仅在服务端计算；不调用厂商接口，不包含消息、工具内容或认证信息。</span>
+          </div>
+          <p
+            v-if="previewLoading"
+            role="status"
+            class="muted small"
+          >
+            正在更新参数预览…
+          </p>
+          <el-alert
+            v-if="previewError"
+            type="error"
+            :title="previewError"
+            :closable="false"
+          />
+          <ul
+            v-if="requestPreview && !requestPreview.valid"
+            class="request-preview-errors"
+            role="alert"
+          >
+            <li
+              v-for="error in requestPreview.errors"
+              :key="error.field"
+            >
+              {{ parameterLabel(error.field) }}：{{ error.message }}
+            </li>
+          </ul>
+          <template v-if="requestPreview?.valid">
+            <div class="request-parameter-scroll">
+              <table class="request-parameter-table">
+                <thead><tr><th>参数</th><th>配置值</th><th>生效值</th><th>处理方式</th></tr></thead>
+                <tbody>
+                  <tr
+                    v-for="item in requestPreview.parameters"
+                    :key="item.field"
+                    :title="item.reason"
+                  >
+                    <td>{{ parameterLabel(item.field) }}</td>
+                    <td>{{ parameterValue(item.configuredValue) }}</td>
+                    <td>{{ parameterValue(item.effectiveValue) }}</td>
+                    <td>{{ parameterStatus(item.status) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <details>
+              <summary>查看转换后的模型参数（不含消息与工具定义）</summary>
+              <pre class="request-parameter-json">{{ JSON.stringify(requestPreview.requestParameters, null, 2) }}</pre>
+            </details>
+            <p class="muted small">
+              参数规则来源：{{ requestPreview.contract.source }}
+              <span v-if="requestPreview.contract.checkedAt"> · 核对于 {{ requestPreview.contract.checkedAt }}</span>
+            </p>
+          </template>
+          <p
+            v-else-if="!previewLoading && !previewError && !requestPreview"
+            class="muted small"
+          >
+            选择供应商并填写模型 ID 后自动预览。
+          </p>
+        </section>
       </el-form>
     </div>
 
@@ -243,7 +289,6 @@ import { computed, reactive } from 'vue'
 const visible = defineModel({ type: Boolean, default: false })
 
 const props = defineProps({
-  editing: { type: Object, default: null },
   formState: { type: Object, required: true },
   rules: { type: Object, required: true },
   savedProviders: { type: Array, default: () => [] },
@@ -251,6 +296,10 @@ const props = defineProps({
   reasoningModeOptions: { type: Array, default: () => [] },
   reasoningOptions: { type: Array, default: () => [] },
   temperatureConfigurable: { type: Boolean, default: true },
+  parameterRules: { type: Object, default: () => ({}) },
+  requestPreview: { type: Object, default: null },
+  previewLoading: { type: Boolean, default: false },
+  previewError: { type: String, default: '' },
   inheritedEndpointLabel: { type: String, default: '' },
   modelLimitHint: { type: String, default: '' },
   reasoningCapabilityHint: { type: String, default: '' },
@@ -260,13 +309,23 @@ const props = defineProps({
 const form = reactive(props.formState)
 const providerName = computed(() => props.savedProviders.find((provider) => provider.id === form.providerId)?.name || '')
 
+const parameterLabel = field => ({ thinkingEnabled: '思考模式', reasoningEffort: '思考等级',
+  temperature: 'Temperature', maxOutputTokens: '输出上限', contextWindowTokens: '本地上下文预算', protocol: '接口协议' }[field] || field)
+const parameterStatus = status => ({ sent: '发送', default: '厂商默认', omitted: '省略', clamped: '按能力裁剪', local: '仅本地生效' }[status] || status)
+const parameterValue = value => value == null ? '未设置' : value === true ? '开启' : value === false ? '关闭' : String(value)
+
 const fallbackOptionLabel = (candidate) => `${candidate.name || candidate.model} · ${candidate.model}`
 
-const emit = defineEmits(['apply-provider', 'submit', 'form-ready'])
+const emit = defineEmits(['submit', 'form-ready'])
 const setFormRef = (instance) => emit('form-ready', instance)
 </script>
 
 <style>
+.request-parameter-scroll { overflow-x: auto; }
+.request-parameter-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.request-parameter-table th, .request-parameter-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--el-border-color-lighter); }
+.request-parameter-json { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.request-preview-errors { color: var(--el-color-danger); padding-left: 20px; }
 .model-config-dialog .ai-model-dialog__body {
   max-height: min(680px, 68vh);
   overflow-y: auto;
@@ -284,13 +343,11 @@ const setFormRef = (instance) => emit('form-ready', instance)
   background: var(--el-fill-color-light);
 }
 
-.model-config-dialog .model-edit-summary div,
-.model-config-dialog .provider-inherit-box {
+.model-config-dialog .model-edit-summary div {
   min-width: 0;
 }
 
 .model-config-dialog .model-edit-summary span,
-.model-config-dialog .provider-inherit-box span,
 .model-config-dialog .limit-config-card span {
   display: block;
   color: var(--el-text-color-secondary);
@@ -298,8 +355,7 @@ const setFormRef = (instance) => emit('form-ready', instance)
   line-height: 1.4;
 }
 
-.model-config-dialog .model-edit-summary strong,
-.model-config-dialog .provider-inherit-box strong {
+.model-config-dialog .model-edit-summary strong {
   display: block;
   margin-top: 4px;
   overflow: hidden;
@@ -345,13 +401,6 @@ const setFormRef = (instance) => emit('form-ready', instance)
   gap: 12px;
 }
 
-.model-config-dialog .provider-inherit-box {
-  padding: 10px 12px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  background: var(--el-bg-color-overlay);
-}
-
 .model-config-dialog .limit-config-card {
   display: flex;
   flex-direction: column;
@@ -386,16 +435,6 @@ const setFormRef = (instance) => emit('form-ready', instance)
 
 .model-config-dialog .advanced-options {
   margin-bottom: 16px;
-}
-
-.model-config-dialog .provider-option-meta {
-  float: right;
-  max-width: 320px;
-  overflow: hidden;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .model-config-dialog .ai-model-dialog__footer {

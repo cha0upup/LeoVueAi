@@ -84,7 +84,7 @@ const props = defineProps({
     default: false
   },
   configId: { type: [Number, String], default: null },
-  reasoningEffort: { type: String, default: 'medium' },
+  reasoningEffort: { type: String, default: 'auto' },
   configs: { type: Array, default: () => [] },
   attachments: { type: Array, default: () => [] },
   waitingForUserInput: { type: Boolean, default: false }

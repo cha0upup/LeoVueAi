@@ -166,7 +166,6 @@ import {
   nodeAiThreadMessagesApi,
   nodeAiSwitchChannelApi
 } from '@/services/api/node-ai.js'
-import { listAvailableAiModelsApi } from '@/services/api/platform-ai.js'
 import { getReconSummaryApi, generateReconSummaryDigestApi } from '@/services/api/sessions.js'
 
 import { useAiChat } from '@/composables/useAiChat.js'
@@ -243,10 +242,7 @@ const sendingSessionsByThread = new Map()
 const requestGuard = createLatestRequestGuard(['history', 'recon', 'config', 'init'])
 
 // ── Channel selector ──────────────────────────────────────────────────────────
-const { selectedConfigId, configs, fetchConfigs } = useAiChannelSelector({
-  loadConfigs: listAvailableAiModelsApi
-})
-const reasoningEffort = ref('medium')
+const { selectedConfigId, configs, fetchConfigs, reasoningEffort } = useAiChannelSelector()
 const attachments = ref([])
 const composerRef = ref(null)
 const selectedConfigModel = computed(() => configs.value.find(c => c.id === selectedConfigId.value)?.model || '')
@@ -259,13 +255,13 @@ const onComposerConfigChange = (configId) => {
   selectedConfigId.value = configId
 }
 
-const reasoningEffortLabels = { low: '低', medium: '中', high: '高', xhigh: '极高' }
 const onReasoningEffortChange = (effort) => {
   if (!effort || effort === reasoningEffort.value) return
   reasoningEffort.value = effort
+  if (reasoningEffort.value !== effort) return
   messages.value.push({
     role: 'system-info',
-    content: `推理强度已切换至 ${reasoningEffortLabels[effort] || effort}`,
+    content: `推理强度已切换至 ${effort}`,
     timestamp: Date.now()
   })
 }
