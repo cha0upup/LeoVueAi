@@ -96,8 +96,8 @@ export function useAgentConsoleModules(iconMap) {
     },
     {
       key: 'terminal',
-      title: '虚拟终端',
-      description: '远程命令行终端操作',
+      title: '主机终端',
+      description: '操作当前 Agent 所在主机的原生终端',
       icon: iconMap.terminal,
       iconClass: 'terminal-icon',
       phase: 'operation',
@@ -105,6 +105,16 @@ export function useAgentConsoleModules(iconMap) {
       component: defineAsyncComponent(
         () => import('@/components/AgentConsole/terminal/TerminalConsole.vue')
       )
+    },
+    {
+      key: 'ssh',
+      title: 'SSH',
+      description: '经当前 Agent 一键连接已保存的 SSH 主机',
+      icon: iconMap.connection,
+      iconClass: 'terminal-icon',
+      phase: 'operation',
+      requiredCapabilities: ['localForward', 'componentInvoke'],
+      component: defineAsyncComponent(() => import('@/components/AgentConsole/terminal/SshWorkspace.vue'))
     },
     {
       key: 'database',

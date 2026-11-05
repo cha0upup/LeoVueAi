@@ -15,7 +15,7 @@ const MAX_TABS = 6
 export function useToolTabs(moduleDefinitions, { getSessionId = () => '', isModuleAvailable = () => true } = {}) {
   const moduleMap = Object.fromEntries(moduleDefinitions.map((m) => [m.key, m]))
 
-  const DEFAULT_TABS = ['info', 'file', 'terminal']
+  const DEFAULT_TABS = ['info', 'file', 'terminal', 'ssh']
 
   function _isAvailableKey(key) {
     const module = moduleMap[key]

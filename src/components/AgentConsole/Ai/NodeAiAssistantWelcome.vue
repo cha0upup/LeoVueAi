@@ -130,6 +130,10 @@ const modulePrompts = {
     { title: '解释命令与输出', desc: '理解命令作用和报错原因', icon: 'lucide:terminal', value: '请解释我接下来提供的命令及输出，说明执行环境、命令作用和报错原因。' },
     { title: '整理排查步骤', desc: '根据问题生成清晰的命令清单', icon: 'lucide:list-checks', value: '请根据我接下来描述的问题整理终端排查步骤，说明每条命令的用途和预期输出，先给出清单。' }
   ],
+  ssh: [
+    { title: '分析 SSH 连接问题', desc: '区分中转、主机指纹和认证错误', icon: 'lucide:network', value: '请根据我提供的 SSH 错误排查 Agent 中转、主机指纹、账号及认证配置。SSH 目标主机与当前 Agent 主机分开分析。' },
+    { title: '解释 SSH 终端输出', desc: '分析提供的命令与输出', icon: 'lucide:terminal', value: '请解释我提供的 SSH 终端命令与输出。以这些输出为依据，不将当前 Agent 的主机信息当作 SSH 目标主机信息。' }
+  ],
   scan: [
     { title: '检查扫描配置', desc: '核对目标、阶段和端口策略', icon: 'lucide:settings-2', value: '请帮我检查网络资产发现的目标格式、扫描阶段与端口策略。先根据我提供的配置指出问题和调整建议。' },
     { title: '解读扫描结果', desc: '分析主机、端口和服务识别结果', icon: 'lucide:search', value: '请解读我提供的网络资产发现结果，区分主机探活、端口开放和服务识别的含义，并说明结果的不确定性。' }

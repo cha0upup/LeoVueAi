@@ -180,6 +180,7 @@ import { safeLocalStorage } from '@/utils/browserStorage.js'
 
 const CACHE_MODE_DISABLED_KEYS = [
   'terminal',
+  'ssh',
   'database',
   'proxy',
   'scan',

@@ -9,6 +9,9 @@ export function useTerminalWorkspace({
   hostSessionId,
   runtime = ref('java'),
   executeCommand,
+  connectSsh,
+  executeSsh,
+  agentTerminalAvailable = ref(true),
   createProcessId = uuidV4,
   pollingConfig = {},
   onError = () => {}
@@ -32,8 +35,10 @@ export function useTerminalWorkspace({
     () => sessions.value.find((session) => session.id === activeSessionId.value) || null
   )
   const terminalModeOptions = computed(() => {
-    if (runtime.value !== 'java') return []
-    const knownModes = sessions.value.find((session) => session.terminalModes.length)?.terminalModes
+    if (!agentTerminalAvailable.value || runtime.value !== 'java') return []
+    const knownModes = sessions.value.find(
+      (session) => session.connectionType === 'agent' && session.terminalModes.length
+    )?.terminalModes
     return [
       { value: 'pipe', label: 'Java 原生管道', disabled: false },
       { value: 'python-pty', label: 'Python PTY', disabled: !knownModes?.includes('python-pty') }
@@ -58,21 +63,29 @@ export function useTerminalWorkspace({
     viewport?.fit()
     viewport?.focus()
   }
-  const createSession = async (mode) => {
+  const appendSession = async ({
+    terminalMode = null,
+    connectionType = 'agent',
+    endpoint = '',
+    profileId = '',
+    title,
+    execute
+  }) => {
     if (!hostSessionId.value) return null
-    const terminalMode = runtime.value === 'java' ? mode || 'pipe' : null
-    if (terminalMode && !['pipe', 'python-pty'].includes(terminalMode)) return null
     const session = reactive(
       createTerminalSession({
         id: createProcessId(),
-        title: `终端 ${sessionSeed++}`,
+        title: title || `终端 ${sessionSeed++}`,
         hostSessionId: hostSessionId.value,
-        terminalMode
+        terminalMode,
+        connectionType,
+        endpoint,
+        profileId
       })
     )
     const controller = createTerminalSessionController({
       session,
-      executeCommand,
+      executeCommand: execute,
       pollingConfig,
       onError,
       isCurrent: () => isCurrentSession(session),
@@ -91,6 +104,43 @@ export function useTerminalWorkspace({
     activeSessionId.value = session.id
     await nextTick()
     if (isCurrentSession(session)) focusActiveViewport()
+    return session
+  }
+  const createSession = async (mode) => {
+    if (!agentTerminalAvailable.value) return null
+    const terminalMode = runtime.value === 'java' ? mode || 'pipe' : null
+    if (terminalMode && !['pipe', 'python-pty'].includes(terminalMode)) return null
+    return appendSession({ terminalMode, execute: executeCommand })
+  }
+  const createSshSession = async (options) => {
+    if (!connectSsh || !executeSsh || !hostSessionId.value) throw new Error('SSH 终端尚未就绪')
+    if (!options?.profileId) throw new Error('请选择已保存的 SSH 连接')
+    const { profileId, version, host, port, username, name } = options
+    const session = await appendSession({
+      connectionType: 'ssh',
+      profileId,
+      endpoint: `${username}@${host}:${port}`,
+      title: name || `${username}@${host}`,
+      execute: async (params) => {
+        if (params.type === 'init') {
+          // Only identifiers enter connection requests; saved credentials stay on the backend.
+          const response = await connectSsh({
+            sessionId: params.sessionId,
+            processId: params.processId,
+            profileId,
+            version
+          })
+          if (response?.data?.profileSaved === false)
+            onError('SSH 已连接，但连接配置更新失败，请刷新列表')
+        }
+        return executeSsh(params)
+      }
+    })
+    const controller = session && controllers.get(session.id)
+    const ready = await controller?.initialize()
+    if (!ready || !isCurrentSession(session)) {
+      throw new Error(session?.endReason || 'SSH 连接已取消')
+    }
     return session
   }
   const activateSession = (sessionId) => {
@@ -126,25 +176,20 @@ export function useTerminalWorkspace({
     if (activeSession.value) removeSession(activeSession.value.id)
   }
 
-  const clearSessionViewport = (sessionId) => {
-    const session = sessions.value.find((item) => item.id === sessionId)
+  const clearActiveViewport = () => {
+    const session = activeSession.value
     if (!isCurrentSession(session)) return
-    getViewport(sessionId)?.clear()
+    getViewport(session.id)?.clear()
     session.hasUnread = false
     markSessionActive(session)
   }
 
-  const clearActiveViewport = () => {
-    if (activeSession.value) clearSessionViewport(activeSession.value.id)
-  }
-
   const handleTerminalInput = (data, session) => controllers.get(session?.id)?.write(data)
   const handleTerminalResize = (size, session) => controllers.get(session?.id)?.resize(size)
-  const interruptSession = (sessionId) => controllers.get(sessionId)?.interrupt()
-  const interruptActiveSession = () => interruptSession(activeSessionId.value)
+  const interruptActiveSession = () => controllers.get(activeSessionId.value)?.interrupt()
   const handleViewportReady = (sessionId) => controllers.get(sessionId)?.initialize()
 
-  const resetWorkspace = async () => {
+  const resetWorkspace = () => {
     disposeWorkspace()
     searchKeyword.value = ''
     sessionSeed = 1
@@ -210,12 +255,11 @@ export function useTerminalWorkspace({
     setViewportRef,
     focusActiveViewport,
     createSession,
+    createSshSession,
     activateSession,
     removeSession,
     closeActiveSession,
-    clearSessionViewport,
     clearActiveViewport,
-    interruptSession,
     interruptActiveSession,
     resetWorkspace,
     markSessionActive,

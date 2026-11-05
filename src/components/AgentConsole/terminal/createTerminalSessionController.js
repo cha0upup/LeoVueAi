@@ -146,7 +146,7 @@ export function createTerminalSessionController({
     }
   })
 
-  const read = (silent = false) => {
+  const read = () => {
     if (!canRead()) return Promise.resolve()
     if (readPromise) return readPromise
     if (outputStream.waiting) return Promise.resolve()
@@ -156,7 +156,7 @@ export function createTerminalSessionController({
         ? String(polling.longPollWait)
         : ''
     const pending = request('read', wait)
-      .catch((error) => handleReadError(error, silent))
+      .catch((error) => handleReadError(error, true))
       .finally(() => {
         if (readPromise === pending) readPromise = null
       })
@@ -171,7 +171,7 @@ export function createTerminalSessionController({
     wasForeground = foreground
     if (activated) return refresh()
     if (now < nextReadTime) return
-    if (session.processExited || hasMoreOutput || readErrors) return read(true)
+    if (session.processExited || hasMoreOutput || readErrors) return read()
     // A foreground long poll already waits efficiently and returns on output.
     const idleInterval = emptyReads ? polling.idleIntervals[emptyReads - 1] : 0
     const interval = foreground
@@ -180,13 +180,13 @@ export function createTerminalSessionController({
         : idleInterval
       : Math.max(polling.backgroundInterval, idleInterval)
     if (now - lastReadFinishedTime < interval) return
-    return read(true)
+    return read()
   }
 
   const refresh = () => {
     if (!current() || !isForeground()) return Promise.resolve()
     activity()
-    return read(true)
+    return read()
   }
 
   const resize = (size) => {

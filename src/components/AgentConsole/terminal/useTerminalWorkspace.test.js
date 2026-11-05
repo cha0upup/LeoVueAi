@@ -33,6 +33,174 @@ function createWorkspace(executeCommand, options = {}) {
 }
 
 describe('useTerminalWorkspace', () => {
+  it('shares the workspace while routing SSH and Agent controls independently', async () => {
+    const native = vi.fn(() =>
+      Promise.resolve({ data: { alive: true, pty: false, terminalModes: ['pipe', 'python-pty'] } })
+    )
+    const connectSsh = vi.fn(() => Promise.resolve({ data: { profileSaved: true } }))
+    const ssh = vi.fn(() =>
+      Promise.resolve({
+        data: {
+          alive: true,
+          pty: true,
+          resizable: true,
+          backend: 'ssh',
+          instanceId: 'ssh-instance'
+        }
+      })
+    )
+    const { workspace } = createWorkspace(native, {
+      connectSsh,
+      executeSsh: testTerminalTransport(ssh)
+    })
+    const agent = workspace.sessions.value[0]
+    await workspace.handleViewportReady(agent.id)
+    const session = await workspace.createSshSession({
+      host: 'ssh.internal',
+      port: 22,
+      username: 'fixture',
+      profileId: 'profile-a',
+      version: 1,
+      password: 'request-only',
+      name: 'SSH fixture'
+    })
+    expect(workspace.sessions.value).toHaveLength(2)
+    expect(session).toMatchObject({
+      connectionType: 'ssh',
+      terminalMode: null,
+      endpoint: 'fixture@ssh.internal:22',
+      title: 'SSH fixture',
+      pty: true
+    })
+    expect(JSON.stringify(session)).not.toContain('request-only')
+    expect(connectSsh).toHaveBeenCalledExactlyOnceWith({
+      sessionId: 'host-a',
+      processId: session.id,
+      profileId: 'profile-a',
+      version: 1
+    })
+    expect(
+      workspace.terminalModeOptions.value.find((mode) => mode.value === 'python-pty').disabled
+    ).toBe(false)
+    expect(ssh.mock.calls.find(([params]) => params.type === 'init')[0]).not.toHaveProperty(
+      'terminalMode'
+    )
+    await workspace.handleTerminalInput('中文\r', session)
+    await workspace.interruptActiveSession()
+    expect(ssh).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'write', processId: session.id, cmd: '中文\r' })
+    )
+    expect(ssh).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'write', processId: session.id, cmd: '\u0003' })
+    )
+    workspace.closeActiveSession()
+    await flushRequests()
+    expect(ssh).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'stop', processId: session.id })
+    )
+    expect(native.mock.calls.some(([params]) => params.type === 'stop')).toBe(false)
+    expect(workspace.sessions.value).toEqual([agent])
+  })
+
+  it('allows relay-only Agents without opening a native terminal or advertising Java modes', async () => {
+    const native = vi.fn()
+    const connectSsh = vi.fn(() => Promise.resolve({ data: { profileSaved: true } }))
+    const ssh = vi.fn(() => Promise.resolve({ data: { alive: true, pty: true } }))
+    const { workspace } = createWorkspace(native, {
+      agentTerminalAvailable: ref(false),
+      connectSsh,
+      executeSsh: testTerminalTransport(ssh)
+    })
+    expect(workspace.sessions.value).toEqual([])
+    expect(await workspace.createSession()).toBeNull()
+    await workspace.createSshSession({
+      host: 'ssh.internal',
+      port: 22,
+      username: 'fixture',
+      profileId: 'profile-a',
+      version: 1
+    })
+    expect(workspace.terminalModeOptions.value).toEqual([])
+    expect(native).not.toHaveBeenCalled()
+  })
+
+  it('requires a saved profile before creating an SSH session', async () => {
+    const connectSsh = vi.fn()
+    const { workspace } = createWorkspace(vi.fn(), {
+      agentTerminalAvailable: ref(false),
+      connectSsh,
+      executeSsh: vi.fn()
+    })
+    await expect(
+      workspace.createSshSession({ host: 'ssh.internal', port: 22, username: 'fixture' })
+    ).rejects.toThrow('请选择已保存的 SSH 连接')
+    expect(connectSsh).not.toHaveBeenCalled()
+    expect(workspace.sessions.value).toEqual([])
+  })
+
+  it('compensates a late SSH connect after parent switch without retrying credentials', async () => {
+    const pending = deferred()
+    const connectSsh = vi.fn(() => pending.promise)
+    const ssh = vi.fn(() => Promise.resolve({ data: { alive: true, pty: true } }))
+    const { hostSessionId, workspace } = createWorkspace(vi.fn(), {
+      agentTerminalAvailable: ref(false),
+      connectSsh,
+      executeSsh: testTerminalTransport(ssh)
+    })
+    const creation = workspace.createSshSession({
+      host: 'ssh.internal',
+      port: 22,
+      username: 'fixture',
+      profileId: 'profile-a',
+      version: 1
+    })
+    const rejected = expect(creation).rejects.toThrow('SSH 连接已取消')
+    await flushRequests()
+    hostSessionId.value = 'host-b'
+    await nextTick()
+    await flushRequests()
+    expect(ssh).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'host-a', processId: 'process-a', type: 'stop' })
+    )
+    pending.resolve({ data: { profileSaved: true } })
+    await rejected
+    await flushRequests()
+    expect(ssh.mock.calls.filter(([params]) => params.type === 'stop')).toHaveLength(2)
+    expect(connectSsh).toHaveBeenCalledTimes(1)
+    expect(workspace.sessions.value).toEqual([])
+  })
+
+  it('retains failed SSH tabs for retry and keeps successful connections on profile writeback failure', async () => {
+    const connectSsh = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('SSH 认证失败'))
+      .mockResolvedValue({ data: { profileSaved: false } })
+    const ssh = vi.fn(() => Promise.resolve({ data: { alive: true, pty: true } }))
+    const onError = vi.fn()
+    const { workspace } = createWorkspace(vi.fn(), {
+      agentTerminalAvailable: ref(false),
+      connectSsh,
+      executeSsh: testTerminalTransport(ssh),
+      onError
+    })
+    const options = {
+      host: 'ssh.internal',
+      port: 22,
+      username: 'fixture',
+      profileId: 'profile-a',
+      version: 1
+    }
+    await expect(workspace.createSshSession(options)).rejects.toThrow('SSH 认证失败')
+    expect(workspace.sessions.value).toHaveLength(1)
+    expect(workspace.sessions.value[0].ended).toBe(true)
+    const session = await workspace.createSshSession(options)
+    expect(session.viewportReady).toBe(true)
+    expect(onError).toHaveBeenCalledWith('SSH 已连接，但连接配置更新失败，请刷新列表')
+    expect(
+      ssh.mock.calls.filter(([params]) => params.type === 'stop' && params.processId === session.id)
+    ).toHaveLength(0)
+  })
+
   it('refreshes only the visible terminal and removes the visibility listener on disposal', async () => {
     const page = new globalThis.EventTarget()
     page.hidden = false
@@ -494,7 +662,7 @@ describe('useTerminalWorkspace', () => {
     session.longPolling = true
     await workspace.handleTerminalInput('a', session)
     await workspace.handleTerminalInput('b', session)
-    await workspace.interruptSession(session.id)
+    await workspace.interruptActiveSession()
     expect(
       executeCommand.mock.calls.filter(([p]) => p.type === 'write').map(([p]) => p.cmd)
     ).toEqual(['a', 'b', '\x03'])

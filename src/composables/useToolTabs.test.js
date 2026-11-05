@@ -25,6 +25,16 @@ describe('tool tab LRU', () => {
     expect(tabs.tabKeys.value).not.toContain('tool-0')
   })
 
+  it('offers host and SSH terminals separately and filters unsupported entry points', () => {
+    const definitions = ['info', 'file', 'terminal', 'ssh'].map(key => ({ key }))
+    const tabs = scope.run(() => useToolTabs(definitions))
+    expect(tabs.tabKeys.value).toEqual(['info', 'file', 'terminal', 'ssh'])
+    const restricted = scope.run(() => useToolTabs(definitions, { isModuleAvailable: key => key !== 'ssh' }))
+    expect(restricted.tabKeys.value).toEqual(['info', 'file', 'terminal'])
+    restricted.openTab('ssh')
+    expect(restricted.tabKeys.value).not.toContain('ssh')
+  })
+
   it('evicts the least recently visited tab while keeping a recently reactivated tab', () => {
     const definitions = ['info', 'file', 'terminal', 'scan', 'database', 'plugin', 'resource'].map(key => ({ key }))
     const tabs = scope.run(() => useToolTabs(definitions))

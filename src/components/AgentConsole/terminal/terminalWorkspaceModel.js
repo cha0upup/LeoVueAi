@@ -4,6 +4,9 @@ export function createTerminalSession({
   id,
   title,
   hostSessionId,
+  connectionType = 'agent',
+  endpoint = '',
+  profileId = '',
   terminalMode = null,
   now = Date.now()
 }) {
@@ -11,6 +14,9 @@ export function createTerminalSession({
     id,
     title,
     hostSessionId,
+    connectionType,
+    endpoint,
+    profileId,
     terminalMode,
     terminalModes: [],
     lastActivityTime: now,

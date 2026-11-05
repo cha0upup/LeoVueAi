@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { describeTerminalCapability } from './terminalWorkspaceModel.js'
+import { createTerminalSession, describeTerminalCapability } from './terminalWorkspaceModel.js'
 
 describe('terminalWorkspaceModel', () => {
+  it('keeps SSH identity separate from native terminal modes and drops credentials', () => {
+    const session = createTerminalSession({ id: 'child', hostSessionId: 'parent', connectionType: 'ssh',
+      endpoint: 'fixture@ssh.internal:22', password: 'request-only', privateKey: 'request-only' })
+    expect(session).toMatchObject({ connectionType: 'ssh', terminalMode: null, endpoint: 'fixture@ssh.internal:22' })
+    expect(session).not.toHaveProperty('password')
+    expect(session).not.toHaveProperty('privateKey')
+    expect(describeTerminalCapability({ ...session, pty: true, resizable: true, longPolling: true, backend: 'ssh' }))
+      .toMatchObject({ mode: 'PTY', streamMode: 'LONG-POLL', resizeMode: 'RESIZE' })
+  })
   it('describes negotiated PTY, fallback, and detecting terminal modes', () => {
     expect(describeTerminalCapability({ pty: false, backend: 'unix-command' })).toMatchObject({
       mode: 'COMMAND',
