@@ -2,9 +2,10 @@
   <el-dialog
     v-model="visible"
     :title="editing ? '编辑供应商' : '新增供应商'"
-    width="840px"
+    width="var(--dialog-width-lg)"
+    align-center
     top="4vh"
-    class="ai-model-dialog provider-dialog"
+    class="ai-model-dialog provider-dialog workbench-dialog"
     :close-on-click-modal="false"
     destroy-on-close
   >
@@ -58,6 +59,7 @@
             >
               <el-input
                 v-model="form.name"
+                autocomplete="off"
                 placeholder="如 DeepSeek / OpenAI / 企业网关"
                 clearable
               />
@@ -69,6 +71,7 @@
               <el-input
                 v-model="form.apiKey"
                 type="password"
+                autocomplete="new-password"
                 :placeholder="editing ? '留空表示不修改' : 'sk-...'"
                 show-password
                 clearable
@@ -221,13 +224,15 @@
         </el-table>
         <el-empty
           v-else
+          class="provider-model-empty"
+          :image-size="48"
           description="尚未获取模型；点击获取模型或手动添加模型 ID"
         />
       </section>
     </div>
 
     <template #footer>
-      <div class="ai-model-dialog__footer">
+      <div class="workbench-dialog__actions">
         <el-button @click="visible = false">
           取消
         </el-button>
@@ -278,38 +283,26 @@ const setFormRef = (instance) => emit('form-ready', instance)
 </script>
 
 <style>
-.provider-dialog {
-  max-height: calc(100vh - 48px);
-}
-
-.provider-dialog .el-dialog__body {
-  overflow: hidden;
-}
-
-.provider-dialog .ai-model-dialog__body {
-  max-height: min(680px, calc(92vh - 220px));
-  overflow-y: auto;
-  padding-right: 6px;
-}
 
 .provider-dialog__body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-3);
 }
 
 .provider-dialog .provider-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-3);
 }
 
 .provider-dialog .provider-preset-section,
 .provider-dialog .provider-form-section,
 .provider-dialog .provider-model-section {
-  padding: 14px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  padding: 0 0 var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--app-divider-color);
+  border-radius: 0;
   background: var(--el-bg-color-overlay);
 }
 
@@ -462,20 +455,11 @@ const setFormRef = (instance) => emit('form-ready', instance)
   margin-top: 8px;
 }
 
-.provider-dialog .ai-model-dialog__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+.provider-dialog .provider-model-empty {
+  padding: var(--space-3);
 }
 
 @media (max-width: 720px) {
-  .provider-dialog {
-    width: calc(100vw - 32px) !important;
-  }
-
-  .provider-dialog .ai-model-dialog__body {
-    max-height: calc(92vh - 200px);
-  }
 
   .provider-dialog .form-grid.two {
     grid-template-columns: 1fr;

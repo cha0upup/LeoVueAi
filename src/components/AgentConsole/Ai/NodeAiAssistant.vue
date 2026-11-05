@@ -775,6 +775,7 @@ onUnmounted(() => {
 }
 
 .node-ai-assistant {
+  container: node-assistant / inline-size;
   --thread-max: min(76rem, 100%);
   --ai-panel-surface: var(--ai-dock-background, var(--app-surface-background));
   --ai-muted-surface: var(--ai-panel-surface);
@@ -932,6 +933,7 @@ onUnmounted(() => {
 }
 
 .thread {
+  box-sizing: border-box;
   min-height: 100%;
   max-width: var(--thread-max);
   margin: 0 auto;
@@ -955,12 +957,13 @@ onUnmounted(() => {
 }
 
 .ai-system-warn {
+  overflow-wrap: anywhere;
   margin: 6px 0;
   padding: 7px 14px;
   border-radius: 8px;
-  background: #fffbe6;
+  background: var(--el-color-warning-light-9);
   border: 0;
-  color: #7c5b00;
+  color: var(--el-color-warning-dark-2);
   font-size: 13px;
   text-align: center;
 }
@@ -974,5 +977,13 @@ onUnmounted(() => {
   background: var(--app-control-background-soft);
   font-size: 12px;
   text-align: center;
+}
+
+@container node-assistant (max-width: 420px) {
+  .assistant-header { min-height: 48px; padding-inline: var(--space-2); gap: var(--space-2); }
+  .assistant-icon { width: 28px; height: 28px; border-radius: var(--radius-control); }
+  .assistant-identity { gap: var(--space-2); }
+  .assistant-actions { gap: var(--space-1); }
+  .header-action { width: 28px; height: 28px; }
 }
 </style>

@@ -41,6 +41,7 @@
               :data-tab="tab.name"
               :title="sidebarCollapsed ? tab.label : ''"
               :aria-label="tab.label"
+              :aria-current="activeTab === tab.name ? 'page' : undefined"
               @click="selectTab(tab.name)"
             >
               <el-icon><Icon :icon="tab.icon" /></el-icon>
@@ -51,7 +52,7 @@
       </aside>
 
       <section class="admin-main">
-        <main class="admin-panel surface">
+        <main class="admin-panel">
           <section class="admin-panel__body">
             <component :is="activeTabMeta.component" />
           </section>
@@ -196,6 +197,7 @@ onMounted(async () => {
 
 <style scoped>
 .admin-console {
+  container: admin-workspace / inline-size;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -396,9 +398,10 @@ onMounted(async () => {
 }
 
 .admin-panel__body {
-  height: calc(100vh - 64px);
+  height: 100%;
+  min-height: 0;
   overflow: auto;
-  padding: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .admin-panel__body :deep(.user-manager),
@@ -409,25 +412,59 @@ onMounted(async () => {
   min-height: 100%;
 }
 
-.admin-panel__body :deep(.ai-model-settings) {
-  padding: var(--space-4);
+@container admin-workspace (max-width: 1100px) {
+  .admin-body { grid-template-columns: 184px minmax(0, 1fr); }
 }
 
-@media (max-width: 768px) {
-  .admin-body {
+@container admin-workspace (max-width: 860px) {
+  .admin-body,
+  .admin-body.is-sidebar-collapsed {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .admin-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--app-divider-color);
+  }
+
+  .admin-menu,
+  .admin-body.is-sidebar-collapsed .admin-menu {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    overflow-x: auto;
+  }
+
+  .admin-menu__brand,
+  .admin-menu__group,
+  .admin-body.is-sidebar-collapsed .admin-menu__group {
     display: none;
   }
 
-  .admin-panel__body {
-    height: calc(100vh - 64px);
+  .admin-menu-item,
+  .admin-body.is-sidebar-collapsed .admin-menu-item {
+    flex: 0 0 auto;
+    width: auto;
+    height: var(--control-height);
+    margin: 0;
+    gap: var(--space-2);
+    padding: 0 var(--space-2);
+    white-space: nowrap;
   }
 
-  .admin-panel__body :deep(.ai-model-settings) {
-    padding: 20px 16px;
+  .admin-body.is-sidebar-collapsed .admin-menu-item span {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip: auto;
+    overflow: visible;
+  }
+
+  .admin-panel__body {
+    padding: var(--space-3) var(--space-2);
   }
 }
 </style>

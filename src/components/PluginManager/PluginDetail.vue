@@ -90,37 +90,11 @@
       </div>
 
       <div class="meta-strip">
-        <span>{{ pluginTypeLabel }}</span>
-        <span>v{{ plugin.version || '-' }}</span>
-        <span>{{ plugin.createUserId || '-' }}</span>
+        <span>创建用户 {{ plugin.createUserId || '-' }}</span>
         <span>创建 {{ formatTime(plugin.createTime) }}</span>
       </div>
 
       <div class="overview-grid">
-        <article class="panel meta-panel">
-          <div class="panel-header">
-            元数据
-          </div>
-          <div class="kv-list">
-            <div class="kv-item">
-              <label>Plugin ID</label>
-              <code>{{ plugin.pluginId }}</code>
-            </div>
-            <div class="kv-item">
-              <label>插件名称</label>
-              <span>{{ plugin.pluginName || '-' }}</span>
-            </div>
-            <div class="kv-item">
-              <label>插件类型</label>
-              <span>{{ plugin.pluginType || '-' }}</span>
-            </div>
-            <div class="kv-item">
-              <label>版本号</label>
-              <span>{{ plugin.version || '-' }}</span>
-            </div>
-          </div>
-        </article>
-
         <article class="panel params-panel">
           <div class="panel-header panel-header-with-actions">
             <span>参数模板</span>
@@ -162,7 +136,6 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { icons } from '@/utils/icons.js'
 import { formatDate as formatTime } from '@/utils/format.js'
@@ -194,14 +167,6 @@ const props = defineProps({
 const emit = defineEmits(['edit', 'delete', 'export'])
 
 const iconMap = icons
-const pluginTypeLabel = computed(() => {
-  const type = props.plugin?.pluginType
-  return {
-    java: 'Java',
-    javaScript: 'JavaScript',
-    shellCode: 'Shell'
-  }[type] || type || '-'
-})
 
 function handleActionCommand(command) {
   if (command === 'delete') {
@@ -273,7 +238,7 @@ async function copyText(text, successMessage) {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px 14px;
+  padding: var(--space-3) var(--space-4);
   background: var(--app-container-background);
   border-bottom: 1px solid var(--detail-border-soft);
 }
@@ -303,7 +268,7 @@ async function copyText(text, successMessage) {
 }
 
 .identity-block p {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-2);
   color: var(--el-text-color-secondary);
   font-size: 13px;
   line-height: 1.6;
@@ -313,10 +278,10 @@ async function copyText(text, successMessage) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 9px;
+  padding: 0;
   border-radius: var(--radius-control);
-  background: var(--detail-surface-muted);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 30%, transparent);
+  background: transparent;
+  border: 0;
 }
 
 .identity-id span {
@@ -357,9 +322,9 @@ async function copyText(text, successMessage) {
 
 .overview-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 0 18px 18px;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
 }
 
 .panel {
@@ -369,7 +334,7 @@ async function copyText(text, successMessage) {
 }
 
 .panel-header {
-  min-height: 42px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   padding: 10px 12px;
@@ -405,34 +370,8 @@ async function copyText(text, successMessage) {
   opacity: 0.45;
 }
 
-.single-column {
-  grid-template-columns: 1fr;
-}
-
-.kv-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 12px;
-}
-
-.kv-item {
-  padding: 9px 10px;
-  border-radius: var(--radius-control);
-}
-
-.kv-item label {
-  margin-bottom: 4px;
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-}
-
-.kv-item span,
-.kv-item code {
-  font-size: 12px;
-}
-
 .params-box {
-  min-height: 150px;
+  min-height: 96px;
   padding: 12px 14px;
   overflow: auto;
   border-radius: var(--radius-control);
@@ -455,12 +394,6 @@ async function copyText(text, successMessage) {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-@media (max-width: 1200px) {
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 768px) {

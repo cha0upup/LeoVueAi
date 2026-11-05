@@ -1,9 +1,6 @@
 <template>
   <ManagerLayout
-    title="伪装管理"
-    :icon="iconMap.mask"
     module-class="disguise-manager"
-    hide-toolbar
     :initial-list-width="320"
     :list-min="260"
     :list-max="480"
@@ -34,6 +31,7 @@
           type="button"
           class="scope-tab"
           :class="{ 'is-active': activeFilter === f.value }"
+          :aria-pressed="activeFilter === f.value"
           @click="activeFilter = f.value"
         >
           {{ f.label }}
@@ -136,7 +134,6 @@
             :description="item.disguiseId"
             :icon="iconMap.codeFile"
             :active="item.disguiseId === selectedDisguiseId"
-            selectable
             :selected="selectedIds.has(item.disguiseId)"
             :in-selection-mode="selectedIds.size > 0"
             @click="selectDisguise(item.disguiseId)"

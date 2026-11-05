@@ -1,5 +1,9 @@
 <template>
   <div class="audit-manager">
+    <PageHeader
+      title="审计日志"
+      :icon="iconMap.document"
+    />
     <AdminToolbar>
       <el-input
         v-model="filterForm.keyword"
@@ -135,24 +139,19 @@
       </el-radio-group>
     </section>
 
-    <AdminStatsGrid :columns="4">
+    <StatsStrip :columns="4">
       <article
         v-for="card in statsCardConfigs"
         :key="card.key"
         class="metric-card"
         :class="card.className"
       >
-        <span class="metric-icon">
-          <el-icon><Icon :icon="card.icon" /></el-icon>
-        </span>
-        <div>
-          <strong class="metric-value">
-            {{ card.format ? card.format(statistics[card.key]) : statistics[card.key] }}
-          </strong>
-          <span class="metric-label">{{ card.label }}</span>
-        </div>
+        <span class="metric-label">{{ card.label }}</span>
+        <strong class="metric-value">
+          {{ card.format ? card.format(statistics[card.key]) : statistics[card.key] }}
+        </strong>
       </article>
-    </AdminStatsGrid>
+    </StatsStrip>
 
     <section
       v-if="hasActiveFilter"
@@ -175,7 +174,7 @@
       </el-button>
     </section>
 
-    <AdminWorkspacePanel title="审计日志">
+    <AdminWorkspacePanel title="日志列表">
       <template #tags>
         <el-tag effect="light">
           总量 {{ totalCount }}
@@ -397,6 +396,7 @@
 </template>
 
 <script setup>
+import PageHeader from '@/components/common/PageHeader.vue'
 import { computed, ref, reactive, onMounted, watch } from 'vue'
 
 import { icons as iconMap } from '@/utils/icons.js'
@@ -416,7 +416,7 @@ import {
   updateAuditModeApi
 } from '@/services/api/admin.js'
 import AdminToolbar from '@/components/Admin/shared/AdminToolbar.vue'
-import AdminStatsGrid from '@/components/Admin/shared/AdminStatsGrid.vue'
+import StatsStrip from '@/components/common/StatsStrip.vue'
 import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import AuditCleanupDialog from './AuditCleanupDialog.vue'
@@ -778,14 +778,13 @@ const handleCurrentChange = (page) => {
 
 // 统计卡片配置
 const statsCardConfigs = [
-  { key: 'totalLogs', label: '总日志数', icon: iconMap.document, className: 'total-logs' },
-  { key: 'successLogs', label: '成功日志', icon: iconMap.success, className: 'success-logs' },
-  { key: 'failedLogs', label: '失败日志', icon: iconMap.warning, className: 'failed-logs' },
+  { key: 'totalLogs', label: '总日志数', className: '' },
+  { key: 'successLogs', label: '成功日志', className: 'metric-card--success' },
+  { key: 'failedLogs', label: '失败日志', className: 'metric-card--danger' },
   {
     key: 'lastUpdate',
     label: '最后更新',
-    icon: iconMap.timer,
-    className: 'last-update',
+    className: 'metric-card--time',
     format: formatAuditTime
   }
 ]
@@ -802,7 +801,7 @@ onMounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-3);
   overflow: hidden;
 }
 
@@ -864,26 +863,6 @@ onMounted(() => {
 
 .toolbar-small {
   width: 112px;
-}
-
-.total-logs .metric-icon {
-  background: color-mix(in srgb, var(--el-color-primary) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-primary);
-}
-
-.success-logs .metric-icon {
-  background: color-mix(in srgb, var(--el-color-success) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-success);
-}
-
-.failed-logs .metric-icon {
-  background: color-mix(in srgb, var(--el-color-danger) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-danger);
-}
-
-.last-update .metric-icon {
-  background: color-mix(in srgb, var(--el-color-warning) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-warning);
 }
 
 .filter-tags {

@@ -2,8 +2,9 @@
   <el-dialog
     v-model="visible"
     title="编辑模型配置"
-    width="760px"
-    class="ai-model-dialog model-config-dialog"
+    width="var(--dialog-width-md)"
+    align-center
+    class="ai-model-dialog model-config-dialog workbench-dialog"
     :close-on-click-modal="false"
     destroy-on-close
   >
@@ -267,7 +268,7 @@
     </div>
 
     <template #footer>
-      <div class="ai-model-dialog__footer">
+      <div class="workbench-dialog__actions">
         <el-button @click="visible = false">
           取消
         </el-button>
@@ -326,11 +327,6 @@ const setFormRef = (instance) => emit('form-ready', instance)
 .request-parameter-table th, .request-parameter-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--el-border-color-lighter); }
 .request-parameter-json { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 .request-preview-errors { color: var(--el-color-danger); padding-left: 20px; }
-.model-config-dialog .ai-model-dialog__body {
-  max-height: min(680px, 68vh);
-  overflow-y: auto;
-  padding-right: 4px;
-}
 
 .model-config-dialog .model-edit-summary {
   display: grid;
@@ -368,7 +364,7 @@ const setFormRef = (instance) => emit('form-ready', instance)
 }
 
 .model-config-dialog .dialog-section {
-  margin-bottom: 18px;
+  margin-bottom: var(--space-3);
 }
 
 .model-config-dialog .dialog-section__title {
@@ -405,10 +401,10 @@ const setFormRef = (instance) => emit('form-ready', instance)
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 104px;
-  padding: 12px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   background: var(--el-bg-color-overlay);
 }
 
@@ -416,7 +412,7 @@ const setFormRef = (instance) => emit('form-ready', instance)
   display: block;
   margin-top: 3px;
   color: var(--el-text-color-placeholder);
-  font-size: 11px;
+  font-size: var(--font-size-helper);
 }
 
 .model-config-dialog .limit-config-card .el-input-number {
@@ -437,20 +433,7 @@ const setFormRef = (instance) => emit('form-ready', instance)
   margin-bottom: 16px;
 }
 
-.model-config-dialog .ai-model-dialog__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
 @media (max-width: 720px) {
-  .model-config-dialog {
-    width: calc(100vw - 32px) !important;
-  }
-
-  .model-config-dialog .ai-model-dialog__body {
-    max-height: 70vh;
-  }
 
   .model-config-dialog .model-edit-summary,
   .model-config-dialog .form-grid.two,

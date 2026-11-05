@@ -3,7 +3,6 @@
     class="entity-card"
     :class="{
       active: active,
-      disabled: disabled,
       'is-selected': selected,
       'has-selection': inSelectionMode
     }"
@@ -15,7 +14,6 @@
     <div class="entity-top">
       <!-- 多选 checkbox：默认隐藏，hover/选中态/进入多选模式时显示 -->
       <div
-        v-if="selectable"
         class="entity-checkbox"
         @click.stop="toggleSelected"
       >
@@ -28,53 +26,24 @@
 
       <!-- 左侧 icon -->
       <div
-        v-if="icon || $slots.icon"
+        v-if="icon"
         class="entity-icon"
-        :class="{ 'entity-icon-disabled': disabled }"
       >
-        <slot name="icon">
-          <el-icon><Icon :icon="icon" /></el-icon>
-        </slot>
+        <el-icon><Icon :icon="icon" /></el-icon>
       </div>
 
       <!-- 主内容 -->
       <div class="entity-main">
         <div class="entity-title-row">
           <strong>{{ title }}</strong>
-          <slot name="badge" />
         </div>
         <span class="entity-desc">{{ description || '暂无描述' }}</span>
-        <div
-          v-if="tags && tags.length"
-          class="entity-tags"
-        >
-          <el-tag
-            v-for="t in tags"
-            :key="t"
-            size="small"
-            type="info"
-            effect="plain"
-            round
-          >
-            {{ t }}
-          </el-tag>
-        </div>
         <slot name="extra" />
       </div>
 
       <!-- 右侧：状态 chip + hover 操作按钮 -->
       <div class="entity-aside">
-        <slot name="status">
-          <el-tag
-            v-if="disabled"
-            size="small"
-            type="info"
-            effect="plain"
-            class="disabled-tag"
-          >
-            禁用
-          </el-tag>
-        </slot>
+        <slot name="status" />
         <div
           v-if="$slots.actions"
           class="entity-actions"
@@ -90,22 +59,19 @@
 import { Icon } from '@iconify/vue'
 
 /**
- * 通用「实体卡片」——用于 list+detail 模块的列表项。
+ * 目录卡片——用于插件、伪装和指纹列表，统一支持批量选择。
  *
- * 三种交互态可独立组合：
+ * 两种交互态可独立组合：
  * - active：当前打开的项（左侧 primary 高亮条 + 浅蓝背景）
  * - selected：批量选中中（边框 primary 40% + 浅蓝背景）
- * - disabled：业务上的禁用状态（去饱和 + 半透明）
  *
  * 槽：
- * - icon：左侧 32×32 容器（默认走 icon prop）
- * - badge：标题旁的 chip（如文件数）
- * - extra：标签下方的额外行
- * - status：右上角状态 tag（默认 disabled 时显示「禁用」）
+ * - extra：描述下方的额外行
+ * - status：右上角状态 tag
  * - actions：右下角操作按钮（hover 时显示，建议用 .u-icon-btn）
  *
  * 事件：
- * - click（item）：单击；批量模式下不触发，由 toggle 处理
+ * - click：单击；批量模式下不触发，由 toggle 处理
  * - toggle-selected（boolean）：选中状态变化
  */
 
@@ -113,10 +79,7 @@ const props = defineProps({
   title:       { type: String, required: true },
   description: { type: String, default: '' },
   icon:        { type: String, default: '' },
-  tags:        { type: Array, default: () => [] },
   active:      { type: Boolean, default: false },
-  disabled:    { type: Boolean, default: false },
-  selectable:  { type: Boolean, default: false },
   selected:    { type: Boolean, default: false },
   /** 是否处于「至少有一个被选中」的批量模式：影响点击行为和 checkbox 显示 */
   inSelectionMode: { type: Boolean, default: false }
@@ -125,7 +88,7 @@ const props = defineProps({
 const emit = defineEmits(['click', 'toggle-selected'])
 
 const onClick = () => {
-  if (props.selectable && props.inSelectionMode) {
+  if (props.inSelectionMode) {
     emit('toggle-selected', !props.selected)
     return
   }
@@ -171,26 +134,6 @@ const toggleSelected = (val) => {
 .entity-card.is-selected {
   border-color: var(--list-item-selected-border);
   background: var(--list-item-selected-bg);
-}
-
-.entity-card.disabled {
-  opacity: var(--disabled-opacity);
-  filter: saturate(var(--disabled-saturation));
-}
-
-.entity-card.disabled:hover {
-  opacity: var(--disabled-opacity-hover);
-  filter: saturate(var(--disabled-saturation-hover));
-}
-
-.entity-card.disabled .entity-main strong,
-.entity-card.disabled .entity-main .entity-desc {
-  color: var(--el-text-color-disabled);
-}
-
-.entity-icon-disabled {
-  color: var(--el-text-color-placeholder) !important;
-  background: var(--el-fill-color) !important;
 }
 
 .entity-top {
@@ -243,19 +186,6 @@ const toggleSelected = (val) => {
   margin-top: 2px;
 }
 
-.entity-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
-}
-
-.entity-tags :deep(.el-tag) {
-  height: 18px;
-  padding: 0 6px;
-  font-size: 11px;
-}
-
 .entity-aside {
   display: flex;
   flex-direction: column;
@@ -263,10 +193,6 @@ const toggleSelected = (val) => {
   gap: 4px;
   flex-shrink: 0;
   margin-left: auto;
-}
-
-.disabled-tag {
-  flex-shrink: 0;
 }
 
 /* 多选 checkbox：默认隐藏，根据交互态显示 */

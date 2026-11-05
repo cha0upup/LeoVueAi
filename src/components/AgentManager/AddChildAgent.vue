@@ -352,7 +352,6 @@
     <template #footer>
       <div class="dialog-footer-actions">
         <el-button
-          type="danger"
           class="cancel-btn"
           @click="close"
         >

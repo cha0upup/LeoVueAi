@@ -47,10 +47,12 @@ defineProps({
 
 .admin-workspace-panel__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--app-layout-gap);
-  padding: 12px 16px;
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--app-surface-border-subtle);
   background: var(--app-container-background);
 }
@@ -67,7 +69,8 @@ defineProps({
 .admin-workspace-panel__title h2 {
   margin: 0;
   color: var(--el-text-color-primary);
-  font-size: 15px;
+  font-size: var(--font-size-section-title);
+  font-weight: var(--font-weight-title);
 }
 
 .admin-workspace-panel__body {
@@ -75,10 +78,6 @@ defineProps({
   min-height: 0;
 }
 
-@media (max-width: 768px) {
-  .admin-workspace-panel__header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
+.admin-workspace-panel__actions { margin-left: auto; }
+.admin-workspace-panel__actions .el-button + .el-button { margin-left: 0; }
 </style>

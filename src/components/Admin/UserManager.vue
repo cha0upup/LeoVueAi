@@ -1,5 +1,19 @@
 <template>
   <div class="user-manager">
+    <PageHeader
+      title="用户管理"
+      :icon="iconMap.user"
+    >
+      <template #actions>
+        <el-button
+          type="primary"
+          @click="openAddDialog"
+        >
+          <el-icon><Icon :icon="iconMap.plus" /></el-icon>
+          新增用户
+        </el-button>
+      </template>
+    </PageHeader>
     <AdminToolbar>
       <el-input
         v-model="searchKeyword"
@@ -65,38 +79,22 @@
       </template>
     </AdminToolbar>
 
-    <AdminStatsGrid :columns="5">
+    <StatsStrip :columns="5">
       <article
         v-for="card in statsCardConfigs"
         :key="card.key"
         class="metric-card"
-        :class="card.className"
       >
-        <span class="metric-icon"><el-icon><Icon :icon="card.icon" /></el-icon></span>
-        <div>
-          <strong class="metric-value">{{ stats[card.key] }}</strong>
-          <span class="metric-label">{{ card.label }}</span>
-        </div>
+        <span class="metric-label">{{ card.label }}</span>
+        <strong class="metric-value">{{ stats[card.key] }}</strong>
       </article>
-    </AdminStatsGrid>
+    </StatsStrip>
 
     <AdminWorkspacePanel title="用户列表">
       <template #tags>
         <el-tag effect="light">
           筛选结果 {{ filteredUsers.length }}
         </el-tag>
-      </template>
-
-      <template
-        #actions
-      >
-        <el-button
-          type="primary"
-          @click="openAddDialog"
-        >
-          <el-icon><Icon :icon="iconMap.plus" /></el-icon>
-          新增用户
-        </el-button>
       </template>
 
       <el-table
@@ -266,6 +264,7 @@
 </template>
 
 <script setup>
+import PageHeader from '@/components/common/PageHeader.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElNotification } from 'element-plus'
 import { v4 as uuidV4 } from 'uuid'
@@ -289,7 +288,7 @@ import { showError } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
 import AdminToolbar from '@/components/Admin/shared/AdminToolbar.vue'
-import AdminStatsGrid from '@/components/Admin/shared/AdminStatsGrid.vue'
+import StatsStrip from '@/components/common/StatsStrip.vue'
 import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import UserEditorDialog from './UserEditorDialog.vue'
@@ -312,11 +311,11 @@ import {
 } from './userManagerModel.js'
 
 const statsCardConfigs = [
-  { key: 'total', label: '用户总数', icon: iconMap.user, className: 'total-users' },
-  { key: 'admin', label: '管理员', icon: iconMap.userFilled, className: 'admin-users' },
-  { key: 'leader', label: '队长', icon: iconMap.userFilled, className: 'leader-users' },
-  { key: 'normal', label: '普通用户', icon: iconMap.avatar, className: 'normal-users' },
-  { key: 'assignedToTeam', label: '已归属团队', icon: iconMap.userFilled, className: 'team-users' }
+  { key: 'total', label: '用户总数' },
+  { key: 'admin', label: '管理员' },
+  { key: 'leader', label: '队长' },
+  { key: 'normal', label: '普通用户' },
+  { key: 'assignedToTeam', label: '已归属团队' }
 ]
 
 const { currentUser, isAdmin, isLeader, fetchAuth } = useAuth()
@@ -608,7 +607,7 @@ onMounted(async () => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-3);
   overflow: auto;
 }
 
@@ -618,31 +617,6 @@ onMounted(async () => {
 
 .toolbar-filter {
   width: 140px;
-}
-
-.total-users .metric-icon {
-  background: color-mix(in srgb, var(--el-color-primary) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-primary);
-}
-
-.admin-users .metric-icon {
-  background: color-mix(in srgb, var(--el-color-danger) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-danger);
-}
-
-.leader-users .metric-icon {
-  background: color-mix(in srgb, var(--el-color-warning) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-warning);
-}
-
-.normal-users .metric-icon {
-  background: color-mix(in srgb, var(--el-color-success) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-success);
-}
-
-.team-users .metric-icon {
-  background: color-mix(in srgb, var(--el-color-warning) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-warning);
 }
 
 .users-table {

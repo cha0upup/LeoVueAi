@@ -91,70 +91,38 @@
       </div>
 
       <div class="meta-strip">
-        <span>HTTP</span>
         <span>{{ detail.tags?.length || 0 }} 标签</span>
         <span>{{ requestList.length }} 请求</span>
-        <span>版本 {{ detail.info?.version || '-' }}</span>
       </div>
 
-      <div class="info-grid">
-        <article class="panel">
-          <div class="panel-header">
-            基础信息
+      <article class="panel">
+        <div class="panel-header">
+          标签与作者
+        </div>
+        <div class="kv-list single-column">
+          <div class="kv-item">
+            <label>作者</label>
+            <span>{{ detail.info?.author || '—' }}</span>
           </div>
-          <div class="kv-list">
-            <div class="kv-item">
-              <label>Fingerprint ID</label>
-              <code>{{ detail.fingerprintId }}</code>
-            </div>
-            <div class="kv-item">
-              <label>名称</label>
-              <span>{{ detail.name || '-' }}</span>
-            </div>
-            <div class="kv-item">
-              <label>协议</label>
-              <span>HTTP</span>
-            </div>
-            <div class="kv-item">
-              <label>版本</label>
-              <span>{{ detail.info?.version || '-' }}</span>
-            </div>
-            <div class="kv-item span-2">
-              <label>标签</label>
-              <div class="tags-wrap">
-                <template v-if="detail.tags?.length">
-                  <el-tag
-                    v-for="tag in detail.tags"
-                    :key="tag"
-                    size="small"
-                    type="info"
-                    effect="plain"
-                  >
-                    {{ tag }}
-                  </el-tag>
-                </template>
-                <span v-else>—</span>
-              </div>
+          <div class="kv-item span-2">
+            <label>标签</label>
+            <div class="tags-wrap">
+              <template v-if="detail.tags?.length">
+                <el-tag
+                  v-for="tag in detail.tags"
+                  :key="tag"
+                  size="small"
+                  type="info"
+                  effect="plain"
+                >
+                  {{ tag }}
+                </el-tag>
+              </template>
+              <span v-else>—</span>
             </div>
           </div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-header">
-            元信息
-          </div>
-          <div class="kv-list single-column">
-            <div class="kv-item">
-              <label>作者</label>
-              <span>{{ detail.info?.author || '-' }}</span>
-            </div>
-            <div class="kv-item">
-              <label>备注</label>
-              <span>{{ detail.info?.remark || '暂无备注' }}</span>
-            </div>
-          </div>
-        </article>
-      </div>
+        </div>
+      </article>
 
       <div class="request-panel panel">
         <div class="panel-header">
@@ -301,6 +269,7 @@ function formatHeaders(headers) {
 
 <style scoped>
 @import '@/styles/workbench-detail-actions-shared.css';
+@import '@/styles/detail-card-shared.css';
 
 .detail-card {
   height: 100%;
@@ -345,7 +314,7 @@ function formatHeaders(headers) {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px 14px;
+  padding: var(--space-3) var(--space-4);
   background: var(--app-container-background);
   border-bottom: 1px solid var(--detail-border-soft);
 }
@@ -375,7 +344,7 @@ function formatHeaders(headers) {
 }
 
 .identity-block p {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-2);
   color: var(--el-text-color-secondary);
   font-size: 13px;
   line-height: 1.6;
@@ -385,10 +354,10 @@ function formatHeaders(headers) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 9px;
+  padding: 0;
   border-radius: var(--radius-control);
-  background: var(--detail-surface-muted);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 30%, transparent);
+  background: transparent;
+  border: 0;
 }
 
 :deep(.detail-protocol-tag) {
@@ -440,13 +409,6 @@ function formatHeaders(headers) {
   background: color-mix(in srgb, var(--el-text-color-secondary) 42%, transparent);
 }
 
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 0 18px;
-}
-
 .panel {
   overflow: hidden;
   border: 1px solid var(--detail-border-soft);
@@ -461,42 +423,8 @@ function formatHeaders(headers) {
   font-weight: 700;
 }
 
-.kv-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding: 14px;
-}
-
-.single-column {
-  grid-template-columns: 1fr;
-}
-
-.kv-item {
-  min-width: 0;
-  padding: 10px 12px;
-  border-radius: var(--radius-control);
-  background: var(--detail-surface-muted);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 30%, transparent);
-}
-
 .span-2 {
   grid-column: 1 / -1;
-}
-
-.kv-item label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.kv-item span,
-.kv-item code {
-  display: block;
-  font-size: 13px;
-  line-height: 1.6;
-  word-break: break-word;
 }
 
 .tags-wrap {
@@ -516,16 +444,17 @@ function formatHeaders(headers) {
 }
 
 .request-list {
-  padding: 14px;
+  padding: var(--space-2) var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
 }
 
 .request-card {
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 30%, transparent);
-  background: var(--detail-surface-muted);
+  border-radius: 0;
+  border: 0;
+  border-bottom: 1px solid var(--app-divider-color);
+  background: transparent;
   overflow: hidden;
 }
 
@@ -534,8 +463,7 @@ function formatHeaders(headers) {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 10px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 30%, transparent);
+  padding: var(--space-2) 0;
 }
 
 .request-path {
@@ -544,7 +472,7 @@ function formatHeaders(headers) {
 }
 
 .request-card-body {
-  padding: 12px;
+  padding: 0 0 var(--space-2);
 }
 
 .request-row {
@@ -566,7 +494,7 @@ function formatHeaders(headers) {
 .request-row label {
   display: inline-block;
   min-width: 56px;
-  margin-bottom: 6px;
+  margin-bottom: 0;
   color: var(--el-text-color-secondary);
 }
 
@@ -599,12 +527,6 @@ function formatHeaders(headers) {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-@media (max-width: 1200px) {
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 768px) {

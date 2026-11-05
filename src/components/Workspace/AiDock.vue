@@ -1,8 +1,9 @@
 <template>
   <div
+    ref="dockRef"
     class="ai-dock"
-    :class="{ 'ai-dock--hidden': !visible }"
-    :style="{ width: visible ? dockWidth + 'px' : '0px' }"
+    :class="{ 'ai-dock--hidden': !visible, 'is-resizing': resizing }"
+    :style="{ width: visible ? renderedWidth + 'px' : '0px' }"
   >
     <!-- Toggle tab — pure open/close control, never blocks -->
     <button
@@ -25,9 +26,21 @@
         v-if="visible"
         class="dock-resize-handle"
         role="separator"
+        tabindex="0"
         aria-label="调整 AI 副驾宽度"
         aria-orientation="vertical"
-        @mousedown="startResize"
+        :aria-valuemin="minimumWidth"
+        :aria-valuemax="maximumWidth"
+        :aria-valuenow="renderedWidth"
+        @pointerdown="startResize"
+        @pointermove="onPointerMove"
+        @pointerup="stopResize"
+        @pointercancel="cancelResize"
+        @lostpointercapture="stopResize"
+        @keydown.left.prevent="setWidth(renderedWidth + 20)"
+        @keydown.right.prevent="setWidth(renderedWidth - 20)"
+        @keydown.home.prevent="setWidth(minimumWidth)"
+        @keydown.end.prevent="setWidth(maximumWidth)"
       />
 
       <!-- AI panel body：已配置 → 助手；未配置 → 引导面板 -->
@@ -53,7 +66,7 @@
 </template>
 
 <script setup>
-import { defineAsyncComponent, onBeforeUnmount, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AiNotConfiguredEmpty from '@/components/common/AiNotConfiguredEmpty.vue'
 import { useAiAvailability } from '@/composables/useAiAvailability.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
@@ -62,7 +75,7 @@ const NodeAiAssistant = defineAsyncComponent(
   () => import('@/components/AgentConsole/Ai/NodeAiAssistant.vue')
 )
 
-defineProps({
+const props = defineProps({
   sessionId: { type: String, required: true },
   initialPrompt: { type: String, default: '' },
   activeModule: { type: Object, default: null },
@@ -89,40 +102,72 @@ const DEFAULT_WIDTH = 500
 const dockWidth = ref(
   Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, parseInt(safeLocalStorage.getItem(STORAGE_KEY_WIDTH, String(DEFAULT_WIDTH)), 10) || DEFAULT_WIDTH))
 )
-
-// ── Resize logic ──────────────────────────────────────────────────────────
-let resizing = false
-let startX = 0
-let startWidth = 0
-
-function startResize(e) {
-  resizing = true
-  startX = e.clientX
-  startWidth = dockWidth.value
-  document.addEventListener('mousemove', onMouseMove)
-  document.addEventListener('mouseup', stopResize)
-  document.body.style.cursor = 'col-resize'
-  document.body.style.userSelect = 'none'
-}
-
-function onMouseMove(e) {
-  if (!resizing) return
-  const delta = startX - e.clientX   // dragging left = wider
-  dockWidth.value = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + delta))
-}
-
-function stopResize() {
-  resizing = false
-  document.removeEventListener('mousemove', onMouseMove)
-  document.removeEventListener('mouseup', stopResize)
-  document.body.style.cursor = ''
-  document.body.style.userSelect = ''
+const dockRef = ref(null)
+const workspaceWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const maximumWidth = computed(() => Math.max(0, Math.min(MAX_WIDTH,
+  workspaceWidth.value <= 900 ? workspaceWidth.value - 26 : workspaceWidth.value - 480
+)))
+const minimumWidth = computed(() => Math.min(MIN_WIDTH, maximumWidth.value))
+const clampWidth = width => Math.min(maximumWidth.value, Math.max(minimumWidth.value, width))
+const renderedWidth = computed(() => clampWidth(dockWidth.value))
+const setWidth = width => {
+  dockWidth.value = clampWidth(width)
   safeLocalStorage.setItem(STORAGE_KEY_WIDTH, dockWidth.value)
 }
 
+let workspaceObserver
+onMounted(() => {
+  const workspace = dockRef.value?.parentElement
+  if (!workspace) return
+  workspaceWidth.value = workspace.clientWidth
+  workspaceObserver = new ResizeObserver(([entry]) => {
+    if (entry) workspaceWidth.value = entry.contentRect.width
+  })
+  workspaceObserver.observe(workspace)
+})
+
+// ── Resize logic ──────────────────────────────────────────────────────────
+const resizing = ref(false)
+let startX = 0
+let startWidth = 0
+let resizeHandle = null
+let pointerId = null
+
+function startResize(e) {
+  if (e.button !== 0) return
+  e.preventDefault()
+  resizing.value = true
+  startX = e.clientX
+  startWidth = renderedWidth.value
+  resizeHandle = e.currentTarget
+  pointerId = e.pointerId
+  resizeHandle.setPointerCapture(pointerId)
+}
+
+function onPointerMove(e) {
+  if (!resizing.value || e.pointerId !== pointerId) return
+  const delta = startX - e.clientX   // dragging left = wider
+  dockWidth.value = clampWidth(startWidth + delta)
+}
+
+function finishResize(persist) {
+  if (!resizing.value) return
+  resizing.value = false
+  const handle = resizeHandle
+  const id = pointerId
+  resizeHandle = null
+  pointerId = null
+  if (handle?.hasPointerCapture(id)) handle.releasePointerCapture(id)
+  if (persist) safeLocalStorage.setItem(STORAGE_KEY_WIDTH, dockWidth.value)
+}
+function stopResize() { finishResize(true) }
+function cancelResize() { finishResize(false) }
+
+watch(() => props.visible, visible => { if (!visible) stopResize() })
+
 onBeforeUnmount(() => {
-  document.removeEventListener('mousemove', onMouseMove)
-  document.removeEventListener('mouseup', stopResize)
+  cancelResize()
+  workspaceObserver?.disconnect()
 })
 </script>
 
@@ -150,6 +195,8 @@ onBeforeUnmount(() => {
 .ai-dock--hidden {
   border-left: none;
 }
+
+.ai-dock.is-resizing { transition: none; user-select: none; }
 
 /* ── Toggle tab — sticks out to the left edge of the dock ───────────────── */
 
@@ -223,8 +270,9 @@ onBeforeUnmount(() => {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 4px;
+  width: 6px;
   cursor: col-resize;
+  touch-action: none;
   z-index: 10;
   transition: background 0.15s;
 }
@@ -238,8 +286,11 @@ onBeforeUnmount(() => {
   transition: background 0.15s;
 }
 
-.dock-resize-handle:hover {
-  background: transparent;
+.dock-resize-handle:hover,
+.dock-resize-handle:focus-visible {
+  background: var(--app-selected-background);
+  outline: var(--focus-outline);
+  outline-offset: -2px;
 }
 
 .dock-resize-handle:hover::before {
@@ -260,5 +311,19 @@ onBeforeUnmount(() => {
   height: 100%;
   flex: 1;
   min-height: 0;
+}
+
+@container console-workspace (max-width: 900px) {
+  .ai-dock {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 30;
+    max-width: calc(100% - 26px);
+    box-shadow: var(--shadow-overlay);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-dock { transition: none; }
 }
 </style>

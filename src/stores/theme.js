@@ -4,7 +4,7 @@ import { safeLocalStorage } from '@/utils/browserStorage.js'
 
 const themes = {
   light: {
-    name: 'IDEA 明亮',
+    name: '明亮',
     value: 'light',
     '--el-color-primary': '#1677ff',
     '--el-color-primary-light-3': '#3a8dff',
@@ -73,15 +73,15 @@ const themes = {
     '--app-inset-highlight-soft': 'inset 0 1px 0 rgba(255, 255, 255, 0.56)'
   },
   dark: {
-    name: 'IDEA 黑暗',
+    name: '黑暗',
     value: 'dark',
     '--el-color-primary': '#2f8cff',
-    '--el-color-primary-light-3': '#55a1ff',
-    '--el-color-primary-light-5': '#7db6ff',
-    '--el-color-primary-light-7': '#a9ccff',
-    '--el-color-primary-light-8': '#d3e5ff',
-    '--el-color-primary-light-9': '#eff7ff',
-    '--el-color-primary-dark-2': '#1f66d6',
+    '--el-color-primary-light-3': '#286ec1',
+    '--el-color-primary-light-5': '#235493',
+    '--el-color-primary-light-7': '#1d3b64',
+    '--el-color-primary-light-8': '#1b2f4e',
+    '--el-color-primary-light-9': '#19253a',
+    '--el-color-primary-dark-2': '#6baaff',
     '--el-color-success': '#59c277',
     '--el-color-warning': '#f0ad4e',
     '--el-color-danger': '#f07178',

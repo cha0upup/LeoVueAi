@@ -25,7 +25,7 @@
     <el-popover
       v-model:visible="menuVisible"
       placement="top-end"
-      :width="350"
+      :width="304"
       trigger="click"
       popper-class="ai-model-popper"
       :disabled="disabled"
@@ -35,6 +35,7 @@
           class="model-trigger"
           type="button"
           :disabled="disabled"
+          :title="selectedModelLabel"
         >
           <span class="model-trigger__name">{{ selectedModelLabel }}</span>
           <span
@@ -48,14 +49,17 @@
       <div class="settings-menu">
         <div class="settings-menu__header">
           <strong>响应设置</strong>
-          <span>仅作用于当前对话</span>
+          <span>仅当前对话</span>
         </div>
-        <label class="settings-row">
+        <div class="settings-row">
           <span class="settings-row__label">模型</span>
           <el-select
             :model-value="modelValue"
             class="settings-row__select"
+            size="small"
+            aria-label="模型"
             placeholder="选择模型"
+            popper-class="ai-model-options-popper"
             :disabled="disabled"
             @update:model-value="emit('update:modelValue', $event)"
           >
@@ -63,34 +67,50 @@
               v-for="config in configs"
               :key="config.id"
               :value="config.id"
-              :label="config.name"
+              :label="config.name || config.model"
             >
-              <div class="model-option">
-                <span>{{ config.name }}</span>
-                <small>{{ config.model }}</small>
+              <div
+                class="model-option"
+                :title="config.model"
+              >
+                <div class="model-option__line">
+                  <span class="model-option__name">{{ config.name || config.model }}</span>
+                  <small
+                    v-if="config.providerName"
+                    class="model-option__provider"
+                    :title="config.providerName"
+                  >{{ config.providerName }}</small>
+                </div>
+                <small
+                  v-if="config.name && config.name !== config.model"
+                  class="model-option__id"
+                >{{ config.model }}</small>
               </div>
             </el-option>
           </el-select>
-        </label>
-        <label
+        </div>
+        <div
           class="settings-row"
           :class="{ 'settings-row--disabled': !canAdjustReasoning }"
         >
           <span class="settings-row__label">推理强度</span>
-          <el-select
+          <el-radio-group
             :model-value="effectiveEffort"
-            class="settings-row__select"
+            class="reasoning-control"
+            size="small"
+            aria-label="推理强度"
             :disabled="disabled || !canAdjustReasoning"
             @update:model-value="onReasoningEffortChange"
           >
-            <el-option
+            <el-radio-button
               v-for="option in reasoningOptions"
               :key="option.value"
               :value="option.value"
-              :label="option.label"
-            />
-          </el-select>
-        </label>
+            >
+              {{ option.label }}
+            </el-radio-button>
+          </el-radio-group>
+        </div>
         <p
           v-if="!canAdjustReasoning"
           class="reasoning-hint"
@@ -199,17 +219,28 @@ async function onFilesSelected(event) {
 .model-trigger:disabled { cursor: not-allowed; opacity: .55; }
 .model-trigger__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-trigger__effort { color: var(--el-text-color-secondary); flex-shrink: 0; }
-.settings-menu { display: grid; gap: 6px; padding: 4px; }
-.settings-menu__header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 4px 6px; }
-.settings-menu__header strong { color: var(--el-text-color-primary); font-size: 13px; }
-.settings-menu__header span { color: var(--el-text-color-placeholder); font-size: 10px; }
-.settings-row { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 42px; padding: 0 4px; }
+.settings-menu { display: grid; gap: 6px; }
+.settings-menu__header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--el-border-color-lighter); line-height: 18px; }
+.settings-menu__header strong { color: var(--el-text-color-primary); font-size: 12px; }
+.settings-menu__header span { color: var(--el-text-color-placeholder); font-size: 11px; }
+.settings-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 28px; }
 .settings-row__label { font-size: 12px; font-weight: 600; color: var(--el-text-color-regular); }
 .settings-row__select { width: 100%; }
 .settings-row--disabled { opacity: .55; }
-.reasoning-hint { margin: -4px 0 4px 92px; color: var(--el-text-color-secondary); font-size: 11px; }
-.model-option { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.model-option small { overflow: hidden; color: var(--el-text-color-secondary); text-overflow: ellipsis; }
+.reasoning-control { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.reasoning-control :deep(.el-radio-button__inner) { padding: 4px 7px; border: 1px solid var(--el-border-color); border-radius: 5px; font-size: 12px; line-height: 14px; }
+.reasoning-control :deep(.el-radio-button.is-active:not(.is-disabled) .el-radio-button__inner) { border-color: var(--el-color-primary); box-shadow: none; }
+.reasoning-control :deep(.el-radio-button__original-radio:focus-visible + .el-radio-button__inner) { outline: 2px solid var(--el-color-primary); outline-offset: 2px; }
+.reasoning-hint { margin: 0 0 0 64px; color: var(--el-text-color-secondary); font-size: 11px; line-height: 16px; }
+.model-option { min-width: 0; }
+.model-option__line { display: flex; align-items: baseline; gap: 8px; line-height: 18px; }
+.model-option__name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.model-option__provider { max-width: 38%; overflow: hidden; color: var(--el-text-color-secondary); text-overflow: ellipsis; font-size: 11px; font-weight: 400; }
+.model-option__id { display: block; overflow: hidden; color: var(--el-text-color-secondary); text-overflow: ellipsis; font-size: 11px; line-height: 14px; font-weight: 400; }
+:global(.ai-model-popper.el-popover.el-popper) { max-width: calc(100vw - 24px); padding: 10px; }
+:global(.ai-model-options-popper.el-popper) { max-width: calc(100vw - 24px); }
+:global(.ai-model-options-popper .el-select-dropdown__list) { padding: 4px 0; }
+:global(.ai-model-options-popper .el-select-dropdown__item) { height: auto; min-height: 28px; padding: 4px 10px; line-height: 18px; }
 
 @media (max-width: 640px) {
   .composer-shortcut { display: none; }

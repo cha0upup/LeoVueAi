@@ -21,9 +21,8 @@
   flex-wrap: wrap;
   min-height: 48px;
   padding: 8px 16px;
-  border: 0;
-  border-bottom: 1px solid var(--app-divider-color);
-  border-radius: 0;
+  border: 1px solid var(--app-divider-color);
+  border-radius: var(--radius-container);
   background: var(--app-container-background);
   box-shadow: none;
 }
@@ -35,4 +34,7 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+.admin-toolbar__main { flex: 1 1 560px; min-width: 0; }
+.admin-toolbar__actions { flex: 0 0 auto; margin-left: auto; }
+.admin-toolbar__actions :deep(.el-button + .el-button) { margin-left: 0; }
 </style>

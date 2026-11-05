@@ -5,8 +5,8 @@ import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { icons } from '@/utils/icons.js'
 
 const themes = [
-  { value: 'light', name: 'IDEA 明亮' },
-  { value: 'dark', name: 'IDEA 黑暗' }
+  { value: 'light', name: '明亮' },
+  { value: 'dark', name: '黑暗' }
 ]
 const fixture = { store: null }
 const ThemeSwitcher = compileClientComponent(new URL('./ThemeSwitcher.vue', import.meta.url), {
@@ -17,7 +17,7 @@ const textContent = (node) => node.type === 'comment'
   ? ''
   : node.text + node.children.map(textContent).join('')
 
-describe('ThemeSwitcher compact icon trigger', () => {
+describe('ThemeSwitcher preview cards', () => {
   const apps = []
   afterEach(() => apps.splice(0).forEach((app) => app.unmount()))
 
@@ -55,8 +55,8 @@ describe('ThemeSwitcher compact icon trigger', () => {
   })
 
   it.each([
-    ['light', 'IDEA 明亮', icons.sunny],
-    ['dark', 'IDEA 黑暗', icons.moon]
+    ['light', '明亮', icons.sunny],
+    ['dark', '黑暗', icons.moon]
   ])('keeps the %s theme discoverable through its icon, label, and hover title', (value, name, icon) => {
     const view = mount(value)
     const button = view.button()
@@ -74,10 +74,36 @@ describe('ThemeSwitcher compact icon trigger', () => {
     dropdown.props.onCommand('dark')
     await nextTick()
     expect(view.store.setTheme).toHaveBeenCalledWith('dark')
-    expect(view.button().props['aria-label']).toContain('IDEA 黑暗')
+    expect(view.button().props['aria-label']).toContain('黑暗')
     expect(nodes(view.button()).find((node) => node.type === 'Icon').props.icon).toBe(icons.moon)
     const items = view.find((node) => node.type === 'ElDropdownItem')
     expect(items.find((node) => node.props.command === 'dark').props.class).toContain('is-active')
+    expect(items.find((node) => node.props.command === 'dark').props['aria-current']).toBe('true')
     expect(items.find((node) => node.props.command === 'light').props.class).not.toContain('is-active')
+    expect(items.find((node) => node.props.command === 'light').props['aria-current']).toBeUndefined()
+  })
+
+  it('keeps only theme names, visual previews, and the selection mark in the menu', () => {
+    const view = mount()
+    const menu = view.find(node => node.type === 'ElDropdownMenu')[0]
+    expect(menu.props['aria-label']).toBe('界面主题')
+    expect(textContent(menu)).toBe(themes.map(theme => theme.name).join(''))
+    expect(view.find(node => ['theme-menu-head', 'theme-menu-tip', 'theme-value', 'theme-text', 'theme-preview-dot']
+      .includes(node.props.class))).toHaveLength(0)
+    expect(view.find(node => node.props.class === 'theme-preview')).toHaveLength(2)
+    expect(view.find(node => node.props.class === 'check-icon')).toHaveLength(1)
+  })
+
+  it('offers two preview cards with separate light and dark palettes and unchanged theme commands', () => {
+    const view = mount()
+    const cards = view.find(node => node.type === 'ElDropdownItem')
+    expect(cards.every(card => card.props.class.includes('theme-card'))).toBe(true)
+    expect(cards.map(card => card.props.command)).toEqual(['light', 'dark'])
+    expect(view.find(node => node.props.class === 'theme-preview').map(node => node.props['data-theme']))
+      .toEqual(['light', 'dark'])
+    expect(view.find(node => node.props.class === 'theme-preview__toolbar')).toHaveLength(2)
+    expect(view.find(node => node.props.class === 'theme-preview__sidebar')).toHaveLength(2)
+    expect(view.find(node => node.props.class === 'theme-preview__panel')).toHaveLength(2)
+    expect(cards.map(textContent)).toEqual(['明亮', '黑暗'])
   })
 })

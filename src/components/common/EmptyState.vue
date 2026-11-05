@@ -1,22 +1,17 @@
 <template>
   <div
     class="empty-state"
-    :class="{
-      'is-compact': compact,
-      'is-workbench': workbench
-    }"
+    :class="{ 'is-compact': compact }"
   >
     <div
       v-if="workbench"
       class="workbench-empty"
     >
       <div
-        v-if="icon || $slots.icon"
+        v-if="icon"
         class="workbench-empty-icon"
       >
-        <slot name="icon">
-          <el-icon><Icon :icon="icon" /></el-icon>
-        </slot>
+        <el-icon><Icon :icon="icon" /></el-icon>
       </div>
       <h3 v-if="title">
         {{ title }}
@@ -32,9 +27,6 @@
             type="primary"
             @click="$emit('action')"
           >
-            <el-icon v-if="actionIcon">
-              <Icon :icon="actionIcon" />
-            </el-icon>
             {{ actionLabel }}
           </el-button>
         </slot>
@@ -45,25 +37,7 @@
       v-else
       :description="description"
       :image-size="compact ? 60 : 80"
-    >
-      <template
-        v-if="$slots.default || actionLabel"
-        #default
-      >
-        <slot>
-          <el-button
-            v-if="actionLabel"
-            type="primary"
-            @click="$emit('action')"
-          >
-            <el-icon v-if="actionIcon">
-              <Icon :icon="actionIcon" />
-            </el-icon>
-            {{ actionLabel }}
-          </el-button>
-        </slot>
-      </template>
-    </el-empty>
+    />
   </div>
 </template>
 
@@ -78,14 +52,14 @@ import { Icon } from '@iconify/vue'
  *
  * 带引导操作：
  *   <EmptyState
+ *     workbench
  *     description="还没有创建过 skill"
  *     action-label="新建 Skill"
- *     :action-icon="iconMap.add"
  *     @action="openCreateDialog"
  *   />
  *
  * 自定义内容：
- *   <EmptyState description="...">
+ *   <EmptyState workbench description="...">
  *     <el-button>选项 A</el-button>
  *     <el-button>选项 B</el-button>
  *   </EmptyState>
@@ -95,7 +69,6 @@ defineProps({
   description: { type: String, default: '暂无数据' },
   icon:        { type: String, default: '' },
   actionLabel: { type: String, default: '' },
-  actionIcon:  { type: String, default: '' },
   compact:     { type: Boolean, default: false },
   workbench:   { type: Boolean, default: false }
 })

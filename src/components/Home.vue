@@ -47,6 +47,7 @@
                   :class="{ 'is-active': selectedMenu === item.key }"
                   :title="sidebarCollapsed ? item.title : ''"
                   :aria-label="item.title"
+                  :aria-current="selectedMenu === item.key ? 'page' : undefined"
                   @click="handleSelect(item.key)"
                 >
                   <span class="menu-icon">
@@ -150,6 +151,7 @@ watch(sidebarCollapsed, (collapsed) => {
 
 <style scoped>
 .home-container {
+  container: home-workspace / inline-size;
   height: 100%;
   width: 100%;
   background: transparent;
@@ -186,6 +188,7 @@ watch(sidebarCollapsed, (collapsed) => {
   border-right: 1px solid var(--app-surface-border-strong);
   background: var(--app-surface-background-soft);
   box-shadow: none;
+  padding: var(--space-3) var(--space-2);
 }
 
 .nav-section {
@@ -201,6 +204,9 @@ watch(sidebarCollapsed, (collapsed) => {
   justify-content: space-between;
   gap: 8px;
   border-bottom: 1px solid var(--app-surface-border-subtle);
+  min-height: 38px;
+  margin: 0 10px 16px;
+  padding: 0 0 12px;
 }
 
 .nav-section-title {
@@ -217,20 +223,25 @@ watch(sidebarCollapsed, (collapsed) => {
   letter-spacing: 0.08em;
   line-height: 1.1;
   text-transform: uppercase;
+  font-size: 9px;
 }
 
 .nav-section-title strong {
   color: var(--el-text-color-primary);
   font-weight: 600;
   line-height: 1.2;
+  font-size: 13px;
 }
 
 .collapse-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 34%, transparent);
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
   border-radius: 6px;
+  background: transparent;
   color: var(--el-text-color-secondary);
   cursor: pointer;
   transition:
@@ -241,6 +252,8 @@ watch(sidebarCollapsed, (collapsed) => {
 
 .collapse-toggle:hover {
   color: var(--el-color-primary);
+  border-color: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-border-color));
+  background: var(--app-hover-background);
 }
 
 .sidebar-menu {
@@ -248,20 +261,19 @@ watch(sidebarCollapsed, (collapsed) => {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.menu-group {
-  flex-direction: column;
-  gap: 1px;
+  padding-bottom: var(--space-2);
 }
 
 .menu-group-label {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-height: 0;
+  margin: 18px 10px 8px;
+  padding: 0;
 }
+
+.menu-group:first-child .menu-group-label { margin-top: 0; }
 
 .menu-group-label strong {
   color: var(--el-text-color-primary);
@@ -284,25 +296,33 @@ watch(sidebarCollapsed, (collapsed) => {
   text-align: left;
   overflow: hidden;
   position: relative;
+  gap: 10px;
+  min-height: 36px;
+  margin-bottom: 2px;
+  padding: 0 12px;
+  border-radius: var(--app-control-radius);
+  color: var(--el-text-color-regular);
 }
 
 .menu-item:hover {
   background: var(--app-hover-background);
+  border-color: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-border-color));
+  color: var(--el-color-primary);
 }
 
 .menu-item.is-active {
   border-color: color-mix(in srgb, var(--el-color-primary) 18%, var(--el-border-color));
   background: var(--app-selected-background);
+  color: var(--el-color-primary);
 }
 
-.menu-item.is-active::before {
-  position: absolute;
-  left: 0;
-  top: 9px;
-  bottom: 9px;
-  width: 3px;
-  border-radius: 0 999px 999px 0;
-  background: color-mix(in srgb, var(--el-color-primary) 72%, white);
+.menu-item.is-active:hover {
+  border-color: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-border-color));
+}
+
+.menu-item:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: -2px;
 }
 
 .menu-icon {
@@ -311,20 +331,27 @@ watch(sidebarCollapsed, (collapsed) => {
   justify-content: center;
   flex-shrink: 0;
   position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--el-text-color-secondary);
+  font-size: 18px;
 }
+
+.menu-item.is-active .menu-icon { color: var(--el-color-primary); }
 
 .menu-title {
   font-size: 13px;
   font-weight: 500;
   min-width: 0;
+  color: inherit;
 }
 
-.menu-item.is-active .menu-title {
-  color: var(--el-color-primary);
-}
+.home-aside.is-collapsed { width: 64px; }
 
 .home-aside.is-collapsed .aside-shell {
-  padding-right: 6px;
+  padding: var(--space-3) 10px;
 }
 
 .home-aside.is-collapsed .nav-section-title,
@@ -344,137 +371,13 @@ watch(sidebarCollapsed, (collapsed) => {
 
 .home-aside.is-collapsed .nav-section-header {
   justify-content: center;
-}
-
-.home-aside.is-collapsed .menu-group-label {
-  min-height: 0;
-  padding: 0;
+  margin: 0 0 16px;
 }
 
 .home-aside.is-collapsed .menu-item {
   justify-content: center;
   gap: 0;
-}
-
-/* 与管理后台侧栏保持一致的目录结构与交互状态。 */
-.aside-shell {
-  padding: var(--space-3) var(--space-2);
-}
-
-.nav-section-header {
-  min-height: 38px;
-  margin: 0 10px 16px;
-  padding: 0 0 12px;
-}
-
-.nav-section-kicker,
-.menu-group-kicker {
-  font-size: 9px;
-}
-
-.nav-section-title strong {
-  font-size: 13px;
-}
-
-.collapse-toggle {
-  width: 24px;
-  height: 24px;
-  border-color: transparent;
-  background: transparent;
-}
-
-.collapse-toggle:hover {
-  border-color: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-border-color));
-  background: var(--app-hover-background);
-}
-
-.sidebar-menu,
-.menu-group {
-  display: block;
-}
-
-.sidebar-menu {
-  padding-bottom: var(--space-2);
-}
-
-.menu-group + .menu-group {
-  padding-top: 0;
-  border-top: 0;
-}
-
-.menu-group-label {
-  min-height: 0;
-  margin: 18px 10px 8px;
   padding: 0;
-}
-
-.menu-group:first-child .menu-group-label {
-  margin-top: 0;
-}
-
-.menu-item {
-  gap: 10px;
-  min-height: 36px;
-  margin-bottom: 2px;
-  padding: 0 12px;
-  border-radius: var(--app-control-radius);
-  color: var(--el-text-color-regular);
-}
-
-.menu-item:hover {
-  border-color: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-border-color));
-  color: var(--el-color-primary);
-}
-
-.menu-item.is-active {
-  color: var(--el-color-primary);
-}
-
-.menu-item.is-active::before {
-  content: none;
-}
-
-.menu-item:focus-visible {
-  outline: var(--focus-outline);
-  outline-offset: -2px;
-}
-
-.menu-icon,
-.home-aside.is-collapsed .menu-icon {
-  width: 18px;
-  height: 18px;
-  border-radius: 0;
-  background: transparent;
-  color: var(--el-text-color-secondary);
-  font-size: 18px;
-}
-
-.menu-item.is-active .menu-icon {
-  color: var(--el-color-primary);
-  background: transparent;
-}
-
-.menu-title {
-  color: inherit;
-}
-
-.home-aside.is-collapsed {
-  width: 64px;
-}
-
-.home-aside.is-collapsed .aside-shell {
-  padding: var(--space-3) 10px;
-}
-
-.home-aside.is-collapsed .nav-section-header {
-  margin: 0 0 16px;
-  padding-bottom: 12px;
-}
-
-.home-aside.is-collapsed .menu-item {
-  min-height: 36px;
-  padding: 0;
-  border-radius: var(--app-control-radius);
 }
 
 .home-aside.is-collapsed .menu-group + .menu-group {
@@ -491,6 +394,7 @@ watch(sidebarCollapsed, (collapsed) => {
   height: 100%;
   flex: 1;
   min-width: 0;
+  min-height: 0;
 }
 
 .content-body {
@@ -541,11 +445,6 @@ watch(sidebarCollapsed, (collapsed) => {
   min-height: 0;
 }
 
-.content-section > :deep(*) {
-  flex: 1;
-  min-height: 0;
-}
-
 .sidebar-menu::-webkit-scrollbar,
 .content-section::-webkit-scrollbar {
   width: var(--app-scrollbar-width);
@@ -568,48 +467,65 @@ watch(sidebarCollapsed, (collapsed) => {
   background: var(--el-text-color-placeholder);
 }
 
-@media (max-width: 1200px) {
+@container home-workspace (max-width: 1100px) {
   .home-layout {
-    gap: 14px;
-    padding: 14px;
+    gap: var(--space-2);
   }
 
   .home-aside {
-    width: 232px;
-  }
-
-  .home-aside.is-collapsed {
-    width: 64px;
+    width: 184px;
   }
 }
 
-@media (max-width: 900px) {
+@container home-workspace (max-width: 860px) {
   .home-layout {
     flex-direction: column;
+    gap: var(--space-2);
   }
 
-  .home-aside {
-    width: 100%;
-  }
-
+  .home-aside,
   .home-aside.is-collapsed {
     width: 100%;
+    flex: 0 0 auto;
   }
 
-  .aside-shell {
-    max-height: 42vh;
-    padding-left: 0;
+  .aside-shell,
+  .home-aside.is-collapsed .aside-shell {
+    padding: var(--space-1) var(--space-2);
     border-right: 0;
+    border-bottom: 1px solid var(--app-divider-color);
   }
 
-  .menu-item {
-    border-radius: 8px;
-    padding-left: 16px;
+  .nav-section-header,
+  .menu-group-label {
+    display: none;
   }
 
-  .home-aside.is-collapsed .nav-section-title,
-  .home-aside.is-collapsed .menu-group-label strong,
-  .home-aside.is-collapsed .menu-group-kicker,
+  .sidebar-menu {
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-1);
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: var(--space-1);
+  }
+
+  .menu-group,
+  .home-aside.is-collapsed .menu-group + .menu-group {
+    display: contents;
+  }
+
+  .menu-item,
+  .home-aside.is-collapsed .menu-item {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: var(--control-height);
+    margin-bottom: 0;
+    padding: 0 var(--space-2);
+    gap: var(--space-2);
+    white-space: nowrap;
+  }
+
   .home-aside.is-collapsed .menu-title {
     position: static;
     width: auto;
@@ -617,40 +533,7 @@ watch(sidebarCollapsed, (collapsed) => {
     margin: 0;
     overflow: visible;
     clip: auto;
-    white-space: normal;
-  }
-
-  .home-aside.is-collapsed .nav-section-header {
-    justify-content: space-between;
-    margin: 0 12px 14px 14px;
-    padding-bottom: 12px;
-  }
-
-  .home-aside.is-collapsed .menu-group-label {
-    min-height: 31px;
-    padding: 0 12px 5px 14px;
-  }
-
-  .home-aside.is-collapsed .menu-item {
-    justify-content: flex-start;
-    gap: 8px;
-    min-height: 34px;
-    padding: 5px 10px 5px 16px;
-  }
-
-  .home-aside.is-collapsed .menu-icon {
-    width: 24px;
-    height: 24px;
-  }
-}
-
-@media (max-width: 640px) {
-  .home-layout {
-    padding: 12px;
-  }
-
-  .aside-shell {
-    border-radius: 0;
+    white-space: nowrap;
   }
 }
 </style>

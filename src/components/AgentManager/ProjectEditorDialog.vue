@@ -1,19 +1,19 @@
 <template>
   <el-dialog
     v-model="visible"
-    width="560px"
+    width="var(--dialog-width-sm)"
+    align-center
     draggable
-    class="project-editor-dialog"
+    class="project-editor-dialog workbench-dialog"
     @closed="reset"
   >
-    <template #header>
+    <template #header="{ titleId }">
       <div class="project-dialog-title">
         <span class="project-dialog-title__icon">
           <el-icon><Icon :icon="editing ? iconMap.settings : iconMap.folderAdd" /></el-icon>
         </span>
         <span>
-          <strong>{{ editing ? '项目设置' : '新建项目' }}</strong>
-          <small>{{ editing ? '维护项目信息、可见范围与生命周期' : '创建独立的主机与会话工作区' }}</small>
+          <strong :id="titleId">{{ editing ? '项目设置' : '新建项目' }}</strong>
         </span>
       </div>
     </template>
@@ -234,8 +234,8 @@ defineExpose({ open })
 }
 
 .project-dialog-title__icon {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -255,7 +255,6 @@ defineExpose({ open })
   font-size: 15px;
 }
 
-.project-dialog-title small,
 .project-status-banner small,
 .permission-card small {
   color: var(--el-text-color-placeholder);

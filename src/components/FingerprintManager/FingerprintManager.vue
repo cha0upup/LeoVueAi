@@ -1,9 +1,6 @@
 <template>
   <ManagerLayout
-    title="指纹管理"
-    :icon="iconMap.fingerprint"
     module-class="fingerprint-manager"
-    hide-toolbar
     :initial-list-width="320"
     :list-min="260"
     :list-max="480"
@@ -122,7 +119,6 @@
             :description="item.fingerprintId"
             :icon="iconMap.fingerprint"
             :active="getRowId(item) === getRowId(selectedFingerprint)"
-            selectable
             :selected="selectedIds.has(item.fingerprintId)"
             :in-selection-mode="selectedIds.size > 0"
             @click="selectedFingerprint = item"

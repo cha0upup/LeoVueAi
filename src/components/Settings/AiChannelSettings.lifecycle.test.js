@@ -6,6 +6,7 @@ import { useAiCapabilityRegistry } from '@/composables/useAiCapabilityRegistry.j
 import { useAiProviderManager } from '@/composables/useAiProviderManager.js'
 import { useAiModelRequestPreview } from '@/composables/useAiModelRequestPreview.js'
 import * as settingsModel from './aiChannelSettingsModel.js'
+import { icons } from '@/utils/icons.js'
 
 const api = vi.hoisted(() => Object.fromEntries([
   'listAiModelConfigsApi', 'createAiModelConfigApi', 'updateAiModelConfigApi', 'activateAiModelConfigApi',
@@ -23,6 +24,8 @@ const childNames = [
   'AiModelDetailPanel', 'AiProviderCatalog', 'AiProviderDialog'
 ]
 const Settings = compileClientComponent(new URL('./AiChannelSettings.vue', import.meta.url), {
+  '@/utils/icons.js': { icons },
+  '@/components/common/PageHeader.vue': { default: createSlotStub('PageHeader', ['default', 'actions']) },
   '@/services/api/admin.js': api,
   '@/utils/messageUtils.js': messages,
   '@/composables/useAiCapabilityRegistry.js': { useAiCapabilityRegistry },
@@ -44,20 +47,42 @@ beforeEach(() => {
 afterEach(() => {
   apps.splice(0).forEach(app => app.unmount())
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 async function mount() {
   const renderer = createTestRenderer()
   const app = renderer.createApp(Settings)
+  for (const name of ['Icon', 'ElIcon', 'ElButton']) app.component(name, createSlotStub(name))
   const errors = []
   app.config.errorHandler = error => errors.push(error)
   apps.push(app)
   app.mount(renderer.root)
   await flush()
-  return { errors, node: name => findNode(renderer.root, name) }
+  return { errors, node: name => findNode(renderer.root, name), root: renderer.root }
 }
 
 describe('AI channel settings initialization', () => {
+  it.each(['374px', '783px 360px'])('focuses model details only in a stacked layout (%s)', async columns => {
+    vi.stubGlobal('window', { getComputedStyle: () => ({ gridTemplateColumns: columns }) })
+    const view = await mount()
+    const detail = { scrollIntoView: vi.fn(), focus: vi.fn() }
+    const row = { scrollIntoView: vi.fn(), focus: vi.fn() }
+    const layout = findNodes(view.root).find(node => node.props.class === 'access-layout')
+    layout.querySelector = selector => selector === '.model-detail-panel' ? detail : row
+    await view.node('AiProviderCatalog').props.onSelectModel({ id: 8 })
+    await flush()
+    expect(view.node('AiProviderCatalog').props['selected-model-id']).toBe(8)
+    expect(detail.focus).toHaveBeenCalledTimes(columns === '374px' ? 1 : 0)
+    expect(detail.scrollIntoView).toHaveBeenCalledTimes(columns === '374px' ? 1 : 0)
+    if (columns === '374px') {
+      view.node('AiModelDetailPanel').props.onBack()
+      expect(row.scrollIntoView).toHaveBeenCalledWith({ block: 'center' })
+      expect(row.focus).toHaveBeenCalledWith({ preventScroll: true })
+    }
+    expect(view.errors).toEqual([])
+  })
+
   it('mounts the actual setup and loads configuration before displaying the model form', async () => {
     const view = await mount()
 

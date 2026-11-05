@@ -95,7 +95,6 @@
         <span>协议 v{{ disguise.protocolVersion }}</span>
         <span>Headers {{ headerEntries.length }}</span>
         <span>创建用户 {{ disguise.createUserId || '-' }}</span>
-        <span>更新 {{ formatTime(disguise.updateTime || disguise.createTime) }}</span>
       </div>
 
       <div class="overview-grid">
@@ -103,19 +102,7 @@
           <div class="panel-header">
             元数据
           </div>
-          <div class="kv-list">
-            <div class="kv-item">
-              <label>Disguise ID</label>
-              <code>{{ disguise.disguiseId }}</code>
-            </div>
-            <div class="kv-item">
-              <label>伪装名称</label>
-              <span>{{ disguise.disguiseName || '-' }}</span>
-            </div>
-            <div class="kv-item">
-              <label>版本号</label>
-              <span>{{ disguise.version }}</span>
-            </div>
+          <div class="kv-list single-column">
             <div class="kv-item">
               <label>创建时间</label>
               <span>{{ formatTime(disguise.createTime) }}</span>
@@ -411,7 +398,7 @@ function formatTime(timestamp) {
 }
 
 .identity-block p {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-2);
   color: var(--el-text-color-secondary);
   font-size: 13px;
   line-height: 1.6;
@@ -421,10 +408,10 @@ function formatTime(timestamp) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 9px;
+  padding: 0;
   border-radius: var(--radius-control);
-  background: var(--detail-surface-muted);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 30%, transparent);
+  background: transparent;
+  border: 0;
 }
 
 .identity-id span {
@@ -483,7 +470,7 @@ function formatTime(timestamp) {
 }
 
 .panel-header {
-  min-height: 42px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   padding: 10px 12px;
@@ -527,7 +514,7 @@ function formatTime(timestamp) {
 
 .code-actions span {
   color: var(--el-text-color-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-helper);
   font-weight: 700;
 }
 
@@ -585,29 +572,6 @@ function formatTime(timestamp) {
   margin: 0;
   overflow: auto;
   height: 330px;
-}
-
-.kv-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 12px;
-  max-height: 260px;
-}
-
-.kv-item {
-  padding: 9px 10px;
-  border-radius: var(--radius-control);
-}
-
-.kv-item label {
-  margin-bottom: 4px;
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-}
-
-.kv-item span,
-.kv-item code {
-  font-size: 12px;
 }
 
 .code-panel code {

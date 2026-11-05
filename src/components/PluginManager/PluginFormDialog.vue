@@ -2,16 +2,16 @@
   <el-dialog
     v-model="visible"
     :title="editing ? '编辑插件' : '新增插件'"
-    width="80%"
+    width="var(--dialog-width-lg)"
+    align-center
     :close-on-click-modal="false"
-    class="plugin-dialog"
+    class="plugin-dialog workbench-dialog"
     @close="visible = false"
   >
     <el-form
       ref="formRef"
       :model="formData"
-      :label-width="editing ? '110px' : '120px'"
-      label-position="left"
+      label-position="top"
       :rules="formRules"
       class="plugin-form"
     >
@@ -21,10 +21,10 @@
         :mode="mode"
         @update:form-data="assignPluginForm(formData, $event)"
       />
-
-      <div class="form-inline-actions">
+    </el-form>
+    <template #footer>
+      <div class="workbench-dialog__actions">
         <el-button
-          type="danger"
           class="cancel-btn"
           @click="visible = false"
         >
@@ -41,7 +41,7 @@
           {{ editing ? '保存更改' : '创建插件' }}
         </el-button>
       </div>
-    </el-form>
+    </template>
   </el-dialog>
 </template>
 

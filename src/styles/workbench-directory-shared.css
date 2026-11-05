@@ -34,42 +34,50 @@
 .action-add {
   flex-shrink: 0;
   margin: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 .scope-tabs {
   display: flex;
-  gap: 4px;
-  padding: 10px 12px 0;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: 10px var(--space-3) 0;
   background: transparent;
   flex-shrink: 0;
 }
 
 .scope-tab {
-  flex: 1;
+  flex: 1 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 10px;
+  gap: var(--space-1);
+  height: var(--control-height-sm);
+  padding: 0 var(--space-2);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--app-control-background-soft) 70%, transparent);
   color: var(--el-text-color-secondary);
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
   transition: color var(--motion-fast) var(--motion-easing),
               border-color var(--motion-fast) var(--motion-easing),
               background var(--motion-fast) var(--motion-easing);
 }
 
 .scope-tab span {
+  flex-shrink: 0;
   color: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  opacity: 0.72;
+  font-size: var(--font-size-label);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.scope-tab:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
 }
 
 .scope-tab:hover:not(.is-active) {
@@ -85,10 +93,10 @@
 
 .toolbar-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px 30px;
+  grid-template-columns: minmax(0, 1fr) repeat(2, var(--control-height-sm));
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px 6px;
+  gap: var(--space-2);
+  padding: 10px var(--space-3) 6px;
   flex-shrink: 0;
 }
 
@@ -96,18 +104,20 @@
   min-width: 0;
 }
 
-.search-input .el-input__wrapper {
-  border-radius: 6px;
-  box-shadow: none;
+.toolbar-row .u-icon-btn {
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  border-radius: var(--radius-control);
 }
 
 .result-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 0 12px 8px;
+  gap: var(--space-1) var(--space-2);
+  padding: 0 var(--space-3) var(--space-2);
   color: var(--el-text-color-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-helper);
   flex-shrink: 0;
 }

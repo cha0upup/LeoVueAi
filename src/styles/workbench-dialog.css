@@ -1,0 +1,69 @@
+/* Shared form dialog shell. Editors retain their own content layout. */
+.workbench-dialog.el-dialog {
+  --el-dialog-padding-primary: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-overlay);
+  background: var(--app-container-background);
+}
+
+.workbench-dialog > .el-dialog__header {
+  flex-shrink: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: var(--space-3) 48px var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--app-divider-color);
+  border-radius: 0;
+  background: transparent;
+}
+
+.workbench-dialog > .el-dialog__header .el-dialog__headerbtn {
+  top: var(--space-2);
+  right: var(--space-2);
+  width: var(--control-height);
+  height: var(--control-height);
+}
+
+.workbench-dialog > .el-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  padding: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.workbench-dialog > .el-dialog__footer {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--app-divider-color);
+  border-radius: 0;
+  background: transparent;
+}
+
+.workbench-dialog .el-form-item { margin-bottom: var(--space-4); }
+.workbench-dialog .el-form-item:last-child { margin-bottom: 0; }
+.workbench-dialog .form-grid > .el-form-item { margin-bottom: 0; }
+
+.workbench-dialog__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.workbench-dialog__actions .el-button + .el-button { margin-left: 0; }
+
+@media (max-width: 640px), (max-height: 600px) {
+  .workbench-dialog > .el-dialog__body { padding: var(--space-3); }
+  .workbench-dialog > .el-dialog__footer { padding: var(--space-2) var(--space-3); }
+}
+
+@media (max-height: 600px) {
+  .workbench-dialog.el-dialog { max-height: calc(100dvh - 24px); }
+}

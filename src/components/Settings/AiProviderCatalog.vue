@@ -1,31 +1,27 @@
 <template>
   <div class="access-main-column">
-    <AdminStatsGrid :columns="4">
-      <div class="metric-card access-stat">
+    <StatsStrip :columns="4">
+      <div class="metric-card">
         <span class="metric-label">供应商</span>
-        <strong>{{ savedProviders.length }}</strong>
-        <small class="metric-label">已启用 {{ enabledProviderCount }} 个</small>
-        <i class="metric-icon"><el-icon><Icon :icon="icons.server" /></el-icon></i>
+        <strong class="metric-value">{{ savedProviders.length }}</strong>
+        <small class="metric-hint">已启用 {{ enabledProviderCount }} 个</small>
       </div>
-      <div class="metric-card access-stat">
+      <div class="metric-card">
         <span class="metric-label">已同步模型</span>
-        <strong>{{ rows.length }}</strong>
-        <small class="metric-label">已启用 {{ enabledModelCount }} 个</small>
-        <i class="metric-icon is-green"><el-icon><Icon :icon="icons.box" /></el-icon></i>
+        <strong class="metric-value">{{ rows.length }}</strong>
+        <small class="metric-hint">已启用 {{ enabledModelCount }} 个</small>
       </div>
-      <div class="metric-card access-stat">
+      <div class="metric-card">
         <span class="metric-label">能力库模型</span>
-        <strong>{{ recognizedModelCount }}</strong>
-        <small class="metric-label">识别率 {{ recognitionRate }}%</small>
-        <i class="metric-icon is-blue"><el-icon><Icon :icon="icons.success" /></el-icon></i>
+        <strong class="metric-value">{{ recognizedModelCount }}</strong>
+        <small class="metric-hint">识别率 {{ recognitionRate }}%</small>
       </div>
-      <div class="metric-card access-stat">
+      <div class="metric-card">
         <span class="metric-label">熔断保护</span>
-        <strong>{{ openCircuitModelCount }}</strong>
-        <small class="metric-label">{{ openCircuitModelCount ? '已切换备用链' : '全部模型可调度' }}</small>
-        <i class="metric-icon is-orange"><el-icon><Icon :icon="icons.warning" /></el-icon></i>
+        <strong class="metric-value">{{ openCircuitModelCount }}</strong>
+        <small class="metric-hint">{{ openCircuitModelCount ? '已切换备用链' : '全部模型可调度' }}</small>
       </div>
-    </AdminStatsGrid>
+    </StatsStrip>
 
     <AdminWorkspacePanel title="供应商列表">
       <template #actions>
@@ -152,6 +148,7 @@
                 :key="model.id"
                 class="model-row-lite"
                 :class="{ 'is-selected': selectedModelId === model.id }"
+                :aria-pressed="selectedModelId === model.id"
                 @click="$emit('select-model', model)"
               >
                 <strong>
@@ -214,15 +211,6 @@
             {{ hasSearchKeyword ? '没有匹配的供应商' : '暂无供应商' }}
           </div>
         </div>
-
-        <button
-          class="add-provider-strip"
-          type="button"
-          @click="$emit('create-provider')"
-        >
-          <el-icon><Icon :icon="icons.add" /></el-icon>
-          新增供应商
-        </button>
       </div>
     </AdminWorkspacePanel>
   </div>
@@ -232,7 +220,7 @@
 import { Icon } from '@iconify/vue'
 import { computed } from 'vue'
 
-import AdminStatsGrid from '@/components/Admin/shared/AdminStatsGrid.vue'
+import StatsStrip from '@/components/common/StatsStrip.vue'
 import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import { icons } from '@/utils/icons.js'
@@ -263,8 +251,7 @@ defineEmits([
   'sync-provider',
   'edit-provider',
   'remove-provider',
-  'select-model',
-  'create-provider'
+  'select-model'
 ])
 
 const enabledProviderCount = computed(() => props.savedProviders.filter((item) => item.enabled !== 0).length)
@@ -285,81 +272,15 @@ const isProviderTesting = (provider) => {
 
 <style scoped>
 .access-main-column {
+  container: ai-catalog / inline-size;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-width: 0;
-  padding-bottom: 34px;
-}
-
-.access-stat {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 42px;
-  grid-template-areas:
-    'label icon'
-    'value icon'
-    'meta icon';
-  align-items: center;
-  column-gap: 14px;
-  min-height: 96px;
-  padding: var(--space-4);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  background: var(--el-bg-color-overlay);
-  box-shadow: none;
-}
-
-.access-stat span,
-.access-stat small {
-  display: block;
-  min-width: 0;
-  color: var(--el-text-color-secondary);
-}
-
-.access-stat > span { grid-area: label; }
-.access-stat > small { grid-area: meta; }
-
-.access-stat strong {
-  grid-area: value;
-  display: block;
-  min-width: 0;
-  margin: 10px 0 8px;
-  color: var(--el-text-color-primary);
-  font-size: 22px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.access-stat i {
-  grid-area: icon;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: var(--radius-control);
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-bg-color-overlay));
-  font-style: normal;
-}
-
-.access-stat i.is-green {
-  color: var(--el-color-success);
-  background: color-mix(in srgb, var(--el-color-success) 14%, var(--el-bg-color-overlay));
-}
-
-.access-stat i.is-blue {
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-bg-color-overlay));
-}
-
-.access-stat i.is-orange {
-  color: var(--el-color-warning);
-  background: color-mix(in srgb, var(--el-color-warning) 14%, var(--el-bg-color-overlay));
 }
 
 .provider-list-content {
-  padding: 16px 18px 18px;
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .ai-model-settings__search {
@@ -398,6 +319,7 @@ const isProviderTesting = (provider) => {
 
 .provider-card-row__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -417,7 +339,7 @@ const isProviderTesting = (provider) => {
 }
 
 .provider-main {
-  flex: 1;
+  flex: 1 1 260px;
   min-width: 0;
 }
 
@@ -432,6 +354,7 @@ const isProviderTesting = (provider) => {
 .provider-name-line strong {
   color: var(--el-text-color-primary);
   font-size: var(--font-size-section-title);
+  overflow-wrap: anywhere;
 }
 
 .provider-meta-line {
@@ -440,6 +363,7 @@ const isProviderTesting = (provider) => {
   gap: 0;
   color: var(--el-text-color-secondary);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .provider-meta-line span + span::before {
@@ -453,7 +377,7 @@ const isProviderTesting = (provider) => {
 }
 
 .connection-dot {
-  color: #16a34a;
+  color: var(--el-color-success);
   font-size: 12px;
 }
 
@@ -465,27 +389,30 @@ const isProviderTesting = (provider) => {
   height: 7px;
   margin-right: 5px;
   border-radius: 999px;
-  background: #16a34a;
+  background: var(--el-color-success);
 }
 
 .provider-actions {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  margin-left: auto;
   gap: 8px;
 }
 
+.provider-actions .el-button + .el-button { margin-left: 0; }
+
 .model-table-lite {
-  padding: 0 22px 18px;
-  overflow-x: auto;
+  padding: 0 var(--space-3) var(--space-3);
 }
 
 .model-table-lite__head,
 .model-row-lite {
   display: grid;
-  grid-template-columns: minmax(170px, 1.35fr) 88px minmax(150px, 1fr) minmax(130px, 0.9fr) 82px;
-  gap: 12px;
+  grid-template-columns: minmax(150px, 1.35fr) 72px minmax(150px, 1fr) minmax(100px, 0.9fr) 72px;
+  gap: 8px;
   align-items: center;
-  min-width: 640px;
+  min-width: 0;
 }
 
 .model-table-lite__head {
@@ -511,6 +438,11 @@ const isProviderTesting = (provider) => {
 .model-row-lite.is-selected {
   background: color-mix(in srgb, var(--el-color-primary) 10%, var(--el-fill-color-light));
 }
+
+.model-row-lite:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
+.model-row-lite > * { min-width: 0; }
+.model-row-lite > strong { overflow-wrap: anywhere; }
+.model-row-lite :deep(.el-tag) { max-width: 100%; height: auto; min-height: 20px; white-space: normal; }
 
 .model-row-lite strong em {
   margin-left: 6px;
@@ -543,40 +475,32 @@ const isProviderTesting = (provider) => {
 
 .muted { color: var(--el-text-color-secondary); }
 
-.add-provider-strip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  height: 54px;
-  margin-top: 18px;
-  border: 1px dashed var(--el-color-primary-light-7);
-  border-radius: 8px;
-  color: var(--el-color-primary);
-  font-weight: 650;
-  background: var(--el-bg-color-overlay);
-  cursor: pointer;
-}
+@container ai-catalog (max-width: 680px) {
+  .provider-avatar { flex-basis: 36px; width: 36px; height: 36px; }
+  .provider-main { flex-basis: calc(100% - 48px); }
+  .provider-actions { margin-left: 48px; }
 
-.add-provider-strip:hover {
-  border-color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 10%, var(--el-fill-color-light));
-}
+  .model-table-lite__head { display: none; }
 
-@media (max-width: 720px) {
-  .provider-card-row__header,
-  .provider-actions {
-    flex-direction: column;
-  }
-
-  .model-table-lite {
-    padding-left: 20px;
-  }
-
-  .model-table-lite__head,
   .model-row-lite {
-    min-width: 720px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2);
   }
+
+  .model-row-lite > strong { grid-column: 1; }
+  .model-row-lite > span:nth-child(2) { grid-column: 2; grid-row: 1; }
+  .model-row-lite > span:nth-child(3) { grid-column: 1 / -1; }
+  .model-row-lite > .cap-icons { grid-column: 1; }
+  .model-row-lite > span:last-child { grid-column: 2; white-space: nowrap; }
+}
+
+@container ai-catalog (max-width: 420px) {
+  .provider-card-row__header { padding: var(--space-3); }
+  .provider-actions { margin-left: 0; gap: var(--space-1); }
+  .provider-meta-line { display: grid; gap: var(--space-1); font-size: var(--font-size-helper); }
+  .provider-meta-line span + span::before { content: none; }
+  .provider-name-line { gap: var(--space-1); }
+  .model-table-lite { padding-inline: var(--space-1); }
+  .model-row-lite { padding: var(--space-2); }
 }
 </style>

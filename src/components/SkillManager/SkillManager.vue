@@ -5,18 +5,11 @@
       v-if="viewMode === 'catalog'"
       class="catalog-shell"
     >
-      <header class="catalog-header">
-        <div class="catalog-heading">
-          <div class="catalog-heading-icon">
-            <Icon :icon="iconMap.bookOpenPageVariant" />
-          </div>
-          <div>
-            <span class="catalog-kicker">CAPABILITY LIBRARY</span>
-            <h1>能力库</h1>
-            <p>管理 Skill 的生命周期、运行可用性、风险边界和依赖关系。</p>
-          </div>
-        </div>
-        <div class="catalog-header-actions">
+      <PageHeader
+        title="能力库"
+        :icon="iconMap.bookOpenPageVariant"
+      >
+        <template #actions>
           <el-segmented
             v-if="isAdmin"
             v-model="catalogMode"
@@ -62,51 +55,55 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-        </div>
-      </header>
+        </template>
+      </PageHeader>
 
-      <div class="catalog-stats">
+      <StatsStrip :columns="4">
         <button
           type="button"
-          class="stat-card"
-          :class="{ active: !filters.availability && !filters.health }"
+          class="metric-card"
+          :class="{ 'is-active': !filters.availability && !filters.health }"
+          :aria-pressed="!filters.availability && !filters.health"
           @click="applyQuickFilter('all')"
         >
-          <span>全部</span>
-          <strong>{{ catalogSummary.total }}</strong>
-          <em>当前 Scope</em>
+          <span class="metric-label">全部</span>
+          <strong class="metric-value">{{ catalogSummary.total }}</strong>
+          <span class="metric-hint">当前 Scope</span>
         </button>
         <button
           type="button"
-          class="stat-card stat-card--success"
-          :class="{ active: filters.availability === 'runtime' }"
+          class="metric-card metric-card--success"
+          :class="{ 'is-active': filters.availability === 'runtime' }"
+          :aria-pressed="filters.availability === 'runtime'"
           @click="applyQuickFilter('runtime')"
         >
-          <span>可运行</span>
-          <strong>{{ catalogSummary.runtime }}</strong>
-          <em>已进入目录</em>
+          <span class="metric-label">可运行</span>
+          <strong class="metric-value">{{ catalogSummary.runtime }}</strong>
+          <span class="metric-hint">已进入目录</span>
         </button>
         <button
           type="button"
-          class="stat-card stat-card--warning"
-          :class="{ active: filters.availability === 'controlled' }"
+          class="metric-card metric-card--warning"
+          :class="{ 'is-active': filters.availability === 'controlled' }"
+          :aria-pressed="filters.availability === 'controlled'"
           @click="applyQuickFilter('controlled')"
         >
-          <span>受控启用</span>
-          <strong>{{ catalogSummary.controlled }}</strong>
-          <em>需授权确认</em>
+          <span class="metric-label">受控启用</span>
+          <strong class="metric-value">{{ catalogSummary.controlled }}</strong>
+          <span class="metric-hint">需授权确认</span>
         </button>
         <button
           type="button"
-          class="stat-card stat-card--danger"
-          :class="{ active: filters.health === 'problems' }"
+          class="metric-card metric-card--danger"
+          :class="{ 'is-active': filters.health === 'problems' }"
+          :aria-pressed="filters.health === 'problems'"
           @click="applyQuickFilter('problems')"
         >
-          <span>存在问题</span>
-          <strong>{{ catalogSummary.problems }}</strong>
-          <em>警告或错误</em>
+          <span class="metric-label">存在问题</span>
+          <strong class="metric-value">{{ catalogSummary.problems }}</strong>
+          <span class="metric-hint">警告或错误</span>
         </button>
-      </div>
+      </StatsStrip>
 
       <section class="catalog-panel">
         <div class="catalog-toolbar">
@@ -386,7 +383,7 @@
                   </div>
                   <div>
                     <strong>{{ row.name }}</strong>
-                    <span>{{ row.description || '暂无描述' }}</span>
+                    <span class="skill-description">{{ row.description || '暂无描述' }}</span>
                   </div>
                 </div>
               </template>
@@ -399,7 +396,7 @@
               <template #default="{ row }">
                 <div class="stacked-cell">
                   <strong>{{ row.category || '未分类' }}</strong>
-                  <span>{{ (row.platforms || []).slice(0, 3).join(' · ') || '—' }}</span>
+                  <span class="cell-secondary">{{ (row.platforms || []).slice(0, 3).join(' · ') || '—' }}</span>
                 </div>
               </template>
             </el-table-column>
@@ -413,7 +410,7 @@
               <template #default="{ row }">
                 <div class="stacked-cell">
                   <strong>{{ row.category || '未分类' }}</strong>
-                  <span>{{ row.pack || row.domain || '—' }}</span>
+                  <span class="cell-secondary">{{ row.pack || row.domain || '—' }}</span>
                 </div>
               </template>
             </el-table-column>
@@ -453,7 +450,10 @@
                   >
                     {{ row.risk || 'unknown' }}
                   </el-tag>
-                  <span v-if="catalogMode === 'governance'">{{ row.accessMode || '—' }}</span>
+                  <span
+                    v-if="catalogMode === 'governance'"
+                    class="cell-secondary"
+                  >{{ row.accessMode || '—' }}</span>
                 </div>
               </template>
             </el-table-column>
@@ -467,7 +467,7 @@
               <template #default="{ row }">
                 <div class="stacked-cell">
                   <strong>{{ row.status || 'unknown' }}</strong>
-                  <span>{{ row.version || '—' }}</span>
+                  <span class="cell-secondary">{{ row.version || '—' }}</span>
                 </div>
               </template>
             </el-table-column>
@@ -1048,6 +1048,8 @@
 </template>
 
 <script setup>
+import StatsStrip from '@/components/common/StatsStrip.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
 import { computed, defineComponent, h, nextTick, ref, watch } from 'vue'
 import { ElTag } from 'element-plus'
 import { Icon } from '@iconify/vue'
@@ -1937,7 +1939,6 @@ loadAllSkills()
   gap: 12px;
 }
 
-.catalog-header,
 .workspace-header {
   display: flex;
   align-items: flex-start;
@@ -1946,7 +1947,6 @@ loadAllSkills()
   flex-shrink: 0;
 }
 
-.catalog-heading,
 .workspace-title-wrap {
   display: flex;
   align-items: flex-start;
@@ -1954,7 +1954,6 @@ loadAllSkills()
   gap: 12px;
 }
 
-.catalog-heading-icon,
 .workspace-skill-icon {
   width: 40px;
   height: 40px;
@@ -1968,7 +1967,6 @@ loadAllSkills()
   font-size: 21px;
 }
 
-.catalog-kicker,
 .section-heading span {
   display: block;
   margin-bottom: 3px;
@@ -1978,15 +1976,13 @@ loadAllSkills()
   letter-spacing: 0.12em;
 }
 
-.catalog-heading h1,
 .workspace-title h1 {
   margin: 0;
   color: var(--el-text-color-primary);
-  font-size: 22px;
-  line-height: 1.2;
+  font-size: var(--font-size-page-title);
+  line-height: 1.35;
 }
 
-.catalog-heading p,
 .workspace-title p {
   margin: 5px 0 0;
   max-width: 760px;
@@ -1995,74 +1991,11 @@ loadAllSkills()
   line-height: 1.5;
 }
 
-.catalog-header-actions,
 .workspace-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-}
-
-.catalog-stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.stat-card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--app-surface-border-subtle);
-  border-radius: var(--app-control-radius);
-  color: var(--el-text-color-primary);
-  background: var(--app-card-background);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-.stat-card:hover,
-.stat-card.active {
-  border-color: color-mix(in srgb, var(--el-color-primary) 50%, var(--app-border-color));
-  background: color-mix(in srgb, var(--el-color-primary) 4%, var(--app-card-background));
-}
-
-.stat-card:active {
-  transform: translateY(1px);
-}
-
-.stat-card span {
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.stat-card strong {
-  grid-row: span 2;
-  align-self: center;
-  color: var(--el-text-color-primary);
-  font-size: 24px;
-}
-
-.stat-card em {
-  color: var(--el-text-color-placeholder);
-  font-size: 10px;
-  font-style: normal;
-}
-
-.stat-card--success strong {
-  color: var(--el-color-success);
-}
-
-.stat-card--warning strong {
-  color: var(--el-color-warning);
-}
-
-.stat-card--danger strong {
-  color: var(--el-color-danger);
 }
 
 .catalog-panel {
@@ -2080,7 +2013,7 @@ loadAllSkills()
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 10px var(--space-4);
   border-bottom: 1px solid var(--app-surface-border-subtle);
   flex-shrink: 0;
 }
@@ -2255,9 +2188,9 @@ loadAllSkills()
 }
 
 .skill-name-cell strong,
-.skill-name-cell span,
-.stacked-cell strong,
-.stacked-cell span {
+.skill-description,
+.stacked-cell > strong,
+.stacked-cell > .cell-secondary {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2265,20 +2198,20 @@ loadAllSkills()
 }
 
 .skill-name-cell strong,
-.stacked-cell strong {
+.stacked-cell > strong {
   color: var(--el-text-color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-body);
 }
 
-.skill-name-cell span,
-.stacked-cell span {
-  margin-top: 3px;
+.skill-description,
+.stacked-cell > .cell-secondary {
+  margin-top: var(--space-1);
   color: var(--el-text-color-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-helper);
 }
 
-.stacked-cell .el-tag + span {
-  margin-top: 4px;
+.stacked-cell > .el-tag + .cell-secondary {
+  margin-top: var(--space-1);
 }
 
 .mini-tags {
@@ -2714,13 +2647,6 @@ loadAllSkills()
 }
 
 @media (max-width: 1180px) {
-  .catalog-stats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .catalog-heading p {
-    display: none;
-  }
 
   .workspace-actions .el-button span:not(.el-icon) {
     display: none;
@@ -2728,12 +2654,10 @@ loadAllSkills()
 }
 
 @media (max-width: 900px) {
-  .catalog-header,
   .workspace-header {
     flex-direction: column;
   }
 
-  .catalog-header-actions,
   .workspace-actions {
     width: 100%;
     justify-content: flex-end;

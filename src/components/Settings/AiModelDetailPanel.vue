@@ -1,5 +1,16 @@
 <template>
-  <aside class="model-detail-panel">
+  <aside
+    class="model-detail-panel"
+    tabindex="-1"
+    aria-label="模型详情"
+  >
+    <button
+      type="button"
+      class="detail-back"
+      @click="$emit('back')"
+    >
+      返回模型列表
+    </button>
     <template v-if="model">
       <div class="detail-header">
         <div class="provider-avatar detail">
@@ -151,21 +162,27 @@
           </div>
         </div>
 
-        <h4 class="section-subtitle">
-          能力上限（{{ model.capabilityRecognized ? '能力库收录' : '未收录' }}）
-        </h4>
-        <div class="limit-grid">
-          <div class="limit-card">
-            <span>上下文窗口</span>
-            <strong>{{ formatNumber(model.capabilityContextWindowTokens) }}</strong>
-            <small>tokens</small>
+        <details
+          class="capability-limits"
+          :open="!limitsMatchCapabilities"
+        >
+          <summary class="section-subtitle">
+            能力上限（{{ model.capabilityRecognized ? '能力库收录' : '未收录' }}）
+            <span v-if="limitsMatchCapabilities">与当前配置一致</span>
+          </summary>
+          <div class="limit-grid">
+            <div class="limit-card">
+              <span>上下文窗口</span>
+              <strong>{{ formatNumber(model.capabilityContextWindowTokens) }}</strong>
+              <small>tokens</small>
+            </div>
+            <div class="limit-card">
+              <span>最大输出长度</span>
+              <strong>{{ formatNumber(model.capabilityMaxOutputTokens) }}</strong>
+              <small>tokens</small>
+            </div>
           </div>
-          <div class="limit-card">
-            <span>最大输出长度</span>
-            <strong>{{ formatNumber(model.capabilityMaxOutputTokens) }}</strong>
-            <small>tokens</small>
-          </div>
-        </div>
+        </details>
 
         <h4 class="section-subtitle">
           支持能力
@@ -211,7 +228,15 @@ const props = defineProps({
   activatingId: { type: [Number, String], default: null }
 })
 
-defineEmits(['edit', 'probe', 'activate'])
+defineEmits(['edit', 'probe', 'activate', 'back'])
+
+const limitsMatchCapabilities = computed(() => props.model?.capabilityRecognized && [
+  ['effectiveContextWindowTokens', 'capabilityContextWindowTokens'],
+  ['effectiveMaxOutputTokens', 'capabilityMaxOutputTokens']
+].every(([effective, capability]) => {
+  const limit = Number(props.model[capability])
+  return Number.isFinite(limit) && limit > 0 && Number(props.model[effective]) === limit
+}))
 
 const health = computed(() => props.modelHealthById[props.model?.id] || {
   status: 'unknown',
@@ -221,12 +246,15 @@ const health = computed(() => props.modelHealthById[props.model?.id] || {
 </script>
 
 <style scoped>
+.capability-limits > summary { cursor: pointer; padding-block: var(--space-2); }
+.capability-limits > summary:focus-visible { outline: var(--focus-outline); }
+.capability-limits > summary span { margin-left: var(--space-2); font-size: var(--font-size-helper); font-weight: 400; color: var(--el-text-color-secondary); }
 .model-detail-panel {
   position: sticky;
   top: 0;
   align-self: start;
   min-width: 0;
-  height: calc(100vh - 64px - 84px);
+  max-height: calc(100dvh - 96px);
   min-height: 0;
   overflow-y: auto;
   padding: 18px 16px;
@@ -235,6 +263,19 @@ const health = computed(() => props.modelHealthById[props.model?.id] || {
   box-shadow: none;
   font-size: 13px;
 }
+
+.detail-back {
+  display: none;
+  margin-bottom: var(--space-3);
+  padding: var(--space-1) 0;
+  border: 0;
+  color: var(--el-color-primary);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.detail-back:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
+.model-detail-panel:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
 
 .model-detail-panel h4 {
   margin: 0;
@@ -266,6 +307,7 @@ const health = computed(() => props.modelHealthById[props.model?.id] || {
   margin-bottom: 3px;
   font-size: 16px;
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .detail-title {
@@ -287,6 +329,9 @@ const health = computed(() => props.modelHealthById[props.model?.id] || {
   margin-left: auto;
   white-space: nowrap;
 }
+
+.detail-actions .el-button + .el-button { margin-left: 0; }
+.capability-box p { overflow-wrap: anywhere; }
 
 .detail-tabs {
   display: flex;
@@ -310,8 +355,8 @@ const health = computed(() => props.modelHealthById[props.model?.id] || {
 
 .warning-copy {
   margin: 6px 0 0;
-  color: #b45309;
-  font-size: 11px;
+  color: var(--el-color-warning-dark-2);
+  font-size: var(--font-size-helper);
   line-height: 1.5;
 }
 
@@ -384,21 +429,30 @@ const health = computed(() => props.modelHealthById[props.model?.id] || {
   font-size: 12px;
 }
 
-.support-item strong { color: #16a34a; }
+.support-item strong { color: var(--el-color-success); }
 
 .support-item.is-off { color: var(--el-text-color-secondary); }
 
-.support-item.is-off strong { color: #94a3b8; }
+.support-item.is-off strong { color: var(--el-text-color-placeholder); }
 
 .muted { color: var(--el-text-color-secondary); }
 
 .muted.small { font-size: 12px; }
 
-@media (max-width: 720px) {
+@container ai-settings (max-width: 1100px) {
+  .detail-back { display: inline-flex; }
   .model-detail-panel {
     position: static;
+    max-height: none;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: var(--radius-container);
   }
+  .detail-actions { flex-direction: row; flex-wrap: wrap; }
+}
 
+@container ai-settings (max-width: 420px) {
+  .detail-header { flex-wrap: wrap; }
+  .detail-actions { width: 100%; margin-left: 0; }
   .limit-grid,
   .support-grid {
     grid-template-columns: 1fr;

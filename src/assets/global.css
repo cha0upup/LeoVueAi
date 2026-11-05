@@ -406,7 +406,7 @@ html,
   font-weight: 600;
   transition: all 0.16s ease;
   border: 1px solid color-mix(in srgb, var(--el-border-color) 26%, transparent);
-  background: color-mix(in srgb, var(--app-control-background) 82%, white);
+  background: color-mix(in srgb, var(--app-control-background) 82%, var(--el-bg-color-overlay));
   color: var(--el-text-color-primary);
   box-shadow: none;
 }
@@ -437,7 +437,7 @@ html,
 }
 
 .el-button.is-plain {
-  background: color-mix(in srgb, var(--app-control-background-soft) 78%, white);
+  background: color-mix(in srgb, var(--app-control-background-soft) 78%, var(--el-bg-color-overlay));
   color: var(--el-text-color-primary);
   border-color: color-mix(in srgb, var(--el-border-color) 34%, transparent);
   box-shadow: none;
@@ -467,7 +467,7 @@ html,
   background: color-mix(
     in srgb,
     var(--el-color-success-light-9, var(--el-color-success)) 84%,
-    white
+    var(--el-bg-color-overlay)
   );
   color: var(--el-color-success-dark-2, var(--el-color-success));
   border-color: color-mix(in srgb, var(--el-color-success) 34%, transparent);
@@ -478,7 +478,7 @@ html,
   background: color-mix(
     in srgb,
     var(--el-color-success-light-8, var(--el-color-success)) 88%,
-    white
+    var(--el-bg-color-overlay)
   );
 }
 
@@ -486,7 +486,7 @@ html,
   background: color-mix(
     in srgb,
     var(--el-color-warning-light-9, var(--el-color-warning)) 84%,
-    white
+    var(--el-bg-color-overlay)
   );
   color: var(--el-color-warning-dark-2, var(--el-color-warning));
   border-color: color-mix(in srgb, var(--el-color-warning) 34%, transparent);
@@ -497,30 +497,30 @@ html,
   background: color-mix(
     in srgb,
     var(--el-color-warning-light-8, var(--el-color-warning)) 88%,
-    white
+    var(--el-bg-color-overlay)
   );
 }
 
 .el-button--danger {
-  background: color-mix(in srgb, var(--el-color-danger-light-9, var(--el-color-danger)) 84%, white);
+  background: color-mix(in srgb, var(--el-color-danger-light-9, var(--el-color-danger)) 84%, var(--el-bg-color-overlay));
   color: var(--el-color-danger-dark-2, var(--el-color-danger));
   border-color: color-mix(in srgb, var(--el-color-danger) 34%, transparent);
   box-shadow: none;
 }
 
 .el-button--danger:hover {
-  background: color-mix(in srgb, var(--el-color-danger-light-8, var(--el-color-danger)) 88%, white);
+  background: color-mix(in srgb, var(--el-color-danger-light-8, var(--el-color-danger)) 88%, var(--el-bg-color-overlay));
 }
 
 .el-button--info {
-  background: color-mix(in srgb, var(--el-color-info-light-9, var(--el-color-info)) 84%, white);
+  background: color-mix(in srgb, var(--el-color-info-light-9, var(--el-color-info)) 84%, var(--el-bg-color-overlay));
   color: var(--el-color-info-dark-2, var(--el-color-info));
   border-color: color-mix(in srgb, var(--el-color-info) 34%, transparent);
   box-shadow: none;
 }
 
 .el-button--info:hover {
-  background: color-mix(in srgb, var(--el-color-info-light-8, var(--el-color-info)) 88%, white);
+  background: color-mix(in srgb, var(--el-color-info-light-8, var(--el-color-info)) 88%, var(--el-bg-color-overlay));
 }
 
 /* 轻量化的 plain 变体 */
@@ -528,7 +528,7 @@ html,
   background: color-mix(
     in srgb,
     var(--el-color-success-light-9, var(--el-color-success)) 84%,
-    white
+    var(--el-bg-color-overlay)
   );
   color: var(--el-color-success-dark-2, var(--el-color-success));
   border: 1px solid color-mix(in srgb, var(--el-color-success) 32%, var(--el-border-color));
@@ -538,20 +538,20 @@ html,
   background: color-mix(
     in srgb,
     var(--el-color-warning-light-9, var(--el-color-warning)) 84%,
-    white
+    var(--el-bg-color-overlay)
   );
   color: var(--el-color-warning-dark-2, var(--el-color-warning));
   border: 1px solid color-mix(in srgb, var(--el-color-warning) 32%, var(--el-border-color));
 }
 
 .el-button--danger.is-plain {
-  background: color-mix(in srgb, var(--el-color-danger-light-9, var(--el-color-danger)) 84%, white);
+  background: color-mix(in srgb, var(--el-color-danger-light-9, var(--el-color-danger)) 84%, var(--el-bg-color-overlay));
   color: var(--el-color-danger-dark-2, var(--el-color-danger));
   border: 1px solid color-mix(in srgb, var(--el-color-danger) 32%, var(--el-border-color));
 }
 
 .el-button--info.is-plain {
-  background: color-mix(in srgb, var(--el-color-info-light-9, var(--el-color-info)) 84%, white);
+  background: color-mix(in srgb, var(--el-color-info-light-9, var(--el-color-info)) 84%, var(--el-bg-color-overlay));
   color: var(--el-color-info-dark-2, var(--el-color-info));
   border: 1px solid color-mix(in srgb, var(--el-color-info) 32%, var(--el-border-color));
 }
@@ -702,37 +702,6 @@ html,
   color: var(--el-color-info);
 }
 
-/* 对话框样式统一 - 现代化设计 */
-.el-dialog {
-  border-radius: var(--el-border-radius-large);
-  box-shadow: var(--el-box-shadow-dark);
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 14%, transparent);
-}
-
-.el-dialog__header {
-  padding: var(--el-spacing-xl) var(--el-spacing-xl) var(--el-spacing-large);
-  border-bottom: 1px solid color-mix(in srgb, var(--el-border-color-lighter) 18%, transparent);
-  background: color-mix(in srgb, var(--app-surface-background) 90%, var(--el-bg-color-overlay));
-  border-radius: var(--el-border-radius-large) var(--el-border-radius-large) 0 0;
-}
-
-.el-dialog__title {
-  font-size: var(--el-font-size-large);
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.el-dialog__body {
-  padding: var(--el-spacing-xl);
-}
-
-.el-dialog__footer {
-  padding: var(--el-spacing-large) var(--el-spacing-xl) var(--el-spacing-xl);
-  border-top: 1px solid color-mix(in srgb, var(--el-border-color-lighter) 40%, transparent);
-  background: color-mix(in srgb, var(--el-bg-color-page) 52%, transparent);
-  border-radius: 0 0 var(--el-border-radius-large) var(--el-border-radius-large);
-}
-
 /* 统一的对话框底部按钮区域 */
 .dialog-footer {
   display: flex;
@@ -746,7 +715,7 @@ html,
   align-items: center;
   white-space: nowrap;
   border: 1px solid color-mix(in srgb, var(--el-border-color) 28%, transparent);
-  background: color-mix(in srgb, var(--app-control-background-soft) 78%, white);
+  background: color-mix(in srgb, var(--app-control-background-soft) 78%, var(--el-bg-color-overlay));
   color: var(--el-text-color-primary);
   box-shadow: none;
   font-weight: 700;
@@ -759,7 +728,7 @@ html,
 }
 
 .el-tag.el-tag--primary {
-  background: color-mix(in srgb, var(--el-color-primary-light-9) 84%, white);
+  background: color-mix(in srgb, var(--el-color-primary-light-9) 84%, var(--el-bg-color-overlay));
   border-color: color-mix(in srgb, var(--el-color-primary) 34%, transparent);
   color: var(--el-color-primary-dark-2);
 }
@@ -768,7 +737,7 @@ html,
   background: color-mix(
     in srgb,
     var(--el-color-success-light-9, var(--el-color-success)) 84%,
-    white
+    var(--el-bg-color-overlay)
   );
   border-color: color-mix(in srgb, var(--el-color-success) 34%, transparent);
   color: var(--el-color-success-dark-2, var(--el-color-success));
@@ -778,20 +747,20 @@ html,
   background: color-mix(
     in srgb,
     var(--el-color-warning-light-9, var(--el-color-warning)) 84%,
-    white
+    var(--el-bg-color-overlay)
   );
   border-color: color-mix(in srgb, var(--el-color-warning) 34%, transparent);
   color: var(--el-color-warning-dark-2, var(--el-color-warning));
 }
 
 .el-tag.el-tag--danger {
-  background: color-mix(in srgb, var(--el-color-danger-light-9, var(--el-color-danger)) 84%, white);
+  background: color-mix(in srgb, var(--el-color-danger-light-9, var(--el-color-danger)) 84%, var(--el-bg-color-overlay));
   border-color: color-mix(in srgb, var(--el-color-danger) 34%, transparent);
   color: var(--el-color-danger-dark-2, var(--el-color-danger));
 }
 
 .el-tag.el-tag--info {
-  background: color-mix(in srgb, var(--el-color-info-light-9, var(--el-color-info)) 84%, white);
+  background: color-mix(in srgb, var(--el-color-info-light-9, var(--el-color-info)) 84%, var(--el-bg-color-overlay));
   border-color: color-mix(in srgb, var(--el-color-info) 34%, transparent);
   color: var(--el-color-info-dark-2, var(--el-color-info));
 }
@@ -805,14 +774,12 @@ html,
  * ======================================== */
 
 /* 对话框基础样式 - 现代化设计 */
-.plugin-dialog,
 .upload-dialog {
   border-radius: var(--el-border-radius-large);
   border: 1px solid color-mix(in srgb, var(--el-border-color) 14%, transparent);
   background: var(--app-dialog-background);
 }
 
-.plugin-dialog .el-dialog__header,
 .upload-dialog .el-dialog__header {
   padding: var(--el-spacing-xl) var(--el-spacing-xl) var(--el-spacing-large);
   border-bottom: 1px solid color-mix(in srgb, var(--el-border-color-lighter) 18%, transparent);
@@ -820,21 +787,18 @@ html,
   border-radius: var(--el-border-radius-large) var(--el-border-radius-large) 0 0;
 }
 
-.plugin-dialog .el-dialog__title,
 .upload-dialog .el-dialog__title {
   font-size: clamp(1rem, 1.125vw, 1.125rem); /* 16px - 18px，基于视口宽度自适应 */
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
-.plugin-dialog .el-dialog__body,
 .upload-dialog .el-dialog__body {
   padding: var(--el-spacing-xl);
   max-height: 70vh;
   overflow-y: auto;
 }
 
-.plugin-dialog .el-dialog__footer,
 .upload-dialog .el-dialog__footer {
   padding: var(--el-spacing-large) var(--el-spacing-xl) var(--el-spacing-xl);
   border-top: 1px solid color-mix(in srgb, var(--el-border-color-lighter) 18%, transparent);
@@ -842,23 +806,19 @@ html,
 }
 
 /* 滚动条样式 */
-.plugin-dialog .el-dialog__body::-webkit-scrollbar,
 .upload-dialog .el-dialog__body::-webkit-scrollbar {
   width: 6px;
 }
 
-.plugin-dialog .el-dialog__body::-webkit-scrollbar-track,
 .upload-dialog .el-dialog__body::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.plugin-dialog .el-dialog__body::-webkit-scrollbar-thumb,
 .upload-dialog .el-dialog__body::-webkit-scrollbar-thumb {
   background: var(--el-border-color);
   border-radius: 3px;
 }
 
-.plugin-dialog .el-dialog__body::-webkit-scrollbar-thumb:hover,
 .upload-dialog .el-dialog__body::-webkit-scrollbar-thumb:hover {
   background: var(--el-border-color-darker);
 }

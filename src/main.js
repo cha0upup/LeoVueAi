@@ -8,6 +8,7 @@ import 'element-plus/theme-chalk/dark/css-vars.css'
 import './assets/global.css'
 import '@/styles/design-tokens.css'
 import '@/styles/element-plus-overrides.css'
+import '@/styles/workbench-dialog.css'
 import { showError } from '@/utils/messageUtils.js'
 import { createLogger } from '@/utils/logger.js'
 

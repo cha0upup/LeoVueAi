@@ -1,6 +1,23 @@
 <template>
   <div class="ai-model-settings">
-    <section class="access-layout">
+    <PageHeader
+      title="AI 模型接入"
+      :icon="iconMap.settings"
+    >
+      <template #actions>
+        <el-button
+          type="primary"
+          @click="openProviderCreate"
+        >
+          <el-icon><Icon :icon="iconMap.add" /></el-icon>
+          新增供应商
+        </el-button>
+      </template>
+    </PageHeader>
+    <section
+      ref="accessLayoutRef"
+      class="access-layout"
+    >
       <AiProviderCatalog
         v-model:search-keyword="searchKeyword"
         :saved-providers="savedProviders"
@@ -17,7 +34,6 @@
         @edit-provider="openProviderEdit"
         @remove-provider="removeProvider"
         @select-model="selectModel"
-        @create-provider="openProviderCreate"
       />
 
       <AiModelDetailPanel
@@ -28,6 +44,7 @@
         @edit="openEdit"
         @probe="probeCapabilities"
         @activate="activate"
+        @back="focusCatalog"
       />
     </section>
 
@@ -98,7 +115,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { icons as iconMap } from '@/utils/icons.js'
+import PageHeader from '@/components/common/PageHeader.vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 
 import {
   listAiModelConfigsApi,
@@ -251,8 +270,22 @@ const fallbackCandidates = computed(() => rows.value.filter((candidate) => (
   && candidate.supportsStreaming !== false
 )))
 
-function selectModel(model) {
+const accessLayoutRef = ref(null)
+
+async function selectModel(model) {
   selectedModelId.value = model.id
+  await nextTick()
+  const layout = accessLayoutRef.value
+  if (!layout?.querySelector || window.getComputedStyle(layout).gridTemplateColumns.split(' ').length !== 1) return
+  const detail = layout.querySelector('.model-detail-panel')
+  detail?.scrollIntoView({ block: 'start' })
+  detail?.focus({ preventScroll: true })
+}
+
+function focusCatalog() {
+  const selected = accessLayoutRef.value?.querySelector?.('.model-row-lite[aria-pressed="true"]')
+  selected?.scrollIntoView({ block: 'center' })
+  selected?.focus({ preventScroll: true })
 }
 
 async function loadList() {
@@ -428,9 +461,10 @@ onMounted(() => {
 
 <style scoped>
 .ai-model-settings {
+  container: ai-settings / inline-size;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-height: 100%;
   padding: 0;
   background: var(--el-bg-color-page);
@@ -438,12 +472,12 @@ onMounted(() => {
 
 .access-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
   gap: var(--space-4);
   align-items: stretch;
 }
 
-@media (max-width: 720px) {
+@container ai-settings (max-width: 1100px) {
   .access-layout {
     grid-template-columns: 1fr;
   }

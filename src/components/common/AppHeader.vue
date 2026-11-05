@@ -27,29 +27,6 @@
           </span>
         </div>
 
-        <nav
-          v-if="modeItems.length"
-          class="mode-switcher"
-          aria-label="空间切换"
-        >
-          <button
-            v-for="item in modeItems"
-            :key="item.key"
-            type="button"
-            class="mode-switcher__item"
-            :class="{ 'is-active': item.key === activeMode }"
-            :data-mode="item.key"
-            :disabled="item.disabled"
-            :aria-current="item.key === activeMode ? 'page' : undefined"
-            @click="$emit('mode-change', item.key)"
-          >
-            <el-icon>
-              <Icon :icon="item.icon || iconMap.circleCheck" />
-            </el-icon>
-            <span>{{ item.label }}</span>
-          </button>
-        </nav>
-
         <div class="app-header__center">
           <slot name="center" />
         </div>
@@ -152,18 +129,10 @@ defineProps({
         divided: true
       }
     ]
-  },
-  modeItems: {
-    type: Array,
-    default: () => []
-  },
-  activeMode: {
-    type: String,
-    default: ''
   }
 })
 
-defineEmits(['command', 'mode-change'])
+defineEmits(['command'])
 
 const iconMap = icons
 </script>
@@ -260,55 +229,6 @@ const iconMap = icons
   line-height: 1.7;
 }
 
-.mode-switcher {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  height: 36px;
-  margin-right: 8px;
-  padding: 3px;
-  border: 1px solid var(--app-surface-border-subtle);
-  border-radius: var(--app-control-radius);
-  background: color-mix(in srgb, var(--app-control-background-soft) 82%, transparent);
-}
-
-.mode-switcher__item {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 28px;
-  min-width: 92px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
-
-.mode-switcher__item:hover:not(:disabled) {
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
-}
-
-.mode-switcher__item.is-active {
-  color: var(--el-color-primary);
-  background: var(--el-bg-color-overlay);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--el-text-color-primary) 8%, transparent);
-}
-
-.mode-switcher__item:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
 .app-header__center {
   flex: 1;
   min-width: 0;
@@ -402,65 +322,46 @@ const iconMap = icons
   margin-right: 0;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 900px) {
   .app-header__shell {
     height: auto;
-    padding: 0 0 8px;
-    flex-direction: column;
-    align-items: stretch;
+    min-height: 48px;
+    padding-block: var(--space-1);
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
   }
 
   .app-header__left {
-    min-height: 48px;
-  }
-
-  .logo-section {
-    min-width: 104px;
-  }
-
-  .mode-switcher {
-    margin-right: 0;
+    min-height: 36px;
+    flex-wrap: wrap;
+    gap: var(--space-1);
   }
 
   .app-header__right {
     justify-content: flex-end;
+    margin-left: auto;
   }
-}
 
-@media (max-width: 900px) {
   .app-header {
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-
-  .app-header__left {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .logo-section {
-    width: 100%;
-    height: 56px;
-    margin-right: 0;
-    padding-right: 0;
-    border-right: 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--el-border-color) 28%, transparent);
-  }
-
-  .mode-switcher {
-    align-self: flex-start;
+    padding-inline: var(--space-2);
   }
 
   .app-header__center {
+    flex: 1 1 auto;
     padding-left: 0;
+    overflow: hidden;
   }
+  .app-header__center:empty { display: none; }
 }
 
 @media (max-width: 640px) {
-  .app-header {
-    padding-top: 8px;
-  }
+  .logo-section { min-width: 0; padding: 0; margin-right: var(--space-1); border: 0; }
+  .logo-copy { display: none; }
+  .user-avatar { display: none; }
+  .app-header__right { gap: var(--space-1); }
+  .app-header__tools { padding: 0; }
+  .app-header__tools :deep(.ai-entry-label) { display: none; }
+  .app-header__tools :deep(.ai-entry-btn) { padding: 6px; }
 
   .user-copy small {
     display: none;

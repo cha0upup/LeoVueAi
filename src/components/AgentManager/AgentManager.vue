@@ -1,9 +1,6 @@
 <template>
   <ManagerLayout
-    title="主机资产"
-    :icon="iconMap.server"
     module-class="agent-manager"
-    hide-toolbar
     :initial-list-width="380"
     :list-min="320"
     :list-max="540"

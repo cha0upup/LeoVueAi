@@ -1,25 +1,24 @@
-.plugin-form {
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
 .dialog-layout {
   display: flex;
-  gap: 20px;
+  gap: var(--space-4);
   align-items: stretch;
 }
 
 .info-pane {
   flex: 0 0 36%;
-  min-width: 320px;
+  min-width: 260px;
   display: flex;
   flex-direction: column;
 }
 
 .info-pane .form-section {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .code-pane {
@@ -27,7 +26,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--el-spacing-large);
-  min-height: 100%;
 }
 
 .form-section {
@@ -51,7 +49,6 @@
 }
 
 .code-block {
-  flex: 1;
   display: flex;
   flex-direction: column;
 }
@@ -61,7 +58,6 @@
   border-radius: var(--el-border-radius-base);
   background: var(--el-bg-color);
   overflow: hidden;
-  max-height: 32vh;
   flex: 1;
 }
 
@@ -87,7 +83,6 @@
 
 .code-editor-body {
   padding: var(--el-spacing-base);
-  height: 100%;
 }
 
 .no-padding-item .el-form-item__content {
@@ -98,25 +93,6 @@
 .bytecode-input .el-textarea__inner {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   line-height: 1.6;
-}
-
-.plugin-form .el-select__wrapper,
-.plugin-form .el-input__wrapper,
-.plugin-form .el-textarea__inner {
-  border-radius: 10px;
-}
-
-.form-inline-actions {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.submit-btn,
-.cancel-btn {
-  font-size: var(--el-font-size-base);
-  font-weight: 500;
 }
 
 @media (max-width: 1024px) {

@@ -1,5 +1,9 @@
 <template>
   <div class="audit-statistics">
+    <PageHeader
+      title="审计统计"
+      :icon="iconMap.trendCharts"
+    />
     <section class="query-grid">
       <article
         v-for="card in queryCards"
@@ -190,6 +194,7 @@
 </template>
 
 <script setup>
+import PageHeader from '@/components/common/PageHeader.vue'
 import { computed, ref, reactive, onMounted } from 'vue'
 
 import { icons as iconMap } from '@/utils/icons.js'

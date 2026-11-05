@@ -1,18 +1,13 @@
 /*
  * design-tokens.css —— 功能模块统一视觉语言
  *
- * 这里只补充 global.css 之外、用于「模块级布局/交互」的 token。
- * 字号阶梯、颜色、阴影等基础令牌已在 global.css 定义，请勿在此重复。
- *
- * 命名空间：所有 token 以 --module- / --panel- / --list- / --motion- / --z- 等开头，
- * 避免与 Element Plus（--el-）和 app 全局（--app-）冲突。
+ * 定义页面语义、排版密度和模块交互使用的令牌；主题基础色来自 global.css 和主题存储。
  */
 
 :root {
   /* ============================================================
    * 基础语义层：页面、文字、排版与密度
    * ============================================================ */
-  --app-brand-color: var(--el-color-primary);
   --app-page-background: var(--el-bg-color-page);
   --app-container-background: var(--el-bg-color-overlay);
   --app-hover-background: color-mix(
@@ -26,9 +21,7 @@
     var(--el-bg-color-overlay)
   );
   --app-text-primary: var(--el-text-color-primary);
-  --app-text-secondary: var(--el-text-color-regular);
   --app-text-muted: var(--el-text-color-secondary);
-  --app-text-placeholder: var(--el-text-color-placeholder);
   --app-divider-color: var(--el-border-color-lighter);
   --app-border-color: var(--el-border-color);
 
@@ -38,7 +31,6 @@
   --font-size-label: 12px;
   --font-size-helper: 12px;
   --font-size-table: 13px;
-  --font-size-code: 12px;
   --font-weight-title: 600;
   --font-weight-medium: 500;
   --font-family-code: var(--el-font-family-mono);
@@ -48,8 +40,6 @@
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
 
   --control-height-sm: 28px;
   --control-height: 32px;
@@ -60,7 +50,9 @@
   --radius-tag: 4px;
   --radius-container: 8px;
   --radius-overlay: 10px;
-  --border-default: 1px solid var(--app-border-color);
+  --dialog-width-sm: 480px;
+  --dialog-width-md: 720px;
+  --dialog-width-lg: 1040px;
   --shadow-overlay: 0 8px 24px color-mix(in srgb, var(--el-text-color-primary) 10%, transparent);
 
   /* ============================================================
@@ -69,33 +61,8 @@
    * 各功能模块（list+detail、tree+editor、form 等）共用的尺寸约定。
    */
 
-  /* 顶栏（page-toolbar）紧凑高度——容纳 icon + h1 + stats 的最小高度 */
-  --module-header-height: 32px;
   /* 顶栏与主体的间距 */
   --module-gap: var(--space-3);
-  /* 模块内边距（home-content 之内） */
-  --module-padding: 0;
-
-  /* ============================================================
-   * 面板（list-panel / detail-panel）
-   * ============================================================ */
-
-  --panel-radius: var(--radius-container);
-  --panel-border-color: var(
-    --workbench-border-soft,
-    color-mix(in srgb, var(--el-border-color) 42%, transparent)
-  );
-  --panel-border: 1px solid var(--panel-border-color);
-  --panel-bg: color-mix(in srgb, var(--app-card-background) 82%, transparent);
-
-  /* 面板内边距（垂直 / 水平），用于 panel-header / toolbar-stack / list-scroll */
-  --panel-padding-y: 10px;
-  --panel-padding-x: 14px;
-
-  /* 面板头部（h2 + 操作按钮） */
-  --panel-header-height: 40px;
-  --panel-header-fs: 13px;
-  --panel-header-fw: 600;
 
   /* ============================================================
    * 列表项（skill-item / disguise-item / 等）
@@ -123,27 +90,11 @@
   );
 
   /* ============================================================
-   * 详情面板头部（detail-header）
-   * ============================================================ */
-
-  --detail-header-padding-y: 10px;
-  --detail-header-padding-x: 16px;
-  --detail-title-fs: 16px;
-  --detail-title-fw: 600;
-
-  /* ============================================================
    * 状态指示
    * ============================================================ */
 
-  /* 禁用项：饱和度 + 透明度同时降低，让禁用态语义更鲜明 */
+  /* 禁用主机与会话操作的透明度 */
   --disabled-opacity: 0.55;
-  --disabled-saturation: 0.4;
-  --disabled-opacity-hover: 0.85;
-  --disabled-saturation-hover: 0.7;
-
-  /* 未保存（dirty）指示色 */
-  --dirty-color: var(--el-color-warning);
-  --dirty-bg: var(--el-color-warning-light-9);
 
   /* ============================================================
    * 动效
@@ -154,7 +105,6 @@
   --motion-base: 0.18s; /* 一般状态切换 */
   --motion-slow: 0.24s; /* 折叠/展开等大块切换 */
   --motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
-  --motion-easing-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ============================================================
    * 焦点/可访问性
@@ -190,19 +140,12 @@
    * 应用层统一管理，避免各组件随意 z-index: 9999。
    */
   --z-base: 1;
-  --z-toolbar: 10;
-  --z-dropdown: 100;
   --z-sticky-bar: 200; /* 批量操作条等 */
-  --z-overlay: 1000; /* drag-over 蒙层 */
-  --z-dialog: 2000; /* 走 ElementPlus 弹窗 */
-  --z-tooltip: 3000;
-  --z-toast: 4000;
 
   /* ============================================================
    * 工具按钮（list 项 hover action / panel icon button）
    * ============================================================ */
   --icon-btn-size: 26px;
-  --icon-btn-size-sm: 22px;
   --icon-btn-radius: 4px;
   --icon-btn-color: var(--el-text-color-secondary);
   --icon-btn-bg-hover: var(--el-fill-color);

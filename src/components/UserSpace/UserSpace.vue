@@ -1,14 +1,10 @@
 <template>
   <section class="artifact-library module-shell">
-    <header class="library-header">
-      <div class="library-heading">
-        <el-icon><Icon :icon="iconMap.folderOpened" /></el-icon>
-        <div>
-          <h1>成果库</h1>
-          <p>保存脚本产物、分析报告与任务输出，便于查找和复用。</p>
-        </div>
-      </div>
-      <div class="library-actions">
+    <PageHeader
+      title="成果库"
+      :icon="iconMap.folderOpened"
+    >
+      <template #actions>
         <span class="storage-summary">{{ overview.totalFiles }} 份成果 · {{ formatFileSize(overview.totalBytes) }}</span>
         <el-button
           type="primary"
@@ -19,8 +15,8 @@
           <el-icon><Icon :icon="iconMap.upload" /></el-icon>
           导入成果
         </el-button>
-      </div>
-    </header>
+      </template>
+    </PageHeader>
     <section
       class="catalog-panel"
       aria-label="成果列表"
@@ -253,6 +249,7 @@
 </template>
 
 <script setup>
+import PageHeader from '@/components/common/PageHeader.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ARTIFACT_CATEGORIES, ARTIFACT_SOURCE_LABELS } from '@/constants/artifacts.js'
 import { icons as iconMap } from '@/utils/icons.js'
@@ -458,8 +455,6 @@ onUnmounted(() => { clearTimeout(searchTimer); ++listSequence; ++overviewSequenc
 </script>
 
 <style scoped>
-@import '@/styles/workbench-toolbar-shared.css';
-
 .artifact-library {
   --workspace-border-soft: var(--app-divider-color);
   display: flex;
@@ -468,32 +463,11 @@ onUnmounted(() => { clearTimeout(searchTimer); ++listSequence; ++overviewSequenc
   min-height: 0;
   gap: 12px;
 }
-.library-header,
-.library-heading,
-.library-actions,
 .catalog-toolbar,
 .catalog-footer {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-.library-header {
-  justify-content: space-between;
-  padding: 4px 2px;
-  flex-shrink: 0;
-}
-.library-heading > .el-icon {
-  font-size: 22px;
-  color: var(--el-color-primary);
-}
-.library-heading h1 {
-  margin: 0;
-  font-size: var(--font-size-page-title);
-}
-.library-heading p {
-  margin: 5px 0 0;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
 }
 .storage-summary,
 .result-count,
@@ -550,14 +524,14 @@ onUnmounted(() => { clearTimeout(searchTimer); ++listSequence; ++overviewSequenc
   opacity: 0.8;
 }
 .catalog-toolbar {
-  padding: 12px 16px;
+  padding: 10px var(--space-4);
   flex-wrap: wrap;
   flex-shrink: 0;
 }
 .catalog-search {
   flex: 1;
   min-width: 220px;
-  max-width: 420px;
+  max-width: 360px;
 }
 .source-filter {
   width: 150px;
@@ -654,14 +628,7 @@ onUnmounted(() => { clearTimeout(searchTimer); ++listSequence; ++overviewSequenc
   border-top: 1px solid var(--app-divider-color);
 }
 @media (max-width: 900px) {
-  .library-header {
-    align-items: flex-start;
-  }
-  .library-actions {
-    flex-shrink: 0;
-  }
-  .storage-summary,
-  .library-heading p {
+  .storage-summary {
     display: none;
   }
   .catalog-footer {

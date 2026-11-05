@@ -19,34 +19,60 @@
         </el-icon>
       </button>
       <template #dropdown>
-        <el-dropdown-menu class="theme-menu">
-          <div class="theme-menu-head">
-            <span class="theme-menu-title">界面主题</span>
-            <span class="theme-menu-tip">切换后立即生效</span>
-          </div>
+        <el-dropdown-menu
+          class="theme-menu"
+          aria-label="界面主题"
+        >
           <el-dropdown-item
             v-for="theme in availableThemes"
             :key="theme.value"
             :command="theme.value"
+            class="theme-card"
             :class="{ 'is-active': currentTheme === theme.value }"
+            :aria-current="currentTheme === theme.value ? 'true' : undefined"
           >
             <div class="theme-item">
               <div
                 class="theme-preview"
-                :style="{ background: themePreviewColors[theme.value] || themePreviewColors.light }"
+                :data-theme="theme.value"
+                aria-hidden="true"
               >
-                <span class="theme-preview-dot" />
+                <div class="theme-preview__toolbar">
+                  <i /><i /><i />
+                </div>
+                <div class="theme-preview__body">
+                  <div class="theme-preview__sidebar">
+                    <i /><i /><i />
+                  </div>
+                  <div class="theme-preview__content">
+                    <div class="theme-preview__heading" />
+                    <div class="theme-preview__panel">
+                      <i /><i /><i />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="theme-text">
+              <div class="theme-card__footer">
+                <el-icon
+                  class="theme-card__icon"
+                  aria-hidden="true"
+                >
+                  <Icon :icon="theme.value === 'light' ? iconMap.sunny : iconMap.moon" />
+                </el-icon>
                 <span class="theme-name">{{ theme.name }}</span>
-                <span class="theme-value">{{ themeDescriptions[theme.value] || '界面主题' }}</span>
+                <span
+                  class="theme-card__indicator"
+                  :class="{ 'is-checked': currentTheme === theme.value }"
+                  aria-hidden="true"
+                >
+                  <el-icon
+                    v-if="currentTheme === theme.value"
+                    class="check-icon"
+                  >
+                    <Icon :icon="iconMap.check" />
+                  </el-icon>
+                </span>
               </div>
-              <el-icon
-                v-if="currentTheme === theme.value"
-                class="check-icon"
-              >
-                <Icon :icon="iconMap.check" />
-              </el-icon>
             </div>
           </el-dropdown-item>
         </el-dropdown-menu>
@@ -66,16 +92,6 @@ const availableThemes = themeStore.getAvailableThemes()
 const currentThemeMeta = computed(() => themeStore.getCurrentTheme())
 const themeButtonLabel = computed(() => `切换主题（当前：${currentThemeMeta.value?.name || '默认主题'}）`)
 const iconMap = icons
-
-const themeDescriptions = {
-  light: '参考 IDEA Light',
-  dark: '参考 IDEA Darcula'
-}
-
-const themePreviewColors = {
-  light: '#edf3ff',
-  dark: '#2b2d30'
-}
 
 const currentThemeIcon = computed(() => currentTheme.value === 'light' ? iconMap.sunny : iconMap.moon)
 </script>
@@ -114,93 +130,192 @@ const currentThemeIcon = computed(() => currentTheme.value === 'light' ? iconMap
 }
 
 .theme-menu {
-  min-width: 220px;
-  padding: 6px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 76%, transparent);
-  box-shadow: var(--app-shell-shadow-strong);
-}
-
-.theme-menu-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px 8px;
-}
-
-.theme-menu-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-}
-
-.theme-menu-tip {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 260px;
+  max-width: calc(100vw - 24px);
+  padding: 8px;
+  border-radius: 12px;
 }
 
 .theme-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  min-width: 0;
   width: 100%;
 }
 
 .theme-preview {
-  width: 28px;
-  height: 28px;
+  --preview-page: #f0f3f8;
+  --preview-surface: #ffffff;
+  --preview-sidebar: #e6ebf3;
+  --preview-line: #c8d2e2;
+  --preview-edge: #dce3ee;
+  height: 66px;
+  overflow: hidden;
+  border: 1px solid var(--preview-edge);
+  border-radius: 7px;
+  background: var(--preview-page);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 4%);
+}
+
+.theme-preview[data-theme='dark'] {
+  --preview-page: #171c25;
+  --preview-surface: #29313e;
+  --preview-sidebar: #222a36;
+  --preview-line: #49586d;
+  --preview-edge: #354052;
+}
+
+.theme-preview__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 12px;
+  padding: 0 5px;
+  border-bottom: 1px solid var(--preview-edge);
+  background: var(--preview-surface);
+}
+
+.theme-preview__toolbar i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--preview-line);
+}
+
+.theme-preview__body {
+  display: flex;
+  height: calc(100% - 12px);
+}
+
+.theme-preview__sidebar {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  width: 22%;
+  padding: 7px 4px;
+  background: var(--preview-sidebar);
+}
+
+.theme-preview__sidebar i {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--preview-line);
+}
+
+.theme-preview__sidebar i:first-child {
+  background: var(--el-color-primary);
+}
+
+.theme-preview__content {
+  flex: 1;
+  min-width: 0;
+  padding: 7px;
+}
+
+.theme-preview__heading {
+  width: 56%;
+  height: 4px;
+  margin-bottom: 6px;
+  border-radius: 2px;
+  background: var(--preview-line);
+}
+
+.theme-preview__panel {
+  display: grid;
+  gap: 3px;
+  padding: 5px;
+  border-radius: 3px;
+  background: var(--preview-surface);
+}
+
+.theme-preview__panel i {
+  width: 88%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--preview-line);
+}
+
+.theme-preview__panel i:nth-child(2) {
+  width: 62%;
+}
+
+.theme-preview__panel i:last-child {
+  width: 74%;
+}
+
+.theme-card__footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.theme-card__icon {
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+}
+
+.theme-card__indicator {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
-  border: 1px solid color-mix(in srgb, var(--el-border-color) 76%, transparent);
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
+  border: 1px solid var(--el-border-color);
+  border-radius: 50%;
+  color: #fff;
 }
 
-.theme-preview-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--app-control-background-hover);
-  box-shadow: var(--app-shell-shadow-soft);
-}
-
-.theme-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
+.theme-card__indicator.is-checked {
+  border-color: var(--el-color-primary);
+  background: var(--el-color-primary);
 }
 
 .theme-name {
+  flex: 1;
   font-size: 12px;
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
-.theme-value {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-}
-
 .check-icon {
-  color: var(--el-color-primary);
-  font-size: 15px;
+  font-size: 11px;
 }
 
-:deep(.el-dropdown-menu__item.is-active) {
-  background-color: color-mix(
-    in srgb,
-    var(--el-color-primary) 12%,
-    var(--app-control-background-soft)
-  );
-  color: var(--el-color-primary);
-  border-radius: 10px;
+:deep(.theme-card.el-dropdown-menu__item) {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 7px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 9px;
+  line-height: 18px;
+  background: var(--el-bg-color-overlay);
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-:deep(.el-dropdown-menu__item) {
-  margin: 2px 0;
-  padding: 10px 8px;
-  border-radius: 10px;
+:deep(.theme-card.el-dropdown-menu__item:hover) {
+  border-color: var(--el-color-primary-light-5);
+  background: var(--app-control-background-soft);
+}
+
+:deep(.theme-card.el-dropdown-menu__item.is-active) {
+  border-color: var(--el-color-primary);
+  background: color-mix(in srgb, var(--el-color-primary) 5%, var(--el-bg-color-overlay));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--el-color-primary) 12%, transparent);
+}
+
+:deep(.theme-card.el-dropdown-menu__item:focus-visible) {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :deep(.theme-card.el-dropdown-menu__item) {
+    transition: none;
+  }
 }
 </style>

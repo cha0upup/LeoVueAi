@@ -619,12 +619,15 @@ watch(
 }
 
 .main-content {
+  container: console-workspace / inline-size;
+  position: relative;
   flex: 1;
   display: flex;
   overflow: hidden;
   writing-mode: horizontal-tb;
   text-orientation: mixed;
   min-width: 0;
+  min-height: 0;
 }
 
 .content-area {
@@ -791,9 +794,4 @@ watch(
   50%       { opacity: 0.6; transform: scale(1.1); }
 }
 
-@media (max-width: 900px) {
-  .main-content > .ai-dock {
-    max-width: 50%;
-  }
-}
 </style>

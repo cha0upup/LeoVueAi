@@ -1,9 +1,6 @@
 <template>
   <ManagerLayout
-    title="插件管理"
-    :icon="iconMap.plugin"
     module-class="plugin-manager"
-    hide-toolbar
     :initial-list-width="320"
     :list-min="260"
     :list-max="480"
@@ -34,6 +31,7 @@
           type="button"
           class="scope-tab"
           :class="{ 'is-active': activeType === t.value }"
+          :aria-pressed="activeType === t.value"
           @click="activeType = t.value"
         >
           {{ t.label }}
@@ -136,7 +134,6 @@
             :description="item.pluginId"
             :icon="iconMap.plugin"
             :active="item.pluginId === selectedPluginId"
-            selectable
             :selected="selectedIds.has(item.pluginId)"
             :in-selection-mode="selectedIds.size > 0"
             @click="selectedPlugin = item"

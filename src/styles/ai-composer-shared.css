@@ -134,3 +134,11 @@
   }
 
 }
+
+@media (max-height: 600px) {
+  .composer-dock { padding-block: var(--space-2); }
+  .composer-input :deep(.el-textarea__inner) {
+    max-height: min(160px, 28dvh) !important;
+    overflow-y: auto;
+  }
+}

@@ -1,5 +1,20 @@
 <template>
   <div class="team-manager">
+    <PageHeader
+      title="团队管理"
+      :icon="iconMap.userFilled"
+    >
+      <template #actions>
+        <el-button
+          v-if="isAdmin"
+          type="primary"
+          @click="openAddTeamDialog"
+        >
+          <el-icon><Icon :icon="iconMap.plus" /></el-icon>
+          新增团队
+        </el-button>
+      </template>
+    </PageHeader>
     <AdminToolbar>
       <el-input
         v-model="searchKeyword"
@@ -25,37 +40,26 @@
       </template>
     </AdminToolbar>
 
-    <AdminStatsGrid :columns="3">
+    <StatsStrip :columns="3">
       <article class="metric-card">
-        <span class="metric-icon primary"><el-icon><Icon :icon="iconMap.userFilled" /></el-icon></span>
-        <div><strong class="metric-value">{{ teamData.length }}</strong><span class="metric-label">团队总数</span></div>
+        <span class="metric-label">团队总数</span>
+        <strong class="metric-value">{{ teamData.length }}</strong>
       </article>
       <article class="metric-card">
-        <span class="metric-icon success"><el-icon><Icon :icon="iconMap.user" /></el-icon></span>
-        <div><strong class="metric-value">{{ assignedLeaderCount }}</strong><span class="metric-label">已分配队长</span></div>
+        <span class="metric-label">已分配队长</span>
+        <strong class="metric-value">{{ assignedLeaderCount }}</strong>
       </article>
       <article class="metric-card">
-        <span class="metric-icon warning"><el-icon><Icon :icon="iconMap.warning" /></el-icon></span>
-        <div><strong class="metric-value">{{ unassignedLeaderCount }}</strong><span class="metric-label">待分配队长</span></div>
+        <span class="metric-label">待分配队长</span>
+        <strong class="metric-value">{{ unassignedLeaderCount }}</strong>
       </article>
-    </AdminStatsGrid>
+    </StatsStrip>
 
     <AdminWorkspacePanel title="团队列表">
       <template #tags>
         <el-tag effect="light">
           结果 {{ filteredTeams.length }}
         </el-tag>
-      </template>
-
-      <template #actions>
-        <el-button
-          v-if="isAdmin"
-          type="primary"
-          @click="openAddTeamDialog"
-        >
-          <el-icon><Icon :icon="iconMap.plus" /></el-icon>
-          新增团队
-        </el-button>
       </template>
 
       <el-table
@@ -185,6 +189,7 @@
 </template>
 
 <script setup>
+import PageHeader from '@/components/common/PageHeader.vue'
 import { computed, ref, reactive, onMounted } from 'vue'
 import { ElNotification } from 'element-plus'
 import { confirmDelete } from '@/utils/confirmUtils.js'
@@ -200,7 +205,7 @@ import {
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import { useAuth } from '@/composables/useAuth.js'
 import AdminToolbar from '@/components/Admin/shared/AdminToolbar.vue'
-import AdminStatsGrid from '@/components/Admin/shared/AdminStatsGrid.vue'
+import StatsStrip from '@/components/common/StatsStrip.vue'
 import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
 
 const iconMap = icons
@@ -341,27 +346,12 @@ onMounted(async () => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-3);
   overflow: auto;
 }
 
 .toolbar-search {
   width: min(380px, 100%);
-}
-
-.metric-icon.primary {
-  background: color-mix(in srgb, var(--el-color-primary) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-primary);
-}
-
-.metric-icon.success {
-  background: color-mix(in srgb, var(--el-color-success) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-success);
-}
-
-.metric-icon.warning {
-  background: color-mix(in srgb, var(--el-color-warning) 14%, var(--el-bg-color-overlay));
-  color: var(--el-color-warning);
 }
 
 .team-table {

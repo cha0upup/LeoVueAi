@@ -896,6 +896,7 @@ onUnmounted(() => {
 }
 
 .ai-system-warn {
+  overflow-wrap: anywhere;
   margin: 6px 0;
   padding: 7px 14px;
   border-radius: 8px;
@@ -918,6 +919,10 @@ onUnmounted(() => {
 }
 
 @container platform-assistant (max-width: 460px) {
+  .assistant-header { min-height: 48px; padding-inline: var(--space-2); gap: var(--space-2); }
+  .assistant-icon { width: 28px; height: 28px; border-radius: var(--radius-control); }
+  .assistant-identity { gap: var(--space-2); }
+  .assistant-actions { gap: var(--space-1); }
   .header-action span { display: none; }
   .header-action { width: 30px; padding: 0; }
 }
