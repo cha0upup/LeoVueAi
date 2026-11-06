@@ -104,8 +104,15 @@ export function useSshWorkspace({
       if (current(epoch, sessionId) && request === listRequest) loading.value = false
     }
   }
+  function invalidateProfileList() {
+    listRequest++
+    abort?.abort()
+    loading.value = false
+  }
   function saved(profile) {
     const index = profiles.value.findIndex((row) => row.profileId === profile.profileId)
+    if (index >= 0 && Number(profiles.value[index].version) > Number(profile.version)) return
+    invalidateProfileList()
     if (index < 0) profiles.value = [profile, ...profiles.value]
     else
       profiles.value = profiles.value.map((row) =>
@@ -201,8 +208,10 @@ export function useSshWorkspace({
       })
       if (!confirmed || !current(epoch, sessionId)) return
       await api.delete({ sessionId, profileId: id, version: profile.version })
-      if (current(epoch, sessionId))
+      if (current(epoch, sessionId)) {
+        invalidateProfileList()
         profiles.value = profiles.value.filter((row) => row.profileId !== id)
+      }
     } catch (error) {
       if (current(epoch, sessionId)) listError.value = error.message || '删除 SSH 配置失败'
     } finally {

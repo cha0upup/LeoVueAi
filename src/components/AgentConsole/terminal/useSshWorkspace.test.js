@@ -220,4 +220,26 @@ describe('saved SSH workspace lifecycle', () => {
     await request
     expect(model.profiles.value[0].profileId).toBe(profile.profileId)
   })
+  it.each(['save', 'delete'])('ignores an older list response after a successful %s', async (operation) => {
+    const { model, api } = setup()
+    await flush()
+    const pending = deferred()
+    api.list.mockReturnValueOnce(pending.promise)
+    const request = model.refreshProfiles()
+    const signal = api.list.mock.calls.at(-1)[1]
+    if (operation === 'save') model.saved({ ...profile, version: 2, name: 'Updated' })
+    else await model.deleteProfile(profile)
+    pending.resolve({ data: [{ ...profile }] })
+    await request
+    expect(signal.aborted).toBe(true)
+    expect(model.loading.value).toBe(false)
+    expect(model.profiles.value).toEqual(operation === 'save' ? [{ ...profile, version: 2, name: 'Updated' }] : [])
+  })
+  it('does not replace a newer profile with an out-of-order save response', async () => {
+    const { model } = setup()
+    await flush()
+    model.saved({ ...profile, version: 3, name: 'Latest' })
+    model.saved({ ...profile, version: 2, name: 'Older' })
+    expect(model.profiles.value[0]).toMatchObject({ version: 3, name: 'Latest' })
+  })
 })

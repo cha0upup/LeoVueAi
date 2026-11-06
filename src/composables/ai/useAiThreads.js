@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch, getCurrentScope, onScopeDispose } from 'vue'
 import {
   nodeAiThreadListApi,
   nodeAiThreadCreateApi,
@@ -25,6 +25,30 @@ export function useAiThreads({ sessionId }) {
   const loading        = ref(false)
   const requestGuard = createLatestRequestGuard(['threads'])
   let loadingSequence = 0
+  let sessionGeneration = 0
+  let disposed = false
+
+  const invalidateSession = () => {
+    sessionGeneration += 1
+    loadingSequence += 1
+    requestGuard.invalidate()
+    loading.value = false
+  }
+  const canRequest = () => !disposed && !!sessionId.value
+  const captureSession = () => {
+    const requestSessionId = sessionId.value
+    const generation = sessionGeneration
+    return {
+      requestSessionId,
+      isCurrent: () => !disposed && generation === sessionGeneration && requestSessionId === sessionId.value
+    }
+  }
+  // The caller owns selection and may still need the old thread ID to stop an active turn.
+  watch(sessionId, invalidateSession, { flush: 'sync' })
+  if (getCurrentScope()) onScopeDispose(() => {
+    disposed = true
+    invalidateSession()
+  })
 
   // ── 线程列表 ──────────────────────────────────────────────────────────────
 
@@ -37,14 +61,14 @@ export function useAiThreads({ sessionId }) {
   }
 
   const fetchThreads = async ({ preserveActive = false, silent = false } = {}) => {
-    if (!sessionId.value) return
-    const requestSessionId = sessionId.value
+    if (!canRequest()) return
+    const { requestSessionId, isCurrent } = captureSession()
     const sequence = requestGuard.next('threads')
     const currentLoadingSequence = silent ? null : ++loadingSequence
     if (!silent) loading.value = true
     try {
       const res = await nodeAiThreadListApi({ sessionId: requestSessionId })
-      if (!requestGuard.isCurrent('threads', sequence) || requestSessionId !== sessionId.value) return
+      if (!requestGuard.isCurrent('threads', sequence) || !isCurrent()) return
       const serverThreads = Array.isArray(res.data?.threads) ? res.data.threads : []
       threads.value = preserveActive ? mergeThreadList(serverThreads) : serverThreads
 
@@ -58,11 +82,11 @@ export function useAiThreads({ sessionId }) {
         activeThreadId.value = threads.value[0].threadId
       }
     } catch (e) {
-      if (!silent && requestGuard.isCurrent('threads', sequence)) {
+      if (!silent && isCurrent() && requestGuard.isCurrent('threads', sequence)) {
         showError('加载线程列表失败：' + (e?.message || '未知错误'))
       }
     } finally {
-      if (!silent && currentLoadingSequence === loadingSequence) loading.value = false
+      if (!silent && isCurrent() && currentLoadingSequence === loadingSequence) loading.value = false
     }
   }
 
@@ -78,15 +102,15 @@ export function useAiThreads({ sessionId }) {
    * @returns {Promise<{threadId: string, title: string, reconSummaryLoaded: boolean}>}
    */
   const createThread = async ({ title, configId } = {}) => {
-    if (!sessionId.value) return null
-    const requestSessionId = sessionId.value
+    if (!canRequest()) return null
+    const { requestSessionId, isCurrent } = captureSession()
     try {
       const res = await nodeAiThreadCreateApi({
         sessionId: requestSessionId,
         title,
         configId
       })
-      if (requestSessionId !== sessionId.value) return null
+      if (!isCurrent()) return null
       requestGuard.invalidate(['threads'])
       const info = res.data
       // 追加到列表头部
@@ -103,7 +127,7 @@ export function useAiThreads({ sessionId }) {
       activeThreadId.value = info.threadId
       return info
     } catch (e) {
-      if (requestSessionId === sessionId.value) {
+      if (isCurrent()) {
         showError('创建线程失败：' + (e?.message || '未知错误'))
       }
       return null
@@ -113,11 +137,11 @@ export function useAiThreads({ sessionId }) {
   // ── 删除线程 ──────────────────────────────────────────────────────────────
 
   const deleteThread = async (threadId) => {
-    if (!sessionId.value || !threadId) return
-    const requestSessionId = sessionId.value
+    if (!canRequest() || !threadId) return
+    const { requestSessionId, isCurrent } = captureSession()
     try {
       await nodeAiThreadDeleteApi({ sessionId: requestSessionId, threadId })
-      if (requestSessionId !== sessionId.value) return
+      if (!isCurrent()) return
       requestGuard.invalidate(['threads'])
       threads.value = threads.value.filter(t => t.threadId !== threadId)
       // 若删除的是活跃线程，切换到第一个
@@ -125,7 +149,7 @@ export function useAiThreads({ sessionId }) {
         activeThreadId.value = threads.value.length > 0 ? threads.value[0].threadId : null
       }
     } catch (e) {
-      if (requestSessionId === sessionId.value) {
+      if (isCurrent()) {
         showError('删除线程失败：' + (e?.message || '未知错误'))
       }
     }
@@ -134,16 +158,16 @@ export function useAiThreads({ sessionId }) {
   // ── 重命名线程 ────────────────────────────────────────────────────────────
 
   const renameThread = async (threadId, title) => {
-    if (!sessionId.value || !threadId || !title?.trim()) return
-    const requestSessionId = sessionId.value
+    if (!canRequest() || !threadId || !title?.trim()) return
+    const { requestSessionId, isCurrent } = captureSession()
     try {
       await nodeAiThreadRenameApi({ sessionId: requestSessionId, threadId, title: title.trim() })
-      if (requestSessionId !== sessionId.value) return
+      if (!isCurrent()) return
       requestGuard.invalidate(['threads'])
       const t = threads.value.find(t => t.threadId === threadId)
       if (t) t.title = title.trim()
     } catch (e) {
-      if (requestSessionId === sessionId.value) {
+      if (isCurrent()) {
         showError('重命名失败：' + (e?.message || '未知错误'))
       }
     }
@@ -167,8 +191,8 @@ export function useAiThreads({ sessionId }) {
    * @returns {Promise<{messages: object[], nextBeforeSequence: number|null, hasMore: boolean}>}
    */
   const loadMessages = async (threadId, offset = 0, limit = 50) => {
-    if (!sessionId.value || !threadId) return { messages: [], nextBeforeSequence: null, hasMore: false }
-    const requestSessionId = sessionId.value
+    if (!canRequest() || !threadId) return { messages: [], nextBeforeSequence: null, hasMore: false }
+    const { requestSessionId, isCurrent } = captureSession()
     try {
       const res = await nodeAiThreadMessagesApi({
         sessionId: requestSessionId,
@@ -176,12 +200,11 @@ export function useAiThreads({ sessionId }) {
         offset,
         limit
       })
-      if (requestSessionId !== sessionId.value) return { messages: [], nextBeforeSequence: null, hasMore: false, stale: true }
+      if (!isCurrent()) return { messages: [], nextBeforeSequence: null, hasMore: false, stale: true }
       return normalizeAiHistoryPage(res)
     } catch (e) {
-      if (requestSessionId === sessionId.value) {
-        showError('加载历史消息失败：' + (e?.message || '未知错误'))
-      }
+      if (!isCurrent()) return { messages: [], nextBeforeSequence: null, hasMore: false, stale: true }
+      showError('加载历史消息失败：' + (e?.message || '未知错误'))
       throw e
     }
   }

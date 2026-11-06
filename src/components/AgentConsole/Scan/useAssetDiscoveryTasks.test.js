@@ -185,6 +185,22 @@ describe('asset discovery task synchronization', () => {
     expect(current.engine.syncNetworkWorkflowTasks.mock.calls.filter(([session]) => session === 'one')).toHaveLength(1)
   })
 
+  it('stops cyclic live-page cursors instead of repeatedly fetching the same pages', async () => {
+    current = fixture([], { pollIntervalMs: 0 })
+    await current.view.syncTasks()
+    let pages = 0
+    current.engine.syncNetworkWorkflowTasks.mockImplementation(async (_session, { scope, cursor }) => {
+      // Bound the fixture as well, so the regression fails without leaving an infinite promise loop.
+      if (scope === 'history' || ++pages > 4) return { tasks: [], hasMore: false, nextCursor: '' }
+      return { tasks: [], hasMore: true, nextCursor: cursor === 'page-a' ? 'page-b' : 'page-a' }
+    })
+    await current.view.syncTasks()
+    expect(pages).toBe(3)
+    expect(current.view.loadError.value).toBe('活跃任务分页游标异常')
+    expect(current.view.loading.value).toBe(false)
+    expect(current.errors).toHaveBeenCalledOnce()
+  })
+
   it('supports task-center selection and an externally owned polling timer', async () => {
     vi.useFakeTimers()
     const scan = task('scan', 'one')

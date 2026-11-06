@@ -86,13 +86,15 @@ export function useAssetDiscoveryTasks({ sessionId, taskEngine, onError, pollInt
         // Discover live tasks independently of how much history is loaded.
         const liveIds = new Set()
         if (!more) {
+          const visitedCursors = new Set()
           let cursor = ''
           do {
+            visitedCursors.add(cursor)
             const page = await taskEngine.syncNetworkWorkflowTasks(currentSession, { scope: 'active', cursor })
             if (!isCurrent(token)) return
             page.tasks.forEach(task => liveIds.add(task.id))
             if (!page.hasMore) break
-            if (!page.nextCursor || page.nextCursor === cursor) throw new Error('活跃任务分页游标异常')
+            if (!page.nextCursor || visitedCursors.has(page.nextCursor)) throw new Error('活跃任务分页游标异常')
             cursor = page.nextCursor
           } while (isCurrent(token))
         }
