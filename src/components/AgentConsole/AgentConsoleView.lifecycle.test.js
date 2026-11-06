@@ -70,7 +70,7 @@ const Console = compileClientComponent(new URL('./AgentConsoleView.vue', import.
     getCurrentHostIdApi: async () => ({ data: { currentHostId: 'fixture-host' } })
   },
   '@/services/api/agent-node.js': { getAgentNodeCapabilitiesApi: async () => ({ data: { capabilities: [] } }) },
-  '@/composables/useAgentConsoleModules.js': {
+  '@/composables/agent/useAgentConsoleModules.js': {
     supportsCapabilityRequirements: () => true,
     useAgentConsoleModules: () => ({ moduleDefinitions: definitions, moduleMap: Object.fromEntries(definitions.map(d => [d.key, d])) })
   },

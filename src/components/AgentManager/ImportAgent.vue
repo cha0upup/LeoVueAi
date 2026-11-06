@@ -227,7 +227,7 @@ import { createDefaultAgent } from '@/utils/constants.js'
 import { useDialog } from '@/utils/dialogUtils.js'
 import { addAgentApi } from '@/services/api/agent-manage.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
-import { useAgentImportBatch } from '@/composables/useAgentImportBatch.js'
+import { useAgentImportBatch } from '@/composables/agent/useAgentImportBatch.js'
 import { decodeAgentTransferPayload, parseAgentTransferPayload } from '@/utils/agentTransfer.js'
 
 const emit = defineEmits(['refresh'])

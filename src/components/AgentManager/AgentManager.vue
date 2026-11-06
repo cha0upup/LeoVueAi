@@ -277,7 +277,7 @@ import ImportAgent from './ImportAgent.vue'
 import AgentDetailPanel from './AgentDetailPanel.vue'
 import AgentTable from './AgentTable.vue'
 import AgentBatchToolbar from './AgentBatchToolbar.vue'
-import { useAgentSelection } from '@/composables/useAgentSelection.js'
+import { useAgentSelection } from '@/composables/agent/useAgentSelection.js'
 import ShareAgent from './ShareAgent.vue'
 import ProjectAssignmentDialog from './ProjectAssignmentDialog.vue'
 import ProjectEditorDialog from './ProjectEditorDialog.vue'
@@ -294,7 +294,7 @@ import {
   buildAgentUpdatePayload,
   normalizeAgentList,
   useAgentDirectory
-} from '@/composables/useAgentDirectory.js'
+} from '@/composables/agent/useAgentDirectory.js'
 import { useProjectDirectory } from '@/composables/useProjectDirectory.js'
 
 const logger = createLogger('AgentManager')

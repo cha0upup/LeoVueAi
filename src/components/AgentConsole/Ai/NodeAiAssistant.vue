@@ -168,12 +168,12 @@ import {
 } from '@/services/api/node-ai.js'
 import { getReconSummaryApi, generateReconSummaryDigestApi } from '@/services/api/sessions.js'
 
-import { useAiChat } from '@/composables/useAiChat.js'
-import { useAiHistory } from '@/composables/useAiHistory.js'
-import { useAiReportArchive } from '@/composables/useAiReportArchive.js'
-import { shouldRecoverAiConversation } from '@/composables/aiConversationRecovery.js'
-import { useAiThreads } from '@/composables/useAiThreads.js'
-import { useAiChannelSelector } from '@/composables/useAiChannelSelector.js'
+import { useAiChat } from '@/composables/ai/useAiChat.js'
+import { useAiHistory } from '@/composables/ai/useAiHistory.js'
+import { useAiReportArchive } from '@/composables/ai/useAiReportArchive.js'
+import { shouldRecoverAiConversation } from '@/composables/ai/aiConversationRecovery.js'
+import { useAiThreads } from '@/composables/ai/useAiThreads.js'
+import { useAiChannelSelector } from '@/composables/ai/useAiChannelSelector.js'
 import { useAppEvent, emitAppEvent } from '@/composables/useAppEvent.js'
 import { ACTIVE_AI_STATUSES, normalizeAiStatus, getThreadStatus, isDefaultThreadTitle } from '@/utils/aiRuntime.js'
 import { icons } from '@/utils/icons.js'
@@ -190,7 +190,7 @@ import {
   buildRequestAttachments,
   findLatestAssistantPlan,
   mapPersistedMessages
-} from '@/composables/aiHistoryModel.js'
+} from '@/composables/ai/aiHistoryModel.js'
 
 const props = defineProps({
   sessionId: {

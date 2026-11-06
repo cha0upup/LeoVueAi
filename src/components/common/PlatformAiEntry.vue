@@ -84,7 +84,7 @@ import { useZIndex } from 'element-plus'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 
 import AiNotConfiguredEmpty from '@/components/common/AiNotConfiguredEmpty.vue'
-import { useAiAvailability } from '@/composables/useAiAvailability.js'
+import { useAiAvailability } from '@/composables/ai/useAiAvailability.js'
 import { icons } from '@/utils/icons.js'
 
 const PlatformAiAssistant = defineAsyncComponent(

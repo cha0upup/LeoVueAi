@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, nextTick, reactive } from 'vue'
 import { compileClientComponent, createSlotStub, findNode, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
-import { useAiCapabilityRegistry } from '@/composables/useAiCapabilityRegistry.js'
-import { useAiProviderManager } from '@/composables/useAiProviderManager.js'
-import { useAiModelRequestPreview } from '@/composables/useAiModelRequestPreview.js'
+import { useAiCapabilityRegistry } from '@/composables/ai/useAiCapabilityRegistry.js'
+import { useAiProviderManager } from '@/composables/ai/useAiProviderManager.js'
+import { useAiModelRequestPreview } from '@/composables/ai/useAiModelRequestPreview.js'
 import * as settingsModel from './aiChannelSettingsModel.js'
 import { icons } from '@/utils/icons.js'
 
@@ -28,9 +28,9 @@ const Settings = compileClientComponent(new URL('./AiChannelSettings.vue', impor
   '@/components/common/PageHeader.vue': { default: createSlotStub('PageHeader', ['default', 'actions']) },
   '@/services/api/admin.js': api,
   '@/utils/messageUtils.js': messages,
-  '@/composables/useAiCapabilityRegistry.js': { useAiCapabilityRegistry },
-  '@/composables/useAiProviderManager.js': { useAiProviderManager },
-  '@/composables/useAiModelRequestPreview.js': { useAiModelRequestPreview },
+  '@/composables/ai/useAiCapabilityRegistry.js': { useAiCapabilityRegistry },
+  '@/composables/ai/useAiProviderManager.js': { useAiProviderManager },
+  '@/composables/ai/useAiModelRequestPreview.js': { useAiModelRequestPreview },
   './aiChannelSettingsModel.js': settingsModel,
   ...Object.fromEntries(childNames.map(name => [`./${name}.vue`, { default: createSlotStub(name) }]))
 })

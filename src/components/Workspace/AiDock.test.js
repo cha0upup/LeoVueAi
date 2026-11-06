@@ -6,7 +6,7 @@ import { createTestRenderer } from '@/test-support/vueRenderer.js'
 const storage = { getItem: vi.fn(), setItem: vi.fn() }
 const Dock = compileClientComponent(new URL('./AiDock.vue', import.meta.url), {
   '@/components/common/AiNotConfiguredEmpty.vue': { default: createSlotStub('AiEmpty') },
-  '@/composables/useAiAvailability.js': { useAiAvailability: () => ({ available: ref(false) }) },
+  '@/composables/ai/useAiAvailability.js': { useAiAvailability: () => ({ available: ref(false) }) },
   '@/utils/browserStorage.js': { safeLocalStorage: storage }
 })
 const apps = []

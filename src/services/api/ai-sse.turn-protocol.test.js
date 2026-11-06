@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { parseAiSseStream } from './ai-sse.js'
-import { createAiChatEventReducer } from '@/composables/aiChatEventReducer.js'
-import { createAssistantMessage } from '@/composables/aiMessageFactory.js'
+import { createAiChatEventReducer } from '@/composables/ai/aiChatEventReducer.js'
+import { createAssistantMessage } from '@/composables/ai/aiMessageFactory.js'
 
 describe('parseAiSseStream Turn protocol', () => {
   it('renders thinking and plan updates through node and patch events', async () => {

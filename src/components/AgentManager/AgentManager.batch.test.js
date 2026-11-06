@@ -5,8 +5,8 @@ import { compileClientComponent, createSlotStub, findNode } from '@/test-support
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
 import { icons } from '@/utils/icons.js'
-import { useAgentDirectory, buildAgentUpdatePayload, normalizeAgentList } from '@/composables/useAgentDirectory.js'
-import { useAgentSelection } from '@/composables/useAgentSelection.js'
+import { useAgentDirectory, buildAgentUpdatePayload, normalizeAgentList } from '@/composables/agent/useAgentDirectory.js'
+import { useAgentSelection } from '@/composables/agent/useAgentSelection.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { executeDeleteWithConfirm, executeBatchDelete } from '@/utils/confirmUtils.js'
 
@@ -70,8 +70,8 @@ const modules = {
   './useHostSelection.js': { useHostSelection: () => ({ open: mocks.selectHost }) },
   './agentSessionEntry.js': { resolveAgentSessionEntry: () => ({ action: 'create' }) },
   './agentRuntimeStatus.js': { resolveAgentRuntimeStatus: () => ({}) },
-  '@/composables/useAgentDirectory.js': { useAgentDirectory, buildAgentUpdatePayload, normalizeAgentList },
-  '@/composables/useAgentSelection.js': { useAgentSelection },
+  '@/composables/agent/useAgentDirectory.js': { useAgentDirectory, buildAgentUpdatePayload, normalizeAgentList },
+  '@/composables/agent/useAgentSelection.js': { useAgentSelection },
   '@/composables/useProjectDirectory.js': { useProjectDirectory: () => fixture.project },
   '@/utils/agentTransfer.js': {
     buildAgentTransferBundle: agents => ({ agents }), encodeAgentTransferPayload: () => 'encoded-config'

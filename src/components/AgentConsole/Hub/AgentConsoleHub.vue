@@ -24,7 +24,7 @@
 
 <script setup>
 import { computed, inject, reactive, ref, unref, watch } from 'vue'
-import { supportsCapabilityRequirements } from '@/composables/useAgentConsoleModules.js'
+import { supportsCapabilityRequirements } from '@/composables/agent/useAgentConsoleModules.js'
 
 const props = defineProps({
   sessionId: { type: String, required: true },

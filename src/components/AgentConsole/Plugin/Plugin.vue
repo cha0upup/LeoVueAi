@@ -67,7 +67,7 @@ import { computed, inject, ref, unref, watch } from 'vue'
 import { icons } from '@/utils/icons.js'
 import JavaPlugin from '@/components/AgentConsole/Plugin/JavaPlugin.vue'
 import ScriptEditor from '@/components/AgentConsole/Plugin/ScriptEditor.vue'
-import { supportsCapabilityRequirements } from '@/composables/useAgentConsoleModules.js'
+import { supportsCapabilityRequirements } from '@/composables/agent/useAgentConsoleModules.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
 const iconMap = icons

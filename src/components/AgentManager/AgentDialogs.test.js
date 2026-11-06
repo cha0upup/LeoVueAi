@@ -6,7 +6,7 @@ import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { icons } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
-import { useAgentForm } from '@/composables/useAgentForm.js'
+import { useAgentForm } from '@/composables/agent/useAgentForm.js'
 
 const mocks = vi.hoisted(() => ({
   add: vi.fn(), update: vi.fn(), validate: vi.fn(),
@@ -46,7 +46,7 @@ const modules = {
   '@/utils/icons.js': { icons },
   '@/utils/dialogUtils.js': { useDialog },
   '@/utils/apiUtils.js': { executeRequest },
-  '@/composables/useAgentForm.js': { useAgentForm },
+  '@/composables/agent/useAgentForm.js': { useAgentForm },
   '@/services/api/agent-manage.js': { addAgentApi: mocks.add, updateAgentApi: mocks.update },
   './AgentFormFields.vue': { default: AgentFormFields },
   './AgentConnectionResultBanner.vue': { default: { render: () => null } },

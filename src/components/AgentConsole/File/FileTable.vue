@@ -33,7 +33,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { formatFilePath } from '@/utils/format.js'
 import { getFileListApi, deleteFileApi } from '@/services/api/agent-files.js'
-import { parseAbsolutePath } from '@/composables/useFilePath.js'
+import { parseAbsolutePath } from '@/composables/files/useFilePath.js'
 import { showSuccess, showError } from '@/utils/messageUtils.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { handleError } from '@/utils/errorHandler.js'

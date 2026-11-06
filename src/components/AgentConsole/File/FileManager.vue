@@ -266,8 +266,8 @@ import {
   useFilePath,
   buildFullPath as buildPath,
   parseAbsolutePath
-} from '@/composables/useFilePath.js'
-import { useFileSystem } from '@/composables/useFileSystem.js'
+} from '@/composables/files/useFilePath.js'
+import { useFileSystem } from '@/composables/files/useFileSystem.js'
 import { FILE_CAPABILITIES_KEY } from './fileCapabilities.js'
 import FileTree from '@/components/AgentConsole/File/FileTree.vue'
 import FileTable from '@/components/AgentConsole/File/FileTable.vue'

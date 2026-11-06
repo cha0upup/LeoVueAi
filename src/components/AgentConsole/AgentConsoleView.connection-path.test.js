@@ -22,7 +22,7 @@ const View = compileClientComponent(new URL('./AgentConsoleView.vue', import.met
   '@/utils/icons.js': { icons: {} },
   '@/services/api/sessions.js': { getConnLinkChainApi: mocks.chain, getCurrentHostIdApi: mocks.host },
   '@/services/api/agent-node.js': { getAgentNodeCapabilitiesApi: mocks.capabilities },
-  '@/composables/useAgentConsoleModules.js': {
+  '@/composables/agent/useAgentConsoleModules.js': {
     supportsCapabilityRequirements: () => true,
     useAgentConsoleModules: () => ({
       moduleDefinitions: [{ key: 'info', component: nullView }], moduleMap: {}

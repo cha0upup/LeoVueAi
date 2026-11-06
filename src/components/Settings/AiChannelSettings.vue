@@ -134,9 +134,9 @@ import AiModelConfigDialog from './AiModelConfigDialog.vue'
 import AiModelDetailPanel from './AiModelDetailPanel.vue'
 import AiProviderCatalog from './AiProviderCatalog.vue'
 import AiProviderDialog from './AiProviderDialog.vue'
-import { useAiCapabilityRegistry } from '@/composables/useAiCapabilityRegistry.js'
-import { useAiProviderManager } from '@/composables/useAiProviderManager.js'
-import { useAiModelRequestPreview } from '@/composables/useAiModelRequestPreview.js'
+import { useAiCapabilityRegistry } from '@/composables/ai/useAiCapabilityRegistry.js'
+import { useAiProviderManager } from '@/composables/ai/useAiProviderManager.js'
+import { useAiModelRequestPreview } from '@/composables/ai/useAiModelRequestPreview.js'
 import {
   AI_PROTOCOL_OPTIONS as protocolOptions,
   DEFAULT_COMPLETIONS_PATH as DEFAULT_PATH,

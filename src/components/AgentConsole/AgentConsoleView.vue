@@ -166,7 +166,7 @@ import { getAgentNodeCapabilitiesApi } from '@/services/api/agent-node.js'
 import {
   supportsCapabilityRequirements,
   useAgentConsoleModules
-} from '@/composables/useAgentConsoleModules.js'
+} from '@/composables/agent/useAgentConsoleModules.js'
 import { useToolTabs } from '@/composables/useToolTabs.js'
 import AgentConsoleHeader from '@/components/AgentConsole/AgentConsoleHeader.vue'
 import TabBar from '@/components/Workspace/TabBar.vue'

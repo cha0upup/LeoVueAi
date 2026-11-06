@@ -275,7 +275,7 @@ import { computed, inject, onMounted, onUnmounted, ref, unref, watch } from 'vue
 import { icons } from '@/utils/icons.js'
 import { execClassApi, execScriptApi } from '@/services/api/agent-tools.js'
 import { addPluginApi } from '@/services/api/plugins.js'
-import { supportsCapabilityRequirements } from '@/composables/useAgentConsoleModules.js'
+import { supportsCapabilityRequirements } from '@/composables/agent/useAgentConsoleModules.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import SplitterBar from '@/components/common/SplitterBar.vue'

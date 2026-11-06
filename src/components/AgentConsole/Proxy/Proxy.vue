@@ -78,7 +78,7 @@
 import { computed, inject, provide, ref, unref, useId, watch } from 'vue'
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
-import { supportsCapabilityRequirements } from '@/composables/useAgentConsoleModules.js'
+import { supportsCapabilityRequirements } from '@/composables/agent/useAgentConsoleModules.js'
 import Socks5Proxy from './Socks5Proxy.vue'
 import HttpProxy from './HttpProxy.vue'
 import LocalForward from './LocalForward.vue'

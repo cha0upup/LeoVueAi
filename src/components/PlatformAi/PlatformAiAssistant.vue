@@ -181,11 +181,11 @@ import {
   platformAiThreadRenameApi,
   platformAiThreadActivateApi
 } from '@/services/api/platform-ai.js'
-import { useAiChat } from '@/composables/useAiChat.js'
-import { useAiHistory } from '@/composables/useAiHistory.js'
-import { useAiReportArchive } from '@/composables/useAiReportArchive.js'
-import { shouldRecoverAiConversation } from '@/composables/aiConversationRecovery.js'
-import { useAiChannelSelector } from '@/composables/useAiChannelSelector.js'
+import { useAiChat } from '@/composables/ai/useAiChat.js'
+import { useAiHistory } from '@/composables/ai/useAiHistory.js'
+import { useAiReportArchive } from '@/composables/ai/useAiReportArchive.js'
+import { shouldRecoverAiConversation } from '@/composables/ai/aiConversationRecovery.js'
+import { useAiChannelSelector } from '@/composables/ai/useAiChannelSelector.js'
 import { ACTIVE_AI_STATUSES, normalizeAiStatus, getThreadStatus, isDefaultThreadTitle } from '@/utils/aiRuntime.js'
 import PlatformAiWelcome from './PlatformAiWelcome.vue'
 import PlatformAiComposer from './PlatformAiComposer.vue'
@@ -199,7 +199,7 @@ import {
   buildRequestAttachments,
   findLatestAssistantPlan,
   mapPersistedMessages
-} from '@/composables/aiHistoryModel.js'
+} from '@/composables/ai/aiHistoryModel.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { createLogger } from '@/utils/logger.js'
 

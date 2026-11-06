@@ -130,7 +130,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { parseAgentStrategy } from '@/composables/useAgentStrategies.js'
+import { parseAgentStrategy } from '@/composables/agent/useAgentStrategies.js'
 
 const props = defineProps({
   agent: {

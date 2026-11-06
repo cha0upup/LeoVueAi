@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useAiChat } from '@/composables/useAiChat.js'
+import { useAiChat } from '@/composables/ai/useAiChat.js'
 
 const { post } = vi.hoisted(() => ({ post: vi.fn() }))
 vi.mock('../http.js', () => ({ default: { post } }))

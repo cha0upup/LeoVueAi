@@ -1,4 +1,4 @@
-import { buildFullPath } from '@/composables/useFilePath.js'
+import { buildFullPath } from '@/composables/files/useFilePath.js'
 import { formatFilePath } from '@/utils/format.js'
 
 export function normalizeFileEntries(entries) {

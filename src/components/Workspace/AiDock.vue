@@ -68,7 +68,7 @@
 <script setup>
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AiNotConfiguredEmpty from '@/components/common/AiNotConfiguredEmpty.vue'
-import { useAiAvailability } from '@/composables/useAiAvailability.js'
+import { useAiAvailability } from '@/composables/ai/useAiAvailability.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 
 const NodeAiAssistant = defineAsyncComponent(

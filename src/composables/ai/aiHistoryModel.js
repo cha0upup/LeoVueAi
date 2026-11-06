@@ -5,7 +5,7 @@ import {
   createThinkingNode,
   createToolNode,
   createUserInputNode
-} from '@/composables/aiTurnModel.js'
+} from '@/composables/ai/aiTurnModel.js'
 import { ACTIVE_AI_STATUSES } from '@/utils/aiRuntime.js'
 
 export const findLatestAssistantPlan = messages =>
