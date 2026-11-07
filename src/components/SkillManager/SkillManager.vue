@@ -20,7 +20,7 @@
           <el-button
             v-if="isAdmin"
             type="primary"
-            @click="openNewDialog"
+            @click="showNewDialog = true"
           >
             <el-icon><Icon :icon="iconMap.add" /></el-icon>
             新增 Skill
@@ -30,8 +30,8 @@
             @command="handleCatalogCommand"
           >
             <el-badge
-              :value="catalogAlertCount"
-              :hidden="catalogAlertCount === 0"
+              :value="catalogSummary.problems"
+              :hidden="catalogSummary.problems === 0"
               type="warning"
             >
               <el-button aria-label="更多能力库操作">
@@ -47,7 +47,7 @@
                   导入 Skill
                 </el-dropdown-item>
                 <el-dropdown-item command="health">
-                  健康检查<span v-if="catalogAlertCount">（{{ catalogAlertCount }}）</span>
+                  健康检查<span v-if="catalogSummary.problems">（{{ catalogSummary.problems }}）</span>
                 </el-dropdown-item>
                 <el-dropdown-item command="refresh">
                   刷新目录
@@ -120,7 +120,7 @@
               class="scope-tab"
               :class="{ 'is-active': activeScope === scope.value }"
               :aria-selected="activeScope === scope.value"
-              @click="onScopeChange(scope.value)"
+              @click="activeScope = scope.value"
             >
               {{ scope.label }}
               <span>{{ scopeCount(scope.value) }}</span>
@@ -139,142 +139,13 @@
             </template>
           </el-input>
 
-          <el-popover
-            v-model:visible="showFilterPanel"
-            placement="bottom-end"
-            :width="catalogMode === 'governance' ? 760 : 520"
-            trigger="click"
-            popper-class="skill-filter-popper"
-          >
-            <template #reference>
-              <el-button
-                :type="hasFilters ? 'primary' : ''"
-                plain
-              >
-                <el-icon><Icon icon="mdi:filter-variant" /></el-icon>
-                筛选
-                <span v-if="activeFilterEntries.length">({{ activeFilterEntries.length }})</span>
-              </el-button>
-            </template>
-            <div>
-              <div class="filter-popover-title">
-                <div>
-                  <strong>筛选能力</strong>
-                  <span>筛选变化会清空当前批量选择，避免操作隐藏条目。</span>
-                </div>
-                <el-button
-                  v-if="hasFilters"
-                  text
-                  @click="clearFilters"
-                >
-                  清除全部
-                </el-button>
-              </div>
-              <div
-                class="filter-grid"
-                :class="{ 'filter-grid--simple': catalogMode === 'simple' }"
-              >
-                <label
-                  v-for="field in catalogFilterFields"
-                  :key="field.key"
-                >
-                  <span>{{ field.label }}</span>
-                  <el-select
-                    v-model="filters[field.key]"
-                    clearable
-                    :filterable="Boolean(field.filterable)"
-                    :placeholder="field.placeholder"
-                  >
-                    <el-option
-                      v-for="item in field.options"
-                      :key="item"
-                      :label="item"
-                      :value="item"
-                    />
-                  </el-select>
-                </label>
-                <label>
-                  <span>运行可用性</span>
-                  <el-select
-                    v-model="filters.availability"
-                    clearable
-                    placeholder="全部可用性"
-                  >
-                    <el-option
-                      label="可进入运行目录"
-                      value="runtime"
-                    />
-                    <el-option
-                      label="受控启用"
-                      value="controlled"
-                    />
-                    <el-option
-                      label="已禁用"
-                      value="disabled"
-                    />
-                    <el-option
-                      label="草稿"
-                      value="draft"
-                    />
-                    <el-option
-                      label="待发布"
-                      value="reviewed"
-                    />
-                    <el-option
-                      label="已弃用"
-                      value="deprecated"
-                    />
-                    <el-option
-                      label="不可运行"
-                      value="invalid"
-                    />
-                  </el-select>
-                </label>
-                <label v-if="catalogMode === 'governance'">
-                  <span>授权要求</span>
-                  <el-select
-                    v-model="filters.approval"
-                    clearable
-                    placeholder="全部"
-                  >
-                    <el-option
-                      label="需要显式授权"
-                      value="required"
-                    />
-                    <el-option
-                      label="不要求显式授权"
-                      value="not-required"
-                    />
-                  </el-select>
-                </label>
-                <label v-if="catalogMode === 'governance'">
-                  <span>健康状态</span>
-                  <el-select
-                    v-model="filters.health"
-                    clearable
-                    placeholder="全部"
-                  >
-                    <el-option
-                      label="存在问题"
-                      value="problems"
-                    />
-                    <el-option
-                      label="健康"
-                      value="healthy"
-                    />
-                    <el-option
-                      label="存在警告"
-                      value="warning"
-                    />
-                    <el-option
-                      label="存在错误"
-                      value="invalid"
-                    />
-                  </el-select>
-                </label>
-              </div>
-            </div>
-          </el-popover>
+          <SkillCatalogFilters
+            :filters="filters"
+            :fields="catalogFilterFields"
+            :mode="catalogMode"
+            @change="setFilter"
+            @clear="clearFilters"
+          />
         </div>
 
         <div
@@ -353,196 +224,17 @@
           </el-button>
         </BatchActionBar>
 
-        <div class="catalog-table-wrap">
-          <el-table
-            ref="tableRef"
-            v-loading="catalogLoading"
-            :data="filteredSkills"
-            row-key="name"
-            height="100%"
-            class="catalog-table"
-            @selection-change="onTableSelectionChange"
-            @row-dblclick="openWorkspace"
-          >
-            <el-table-column
-              type="selection"
-              width="46"
-              :reserve-selection="false"
-            />
-            <el-table-column
-              prop="name"
-              label="Skill"
-              min-width="230"
-              sortable
-              show-overflow-tooltip
-            >
-              <template #default="{ row }">
-                <div class="skill-name-cell">
-                  <div class="skill-name-icon">
-                    <Icon :icon="iconMap.bookOpenPageVariant" />
-                  </div>
-                  <div>
-                    <strong>{{ row.name }}</strong>
-                    <span class="skill-description">{{ row.description || '暂无描述' }}</span>
-                  </div>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column
-              v-if="catalogMode === 'simple'"
-              label="分类 / 平台"
-              min-width="170"
-            >
-              <template #default="{ row }">
-                <div class="stacked-cell">
-                  <strong>{{ row.category || '未分类' }}</strong>
-                  <span class="cell-secondary">{{ (row.platforms || []).slice(0, 3).join(' · ') || '—' }}</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column
-              v-if="catalogMode === 'governance'"
-              label="分类 / 能力包"
-              min-width="155"
-              sortable
-              :sort-by="(row) => row.category || ''"
-            >
-              <template #default="{ row }">
-                <div class="stacked-cell">
-                  <strong>{{ row.category || '未分类' }}</strong>
-                  <span class="cell-secondary">{{ row.pack || row.domain || '—' }}</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column
-              v-if="catalogMode === 'governance'"
-              label="平台"
-              min-width="105"
-            >
-              <template #default="{ row }">
-                <div class="mini-tags">
-                  <el-tag
-                    v-for="platform in (row.platforms || []).slice(0, 2)"
-                    :key="platform"
-                    size="small"
-                    effect="plain"
-                    type="info"
-                  >
-                    {{ platform }}
-                  </el-tag>
-                  <span v-if="(row.platforms || []).length > 2">+{{ row.platforms.length - 2 }}</span>
-                  <span v-if="!(row.platforms || []).length">—</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column
-              :label="catalogMode === 'governance' ? '风险 / 访问' : '风险'"
-              min-width="125"
-              sortable
-              :sort-by="(row) => row.risk || ''"
-            >
-              <template #default="{ row }">
-                <div class="stacked-cell">
-                  <el-tag
-                    size="small"
-                    effect="plain"
-                    :type="riskTagType(row.risk)"
-                  >
-                    {{ row.risk || 'unknown' }}
-                  </el-tag>
-                  <span
-                    v-if="catalogMode === 'governance'"
-                    class="cell-secondary"
-                  >{{ row.accessMode || '—' }}</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column
-              v-if="catalogMode === 'governance'"
-              label="生命周期"
-              min-width="100"
-              sortable
-              prop="status"
-            >
-              <template #default="{ row }">
-                <div class="stacked-cell">
-                  <strong>{{ row.status || 'unknown' }}</strong>
-                  <span class="cell-secondary">{{ row.version || '—' }}</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column
-              label="运行状态"
-              min-width="112"
-              fixed="right"
-            >
-              <template #default="{ row }">
-                <SkillAvailabilityTag :skill="row" />
-              </template>
-            </el-table-column>
-            <el-table-column
-              label="操作"
-              width="150"
-              fixed="right"
-              align="right"
-            >
-              <template #default="{ row }">
-                <el-button
-                  size="small"
-                  text
-                  type="primary"
-                  @click.stop="openWorkspace(row)"
-                >
-                  打开
-                </el-button>
-                <el-tooltip
-                  v-if="isAdmin"
-                  :content="toggleDisabledReason(row) || (row.enabled ? '禁用' : '启用')"
-                >
-                  <span>
-                    <el-button
-                      size="small"
-                      text
-                      :type="row.enabled ? '' : 'success'"
-                      :disabled="Boolean(toggleDisabledReason(row))"
-                      @click.stop="handleToggleForSkill(row)"
-                    >
-                      {{ row.enabled ? '禁用' : '启用' }}
-                    </el-button>
-                  </span>
-                </el-tooltip>
-                <el-dropdown
-                  trigger="click"
-                  @command="(command) => handleRowCommand(command, row)"
-                  @click.stop
-                >
-                  <el-button
-                    size="small"
-                    text
-                    aria-label="更多 Skill 操作"
-                  >
-                    <el-icon><Icon :icon="iconMap.more" /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item command="export">
-                        导出
-                      </el-dropdown-item>
-                      <el-dropdown-item
-                        v-if="isAdmin"
-                        command="delete"
-                        divided
-                        class="danger-item"
-                      >
-                        删除
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
+        <SkillCatalogTable
+          :items="filteredSkills"
+          :selected-names="selectedNames"
+          :mode="catalogMode"
+          :loading="catalogLoading"
+          :is-admin="isAdmin"
+          @selection-change="setSelection"
+          @open="openWorkspace"
+          @toggle="handleToggleForSkill"
+          @command="handleSkillCommand"
+        />
       </section>
     </section>
 
@@ -624,7 +316,7 @@
           <el-dropdown
             v-if="isAdmin"
             trigger="click"
-            @command="handleDetailCommand"
+            @command="command => handleSkillCommand(command, selectedSkill)"
           >
             <el-button aria-label="更多 Skill 操作">
               <el-icon><Icon :icon="iconMap.more" /></el-icon>
@@ -655,116 +347,12 @@
           label="说明"
           name="overview"
         >
-          <div class="overview-scroll">
-            <section class="overview-card">
-              <div class="section-heading">
-                <div>
-                  <span>SKILL GUIDE</span>
-                  <h2>使用说明</h2>
-                </div>
-                <el-button
-                  v-if="isAdmin"
-                  text
-                  type="primary"
-                  @click="showManifestEditor = true"
-                >
-                  编辑配置
-                </el-button>
-              </div>
-              <p class="skill-brief-description">
-                {{ selectedSkill.description || '暂无说明，请编辑 SKILL.md 补充适用场景和执行边界。' }}
-              </p>
-              <div class="skill-brief-meta">
-                <span><small>分类</small>{{ selectedSkill.category || '未分类' }}</span>
-                <span><small>平台</small>{{ (selectedSkill.platforms || []).join('、') || '未声明' }}</span>
-                <span><small>风险</small>{{ selectedSkill.risk || 'unknown' }}</span>
-                <span><small>访问</small>{{ selectedSkill.accessMode || '未声明' }}</span>
-              </div>
-            </section>
-
-            <section
-              v-if="catalogMode === 'governance'"
-              class="overview-card"
-            >
-              <div class="section-heading">
-                <div>
-                  <span>GOVERNANCE</span>
-                  <h2>治理信息</h2>
-                </div>
-              </div>
-              <el-descriptions
-                :column="3"
-                border
-              >
-                <el-descriptions-item label="稳定 ID">
-                  {{ selectedSkill.id }}
-                </el-descriptions-item>
-                <el-descriptions-item label="负责人">
-                  {{ selectedSkill.owner }}
-                </el-descriptions-item>
-                <el-descriptions-item label="来源">
-                  {{ selectedSkill.source }}
-                </el-descriptions-item>
-                <el-descriptions-item label="能力域">
-                  {{ selectedSkill.domain }}
-                </el-descriptions-item>
-                <el-descriptions-item label="主分类">
-                  {{ selectedSkill.category }}
-                </el-descriptions-item>
-                <el-descriptions-item label="能力包">
-                  {{ selectedSkill.pack || '—' }}
-                </el-descriptions-item>
-                <el-descriptions-item label="执行模式">
-                  {{ selectedSkill.mode }}
-                </el-descriptions-item>
-                <el-descriptions-item label="风险">
-                  {{ selectedSkill.risk }}
-                </el-descriptions-item>
-                <el-descriptions-item label="访问模式">
-                  {{ selectedSkill.accessMode }}
-                </el-descriptions-item>
-              </el-descriptions>
-            </section>
-
-            <div
-              v-if="catalogMode === 'governance'"
-              class="overview-grid"
-            >
-              <OverviewListCard
-                title="平台与目标"
-                kicker="TARGETING"
-                :groups="[
-                  { label: 'Platforms', values: selectedSkill.platforms },
-                  { label: 'Targets', values: selectedSkill.targets }
-                ]"
-              />
-              <OverviewListCard
-                title="ATT&CK 映射"
-                kicker="ATT&CK"
-                :groups="[
-                  { label: 'Tactics', values: selectedSkill.tactics },
-                  { label: 'Techniques', values: selectedSkill.techniques }
-                ]"
-              />
-              <OverviewListCard
-                title="运行依赖"
-                kicker="REQUIRES"
-                :groups="[
-                  { label: 'Tools', values: selectedSkill.requiredTools },
-                  { label: 'Skills', values: selectedSkill.requiredSkills },
-                  { label: 'Facts', values: selectedSkill.requiredFacts }
-                ]"
-              />
-              <OverviewListCard
-                title="产出与后续"
-                kicker="OUTPUTS"
-                :groups="[
-                  { label: 'Produces', values: selectedSkill.produces },
-                  { label: 'Next', values: selectedSkill.next }
-                ]"
-              />
-            </div>
-          </div>
+          <SkillWorkspaceOverview
+            :skill="selectedSkill"
+            :mode="catalogMode"
+            :is-admin="isAdmin"
+            @edit-config="isAdmin && (showManifestEditor = true)"
+          />
         </el-tab-pane>
 
         <el-tab-pane
@@ -774,7 +362,7 @@
           <div class="workspace-file-area">
             <SkillFileTree
               class="content-tree"
-              :style="{ width: treePanelWidth + 'px', flex: '0 0 auto' }"
+              :style="{ width: uiState.treePanelWidth + 'px', flex: '0 0 auto' }"
               :scope="activeScope"
               :skill-name="selectedSkill.name"
               :files="skillFiles"
@@ -782,12 +370,12 @@
               :current-path="currentFilePath"
               :dirty-paths="dirtyFilePaths"
               :read-only="!isAdmin"
-              @select="onFileSelect"
+              @select="openFile"
               @refresh="reloadFiles"
               @open-after-write="onOpenAfterWrite"
             />
             <SplitterBar
-              v-model="treePanelWidth"
+              v-model="uiState.treePanelWidth"
               :min="190"
               :max="420"
             />
@@ -827,250 +415,44 @@
       @saved="handleManifestSaved"
     />
 
-    <el-drawer
+    <SkillIssueDrawer
       v-model="showIssueDrawer"
-      title="校验与问题定位"
-      size="520px"
-      append-to-body
-    >
-      <div
-        v-if="selectedSkill"
-        class="validation-scroll validation-drawer"
-      >
-        <div class="validation-summary">
-          <div :class="selectedSkill.valid ? 'validation-icon--success' : 'validation-icon--danger'">
-            <Icon :icon="selectedSkill.valid ? 'mdi:check-decagram-outline' : 'mdi:alert-decagram-outline'" />
-          </div>
-          <div>
-            <h2>{{ selectedSkill.valid ? '基础校验通过' : '存在阻塞错误' }}</h2>
-            <p>
-              错误 {{ selectedErrorCount }} · 警告 {{ selectedWarnings.length }}。
-              {{ getSkillAvailability(selectedSkill).description }}
-            </p>
-          </div>
-          <el-button
-            size="small"
-            @click="refreshWorkspaceHealth"
-          >
-            重新校验
-          </el-button>
-        </div>
+      :skill="selectedSkill"
+      @open-file="openIssueFile"
+      @revalidate="refreshWorkspaceHealth"
+    />
 
-        <div
-          v-if="selectedIssues.length"
-          class="validation-list"
-        >
-          <button
-            v-for="(issue, index) in selectedIssues"
-            :key="`${issue.field}-${index}`"
-            type="button"
-            class="validation-item"
-            @click="openIssueFile(issue)"
-          >
-            <span
-              class="issue-level"
-              :class="`issue-level--${String(issue.severity).toLowerCase()}`"
-            >
-              {{ issue.severity }}
-            </span>
-            <span class="issue-content">
-              <strong>{{ issue.field }}</strong>
-              <span>{{ issue.message }}</span>
-            </span>
-            <span class="issue-target">
-              打开 {{ issueTargetFile(issue) }}
-              <Icon icon="mdi:arrow-right" />
-            </span>
-          </button>
-        </div>
-        <div
-          v-else
-          class="validation-empty"
-        >
-          <Icon icon="mdi:check-circle-outline" />
-          <strong>没有发现校验问题</strong>
-          <span>manifest、依赖关系和生命周期状态均通过当前校验。</span>
-        </div>
-      </div>
-    </el-drawer>
-
-    <el-dialog
+    <SkillHealthDialog
       v-model="showHealthDialog"
-      title="Skill Catalog 健康检查"
-      width="940px"
-    >
-      <div class="health-summary">
-        <div>
-          <span>健康</span>
-          <strong>{{ healthCounts.healthy }}</strong>
-        </div>
-        <div class="health-warning">
-          <span>警告</span>
-          <strong>{{ healthCounts.warning }}</strong>
-        </div>
-        <div class="health-danger">
-          <span>错误</span>
-          <strong>{{ healthCounts.invalid }}</strong>
-        </div>
-        <p>共检查 {{ healthCounts.total }} 个 {{ activeScope }} Skill</p>
-      </div>
-      <el-table
-        :data="healthData.skills || []"
-        size="small"
-        max-height="540"
-      >
-        <el-table-column
-          prop="name"
-          label="Skill"
-          min-width="190"
-        />
-        <el-table-column
-          label="健康状态"
-          width="120"
-        >
-          <template #default="{ row }">
-            <el-tag
-              :type="healthRowState(row).type"
-              size="small"
-              effect="plain"
-            >
-              {{ healthRowState(row).label }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="问题"
-          min-width="440"
-        >
-          <template #default="{ row }">
-            <div
-              v-if="row.issues?.length"
-              class="health-issues"
-            >
-              <div
-                v-for="(issue, index) in row.issues"
-                :key="index"
-                :class="`issue-${String(issue.severity).toLowerCase()}`"
-              >
-                {{ issue.field }}：{{ issue.message }}
-              </div>
-            </div>
-            <span v-else>—</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="操作"
-          width="100"
-          align="right"
-        >
-          <template #default="{ row }">
-            <el-button
-              size="small"
-              text
-              type="primary"
-              @click="locateHealthRow(row)"
-            >
-              定位
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
+      :data="healthData"
+      :scope="activeScope"
+      @locate="locateHealthRow"
+    />
 
-    <el-dialog
+    <SkillBatchResultDialog
       v-model="showBatchResultDialog"
       :title="batchResultTitle"
-      width="760px"
-    >
-      <div class="batch-result-summary">
-        <el-tag type="success">
-          已变更 {{ batchResultData.changed || 0 }}
-        </el-tag>
-        <el-tag type="info">
-          未变更 {{ batchResultData.unchanged || 0 }}
-        </el-tag>
-        <el-tag
-          v-if="batchResultData.failed"
-          type="danger"
-        >
-          失败 {{ batchResultData.failed }}
-        </el-tag>
-      </div>
-      <el-table
-        :data="batchResultData.results || []"
-        size="small"
-        max-height="440"
-      >
-        <el-table-column
-          prop="name"
-          label="Skill"
-          min-width="180"
-        />
-        <el-table-column
-          label="结果"
-          width="100"
-        >
-          <template #default="{ row }">
-            <el-tag
-              size="small"
-              :type="batchResultType(row.status)"
-              effect="plain"
-            >
-              {{ batchResultLabel(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="message"
-          label="说明"
-          min-width="340"
-        />
-        <el-table-column
-          label="操作"
-          width="90"
-          align="right"
-        >
-          <template #default="{ row }">
-            <el-button
-              v-if="row.status === 'failed' && findSkill(row.name)"
-              size="small"
-              text
-              type="primary"
-              @click="locateBatchResult(row.name)"
-            >
-              定位
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
+      :data="batchResultData"
+      :available-names="skills.map(skill => skill.name)"
+      @locate="locateBatchResult"
+    />
   </div>
 </template>
 
 <script setup>
 import StatsStrip from '@/components/common/StatsStrip.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { computed, defineComponent, h, nextTick, ref, watch } from 'vue'
-import { ElTag } from 'element-plus'
+import { computed, nextTick, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons as iconMap } from '@/utils/icons.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { confirmAction, executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
-import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { showSuccess, showWarning } from '@/utils/messageUtils.js'
 import {
   deleteSkillApi,
-  deleteSkillsBatchApi,
   exportSkillApi,
-  exportSkillsBatchApi,
-  getSkillFileApi,
-  getSkillHealthApi,
-  getSkillTaxonomyApi,
-  listSkillFilesApi,
-  listSkillsApi,
   saveSkillApi,
-  searchSkillsApi,
-  toggleSkillApi,
-  toggleSkillsBatchApi
+  toggleSkillApi
 } from '@/services/api/skills.js'
 import SkillEditorDialog from './SkillEditorDialog.vue'
 import SkillFileTree from './SkillFileTree.vue'
@@ -1081,49 +463,24 @@ import SkillManifestEditorDialog from './SkillManifestEditorDialog.vue'
 import BatchActionBar from '@/components/common/BatchActionBar.vue'
 import SplitterBar from '@/components/common/SplitterBar.vue'
 import { useSkillUiState } from './useSkillUiState.js'
+import SkillIssueDrawer from './SkillIssueDrawer.vue'
+import SkillHealthDialog from './SkillHealthDialog.vue'
+import SkillBatchResultDialog from './SkillBatchResultDialog.vue'
+import { useSkillWorkspace } from './useSkillWorkspace.js'
+import { useSkillCatalog } from './useSkillCatalog.js'
 import { executeBlobDownload } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
-import { useBatchSelection } from '@/composables/useBatchSelection.js'
+import SkillCatalogTable from './SkillCatalogTable.vue'
+import SkillCatalogFilters from './SkillCatalogFilters.vue'
+import SkillWorkspaceOverview from './SkillWorkspaceOverview.vue'
+import { useSkillFilters } from './useSkillFilters.js'
+import { useSkillBatchActions } from './useSkillBatchActions.js'
 import { buildSkillManifest, buildSkillMarkdown } from './skillManifestSerializer.js'
 import {
-  filterSkills,
-  getSkillAvailability,
+  skillToggleDisabledReason as toggleDisabledReason,
   issueTargetFile,
-  keepVisibleSelection,
-  summarizeSelectedRisk,
-  summarizeSkillCatalog
+  summarizeSelectedRisk
 } from './skillUiModel.js'
-
-const OverviewListCard = defineComponent({
-  name: 'OverviewListCard',
-  props: {
-    title: { type: String, required: true },
-    kicker: { type: String, default: '' },
-    groups: { type: Array, default: () => [] }
-  },
-  setup(props) {
-    return () =>
-      h('section', { class: 'overview-card overview-list-card' }, [
-        h('div', { class: 'section-heading' }, [
-          h('div', [h('span', props.kicker), h('h2', props.title)])
-        ]),
-        ...props.groups.map((group) =>
-          h('div', { class: 'overview-list-group', key: group.label }, [
-            h('strong', group.label),
-            h(
-              'div',
-              { class: 'overview-tag-list' },
-              group.values?.length
-                ? group.values.map((value) =>
-                    h(ElTag, { key: value, size: 'small', effect: 'plain', type: 'info' }, () => value)
-                  )
-                : [h('span', { class: 'empty-value' }, '未声明')]
-            )
-          ])
-        )
-      ])
-  }
-})
 
 const { isAdmin } = useAuth()
 const { state: uiState } = useSkillUiState()
@@ -1145,374 +502,78 @@ const scopes = [
 const activeScope = ref(uiState.value.activeScope || 'agent-node')
 const viewMode = ref('catalog')
 const workspaceTab = ref('overview')
-const scopeCatalog = ref({ 'agent-node': [], platform: [] })
-const selectedSkill = ref(null)
-const selectedSkillName = ref('')
-const searchKeyword = ref('')
-const searchResults = ref(null)
-const searchError = ref('')
 
-const catalogLoading = ref(false)
 const toggleLoading = ref(false)
-const searchLoading = ref(false)
-const batchToggleLoading = ref(false)
-const batchExportLoading = ref(false)
-const batchDeleteLoading = ref(false)
 
 const showNewDialog = ref(false)
 const showImportDialog = ref(false)
 const showManifestEditor = ref(false)
 const showIssueDrawer = ref(false)
 const showHealthDialog = ref(false)
-const showFilterPanel = ref(false)
-const showBatchResultDialog = ref(false)
-const batchResultTitle = ref('批量操作结果')
-const batchResultData = ref({ changed: 0, unchanged: 0, failed: 0, results: [] })
 const healthData = ref({ total: 0, valid: 0, invalid: 0, skills: [] })
 
-const taxonomy = ref({
-  domains: [],
-  categories: [],
-  modes: [],
-  risks: [],
-  accessModes: [],
-  statuses: []
-})
+const {
+  selectedSkill, selectedSkillName, skillFiles, filesLoading, currentFilePath, currentFileContent,
+  currentFileEncoding, currentFileSize, fileLoading, dirtyFilePaths, fileEditorRef,
+  confirmLeaveEdit, clearWorkspace, openSkill, loadSkillFiles, reloadFiles, openFile,
+  onOpenAfterWrite, onFileSaved, onDirtyChange
+} = useSkillWorkspace({ activeScope, uiState, onMetadataChanged: () => loadSkills() })
 
-const emptyFilters = () => ({
-  domain: '',
-  category: '',
-  platform: '',
-  risk: '',
-  status: '',
-  accessMode: '',
-  pack: '',
-  approval: '',
-  health: '',
-  availability: ''
-})
-const filters = ref(emptyFilters())
-
-const tableRef = ref(null)
-
-const skillFiles = ref([])
-const filesLoading = ref(false)
-const currentFilePath = ref('')
-const currentFileContent = ref('')
-const currentFileEncoding = ref('text')
-const currentFileSize = ref(0)
-const fileLoading = ref(false)
-const dirtyFilePaths = ref([])
-const fileEditorRef = ref(null)
-
-const treePanelWidth = computed({
-  get: () => uiState.value.treePanelWidth,
-  set: (value) => {
-    uiState.value = { ...uiState.value, treePanelWidth: value }
-  }
+const {
+  scopeCatalog, catalogLoading, searchKeyword, searchResults, searchError, searchLoading, taxonomy,
+  loadTaxonomy, loadScopeSkills, loadSkills, loadCatalog, loadHealth
+} = useSkillCatalog({
+  activeScope,
+  scopes: scopes.map(scope => scope.value),
+  onScopeLoaded: (scope, list) => {
+    if (scope !== activeScope.value || !selectedSkillName.value) return
+    const latest = list.find(skill => skill.name === selectedSkillName.value)
+    if (latest) selectedSkill.value = latest
+  },
+  onSearchChanged: () => clearBatchSelection()
 })
 
 watch(activeScope, (value) => {
   uiState.value = { ...uiState.value, activeScope: value }
+  viewMode.value = 'catalog'
+  showHealthDialog.value = false
+  showIssueDrawer.value = false
+  showBatchResultDialog.value = false
 })
 
 const skills = computed(() => scopeCatalog.value[activeScope.value] || [])
-const searchSource = computed(() => {
-  if (!searchKeyword.value.trim()) return skills.value
-  return Array.isArray(searchResults.value) ? searchResults.value : []
+const {
+  filters, filteredSkills, catalogSummary, catalogFilterFields, activeFilterEntries,
+  setFilter, removeFilter, clearFilters, applyQuickFilter
+} = useSkillFilters({
+  skills, taxonomy, catalogMode, activeScope, searchKeyword, searchResults,
+  onChange: () => clearBatchSelection()
 })
-const filteredSkills = computed(() => filterSkills(searchSource.value, filters.value))
-const catalogSummary = computed(() => summarizeSkillCatalog(skills.value))
-const catalogAlertCount = computed(() => catalogSummary.value.problems)
-
-const availableCategories = computed(() =>
-  [...new Set(skills.value.map((item) => item.category).filter(Boolean))].sort()
-)
-const availablePlatforms = computed(() =>
-  [...new Set(skills.value.flatMap((item) => item.platforms || []))].sort()
-)
-const availablePacks = computed(() =>
-  [...new Set(skills.value.map((item) => item.pack).filter(Boolean))].sort()
-)
-const catalogFilterFields = computed(() => [
-  {
-    key: 'domain',
-    label: '能力域',
-    placeholder: '全部能力域',
-    options: taxonomy.value.domains,
-    governance: true
-  },
-  {
-    key: 'category',
-    label: '主分类',
-    placeholder: '全部分类',
-    options: availableCategories.value,
-    filterable: true
-  },
-  {
-    key: 'pack',
-    label: '能力包',
-    placeholder: '全部能力包',
-    options: availablePacks.value,
-    filterable: true,
-    governance: true
-  },
-  {
-    key: 'platform',
-    label: '平台',
-    placeholder: '全部平台',
-    options: availablePlatforms.value,
-    filterable: true
-  },
-  {
-    key: 'risk',
-    label: '风险',
-    placeholder: '全部风险',
-    options: taxonomy.value.risks
-  },
-  {
-    key: 'accessMode',
-    label: '访问模式',
-    placeholder: '全部访问模式',
-    options: taxonomy.value.accessModes,
-    governance: true
-  },
-  {
-    key: 'status',
-    label: '生命周期',
-    placeholder: '全部状态',
-    options: taxonomy.value.statuses,
-    governance: true
-  }
-].filter((field) => catalogMode.value === 'governance' || !field.governance))
-const hasFilters = computed(() => Object.values(filters.value).some(Boolean))
-
-const filterLabels = {
-  domain: '能力域',
-  category: '分类',
-  platform: '平台',
-  risk: '风险',
-  status: '生命周期',
-  accessMode: '访问模式',
-  pack: '能力包',
-  approval: '授权',
-  health: '健康',
-  availability: '可用性'
-}
-const filterValueLabels = {
-  required: '需要显式授权',
-  'not-required': '不要求显式授权',
-  healthy: '健康',
-  problems: '存在问题',
-  warning: '存在警告',
-  invalid: '存在错误',
-  runtime: '可进入运行目录',
-  controlled: '受控启用',
-  disabled: '已禁用',
-  draft: '草稿',
-  reviewed: '待发布',
-  deprecated: '已弃用'
-}
-const activeFilterEntries = computed(() =>
-  Object.entries(filters.value)
-    .filter(([, value]) => Boolean(value))
-    .map(([key, value]) => ({
-      key,
-      label: filterLabels[key] || key,
-      value: filterValueLabels[value] || value
-    }))
-)
 
 const {
-  selectedIds: selectedNames,
-  allFilteredSelected,
-  someFilteredSelected,
-  clearBatchSelection: clearSelectionState
-} = useBatchSelection(filteredSkills, (skill) => skill?.name)
-
-const selectedSkills = computed(() =>
-  filteredSkills.value.filter((skill) => selectedNames.value.has(skill.name))
-)
-const hasBatchEnableTarget = computed(() => selectedSkills.value.some((skill) => !skill.enabled))
-const hasBatchDisableTarget = computed(() => selectedSkills.value.some((skill) => skill.enabled))
+  selectedNames, allFilteredSelected, someFilteredSelected, hasBatchEnableTarget, hasBatchDisableTarget,
+  setSelection, clearBatchSelection, toggleSelectAll, batchToggleLoading, batchExportLoading, batchDeleteLoading,
+  showBatchResultDialog, batchResultTitle, batchResultData, handleBatchToggle, handleBatchExport, handleBatchDelete
+} = useSkillBatchActions({
+  activeScope, items: filteredSkills, isAdmin, dirtyFilePaths,
+  confirmEnable: targets => confirmRiskyEnable(targets),
+  refreshScope: loadScopeSkills
+})
 
 const selectedIssues = computed(() => selectedSkill.value?.issues || [])
-const selectedWarnings = computed(() =>
-  selectedIssues.value.filter((issue) => String(issue.severity).toUpperCase() === 'WARNING')
-)
 const selectedErrorCount = computed(
   () =>
     selectedIssues.value.filter((issue) => String(issue.severity).toUpperCase() === 'ERROR').length
 )
 
-const healthCounts = computed(() => {
-  const rows = healthData.value.skills || []
-  let warning = 0
-  let invalid = 0
-  let healthy = 0
-  for (const row of rows) {
-    if (!row.valid) invalid += 1
-    else if ((row.issues || []).some((issue) => String(issue.severity).toUpperCase() === 'WARNING')) {
-      warning += 1
-    } else healthy += 1
-  }
-  return { total: rows.length, warning, invalid, healthy }
-})
-
-const riskTagType = (risk) => {
-  if (risk === 'critical' || risk === 'high') return 'danger'
-  if (risk === 'medium') return 'warning'
-  return 'success'
-}
-
 const scopeCount = (scope) => scopeCatalog.value[scope]?.length || 0
 const findSkill = (name, scope = activeScope.value) =>
   (scopeCatalog.value[scope] || []).find((skill) => skill.name === name)
 
-const removeFilter = (key) => {
-  filters.value = { ...filters.value, [key]: '' }
-}
-
-const clearFilters = () => {
-  filters.value = emptyFilters()
-}
-
-const applyQuickFilter = (kind) => {
-  const next = emptyFilters()
-  if (['runtime', 'controlled', 'draft'].includes(kind)) next.availability = kind
-  else if (['problems', 'warning', 'invalid'].includes(kind)) next.health = kind
-  filters.value = next
-}
-
 const handleCatalogCommand = async (command) => {
   if (command === 'import') showImportDialog.value = true
   else if (command === 'health') await openHealthDialog()
-  else if (command === 'refresh') await loadAllSkills()
-}
-
-const loadTaxonomy = async () => {
-  try {
-    const response = await getSkillTaxonomyApi()
-    taxonomy.value = { ...taxonomy.value, ...(response.data || {}) }
-  } catch (error) {
-    showError(error?.response?.data?.msg || '加载 Skill 分类字典失败')
-  }
-}
-
-const loadScopeSkills = async (scope) => {
-  const response = await listSkillsApi(scope)
-  const list = Array.isArray(response.data) ? response.data : []
-  scopeCatalog.value = { ...scopeCatalog.value, [scope]: list }
-  if (scope === activeScope.value && selectedSkillName.value) {
-    const latest = list.find((skill) => skill.name === selectedSkillName.value)
-    if (latest) selectedSkill.value = latest
-  }
-  return list
-}
-
-const loadSkills = async () => {
-  try {
-    await loadScopeSkills(activeScope.value)
-  } catch (error) {
-    showError(error?.response?.data?.msg || '加载 Skill 列表失败')
-  }
-}
-
-const loadAllSkills = async () => {
-  catalogLoading.value = true
-  try {
-    await Promise.all(scopes.map((scope) => loadScopeSkills(scope.value)))
-    selectedNames.value = keepVisibleSelection(selectedNames.value, filteredSkills.value)
-  } catch (error) {
-    showError(error?.response?.data?.msg || '加载 Skill Catalog 失败')
-  } finally {
-    catalogLoading.value = false
-  }
-}
-
-let searchTimer = null
-const doSearch = async (keyword) => {
-  const normalized = keyword.trim()
-  if (!normalized) {
-    searchResults.value = null
-    searchError.value = ''
-    return
-  }
-  searchLoading.value = true
-  searchError.value = ''
-  try {
-    const response = await searchSkillsApi(activeScope.value, normalized)
-    searchResults.value = Array.isArray(response.data) ? response.data : []
-  } catch (error) {
-    searchResults.value = []
-    searchError.value = error?.response?.data?.msg || '搜索失败，请重试'
-  } finally {
-    searchLoading.value = false
-  }
-}
-
-watch(searchKeyword, (value) => {
-  clearTimeout(searchTimer)
-  clearBatchSelection()
-  if (!value.trim()) {
-    searchResults.value = null
-    searchError.value = ''
-    return
-  }
-  searchResults.value = []
-  searchTimer = setTimeout(() => doSearch(value), 350)
-})
-
-watch(
-  filters,
-  () => {
-    clearBatchSelection()
-  },
-  { deep: true }
-)
-
-watch(catalogMode, (mode) => {
-  if (mode !== 'simple') return
-  const current = filters.value
-  filters.value = {
-    ...emptyFilters(),
-    category: current.category,
-    platform: current.platform,
-    risk: current.risk,
-    availability: current.availability,
-    health: current.health === 'problems' ? 'problems' : ''
-  }
-})
-
-const onScopeChange = async (scope) => {
-  if (scope === activeScope.value) return
-  activeScope.value = scope
-  searchKeyword.value = ''
-  searchResults.value = null
-  searchError.value = ''
-  clearFilters()
-  clearBatchSelection()
-}
-
-const confirmLeaveEdit = async () => {
-  if (!dirtyFilePaths.value.length) return true
-  return confirmAction({
-    title: '存在未保存内容',
-    message: `有 ${dirtyFilePaths.value.length} 个文件未保存，离开后将丢失修改。`,
-    confirmButtonText: '放弃并离开',
-    cancelButtonText: '继续编辑'
-  })
-}
-
-const clearWorkspace = () => {
-  selectedSkill.value = null
-  selectedSkillName.value = ''
-  skillFiles.value = []
-  currentFilePath.value = ''
-  currentFileContent.value = ''
-  currentFileEncoding.value = 'text'
-  currentFileSize.value = 0
-  dirtyFilePaths.value = []
+  else if (command === 'refresh') await loadCatalog()
 }
 
 const openWorkspace = async (skill, tab = 'overview') => {
@@ -1523,8 +584,8 @@ const openWorkspace = async (skill, tab = 'overview') => {
   viewMode.value = 'workspace'
   const requestedTab = typeof tab === 'string' ? tab : 'overview'
   workspaceTab.value = requestedTab === 'validation' ? 'overview' : requestedTab
-  await openSkill(skill)
-  if (requestedTab === 'validation') showIssueDrawer.value = true
+  const opened = await openSkill(skill)
+  if (opened && requestedTab === 'validation') showIssueDrawer.value = true
 }
 
 const backToCatalog = async () => {
@@ -1532,93 +593,6 @@ const backToCatalog = async () => {
   viewMode.value = 'catalog'
   showIssueDrawer.value = false
   clearWorkspace()
-}
-
-const openSkill = async (skill) => {
-  const sameSkill = skill.name === selectedSkillName.value
-  selectedSkill.value = skill
-  selectedSkillName.value = skill.name
-  dirtyFilePaths.value = []
-  if (!sameSkill) {
-    currentFilePath.value = ''
-    currentFileContent.value = ''
-  }
-  await loadSkillFiles()
-  const remembered = sameSkill ? uiState.value.lastFilePath : ''
-  const exists = (path) => skillFiles.value.some((file) => file.path === path)
-  const target =
-    (remembered && exists(remembered) && remembered) ||
-    (exists('SKILL.md') && 'SKILL.md') ||
-    skillFiles.value[0]?.path ||
-    ''
-  if (target) await openFile(target)
-}
-
-const loadSkillFiles = async () => {
-  if (!selectedSkillName.value) return
-  filesLoading.value = true
-  try {
-    const response = await listSkillFilesApi(activeScope.value, selectedSkillName.value)
-    skillFiles.value = Array.isArray(response.data) ? response.data : []
-  } catch (error) {
-    showError(error?.response?.data?.msg || '加载文件列表失败')
-    skillFiles.value = []
-  } finally {
-    filesLoading.value = false
-  }
-}
-
-const reloadFiles = async () => {
-  await loadSkillFiles()
-  if (currentFilePath.value && !skillFiles.value.some((file) => file.path === currentFilePath.value)) {
-    currentFilePath.value = ''
-    currentFileContent.value = ''
-  }
-}
-
-const openFile = async (path, force = false) => {
-  if (!path || !selectedSkillName.value) return
-  if (!force && path === currentFilePath.value) return
-  if (fileEditorRef.value?.hasUnsavedChanges?.() && !(await confirmAction({
-    title: '存在未保存内容',
-    message: '当前文件有未保存修改，切换后将丢失。',
-    confirmButtonText: '放弃并切换',
-    cancelButtonText: '继续编辑'
-  }))) {
-    return
-  }
-  fileLoading.value = true
-  try {
-    const response = await getSkillFileApi(activeScope.value, selectedSkillName.value, path)
-    const data = response.data || {}
-    currentFilePath.value = path
-    currentFileContent.value = data.content ?? ''
-    currentFileEncoding.value = data.encoding || 'text'
-    currentFileSize.value = data.size || 0
-    uiState.value = { ...uiState.value, lastFilePath: path }
-  } catch (error) {
-    showError(error?.response?.data?.msg || '加载文件失败')
-  } finally {
-    fileLoading.value = false
-  }
-}
-
-const onFileSelect = (path) => openFile(path)
-const onOpenAfterWrite = async (path) => {
-  await loadSkillFiles()
-  await openFile(path, true)
-}
-const onFileSaved = async ({ path }) => {
-  dirtyFilePaths.value = dirtyFilePaths.value.filter((item) => item !== path)
-  await loadSkillFiles()
-  if (path === 'SKILL.md' || path === 'manifest.yaml') await loadSkills()
-}
-const onDirtyChange = (dirty) => {
-  const path = currentFilePath.value
-  if (!path) return
-  const hasPath = dirtyFilePaths.value.includes(path)
-  if (dirty && !hasPath) dirtyFilePaths.value = [...dirtyFilePaths.value, path]
-  else if (!dirty && hasPath) dirtyFilePaths.value = dirtyFilePaths.value.filter((item) => item !== path)
 }
 
 const openIssueFile = async (issue) => {
@@ -1631,10 +605,6 @@ const openIssueFile = async (issue) => {
 const refreshWorkspaceHealth = async () => {
   await loadSkills()
   showSuccess('已重新校验')
-}
-
-const openNewDialog = () => {
-  showNewDialog.value = true
 }
 
 const handleNewConfirm = async (data) => {
@@ -1678,7 +648,7 @@ const handleNewConfirm = async (data) => {
 
 const handleImported = async ({ scope }) => {
   if (scope) activeScope.value = scope
-  await loadAllSkills()
+  await loadCatalog()
   viewMode.value = 'catalog'
 }
 
@@ -1686,13 +656,6 @@ const handleManifestSaved = async () => {
   await loadSkills()
   await loadSkillFiles()
   if (currentFilePath.value === 'manifest.yaml') await openFile('manifest.yaml', true)
-}
-
-const toggleDisabledReason = (skill) => {
-  if (!skill || skill.enabled) return ''
-  if (!skill.valid) return '校验失败，修复错误后才能启用'
-  if (skill.status !== 'published') return '只有 published 状态的 Skill 才能启用'
-  return ''
 }
 
 const confirmRiskyEnable = async (targets) => {
@@ -1732,12 +695,8 @@ const handleToggleForSkill = async (skill) => {
   ).catch(() => false)
 }
 
-const handleDetailCommand = async (command) => {
-  if (command === 'export') await handleExport()
-  else if (command === 'delete') await handleDelete(selectedSkill.value)
-}
-
-const handleRowCommand = async (command, skill) => {
+const handleSkillCommand = async (command, skill) => {
+  if (!skill) return
   if (command === 'export') await downloadSkill(activeScope.value, skill.name)
   else if (command === 'delete') await handleDelete(skill)
 }
@@ -1760,132 +719,9 @@ const handleDelete = async (skill) => {
   )
 }
 
-const handleExport = async () => {
-  if (selectedSkill.value) await downloadSkill(activeScope.value, selectedSkill.value.name)
-}
 const downloadSkill = (scope, name) =>
   executeBlobDownload(() => exportSkillApi(scope, name), `${name}.skill`).catch(() => false)
 
-const onTableSelectionChange = (rows) => {
-  selectedNames.value = new Set((rows || []).map((row) => row.name))
-}
-const clearBatchSelection = () => {
-  clearSelectionState()
-  tableRef.value?.clearSelection?.()
-}
-const toggleSelectAll = (selected) => {
-  tableRef.value?.clearSelection?.()
-  if (selected) {
-    for (const skill of filteredSkills.value) tableRef.value?.toggleRowSelection?.(skill, true)
-  }
-}
-const restoreTableSelection = async (names) => {
-  await nextTick()
-  tableRef.value?.clearSelection?.()
-  for (const skill of filteredSkills.value) {
-    if (names.has(skill.name)) tableRef.value?.toggleRowSelection?.(skill, true)
-  }
-}
-
-const showBatchResults = (title, data) => {
-  batchResultTitle.value = title
-  batchResultData.value = {
-    changed: Number(data?.changed) || 0,
-    unchanged: Number(data?.unchanged) || 0,
-    failed: Number(data?.failed) || 0,
-    results: data?.results || []
-  }
-  showBatchResultDialog.value = true
-}
-
-const applyBatchResult = async (title, { data }) => {
-  await loadSkills()
-  showBatchResults(title, data)
-  const failedNames = new Set(
-    (data?.results || []).filter((item) => item.status === 'failed').map((item) => item.name)
-  )
-  selectedNames.value = failedNames
-  await restoreTableSelection(failedNames)
-}
-
-const handleBatchToggle = async (enabled) => {
-  const targets = selectedSkills.value
-  if (!targets.length) return
-  if (dirtyFilePaths.value.includes('manifest.yaml')) {
-    showWarning('manifest.yaml 有未保存修改，请先保存或放弃修改')
-    return
-  }
-  if (enabled && !(await confirmRiskyEnable(targets))) return
-  const action = enabled ? '启用' : '禁用'
-  const needsConfirmation = !enabled || !targets.some(
-    (skill) => skill.requiresExplicitApproval || ['high', 'critical'].includes(skill.risk)
-  )
-  if (needsConfirmation && !(await confirmAction({
-    title: `批量${action}`,
-    message: enabled
-      ? `确认启用选中的 ${targets.length} 个 Skill？只有已发布且校验通过的条目会被启用。`
-      : `确认禁用选中的 ${targets.length} 个 Skill？`,
-    type: enabled ? 'warning' : 'info',
-    confirmButtonText: action
-  }))) {
-    return
-  }
-
-  await executeRequest(
-    () => toggleSkillsBatchApi({
-      scope: activeScope.value,
-      names: targets.map((skill) => skill.name),
-      enabled
-    }),
-    {
-      loadingRef: batchToggleLoading,
-      errorMessage: '批量操作失败',
-      onSuccess: (response) => applyBatchResult(`批量${action}结果`, response)
-    }
-  ).catch(() => false)
-}
-
-const handleBatchExport = async () => {
-  const names = selectedSkills.value.map((skill) => skill.name)
-  if (!names.length) return
-  const scope = activeScope.value
-  const date = new Date().toISOString().slice(0, 10)
-  await executeBlobDownload(
-    () => exportSkillsBatchApi({ scope, names }),
-    `skills_${scope}_${date}.zip`,
-    {
-      loadingRef: batchExportLoading,
-      errorMessage: '批量导出失败',
-      onSuccess: clearBatchSelection
-    }
-  ).catch(() => false)
-}
-
-const handleBatchDelete = async () => {
-  const targets = selectedSkills.value
-  if (!targets.length) return
-  await executeDeleteWithConfirm(
-    () => deleteSkillsBatchApi({
-      scope: activeScope.value,
-      names: targets.map((skill) => skill.name)
-    }),
-    {
-      title: '批量删除确认',
-      message: `确认删除选中的 ${targets.length} 个 Skill？删除后无法恢复。`,
-      confirmButtonText: '删除',
-      confirmButtonClass: 'el-button--danger',
-      loadingRef: batchDeleteLoading,
-      successMessage: null,
-      errorMessage: '批量删除失败',
-      onSuccess: (response) => applyBatchResult('批量删除结果', response)
-    }
-  ).catch(() => false)
-}
-
-const batchResultType = (status) =>
-  ({ changed: 'success', deleted: 'success', unchanged: 'info', failed: 'danger' })[status] || 'info'
-const batchResultLabel = (status) =>
-  ({ changed: '已变更', deleted: '已删除', unchanged: '未变更', failed: '失败' })[status] || status
 const locateBatchResult = async (name) => {
   const skill = findSkill(name)
   if (!skill) return
@@ -1894,21 +730,11 @@ const locateBatchResult = async (name) => {
 }
 
 const openHealthDialog = async () => {
-  try {
-    const response = await getSkillHealthApi(activeScope.value)
+  const response = await loadHealth()
+  if (response) {
     healthData.value = response.data || healthData.value
     showHealthDialog.value = true
-  } catch (error) {
-    showError(error?.response?.data?.msg || 'Skill 健康检查失败')
   }
-}
-
-const healthRowState = (row) => {
-  if (!row.valid) return { label: '错误', type: 'danger' }
-  if ((row.issues || []).some((issue) => String(issue.severity).toUpperCase() === 'WARNING')) {
-    return { label: '警告', type: 'warning' }
-  }
-  return { label: '健康', type: 'success' }
 }
 
 const locateHealthRow = async (row) => {
@@ -1919,7 +745,7 @@ const locateHealthRow = async (row) => {
 }
 
 loadTaxonomy()
-loadAllSkills()
+loadCatalog()
 </script>
 
 <style scoped>
@@ -1967,19 +793,10 @@ loadAllSkills()
   font-size: 21px;
 }
 
-.section-heading span {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--el-text-color-secondary);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-}
-
 .workspace-title h1 {
   margin: 0;
   color: var(--el-text-color-primary);
-  font-size: var(--font-size-page-title);
+  font-size: 19px;
   line-height: 1.35;
 }
 
@@ -2069,51 +886,6 @@ loadAllSkills()
   margin-left: auto;
 }
 
-.filter-popover-title {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-
-.filter-popover-title strong,
-.filter-popover-title span {
-  display: block;
-}
-
-.filter-popover-title strong {
-  margin-bottom: 3px;
-  font-size: 14px;
-}
-
-.filter-popover-title span {
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-}
-
-.filter-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.filter-grid--simple {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.filter-grid label > span {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.filter-grid :deep(.el-select) {
-  width: 100%;
-}
-
 .active-filter-row,
 .catalog-result-row {
   min-height: 34px;
@@ -2148,81 +920,6 @@ loadAllSkills()
   margin: 8px 14px 0;
 }
 
-.catalog-table-wrap {
-  flex: 1;
-  min-height: 0;
-  padding: 0 8px 8px;
-}
-
-.catalog-table {
-  height: 100%;
-  --el-table-header-bg-color: var(--app-control-background-soft);
-  --el-table-row-hover-bg-color: color-mix(in srgb, var(--el-color-primary) 4%, transparent);
-}
-
-.catalog-table :deep(.el-table__row) {
-  cursor: default;
-}
-
-.skill-name-cell {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 9px;
-}
-
-.skill-name-icon {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border-radius: 7px;
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 9%, var(--app-control-background));
-}
-
-.skill-name-cell > div:last-child {
-  min-width: 0;
-}
-
-.skill-name-cell strong,
-.skill-description,
-.stacked-cell > strong,
-.stacked-cell > .cell-secondary {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.skill-name-cell strong,
-.stacked-cell > strong {
-  color: var(--el-text-color-primary);
-  font-size: var(--font-size-body);
-}
-
-.skill-description,
-.stacked-cell > .cell-secondary {
-  margin-top: var(--space-1);
-  color: var(--el-text-color-secondary);
-  font-size: var(--font-size-helper);
-}
-
-.stacked-cell > .el-tag + .cell-secondary {
-  margin-top: var(--space-1);
-}
-
-.mini-tags {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  color: var(--el-text-color-secondary);
-  font-size: 10px;
-}
-
 .danger-item {
   color: var(--el-color-danger) !important;
 }
@@ -2255,10 +952,6 @@ loadAllSkills()
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.workspace-title h1 {
-  font-size: 19px;
 }
 
 .workspace-meta {
@@ -2314,119 +1007,6 @@ loadAllSkills()
   min-height: 0;
 }
 
-.overview-scroll,
-.validation-scroll {
-  height: 100%;
-  overflow: auto;
-  padding: 18px;
-}
-
-.overview-card {
-  padding: 15px;
-  border: 1px solid var(--app-surface-border-subtle);
-  border-radius: var(--app-control-radius);
-  background: var(--app-card-background);
-}
-
-.skill-brief-description {
-  max-width: 860px;
-  margin: 0;
-  color: var(--el-text-color-regular);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.skill-brief-meta {
-  display: grid;
-  margin-top: 18px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.skill-brief-meta > span {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding: 10px 12px;
-  overflow: hidden;
-  border-radius: var(--app-control-radius);
-  color: var(--el-text-color-primary);
-  background: var(--app-control-background-soft);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.skill-brief-meta small {
-  color: var(--el-text-color-secondary);
-  font-size: 10px;
-}
-
-.section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.section-heading h2 {
-  margin: 0;
-  font-size: 14px;
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.overview-list-card :deep(.section-heading) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.overview-list-card :deep(.section-heading span) {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--el-text-color-secondary);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-}
-
-.overview-list-card :deep(.section-heading h2) {
-  margin: 0;
-  font-size: 14px;
-}
-
-.overview-list-card :deep(.overview-list-group + .overview-list-group) {
-  margin-top: 12px;
-}
-
-.overview-list-card :deep(.overview-list-group > strong) {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-}
-
-.overview-list-card :deep(.overview-tag-list) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.overview-list-card :deep(.empty-value) {
-  color: var(--el-text-color-placeholder);
-  font-size: 11px;
-}
-
 .workspace-file-area {
   height: 100%;
   min-height: 0;
@@ -2442,208 +1022,6 @@ loadAllSkills()
 
 .content-editor {
   flex: 1;
-}
-
-.validation-summary {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  padding: 15px;
-  border: 1px solid var(--app-surface-border-subtle);
-  border-radius: var(--app-control-radius);
-  background: var(--app-control-background-soft);
-}
-
-.validation-drawer {
-  height: auto;
-  padding: 0;
-}
-
-.validation-summary > div:first-child {
-  font-size: 30px;
-}
-
-.validation-icon--success {
-  color: var(--el-color-success);
-}
-
-.validation-icon--danger {
-  color: var(--el-color-danger);
-}
-
-.validation-summary > div:nth-child(2) {
-  flex: 1;
-}
-
-.validation-summary h2 {
-  margin: 0;
-  font-size: 15px;
-}
-
-.validation-summary p {
-  margin: 4px 0 0;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.validation-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.validation-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--app-surface-border-subtle);
-  border-radius: var(--app-control-radius);
-  color: var(--el-text-color-primary);
-  background: var(--app-card-background);
-  text-align: left;
-  cursor: pointer;
-}
-
-.validation-item:hover {
-  border-color: color-mix(in srgb, var(--el-color-primary) 35%, var(--app-border-color));
-  background: color-mix(in srgb, var(--el-color-primary) 3%, var(--app-card-background));
-}
-
-.issue-level {
-  min-width: 64px;
-  padding: 3px 7px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.issue-level--error {
-  color: var(--el-color-danger);
-  background: var(--el-color-danger-light-9);
-}
-
-.issue-level--warning {
-  color: var(--el-color-warning);
-  background: var(--el-color-warning-light-9);
-}
-
-.issue-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.issue-content strong,
-.issue-content span {
-  display: block;
-}
-
-.issue-content strong {
-  margin-bottom: 3px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-}
-
-.issue-content span,
-.issue-target {
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-}
-
-.issue-target {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.validation-empty {
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  color: var(--el-text-color-secondary);
-}
-
-.validation-empty svg {
-  font-size: 40px;
-  color: var(--el-color-success);
-}
-
-.validation-empty strong {
-  color: var(--el-text-color-primary);
-  font-size: 14px;
-}
-
-.validation-empty span {
-  font-size: 12px;
-}
-
-.health-summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.health-summary > div {
-  min-width: 92px;
-  padding: 9px 12px;
-  border: 1px solid var(--app-surface-border-subtle);
-  border-radius: var(--app-control-radius);
-}
-
-.health-summary span {
-  display: block;
-  color: var(--el-text-color-secondary);
-  font-size: 10px;
-}
-
-.health-summary strong {
-  display: block;
-  margin-top: 2px;
-  color: var(--el-color-success);
-  font-size: 20px;
-}
-
-.health-warning strong {
-  color: var(--el-color-warning);
-}
-
-.health-danger strong {
-  color: var(--el-color-danger);
-}
-
-.health-summary p {
-  margin-left: auto;
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-}
-
-.health-issues {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  white-space: normal;
-  line-height: 1.45;
-}
-
-.issue-error {
-  color: var(--el-color-danger);
-}
-
-.issue-warning {
-  color: var(--el-color-warning);
-}
-
-.batch-result-summary {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
 }
 
 @media (max-width: 1180px) {
@@ -2673,13 +1051,5 @@ loadAllSkills()
     max-width: none;
   }
 
-  .overview-grid,
-  .filter-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .skill-brief-meta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 </style>

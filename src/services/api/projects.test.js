@@ -1,36 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({
-  get: vi.fn(),
-  post: vi.fn()
-}))
-
-vi.mock('../http.js', () => ({
-  default: {
-    get: mocks.get,
-    post: mocks.post
-  }
-}))
-
+vi.mock('../http.js', () => ({ default: { post: vi.fn() } }))
+import http from '../http.js'
 import { getWorkspaceAgentChildrenApi } from './projects.js'
 
 describe('getWorkspaceAgentChildrenApi', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('uses the global children endpoint when no project is active', () => {
-    getWorkspaceAgentChildrenApi('', 'parent-1')
-
-    expect(mocks.post).toHaveBeenCalledWith('/platform/agent-manage/children', {
-      parentAgentId: 'parent-1'
-    })
-  })
-
-  it('uses the project endpoint when a project is active', () => {
-    getWorkspaceAgentChildrenApi('project/1', 'parent-1')
-
-    expect(mocks.post).toHaveBeenCalledWith('/platform/projects/project%2F1/children', {
+  beforeEach(() => vi.clearAllMocks())
+  it.each([
+    ['', '/platform/agent-manage/children'],
+    ['project/1', '/platform/projects/project%2F1/children']
+  ])('routes project %j children to %s', (projectId, endpoint) => {
+    getWorkspaceAgentChildrenApi(projectId, 'parent-1')
+    expect(http.post).toHaveBeenCalledExactlyOnceWith(endpoint, {
       parentAgentId: 'parent-1'
     })
   })

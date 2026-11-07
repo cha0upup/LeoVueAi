@@ -172,6 +172,7 @@ import { Icon } from '@iconify/vue'
 import { formatFilePath, joinFilePath, normalizeDirectoryPath } from '@/utils/format.js'
 import { compressFileApi } from '@/services/api/agent-files.js'
 import { showError, showInfo, showSuccess } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
 
 // Props
@@ -349,10 +350,7 @@ const handleArchiveNameInput = () => {
 
 const copyOutputPath = () => {
   if (!effectiveArchiveName.value) return
-  navigator.clipboard.writeText(outputPath.value).then(
-    () => showSuccess('已复制输出路径'),
-    () => showError('复制失败，请手动复制')
-  )
+  return copyTextWithFeedback(outputPath.value, '已复制输出路径')
 }
 
 // 应用预设排除规则

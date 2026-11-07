@@ -284,11 +284,6 @@ function formatHeaders(headers) {
     var(--app-control-background-soft) 88%,
     var(--el-bg-color-overlay)
   );
-  --detail-surface-raised-strong: color-mix(
-    in srgb,
-    var(--app-control-background-hover) 92%,
-    var(--el-bg-color-overlay)
-  );
   --detail-surface-muted: color-mix(
     in srgb,
     var(--app-control-background) 94%,

@@ -565,13 +565,6 @@ function formatVal(val) {
 .user-link:hover {
   text-decoration: underline;
 }
-.result-bar {
-  padding: 6px 12px;
-  border-top: 1px solid var(--el-border-color-lighter);
-  display: flex;
-  align-items: center;
-}
-
 /* 详情 */
 .detail-content {
   max-height: 500px;

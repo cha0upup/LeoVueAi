@@ -189,8 +189,10 @@ import { computed, ref } from 'vue'
 
 import { icons } from '@/utils/icons.js'
 import { fetchResourceApi } from '@/services/api/resource.js'
-import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { showError, showWarning } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
+import { base64ToBytes } from '@/utils/base64.js'
 import CodePreview from '@/components/AgentConsole/Common/CodePreview.vue'
 
 const iconMap = icons
@@ -339,19 +341,13 @@ const onCopy = async () => {
   if (result.value.preview === 'java' && result.value.javaCode) toCopy = result.value.javaCode
   else if (result.value.preview === 'text' && result.value.text) toCopy = result.value.text
   else toCopy = result.value.base64
-  try {
-    await navigator.clipboard.writeText(toCopy)
-    showSuccess('已复制到剪贴板')
-  } catch {
-    showError('复制失败')
-  }
+  await copyTextWithFeedback(toCopy, '已复制到剪贴板', '复制失败')
 }
 
 const onDownload = () => {
   if (!result.value?.base64) return
   try {
-    const raw = atob(result.value.base64)
-    const bytes = Uint8Array.from(raw, (character) => character.charCodeAt(0))
+    const bytes = base64ToBytes(result.value.base64)
     const blob = new Blob([bytes], { type: 'application/octet-stream' })
     // 用资源路径最后一段作为文件名
     const path = result.value.resourcePath || 'resource'

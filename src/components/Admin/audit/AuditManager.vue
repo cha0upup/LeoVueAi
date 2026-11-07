@@ -895,8 +895,7 @@ onMounted(() => {
   padding: 10px 0;
 }
 
-.log-id-text,
-.session-id-text {
+.log-id-text {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: var(--el-font-size-extra-small);
   color: var(--el-text-color-regular);

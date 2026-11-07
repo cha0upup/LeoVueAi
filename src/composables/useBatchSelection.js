@@ -2,14 +2,14 @@ import { computed, ref } from 'vue'
 
 export function useBatchSelection(items, getId) {
   const selectedIds = ref(new Set())
-  const selectedCount = computed(
-    () => items.value.filter(item => selectedIds.value.has(getId(item))).length
+  const selectedItems = computed(
+    () => items.value.filter(item => selectedIds.value.has(getId(item)))
   )
   const allFilteredSelected = computed(
-    () => items.value.length > 0 && selectedCount.value === items.value.length
+    () => items.value.length > 0 && selectedItems.value.length === items.value.length
   )
   const someFilteredSelected = computed(
-    () => selectedCount.value > 0 && selectedCount.value < items.value.length
+    () => selectedItems.value.length > 0 && selectedItems.value.length < items.value.length
   )
 
   function setSelected(item, selected) {
@@ -29,6 +29,7 @@ export function useBatchSelection(items, getId) {
 
   return {
     selectedIds,
+    selectedItems,
     allFilteredSelected,
     someFilteredSelected,
     setSelected,

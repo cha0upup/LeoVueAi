@@ -1,3 +1,5 @@
+import { base64ToBytes, bytesToBase64 } from './base64.js'
+
 const AGENT_TRANSFER_FORMAT = 'leo-agent-bundle'
 const AGENT_TRANSFER_VERSION = 2
 
@@ -85,17 +87,11 @@ export const buildAgentTransferBundle = (agents = [], selectedAgentIds = []) => 
 
 export const encodeAgentTransferPayload = (payload) => {
   const bytes = new TextEncoder().encode(JSON.stringify(payload))
-  const chunkSize = 8192
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
-  }
-  return btoa(binary)
+  return bytesToBase64(bytes)
 }
 
 export const decodeAgentTransferPayload = (content) => {
-  const binary = atob(String(content || '').trim())
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+  const bytes = base64ToBytes(String(content || '').trim())
   return JSON.parse(new TextDecoder().decode(bytes))
 }
 

@@ -2,20 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { createAiChatEventReducer } from './aiChatEventReducer.js'
 import { createAssistantMessage } from './aiMessageFactory.js'
 
+function fixture() {
+  const state = { messages: [createAssistantMessage()], status: 'running', lastEventSeq: 0, lastHeartbeatAt: null }
+  const reducer = createAiChatEventReducer({ ensureState: () => state, getActiveKey: () => 'platform-thread' })
+  return { state, handlers: reducer.makeRecoveryHandlers('platform-thread') }
+}
+
 describe('aiChatEventReducer Node AI subtask', () => {
   it('groups child tool events under the delegated subtask', () => {
-    const state = {
-      messages: [createAssistantMessage()],
-      status: 'running',
-      lastEventSeq: 0,
-      lastHeartbeatAt: null
-    }
-    const reducer = createAiChatEventReducer({
-      ensureState: () => state,
-      getActiveKey: () => 'platform-thread'
-    })
-    const handlers = reducer.makeRecoveryHandlers('platform-thread')
-
+    const { state, handlers } = fixture()
     handlers.onNode({
       kind: 'subtask',
       subagentInvocationId: 'inv-1',
@@ -69,17 +64,7 @@ describe('aiChatEventReducer Node AI subtask', () => {
   })
 
   it('keeps delegated child user input inside the subtask children', () => {
-    const state = {
-      messages: [createAssistantMessage()],
-      status: 'running',
-      lastEventSeq: 0,
-      lastHeartbeatAt: null
-    }
-    const reducer = createAiChatEventReducer({
-      ensureState: () => state,
-      getActiveKey: () => 'platform-thread'
-    })
-    const handlers = reducer.makeRecoveryHandlers('platform-thread')
+    const { state, handlers } = fixture()
     handlers.onNode({ kind: 'subtask', subagentInvocationId: 'inv-2', status: 'running' }, 1)
     handlers.onSubagentEvent({
       subagentInvocationId: 'inv-2',

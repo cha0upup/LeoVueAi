@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   filterFileEntries,
-  formatFileModifiedDate,
   getFileEntryKey,
   normalizeFileEntries,
   resolveCurrentFileDirectory,
@@ -38,7 +37,6 @@ describe('fileTableModel', () => {
       '/var/log/app.log'
     )
     expect(resolveFileEntryPath({ path: 'C:\\Temp\\a.txt' })).toBe('C:/Temp/a.txt')
-    expect(formatFileModifiedDate('bad')).toBe('-')
   })
 
   it('settles work with bounded concurrency and preserves item order', async () => {

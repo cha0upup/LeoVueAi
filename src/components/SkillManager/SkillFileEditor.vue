@@ -168,6 +168,7 @@ import { monaco } from '@/utils/monaco.js'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { icons } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
+import { base64ToBytes } from '@/utils/base64.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { saveSkillFileApi } from '@/services/api/skills.js'
 import { useTheme } from '@/stores/theme'
@@ -363,7 +364,7 @@ const handleDownload = () => {
   if (props.encoding === 'text') {
     blob = new Blob([props.fileContent], { type: 'text/plain;charset=utf-8' })
   } else {
-    const bytes = Uint8Array.from(atob(props.fileContent), character => character.charCodeAt(0))
+    const bytes = base64ToBytes(props.fileContent)
     blob = new Blob([bytes], { type: 'application/octet-stream' })
   }
   downloadBlob(blob, props.filePath.split('/').pop())

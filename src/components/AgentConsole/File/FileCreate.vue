@@ -212,7 +212,7 @@ import { joinFilePath, normalizeDirectoryPath } from '@/utils/format.js'
 import { validateForm } from '@/utils/formUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { newDirApi, newFileApi } from '@/services/api/agent-files.js'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 
 const iconMap = icons
 const emit = defineEmits(['refresh', 'created'])
@@ -410,19 +410,11 @@ const handleNameInput = () => {
   }
 }
 
-const copyTargetPath = () => {
-  navigator.clipboard.writeText(targetDirectory.value).then(
-    () => showSuccess('已复制目录路径'),
-    () => showError('复制失败，请手动复制')
-  )
-}
+const copyTargetPath = () => copyTextWithFeedback(targetDirectory.value, '已复制目录路径')
 
 const copyGeneratedPath = () => {
   if (!normalizedName.value) return
-  navigator.clipboard.writeText(fullPath.value).then(
-    () => showSuccess('已复制生成路径'),
-    () => showError('复制失败，请手动复制')
-  )
+  return copyTextWithFeedback(fullPath.value, '已复制生成路径')
 }
 
 const handleSave = async ({ openAfterCreate = false } = {}) => {

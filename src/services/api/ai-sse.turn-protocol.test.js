@@ -4,6 +4,17 @@ import { createAiChatEventReducer } from '@/composables/ai/aiChatEventReducer.js
 import { createAssistantMessage } from '@/composables/ai/aiMessageFactory.js'
 
 describe('parseAiSseStream Turn protocol', () => {
+  it.each([
+    ['subagent_event', 'onSubagentEvent', 12, { subagentInvocationId: 'inv-1', eventName: 'delta', eventData: 'root' }],
+    ['trace', 'onTrace', 7, { traceId: 'trace-1', source: 'platform', startedAt: 100 }]
+  ])('dispatches %s with its sequence and turn identity', async (event, callback, seq, payload) => {
+    const handler = vi.fn()
+    const body = `id: ${seq}|turn-1|item-1|run-1|\nevent: ${event}\ndata: ${JSON.stringify(payload)}\n\n`
+    await parseAiSseStream(new globalThis.Response(body), { [callback]: handler })
+    expect(handler).toHaveBeenCalledWith(payload, seq,
+      expect.objectContaining({ turnId: 'turn-1', itemId: 'item-1', runId: 'run-1' }))
+  })
+
   it('renders thinking and plan updates through node and patch events', async () => {
     const assistant = createAssistantMessage()
     const state = { messages: [assistant], status: 'running', lastEventSeq: 0 }

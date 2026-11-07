@@ -80,7 +80,7 @@
 import { ref, computed, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
-import { formatFilePath } from '@/utils/format.js'
+import { joinFilePath } from '@/utils/format.js'
 import { renameFileApi } from '@/services/api/agent-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { FILE_NAME_PATTERN, FILE_NAME_ERROR_MESSAGE } from '@/utils/fileValidator.js'
@@ -106,14 +106,12 @@ const inputRef = ref(null)
 const form = ref({ newName: '' })
 
 const filePath = computed(() =>
-  formatFilePath(`${props.disk}${props.currentPath}/${props.file.name}`)
+  joinFilePath(`${props.disk}${props.currentPath}`, props.file.name)
 )
-
-const targetDirectory = computed(() => formatFilePath(`${props.disk}${props.currentPath}`).replace(/\/+$/, ''))
 
 const newFilePath = computed(() => {
   const nextName = form.value.newName?.trim() || props.file.name || ''
-  return formatFilePath(`${targetDirectory.value}/${nextName}`)
+  return joinFilePath(`${props.disk}${props.currentPath}`, nextName)
 })
 
 const fileIconPresentation = computed(() => getFileIconPresentation(props.file))

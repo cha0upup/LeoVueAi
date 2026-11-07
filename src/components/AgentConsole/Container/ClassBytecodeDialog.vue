@@ -115,6 +115,7 @@ import { ref, nextTick, onUnmounted, watch } from 'vue'
 
 import { icons } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
+import { base64ToBytes } from '@/utils/base64.js'
 import { getClassBytecodeApi } from '@/services/api/container.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEditor.js'
@@ -123,6 +124,7 @@ import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { useResponsiveDialogWidth } from '@/composables/useResponsiveDialogWidth.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 
 const iconMap = icons
 
@@ -210,12 +212,7 @@ const copyCode = async () => {
     return
   }
 
-  try {
-    await navigator.clipboard.writeText(bytecodeData.value.javaCode)
-    showSuccess('代码已复制到剪贴板')
-  } catch {
-    showError('复制失败，请手动选择复制')
-  }
+  await copyTextWithFeedback(bytecodeData.value.javaCode, '代码已复制到剪贴板', '复制失败，请手动选择复制')
 }
 
 /**
@@ -228,7 +225,7 @@ const downloadClassFile = () => {
   }
 
   try {
-    const bytes = Uint8Array.from(atob(bytecodeData.value.bytecode), character => character.charCodeAt(0))
+    const bytes = base64ToBytes(bytecodeData.value.bytecode)
     const blob = new Blob([bytes], { type: 'application/java-vm' })
     const className = bytecodeData.value.className || 'UnknownClass'
     const fileName = className.split('.').pop() + '.class'

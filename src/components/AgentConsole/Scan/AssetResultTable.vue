@@ -761,7 +761,7 @@ watch(
 watch(() => props.refreshToken, refreshResults)
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .component-tags { display: flex; flex-wrap: wrap; gap: 4px; cursor: pointer; }
 .asset-result-table { container: results / inline-size; min-width: 0; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; background: var(--el-bg-color); color: var(--el-text-color-primary); }
 .result-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; }

@@ -1,3 +1,5 @@
+import { base64ToBytes } from '@/utils/base64.js'
+
 const CLASS_MAGIC = [0xca, 0xfe, 0xba, 0xbe]
 
 const CLASS_ARTIFACT_ROLE_LABELS = Object.freeze({
@@ -29,17 +31,12 @@ export function decodeClassArtifact(artifact) {
   const normalized = normalizeClassArtifacts([artifact])[0]
   if (!normalized) throw new TypeError('Class 产物数据不完整')
 
-  let decoded
+  let bytes
   try {
-    decoded = globalThis.atob(normalized.content)
+    bytes = base64ToBytes(normalized.content)
   } catch {
     throw new TypeError('Class 产物 Base64 内容无效')
   }
-  const bytes = new Uint8Array(decoded.length)
-  for (let index = 0; index < decoded.length; index += 1) {
-    bytes[index] = decoded.charCodeAt(index)
-  }
-
   if (normalized.sizeBytes && normalized.sizeBytes !== bytes.byteLength) {
     throw new TypeError('Class 产物长度校验失败')
   }

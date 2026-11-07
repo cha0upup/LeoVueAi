@@ -4,6 +4,7 @@ import { compileClientComponent, createSlotStub as stub, findNodes } from '@/tes
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { icons } from '@/utils/icons.js'
+import * as format from '@/utils/format.js'
 import * as pluginForms from '@/utils/plugin.js'
 import * as modelLabels from '@/components/Settings/aiChannelSettingsModel.js'
 
@@ -42,6 +43,15 @@ const PluginDialog = compileClientComponent(new URL('../PluginManager/PluginForm
 const ModelDetail = compileClientComponent(new URL('../Settings/AiModelDetailPanel.vue', import.meta.url), {
   './aiChannelSettingsModel.js': modelLabels
 })
+const copyTextWithFeedback = vi.fn()
+const detailImports = {
+  '@/components/common/EmptyState.vue': { default: EmptyState },
+  '@/utils/icons.js': { icons },
+  '@/utils/format.js': format,
+  '@/utils/clipboard.js': { copyTextWithFeedback }
+}
+const PluginDetail = compileClientComponent(new URL('../PluginManager/PluginDetail.vue', import.meta.url), detailImports)
+const DisguiseDetail = compileClientComponent(new URL('../DisguiseManager/DisguiseDetail.vue', import.meta.url), detailImports)
 const text = node => node.type === 'comment' ? '' : node.text + node.children.map(text).join('')
 const apps = []
 afterEach(() => { apps.splice(0).forEach(app => app.unmount()); vi.clearAllMocks() })
@@ -64,6 +74,34 @@ function mount(component, props = {}, slots = {}) {
 }
 
 describe('shared workbench presentation', () => {
+  it('copies the original plugin parameters with its own success label and keeps the empty guard', async () => {
+    const plugin = reactive({ pluginId: 'plugin', paramsDemo: ' { "name": "中文" }\n' })
+    const view = mount(PluginDetail, { plugin })
+    const copyButton = () => view.nodes('button').find(node => node.props.title === '复制参数模板')
+    await copyButton().props.onClick()
+    expect(copyTextWithFeedback).toHaveBeenCalledExactlyOnceWith(plugin.paramsDemo, '参数模板已复制')
+    copyTextWithFeedback.mockClear()
+    plugin.paramsDemo = ''
+    await nextTick()
+    expect(copyButton().props.disabled).toBe(true)
+    await copyButton().props.onClick()
+    expect(copyTextWithFeedback).not.toHaveBeenCalled()
+  })
+
+  it('copies formatted headers while retaining the empty-header guard', async () => {
+    const disguise = reactive({ disguiseId: 'fixture', headers: { 'X-Name': '中文', 'X-Empty': '' } })
+    const view = mount(DisguiseDetail, { disguise })
+    const copyButton = () => view.nodes('button').find(node => node.props.title === '复制 Headers')
+    await copyButton().props.onClick()
+    expect(copyTextWithFeedback).toHaveBeenCalledExactlyOnceWith('X-Name: 中文\nX-Empty: -', 'Headers 已复制')
+    copyTextWithFeedback.mockClear()
+    disguise.headers = {}
+    await nextTick()
+    expect(copyButton().props.disabled).toBe(true)
+    await copyButton().props.onClick()
+    expect(copyTextWithFeedback).not.toHaveBeenCalled()
+  })
+
   it('keeps card activation and batch checkbox behavior independent', async () => {
     const click = vi.fn()
     const toggle = vi.fn()

@@ -559,7 +559,7 @@ function stageStatusText(task, name, stage) {
 }
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .asset-discovery-view {
   container: discovery / inline-size;
   height: 100%;

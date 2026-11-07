@@ -1,3 +1,5 @@
+import { base64ToBytes, bytesToBase64 } from '@/utils/base64.js'
+
 const SCRIPT_LANGUAGE_OPTIONS = Object.freeze({
   java: [
     { value: 'js', label: 'JavaScript' },
@@ -25,15 +27,6 @@ export const createEmptyBytecode = () => ({
   magicValid: false
 })
 
-const bytesToBase64 = bytes => {
-  let binary = ''
-  const chunkSize = 0x8000
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
-  }
-  return btoa(binary)
-}
-
 export const analyzeBytecode = (bytes, fileName = '') => {
   if (!(bytes instanceof Uint8Array) || bytes.length === 0) {
     throw new TypeError('字节码为空')
@@ -52,13 +45,11 @@ export const decodeBytecodeBase64 = rawValue => {
   const cleaned = String(rawValue || '').trim().replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/')
   if (!cleaned) throw new TypeError('字节码为空')
   const padded = cleaned + '='.repeat((4 - (cleaned.length % 4)) % 4)
-  const binary = atob(padded)
-  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0))
-  return analyzeBytecode(bytes)
+  return analyzeBytecode(base64ToBytes(padded))
 }
 
 export const decodePluginScript = bytecode =>
-  new TextDecoder().decode(Uint8Array.from(atob(bytecode), character => character.charCodeAt(0)))
+  new TextDecoder().decode(base64ToBytes(bytecode))
 
 export const formatByteSize = value => {
   const bytes = Number(value)

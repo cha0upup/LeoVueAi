@@ -338,7 +338,7 @@ function formatResolved(target) {
 }
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .target-input { width: 100%; min-width: 0; color: var(--el-text-color-primary); }
 .target-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 24px; }
 .target-toolbar label { font-size: 13px; font-weight: 600; }

@@ -149,21 +149,18 @@ const removeDatabaseTab = (targetTabId) => {
   padding: 0;
   background: transparent;
   --database-panel-surface: transparent;
-  --database-tab-active-surface: var(--app-control-background-soft);
   --database-soft-border: color-mix(in srgb, var(--el-border-color) 18%, transparent);
 }
 
 :global(html:not(.dark) .database-container),
 :global(html[data-theme='light'] .database-container) {
   --database-panel-surface: transparent;
-  --database-tab-active-surface: var(--app-control-background-soft);
   --database-soft-border: color-mix(in srgb, var(--el-border-color) 16%, transparent);
 }
 
 :global(html.dark .database-container),
 :global(html[data-theme='dark'] .database-container) {
   --database-panel-surface: transparent;
-  --database-tab-active-surface: var(--app-control-background-soft);
   --database-soft-border: color-mix(in srgb, var(--el-border-color) 18%, transparent);
 }
 

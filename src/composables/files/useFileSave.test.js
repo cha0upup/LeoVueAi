@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deferred } from '@/test-support/deferred.js'
 import { useFileSave } from './useFileSave.js'
+import { useFileEncoding } from './useFileEncoding.js'
 import { editFileApi } from '@/services/api/agent-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
@@ -79,15 +80,20 @@ describe('saving a preview', () => {
     expect(content.value).toBe('one\ntwo')
     expect(modified.value).toBe(false)
   })
-  it('keeps the selected BOM on repeated saves while preserving editor content', async () => {
+  it('writes the offered UTF-8 encodings losslessly and keeps BOM handling idempotent', async () => {
+    expect(useFileEncoding().encodingOptions.map(option => option.value)).toEqual(['utf-8', 'utf-8-bom'])
     const { save, content, state } = fixture()
+    content.value = 'hello世界'
     state.currentEncoding.value = 'utf-8-bom'
     await save()
+    expect(content.value).toBe('hello世界')
+    content.value = '\uFEFFhello世界'
     await save()
-    expect(content.value).toBe('first revision')
+    state.currentEncoding.value = 'utf-8'
+    await save()
+    expect(content.value).toBe('\uFEFFhello世界')
     expect(editFileApi.mock.calls.map(([request]) => request.content)).toEqual([
-      '\uFEFFfirst revision',
-      '\uFEFFfirst revision'
+      '\uFEFFhello世界', '\uFEFFhello世界', 'hello世界'
     ])
   })
   it('ignores an old save response after closing and reopening the preview', async () => {

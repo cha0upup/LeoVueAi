@@ -2,6 +2,7 @@ import { deleteFileApi, getFileMd5Api, moveFileApi, newFileApi } from '@/service
 import { formatFilePath } from '@/utils/format.js'
 import { createMd5Hasher } from '@/utils/md5.js'
 import { TaskStatus } from '@/constants/task.js'
+import { bytesToBase64 } from '@/utils/base64.js'
 
 export function applyUploadExecutor(TaskEngine) {
   TaskEngine.prototype.executeUploadTask = async function (task) {
@@ -175,15 +176,7 @@ export function applyUploadExecutor(TaskEngine) {
 
   // 将ArrayBuffer转换为Base64字符串
   TaskEngine.prototype.arrayBufferToBase64 = function (buffer) {
-    let binary = ''
-    const bytes = new Uint8Array(buffer)
-    const len = bytes.byteLength
-
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-
-    return btoa(binary)
+    return bytesToBase64(new Uint8Array(buffer))
   }
 
   // 每次读取最多 1 MiB；摘要结果与服务端一致。

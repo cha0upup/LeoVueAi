@@ -40,12 +40,6 @@
   --el-transition-function: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* 统一的应用令牌 */
-  --app-surface-bg: var(--el-bg-color-overlay);
-  --app-surface-border: var(--el-border-color-lighter);
-  --app-surface-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --app-surface-shadow-hover: 0 2px 8px rgba(15, 23, 42, 0.08);
-  --app-header-height: 49px;
-  --app-gradient-primary: var(--el-color-primary);
   --app-section-gap: 16px;
   --app-page-padding: 12px;
   --app-layout-gap: 12px;
@@ -82,13 +76,6 @@
     var(--el-border-color) 10%
   );
   --app-brand-background: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
-  --app-card-active-background: color-mix(
-    in srgb,
-    var(--el-bg-color-overlay) 92%,
-    var(--el-border-color) 8%
-  );
-  --app-soft-glow: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
-  --app-secondary-glow: color-mix(in srgb, var(--el-color-info) 8%, transparent);
   --app-shell-shadow: 0 10px 26px color-mix(in srgb, var(--el-text-color-primary) 5%, transparent);
   --app-shell-shadow-strong: 0 16px 34px
     color-mix(in srgb, var(--el-text-color-primary) 7%, transparent);
@@ -112,30 +99,6 @@
     in srgb,
     var(--el-bg-color-overlay) 94%,
     var(--el-border-color) 6%
-  );
-  --app-tree-node-content-hover-background: color-mix(
-    in srgb,
-    var(--el-color-primary) 6%,
-    transparent
-  );
-  --app-tree-node-content-hover-border: color-mix(
-    in srgb,
-    var(--el-color-primary) 10%,
-    var(--el-border-color)
-  );
-  --app-tree-node-content-active-background: var(--app-card-active-background);
-  --app-tree-node-content-active-border: color-mix(
-    in srgb,
-    var(--el-color-primary) 22%,
-    var(--el-border-color)
-  );
-  --app-tree-node-content-active-shadow: var(--app-inset-highlight-soft);
-  --app-tree-node-content-active-text: var(--el-color-primary);
-  --app-tree-node-content-active-icon-shell-background: var(--app-control-background-hover);
-  --app-tree-node-content-active-icon-shell-border: color-mix(
-    in srgb,
-    var(--el-color-primary) 18%,
-    var(--el-border-color)
   );
 
   /* 滚动条尺寸 */
@@ -664,7 +627,6 @@ html,
 
 /* 表单区块样式 - 现代化设计 */
 .form-section {
-  margin-bottom: var(--el-spacing-xl);
   padding: var(--el-spacing-xl);
   background: color-mix(in srgb, var(--app-surface-background) 94%, var(--el-bg-color-overlay));
   border-radius: var(--app-panel-radius);
@@ -682,9 +644,6 @@ html,
 }
 
 .section-title {
-  font-size: var(--el-font-size-medium);
-  font-weight: 600;
-  color: var(--el-text-color-primary);
   margin: 0;
 }
 
@@ -692,21 +651,11 @@ html,
   display: flex;
   align-items: center;
   gap: var(--el-spacing-small);
-  margin-top: var(--el-spacing-small);
-  font-size: var(--el-font-size-extra-small);
-  color: var(--el-text-color-secondary);
 }
 
 .form-tip .el-icon {
   font-size: var(--el-font-size-base);
   color: var(--el-color-info);
-}
-
-/* 统一的对话框底部按钮区域 */
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--el-spacing-base);
 }
 
 /* Tag 样式增强 - 确保图标和文字不换行 */

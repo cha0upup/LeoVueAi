@@ -105,11 +105,11 @@
           <div class="kv-list single-column">
             <div class="kv-item">
               <label>创建时间</label>
-              <span>{{ formatTime(disguise.createTime) }}</span>
+              <span>{{ formatDate(disguise.createTime) }}</span>
             </div>
             <div class="kv-item">
               <label>更新时间</label>
-              <span>{{ formatTime(disguise.updateTime) }}</span>
+              <span>{{ formatDate(disguise.updateTime) }}</span>
             </div>
             <div class="kv-item">
               <label>备注</label>
@@ -250,7 +250,7 @@ import { computed } from 'vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { icons } from '@/utils/icons.js'
 import { formatDate } from '@/utils/format.js'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 
 const props = defineProps({
   disguise: {
@@ -297,21 +297,9 @@ function handleActionCommand(command) {
   }
 }
 
-async function copyText(text, successMessage) {
+function copyText(text, successMessage) {
   if (!text) return
-  try {
-    await navigator.clipboard.writeText(text)
-    showSuccess(successMessage)
-  } catch {
-    showError('复制失败，请手动复制')
-  }
-}
-
-function formatTime(timestamp) {
-  if (!timestamp) {
-    return '-'
-  }
-  return formatDate(timestamp)
+  return copyTextWithFeedback(text, successMessage)
 }
 </script>
 
@@ -333,11 +321,6 @@ function formatTime(timestamp) {
     var(--app-control-background-soft) 88%,
     var(--el-bg-color-overlay)
   );
-  --detail-surface-raised-strong: color-mix(
-    in srgb,
-    var(--app-control-background-hover) 92%,
-    var(--el-bg-color-overlay)
-  );
   --detail-surface-muted: color-mix(
     in srgb,
     var(--app-control-background) 94%,
@@ -347,7 +330,6 @@ function formatTime(timestamp) {
   --workbench-surface-muted: var(--detail-surface-muted);
   --workbench-border-soft: var(--detail-border-soft);
   --detail-card-surface-raised: var(--detail-surface-raised);
-  --detail-card-surface-muted: var(--detail-surface-muted);
   --detail-card-border-soft: var(--detail-border-soft);
 }
 

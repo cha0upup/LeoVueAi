@@ -332,7 +332,6 @@ const formatCellValue = (value) => {
 .sql-query {
   --sql-query-panel-surface: var(--app-card-background);
   --sql-query-muted-surface: var(--app-control-background-soft);
-  --sql-query-strong-surface: var(--app-control-background);
   --sql-query-soft-border: color-mix(in srgb, var(--el-border-color) 72%, transparent);
   height: 100%;
   display: flex;
@@ -344,7 +343,6 @@ const formatCellValue = (value) => {
 :global(html[data-theme='light'] .sql-query) {
   --sql-query-panel-surface: var(--app-surface-background);
   --sql-query-muted-surface: #f2f2f2;
-  --sql-query-strong-surface: var(--app-control-background);
   --sql-query-soft-border: color-mix(in srgb, var(--el-border-color) 68%, transparent);
 }
 
@@ -358,11 +356,6 @@ const formatCellValue = (value) => {
   --sql-query-muted-surface: color-mix(
     in srgb,
     var(--app-control-background-soft) 76%,
-    var(--app-card-background)
-  );
-  --sql-query-strong-surface: color-mix(
-    in srgb,
-    var(--app-control-background) 84%,
     var(--app-card-background)
   );
   --sql-query-soft-border: color-mix(in srgb, var(--el-border-color) 52%, transparent);

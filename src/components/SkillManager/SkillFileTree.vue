@@ -217,6 +217,7 @@ import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { icons } from '@/utils/icons.js'
+import { bytesToBase64 } from '@/utils/base64.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
@@ -547,13 +548,7 @@ function readFile(file, asText) {
         resolve(reader.result)
       } else {
         // ArrayBuffer → base64
-        const bytes = new Uint8Array(reader.result)
-        const CHUNK = 8192
-        let bin = ''
-        for (let i = 0; i < bytes.length; i += CHUNK) {
-          bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
-        }
-        resolve(btoa(bin))
+        resolve(bytesToBase64(new Uint8Array(reader.result)))
       }
     }
     reader.onerror = () => reject(reader.error || new Error('读取文件失败'))

@@ -113,7 +113,7 @@
                   v-if="compact"
                   class="file-secondary"
                 >
-                  <time :title="formatFileModifiedDate(row.modified)">{{
+                  <time :title="formatDate(row.modified)">{{
                     shortDate(row.modified)
                   }}</time><span :title="permissionLabel(row)">{{ permissionText(row) }}</span>
                 </div>
@@ -161,7 +161,7 @@
           <template #default="{ row }">
             <time
               class="time-text"
-              :title="formatFileModifiedDate(row.modified)"
+              :title="formatDate(row.modified)"
             >{{
               shortDate(row.modified)
             }}</time>
@@ -226,9 +226,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons } from '@/utils/icons.js'
 import { getFileIconMeta } from '@/utils/fileIcons.js'
-import { formatFileSize } from '@/utils/format.js'
+import { formatDate, formatFileSize } from '@/utils/format.js'
 import ActionButton from './ActionButton.vue'
-import { formatFileModifiedDate, getFileEntryKey } from './fileTableModel.js'
+import { getFileEntryKey } from './fileTableModel.js'
 
 const props = defineProps({
   visibleFiles: { type: Array, default: () => [] },
@@ -254,7 +254,7 @@ const filters = computed(() => [
 ])
 const getIcon = (file) => getFileIconMeta(file).icon
 const getIconClass = (file) => getFileIconMeta(file).className
-const shortDate = (value) => formatFileModifiedDate(value).slice(0, 16)
+const shortDate = (value) => formatDate(value).slice(0, 16)
 const permissionText = (file) =>
   `${file.canRead ? 'r' : '-'}${file.canWrite ? 'w' : '-'}${file.canExecute ? 'x' : '-'}`
 const permissionLabel = (file) =>

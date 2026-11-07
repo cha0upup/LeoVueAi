@@ -271,6 +271,7 @@ import { getPluginsApi } from '@/services/api/plugins.js'
 import { invokePluginApi } from '@/services/api/agent-tools.js'
 import { useResponsiveDialogWidth } from '@/composables/useResponsiveDialogWidth.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import { formatExecutionResult } from './scriptEditorModel.js'
 
 const iconMap = icons
@@ -396,12 +397,7 @@ const invokePlugin = async () => {
 
 const copyResult = async () => {
   if (!executionResult.value) return
-  try {
-    await navigator.clipboard.writeText(executionResult.value)
-    showSuccess('结果已复制到剪贴板')
-  } catch {
-    showError('复制失败')
-  }
+  await copyTextWithFeedback(executionResult.value, '结果已复制到剪贴板', '复制失败')
 }
 
 onMounted(getPlugins)

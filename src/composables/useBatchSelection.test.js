@@ -17,11 +17,13 @@ describe('useBatchSelection', () => {
     selection.setSelected(items.value[0], true)
     expect(selection.someFilteredSelected.value).toBe(true)
     expect(selection.selectedIds.value.has('a')).toBe(true)
+    expect(selection.selectedItems.value.map(item => item.id)).toEqual(['a'])
 
     items.value = items.value.filter(item => item.id !== 'a')
     expect(selection.allFilteredSelected.value).toBe(false)
     expect(selection.someFilteredSelected.value).toBe(false)
     expect(selection.selectedIds.value.has('a')).toBe(true)
+    expect(selection.selectedItems.value).toEqual([])
 
     selection.toggleSelectAll(true)
     expect([...selection.selectedIds.value]).toEqual(['a', 'b', 'c'])
@@ -51,6 +53,7 @@ describe('useBatchSelection', () => {
 
     items.value = [{ id: 'a', name: 'updated' }]
     expect(selection.allFilteredSelected.value).toBe(true)
+    expect(selection.selectedItems.value[0]).toBe(items.value[0])
     selection.setSelected(items.value[0], false)
     expect(selection.selectedIds.value.size).toBe(0)
   })

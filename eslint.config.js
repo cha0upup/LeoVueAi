@@ -50,5 +50,49 @@ export default [
       'vue/require-default-prop': 'off',
       'vue/no-v-html': 'warn'
     }
+  },
+  {
+    files: ['src/components/SkillManager/SkillHealthDialog.vue',
+      'src/components/SkillManager/SkillBatchResultDialog.vue',
+      'src/components/SkillManager/SkillCatalogTable.vue',
+      'src/components/SkillManager/SkillCatalogFilters.vue',
+      'src/components/SkillManager/SkillWorkspaceOverview.vue',
+      'src/components/SkillManager/SkillIssueDrawer.vue'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['@/services/**', '@/composables/**', './useSkill*', '@/utils/apiUtils.js', '@/utils/confirmUtils.js'],
+        message: 'Skill views receive data via props and delegate actions via events.'
+      }] }],
+      'vue/no-mutating-props': 'error'
+    }
+  },
+  {
+    files: ['src/components/SkillManager/useSkillCatalog.js', 'src/components/SkillManager/useSkillWorkspace.js',
+      'src/components/SkillManager/useSkillBatchActions.js', 'src/components/SkillManager/useSkillFilters.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/*.vue', 'element-plus', '@iconify/vue'],
+        message: 'Skill state controllers must stay independent of rendered views.'
+      }] }]
+    }
+  },
+  {
+    files: ['src/components/SkillManager/useSkillFilters.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/*.vue', 'element-plus', '@iconify/vue', '@/services/**', '@/utils/apiUtils.js',
+          '@/utils/confirmUtils.js', '@/utils/messageUtils.js', '@/utils/errorHandler.js'],
+        message: 'Filter models are pure projections; state and effects come from explicit inputs.'
+      }] }]
+    }
+  },
+  {
+    files: ['src/components/SkillManager/SkillManager.vue'],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: 'CallExpression[callee.type="MemberExpression"][callee.property.name=/^(clearSelection|toggleRowSelection)$/]',
+        message: 'Control catalog selection through row models; widget methods belong inside SkillCatalogTable.'
+      }]
+    }
   }
 ]

@@ -63,7 +63,7 @@ export function formatFilePath(filePath) {
 
 /** 规范化目录路径，保留 POSIX 与 Windows 盘符根目录。 */
 export function normalizeDirectoryPath(path) {
-  const formatted = formatFilePath(path || '/').replace(/\/\.$/, '')
+  const formatted = formatFilePath(path || '/').replace(/\/\.$/, '') || '/'
   if (formatted === '/' || /^[A-Za-z]:\/?$/.test(formatted)) {
     return formatted.endsWith('/') ? formatted : `${formatted}/`
   }

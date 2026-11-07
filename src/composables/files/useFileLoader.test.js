@@ -18,7 +18,8 @@ describe('file preview loading', () => {
     ['aGVsbG8=', undefined, 'utf-8', 'hello'],
     ['77u/aGVsbG8=', undefined, 'utf-8-bom', '\uFEFFhello'],
     ['77u/aGVsbG8=', 'utf-8', 'utf-8', '\uFEFFhello'],
-    ['aGVsbG8=', 'utf-8-bom', 'utf-8-bom', 'hello']
+    ['aGVsbG8=', 'utf-8-bom', 'utf-8-bom', 'hello'],
+    ['8J-YgA\n', undefined, 'utf-8', '😀']
   ])('detects BOMs while preserving an explicit encoding choice: %s / %s', async (data, requested, expected, content) => {
     const encoding = useFileEncoding()
     const loader = useFileLoader(encoding)
@@ -60,12 +61,16 @@ describe('file preview loading', () => {
   it('invalidates a pending response when file state is reset', async () => {
     const pending = deferred()
     previewFileApi.mockReturnValueOnce(pending.promise)
-    const loader = useFileLoader(useFileEncoding())
+    const encoding = useFileEncoding()
+    encoding.currentEncoding.value = 'utf-8-bom'
+    const loader = useFileLoader(encoding)
     const load = loader.loadFile('s', '/file.txt')
     loader.resetFileState()
+    encoding.resetEncoding()
     pending.resolve(response('stale'))
     expect(await load).toBeNull()
     expect(loader.fileContent.value).toBe('')
+    expect(encoding.currentEncoding.value).toBe('utf-8')
   })
 
   it('ignores a cancelled encoding reload before another fetch begins', async () => {

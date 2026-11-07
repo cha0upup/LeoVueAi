@@ -41,4 +41,13 @@ describe('script generator class artifacts', () => {
     expect(normalizeClassArtifacts(null)).toEqual([])
     expect(normalizeClassArtifacts([{ role: 'core', className: 'Core' }])).toEqual([])
   })
+
+  it.each([
+    ['invalid!', classBytes.length, 'Class 产物 Base64 内容无效'],
+    [classBase64, 100, 'Class 产物长度校验失败']
+  ])('retains domain validation for %s after binary decoding is shared', (content, sizeBytes, message) => {
+    expect(() => decodeClassArtifact({
+      role: 'core', className: 'fixture.Core', contentEncoding: 'base64', content, sizeBytes
+    })).toThrow(message)
+  })
 })

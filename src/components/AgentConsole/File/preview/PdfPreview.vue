@@ -52,6 +52,7 @@
 <script setup>
 import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
+import { base64ToBytes } from '@/utils/base64.js'
 
 const props = defineProps({
   /** data:application/pdf;base64,... or object URL */
@@ -86,7 +87,7 @@ watch(() => props.pdfSrc, (val) => {
   if (val && val.startsWith('data:application/pdf')) {
     loading.value = true
     try {
-      const bytes = Uint8Array.from(atob(val.split(',')[1]), character => character.charCodeAt(0))
+      const bytes = base64ToBytes(val.split(',')[1])
       const blob = new Blob([bytes], { type: 'application/pdf' })
       objectUrl.value = URL.createObjectURL(blob)
     } catch {

@@ -15,6 +15,11 @@ describe('scriptEditorModel', () => {
     const decoded = decodeBytecodeBase64(` ${descriptor.base64.slice(0, 4)}\n${descriptor.base64.slice(4)} `)
     expect(descriptor).toMatchObject({ fileName: 'Demo.class', size: 5, magicValid: true, preview: 'ca fe ba be 01' })
     expect(decoded).toMatchObject({ base64: descriptor.base64, size: 5, magicValid: true })
+    expect(decodeBytecodeBase64(' -_8\n')).toMatchObject({ base64: '+/8=', size: 2, magicValid: false })
+    expect(() => decodeBytecodeBase64('  ')).toThrow('字节码为空')
+    const original = Uint8Array.of(0, 255, 128, 65, 0)
+    expect(analyzeBytecode(original.subarray(1, 4))).toMatchObject({ base64: '/4BB', size: 3 })
+    expect([...original]).toEqual([0, 255, 128, 65, 0])
   })
 
   it('formats result envelopes and byte sizes', () => {

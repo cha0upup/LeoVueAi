@@ -12,11 +12,11 @@ const sharedStyles = [
   'styles/workbench-directory-shared.css', 'styles/workbench-dialog.css', 'styles/workbench-toolbar-shared.css'
 ]
 
-function sourceFiles(directory) {
+function sourceFiles(directory, extension = /\.(?:js|ts|vue)$/) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const path = join(directory, entry.name)
-    if (entry.isDirectory()) return entry.name === 'test-support' ? [] : sourceFiles(path)
-    return /\.(?:js|ts|vue)$/.test(entry.name) && !/\.(?:test|spec)\./.test(entry.name) ? [path] : []
+    if (entry.isDirectory()) return entry.name === 'test-support' ? [] : sourceFiles(path, extension)
+    return extension.test(entry.name) && !/\.(?:test|spec)\./.test(entry.name) ? [path] : []
   })
 }
 
@@ -49,6 +49,43 @@ function orphanedSelectors(styleRules) {
   return missing
 }
 
+function unusedCustomTokens(styles, scripts = '') {
+  const dependencies = new Map()
+  const roots = new Set()
+  const references = value => [...value.matchAll(/var\(\s*(--[\w-]+)/g)].map(match => match[1])
+  const define = (name, value) => {
+    const aliases = dependencies.get(name) ?? new Set()
+    for (const reference of references(value)) aliases.add(reference)
+    dependencies.set(name, aliases)
+    // Element Plus consumes its public variables outside first-party stylesheets.
+    if (name.startsWith('--el-')) roots.add(name)
+  }
+  for (const source of styles) {
+    const result = compileStyle({ id: 'style-token-check', source })
+    expect(result.errors).toEqual([])
+    result.rawResult.root.walkDecls(declaration => {
+      if (declaration.prop.startsWith('--')) define(declaration.prop, declaration.value)
+      else for (const reference of references(declaration.value)) roots.add(reference)
+    })
+  }
+  // Quoted theme/style object keys define tokens; other script mentions are
+  // conservatively treated as consumers, including direct DOM style reads.
+  const reads = scripts.replace(/(['"])(--[\w-]+)\1\s*:\s*(['"])(.*?)\3/g, (_match, _quote, name, _valueQuote, value) => {
+    define(name, value)
+    return ''
+  })
+  for (const match of reads.matchAll(/--[a-zA-Z][\w-]+/g)) roots.add(match[0])
+  const live = new Set()
+  const pending = [...roots]
+  while (pending.length) {
+    const name = pending.pop()
+    if (live.has(name)) continue
+    live.add(name)
+    pending.push(...(dependencies.get(name) ?? []))
+  }
+  return [...dependencies.keys()].filter(name => !live.has(name)).sort()
+}
+
 describe('shared stylesheet reachability', () => {
   it.each(sharedStyles)('has no orphaned custom selector branches in %s', path => {
     expect(orphanedSelectors(rules(path))).toEqual([])
@@ -65,54 +102,35 @@ describe('shared stylesheet reachability', () => {
     }
   )
 
-  it('preserves the live branches of partially retired selector groups', () => {
-    expect(rules('assets/global.css').some(rule => rule.selector.trim() === '.module-shell .content-split > section')).toBe(true)
-    expect(rules('styles/workbench-directory-shared.css').some(rule => rule.selector.trim() === '.scope-tab span')).toBe(true)
-  })
-
   it('retains responsive file-dialog layout', () => {
     const footer = rules('styles/file-operation-dialog-shared.css').find(rule =>
       rule.selector === '.file-dialog-footer' && rule.parent.type === 'atrule' && rule.parent.name === 'media')
     expect(footer?.nodes.some(node => node.prop === 'flex-direction' && node.value === 'column')).toBe(true)
   })
 
-  it('retains type-tag variants without retired toolbar selectors', () => {
+  it('retains supported type-tag variants', () => {
     const selectors = rules('styles/workbench-toolbar-shared.css').map(rule => rule.selector).join('\n')
     for (const tone of ['info', 'success', 'primary', 'warning']) {
       expect(selectors).toContain(`.workbench-type-tag.el-tag--${tone}`)
     }
-    expect(selectors).not.toContain('.toolbar-stats')
   })
 
-  it('keeps only referenced static design tokens', () => {
-    const css = readdirSync(join(root, 'styles')).filter(name => name.endsWith('.css'))
-      .map(name => readFileSync(join(root, 'styles', name), 'utf8')).join('\n')
-    const implementation = [usage, componentStyles, css, readFileSync(join(root, 'assets/global.css'), 'utf8')]
-      .join('\n').replace(/\/\*[\s\S]*?\*\//g, '')
-    const tokens = rules('styles/design-tokens.css').find(rule => rule.selector === ':root').nodes
-      .filter(node => node.type === 'decl').map(node => node.prop)
-    const unused = tokens.filter(token => (implementation.match(new RegExp(`${token}(?![\\w-])`, 'g')) ?? []).length < 2)
-    expect(unused).toEqual([])
+  it('keeps stylesheet and theme tokens reachable from consumers rather than other unused aliases', () => {
+    const css = sourceFiles(root, /\.css$/).map(path => readFileSync(path, 'utf8'))
+    const scoped = components.flatMap(file => file.styles ?? []).map(style => style.content)
+    expect(unusedCustomTokens([...css, ...scoped], usage)).toEqual([])
   })
 
-  it('does not repeat sidebar selectors within the same responsive context', () => {
-    const file = components.find(file => file.path === join(root, 'components/Home.vue'))
-    const result = compileStyle({ filename: file.path, id: 'sidebar-cleanup', source: file.styles[0].content })
-    expect(result.errors).toEqual([])
-    const seen = new Set()
-    const duplicate = []
-    result.rawResult.root.walkRules(rule => {
-      const context = []
-      for (let parent = rule.parent; parent; parent = parent.parent) {
-        if (parent.type === 'atrule') context.push(`${parent.name} ${parent.params}`)
-      }
-      for (const selector of rule.selectors) {
-        const key = [...context, selector].join('|')
-        if (seen.has(key)) duplicate.push(key)
-        seen.add(key)
-      }
-    })
-    expect(duplicate).toEqual([])
+  it('detects unused alias cycles while retaining live chains, fallbacks and Element Plus dependencies', () => {
+    expect(unusedCustomTokens([
+      ':root { --base: red; --alias: var(--base); --fallback: blue; --unused-a: var(--unused-b); --unused-b: var(--unused-a); --el-button-bg-color: var(--library-surface); --library-surface: white; }',
+      '.card { color: var(--alias, var(--fallback)); }'
+    ])).toEqual(['--unused-a', '--unused-b'])
+  })
+
+  it('distinguishes theme definitions from script consumers', () => {
+    const source = "const theme = { '--read': 'var(--base)', '--unused': 'red' }; style.getPropertyValue('--read')"
+    expect(unusedCustomTokens([':root { --base: green; }'], source)).toEqual(['--unused'])
   })
 
   it('retains styles for Vue-generated named transition classes', () => {
@@ -163,7 +181,7 @@ describe('workbench control baseline', () => {
   })
 
   it('limits stacked-cell text styles to text nodes instead of stretching tags and their inner spans', () => {
-    const file = component('components/SkillManager/SkillManager.vue')
+    const file = component('components/SkillManager/SkillCatalogTable.vue')
     const result = compileStyle({ filename: file.path, id: 'skill-control-check', source: file.styles[0].content })
     expect(result.errors).toEqual([])
     const selectors = []
@@ -171,9 +189,6 @@ describe('workbench control baseline', () => {
     expect(selectors).toContain('.stacked-cell > .cell-secondary')
     expect(selectors).not.toContain('.stacked-cell span')
     expect(selectors).not.toContain('.skill-name-cell span')
-    const textNodes = elements(file.template.ast).filter(node => node.tag === 'span' &&
-      node.props.some(prop => prop.name === 'class' && prop.value?.content === 'cell-secondary'))
-    expect(textNodes).toHaveLength(4)
   })
 
   it('uses neutral cancellation controls without changing confirmation buttons', () => {

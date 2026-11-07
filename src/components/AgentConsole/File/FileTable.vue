@@ -292,11 +292,6 @@ defineExpose({
 
 <style scoped>
 .file-table-container {
-  --file-table-muted-surface: var(--app-control-background-soft);
-  --file-table-panel-surface: var(--app-card-background);
-  --file-table-raised-surface: var(--app-control-background);
-  --file-table-selected-surface: var(--app-card-active-background);
-  --file-table-soft-border: color-mix(in srgb, var(--el-border-color) 16%, transparent);
   height: 100%;
   width: 100%;
   display: flex;

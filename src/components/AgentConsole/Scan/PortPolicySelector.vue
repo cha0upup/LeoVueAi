@@ -179,7 +179,7 @@ function clearCustom() {
 }
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .port-policy-selector { min-width: 0; color: var(--el-text-color-primary); }
 .policy-heading, .custom-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .policy-heading { margin-bottom: 8px; }

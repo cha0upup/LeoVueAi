@@ -139,7 +139,7 @@
 import EmptyState from '@/components/common/EmptyState.vue'
 import { icons } from '@/utils/icons.js'
 import { formatDate as formatTime } from '@/utils/format.js'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 
 const props = defineProps({
   plugin: {
@@ -174,14 +174,9 @@ function handleActionCommand(command) {
   }
 }
 
-async function copyText(text, successMessage) {
+function copyText(text, successMessage) {
   if (!text) return
-  try {
-    await navigator.clipboard.writeText(text)
-    showSuccess(successMessage)
-  } catch {
-    showError('复制失败，请手动复制')
-  }
+  return copyTextWithFeedback(text, successMessage)
 }
 </script>
 
@@ -203,11 +198,6 @@ async function copyText(text, successMessage) {
     var(--app-control-background-soft) 88%,
     var(--el-bg-color-overlay)
   );
-  --detail-surface-raised-strong: color-mix(
-    in srgb,
-    var(--app-control-background-hover) 92%,
-    var(--el-bg-color-overlay)
-  );
   --detail-surface-muted: color-mix(
     in srgb,
     var(--app-control-background) 94%,
@@ -217,7 +207,6 @@ async function copyText(text, successMessage) {
   --workbench-surface-muted: var(--detail-surface-muted);
   --workbench-border-soft: var(--detail-border-soft);
   --detail-card-surface-raised: var(--detail-surface-raised);
-  --detail-card-surface-muted: var(--detail-surface-muted);
   --detail-card-border-soft: var(--detail-border-soft);
 }
 

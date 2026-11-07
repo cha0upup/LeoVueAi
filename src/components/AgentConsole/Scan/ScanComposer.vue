@@ -342,7 +342,7 @@ function buildScanConfig() {
 }
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .scan-composer {
   display: flex;
   flex-direction: column;

@@ -103,7 +103,7 @@ import { ref, computed, reactive, inject } from 'vue'
 import { FILE_CAPABILITIES_KEY, archiveFormat, stripArchiveExtension } from './fileCapabilities.js'
 import { icons } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
-import { formatFilePath } from '@/utils/format.js'
+import { formatFilePath, joinFilePath } from '@/utils/format.js'
 import { decompressFileApi } from '@/services/api/agent-files.js'
 import { showError, showInfo, showSuccess } from '@/utils/messageUtils.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
@@ -150,24 +150,13 @@ const fileName = computed(() => {
 })
 
 const filePath = computed(() => {
-  return joinPath(`${props.disk}${props.currentPath}`, props.file.name)
+  return joinFilePath(`${props.disk}${props.currentPath}`, props.file.name)
 })
 
 const capabilities = inject(FILE_CAPABILITIES_KEY, { value: {} })
 const availableFormats = computed(() =>
   (capabilities.value.extractionFormats || []).map((value) => ({ value, label: value.toUpperCase() }))
 )
-
-const normalizeDirectoryPath = (path) => {
-  const formatted = formatFilePath(path || '/').replace(/\/\.$/, '')
-  return formatted || '/'
-}
-
-const joinPath = (base, name) => {
-  const normalizedBase = normalizeDirectoryPath(base)
-  if (normalizedBase === '/') return formatFilePath(`/${name}`)
-  return formatFilePath(`${normalizedBase}${normalizedBase.endsWith('/') ? '' : '/'}${name}`)
-}
 
 const activeFormatLabel = computed(() => form.format.toUpperCase())
 
@@ -203,8 +192,7 @@ const handleClose = () => {
 
 const resetForm = () => {
   form.format = archiveFormat(props.file.name) || 'zip'
-  const baseDir = normalizeDirectoryPath(`${props.disk}${props.currentPath}`)
-  form.targetPath = joinPath(baseDir, stripArchiveExtension(props.file.name))
+  form.targetPath = joinFilePath(`${props.disk}${props.currentPath}`, stripArchiveExtension(props.file.name))
   formRef.value?.clearValidate()
 }
 

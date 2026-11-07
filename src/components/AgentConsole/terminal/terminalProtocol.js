@@ -1,3 +1,5 @@
+import { base64ToBytes } from '@/utils/base64.js'
+
 export const TERMINAL_POLLING = Object.freeze({
   interval: 250,
   idleIntervals: Object.freeze([3000, 5000, 10000, 20000]),
@@ -30,7 +32,7 @@ export function createTerminalOutputDecoder() {
     if (typeof payload.data === 'string' && payload.data) {
       let bytes
       try {
-        bytes = Uint8Array.from(atob(payload.data), (character) => character.charCodeAt(0))
+        bytes = base64ToBytes(payload.data)
       } catch {
         throw new Error('终端输出不是有效的 Base64 数据')
       }

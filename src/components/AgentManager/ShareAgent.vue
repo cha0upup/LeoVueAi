@@ -195,6 +195,7 @@ import { exportAgentsApi } from '@/services/api/agent-manage.js'
 import { icons } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import {
   buildAgentTransferBundle,
   encodeAgentTransferPayload
@@ -294,11 +295,7 @@ const close = () => {
 const copyToClipboard = async () => {
   copying.value = true
   try {
-    const textToCopy = output.value
-    await navigator.clipboard.writeText(textToCopy)
-    showSuccess('内容已复制到剪贴板')
-  } catch {
-    showError('复制到剪贴板失败')
+    await copyTextWithFeedback(output.value, '内容已复制到剪贴板', '复制到剪贴板失败')
   } finally {
     copying.value = false
   }

@@ -54,6 +54,7 @@ import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEdi
 import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback as writeTextToClipboard } from '@/utils/clipboard.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { generatePayloadKey } from '@/utils/payloadKey.js'
 import { getDisguisesApi } from '@/services/api/disguises.js'
@@ -704,15 +705,6 @@ const generateArtifact = async () => {
     showError('生成脚本失败: ' + (error.message || '未知错误'))
   } finally {
     isGenerating.value = false
-  }
-}
-
-const writeTextToClipboard = async (text, successMessage = '已复制到剪贴板') => {
-  try {
-    await navigator.clipboard.writeText(text)
-    showSuccess(successMessage)
-  } catch {
-    showError('复制失败，请手动复制')
   }
 }
 

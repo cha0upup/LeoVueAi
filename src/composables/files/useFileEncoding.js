@@ -1,11 +1,11 @@
 import { ref } from 'vue'
+import { base64ToBytes } from '@/utils/base64.js'
 
 const DEFAULT_ENCODING = 'utf-8'
 
 function decodeBase64Bytes(value) {
   const normalized = value.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/')
-  const binary = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='))
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0))
+  return base64ToBytes(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='))
 }
 
 export function createBase64StreamDecoder(encoding = DEFAULT_ENCODING) {

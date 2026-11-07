@@ -42,7 +42,8 @@ describe('useAiChat refresh recovery', () => {
       getExtraParams: threadId => ({ sessionId: 'session-1', threadId, configId })
     })
     const attachment = { name: 'fixture.txt', content: 'original', mimeType: 'text/plain', size: 8 }
-    await chat.send({ text: 'analyze', attachments: [{ name: attachment.name }],
+    const metadata = { name: attachment.name, mimeType: attachment.mimeType, size: attachment.size }
+    await chat.send({ text: 'analyze', displayText: '', attachments: [metadata],
       requestParams: { reasoningEffort: 'high', attachments: [attachment] } })
     const failed = chat.messages.value.at(-1)
     const first = globalThis.structuredClone(enqueueApi.mock.calls[0][0])
@@ -53,7 +54,10 @@ describe('useAiChat refresh recovery', () => {
 
     expect(enqueueApi.mock.calls[1][0]).toEqual(first)
     expect(chat.messages.value).toHaveLength(2)
-    expect(chat.messages.value[0]).toMatchObject({ id: 'user-retry', attachments: [{ name: 'fixture.txt' }] })
+    expect(chat.messages.value[0]).toMatchObject({
+      id: 'user-retry', role: 'user', content: ''
+    })
+    expect(chat.messages.value[0].attachments).toEqual([metadata])
     expect(chat.messages.value[1]).toMatchObject({ id: 'assistant-retry', failed: false, retryRequest: null })
   })
 

@@ -77,41 +77,6 @@ const getNodeClass = (level) => {
 
 <style scoped>
 /* 树形结构样式 */
-.db-tree {
-  --db-tree-muted-surface: color-mix(
-    in srgb,
-    var(--app-control-background-soft) 90%,
-    var(--el-bg-color-overlay)
-  );
-  --db-tree-selected-surface: color-mix(
-    in srgb,
-    var(--app-card-active-background) 88%,
-    var(--el-bg-color-overlay)
-  );
-  --db-tree-soft-border: color-mix(in srgb, var(--el-border-color) 34%, transparent);
-}
-
-:global(html:not(.dark) .db-tree),
-:global(html[data-theme='light'] .db-tree) {
-  --db-tree-muted-surface: #f2f2f2;
-  --db-tree-selected-surface: #e7e8e9;
-  --db-tree-soft-border: color-mix(in srgb, var(--el-border-color) 74%, transparent);
-}
-
-:global(html.dark .db-tree),
-:global(html[data-theme='dark'] .db-tree) {
-  --db-tree-muted-surface: color-mix(
-    in srgb,
-    var(--app-control-background-soft) 76%,
-    var(--el-bg-color-overlay)
-  );
-  --db-tree-selected-surface: color-mix(
-    in srgb,
-    var(--app-card-active-background) 84%,
-    var(--el-bg-color-overlay)
-  );
-  --db-tree-soft-border: color-mix(in srgb, var(--el-border-color) 28%, transparent);
-}
 
 .db-tree :deep(.el-tree-node__content) {
   height: 30px;

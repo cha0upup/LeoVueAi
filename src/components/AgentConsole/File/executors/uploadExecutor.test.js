@@ -32,6 +32,14 @@ function fixture(content = 'abc') {
 }
 beforeEach(() => vi.resetAllMocks())
 describe('upload commit lifecycle', () => {
+  it('encodes binary upload buffers across chunk boundaries without losing bytes', () => {
+    const { engine } = fixture()
+    expect(engine.arrayBufferToBase64(Uint8Array.of(0, 128, 255).buffer)).toBe('AID/')
+    const bytes = Uint8Array.from({ length: 0x20001 }, (_, index) => index % 256)
+    const encoded = engine.arrayBufferToBase64(bytes.buffer)
+    expect(Uint8Array.from(atob(encoded), character => character.charCodeAt(0))).toEqual(bytes)
+  })
+
   it('detaches an old upload without committing, retrying or deleting through a new login', async () => {
     const { engine, task } = fixture()
     const preparing = deferred()

@@ -1,8 +1,26 @@
+export function skillToggleDisabledReason(skill) {
+  if (!skill || skill.enabled) return ''
+  if (!skill.valid) return '校验失败，修复错误后才能启用'
+  if (skill.status !== 'published') return '只有 published 状态的 Skill 才能启用'
+  return ''
+}
+
+export function skillRiskTagType(risk) {
+  if (risk === 'critical' || risk === 'high') return 'danger'
+  if (risk === 'medium') return 'warning'
+  return 'success'
+}
+
 function hasSkillWarnings(skill) {
   const issues = Array.isArray(skill?.issues) ? skill.issues : []
   return issues.some(
     (issue) => String(issue?.severity || '').toUpperCase() === 'WARNING'
   )
+}
+
+export function getSkillHealthKey(skill) {
+  if (!skill?.valid) return 'invalid'
+  return hasSkillWarnings(skill) ? 'warning' : 'healthy'
 }
 
 export function getSkillAvailability(skill) {
@@ -73,7 +91,7 @@ export function summarizeSkillCatalog(skills) {
     const availability = getSkillAvailability(skill)
     if (availability.runtimeEligible) summary.runtime += 1
     if (availability.key === 'controlled') summary.controlled += 1
-    if (availability.key === 'invalid' || hasSkillWarnings(skill)) summary.problems += 1
+    if (getSkillHealthKey(skill) !== 'healthy') summary.problems += 1
   }
   return summary
 }
@@ -126,7 +144,8 @@ export function filterSkills(skills, filters) {
 
 export function keepVisibleSelection(selectedNames, visibleSkills) {
   const visibleNames = new Set((visibleSkills || []).map((skill) => skill.name))
-  return new Set(Array.from(selectedNames || []).filter((name) => visibleNames.has(name)))
+  const names = Array.isArray(selectedNames) ? selectedNames : Array.from(selectedNames || [])
+  return new Set(names.filter((name) => visibleNames.has(name)))
 }
 
 export function issueTargetFile(issue) {

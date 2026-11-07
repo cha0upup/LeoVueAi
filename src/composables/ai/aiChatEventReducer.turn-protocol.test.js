@@ -23,6 +23,28 @@ function fixture() {
 }
 
 describe('aiChatEventReducer Turn protocol', () => {
+  it('preserves the server plan step status during replay', () => {
+    const { assistant, handlers } = fixture()
+    handlers.onNode({ kind: 'plan', steps: [{ index: 0, status: 'IN_PROGRESS' }] }, 1)
+    expect(assistant.plan.steps[0].status).toBe('IN_PROGRESS')
+  })
+
+  it('binds trace, turn and run identities to the assistant runtime', () => {
+    const { state, assistant, handlers } = fixture()
+    assistant.id = 'item-1'
+    handlers.onTrace({ traceId: 'trace-1', source: 'platform' }, 1)
+    handlers.onTurn({
+      content: 'answer', trace: { traceId: 'trace-1', turnId: 'turn-1', runId: 'run-1' }
+    }, 2)
+    handlers.onTurnCompleted({ turn: { id: 'turn-1', status: 'completed' } }, 3)
+    expect(state.activeTrace).toEqual({
+      traceId: 'trace-1', source: 'platform', turnId: 'turn-1', runId: 'run-1'
+    })
+    expect(assistant.runtime).toMatchObject({
+      traceId: 'trace-1', turnId: 'turn-1', runId: 'run-1', status: 'completed'
+    })
+  })
+
   it('keeps the assistant active when model turn aggregate arrives', () => {
     const { state, assistant, handlers } = fixture()
 
