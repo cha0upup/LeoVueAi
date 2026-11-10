@@ -299,7 +299,7 @@
             class="detail-row"
           >
             <span class="detail-key">{{ key }}</span>
-            <span class="detail-val">{{ formatVal(val) }}</span>
+            <span class="detail-val">{{ formatDetailValue(val) }}</span>
           </div>
         </div>
         <div
@@ -325,6 +325,7 @@ import {
 import { showWarning, handleApiError } from '@/utils/messageUtils.js'
 import { useSessionParams } from '@/composables/useSessionParams.js'
 import { exportTsv } from '@/utils/exportUtils.js'
+import { formatDetailValue } from '@/utils/format.js'
 
 const props = defineProps({
   sessionId: {
@@ -449,12 +450,6 @@ async function handleQueryDetail(tab, name) {
 
 function handleExport() {
   exportTsv(currentList.value, `${activeTab.value}-${Date.now()}`)
-}
-
-function formatVal(val) {
-  if (val === null || val === undefined) return '-'
-  if (typeof val === 'object') return JSON.stringify(val, null, 2)
-  return String(val)
 }
 </script>
 

@@ -86,6 +86,7 @@
 <script setup>
 import { Icon } from '@iconify/vue'
 import ThemeSwitcher from '@/components/common/ThemeSwitcher.vue'
+import { createUserMenuItems } from '@/constants/app.js'
 import { icons } from '@/utils/icons.js'
 
 defineProps({
@@ -111,24 +112,7 @@ defineProps({
   },
   menuItems: {
     type: Array,
-    default: () => [
-      {
-        command: 'profile',
-        label: '个人信息',
-        icon: icons.user
-      },
-      {
-        command: 'changePassword',
-        label: '修改密码',
-        icon: icons.key
-      },
-      {
-        command: 'logout',
-        label: '退出登录',
-        icon: icons.switchButton,
-        divided: true
-      }
-    ]
+    default: createUserMenuItems
   }
 })
 

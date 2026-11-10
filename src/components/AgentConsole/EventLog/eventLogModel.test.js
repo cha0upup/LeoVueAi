@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { formatDetailValue } from '@/utils/format.js'
 import {
   appendBoundedEventLogEntries,
   buildEventLogAggregateParams,
@@ -51,9 +52,17 @@ describe('eventLogModel', () => {
     expect(appendBoundedEventLogEntries(null, null, 3)).toEqual([])
   })
 
-  it('formats circular values without throwing', () => {
+  it('shares detail formatting while keeping the event-log fallback for circular values', () => {
+    for (const [value, expected] of [
+      [null, '-'], [undefined, '-'], ['', ''], [false, 'false'], [0, '0'],
+      ['  value  ', '  value  '], [{ enabled: true }, '{\n  "enabled": true\n}']
+    ]) {
+      expect(formatDetailValue(value)).toBe(expected)
+      expect(formatEventLogValue(value)).toBe(expected)
+    }
     const value = {}
     value.self = value
+    expect(() => formatDetailValue(value)).toThrow()
     expect(formatEventLogValue(value)).toBe('[对象序列化失败]')
   })
 

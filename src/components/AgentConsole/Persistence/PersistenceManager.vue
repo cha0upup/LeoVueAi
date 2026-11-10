@@ -203,7 +203,7 @@
           class="detail-row"
         >
           <span class="detail-key">{{ key }}</span>
-          <span class="detail-val">{{ formatVal(val) }}</span>
+          <span class="detail-val">{{ formatDetailValue(val) }}</span>
         </div>
       </div>
       <div
@@ -222,6 +222,7 @@ import { listPersistenceApi, queryPersistenceApi } from '@/services/api/persiste
 import { showWarning, handleApiError } from '@/utils/messageUtils.js'
 import { useSessionParams } from '@/composables/useSessionParams.js'
 import { exportTsv } from '@/utils/exportUtils.js'
+import { formatDetailValue } from '@/utils/format.js'
 
 const props = defineProps({
   sessionId: {
@@ -314,12 +315,6 @@ function typeColor(type) {
   if (type.includes('launchd') || type.includes('systemd')) return 'success'
   if (type.includes('startup') || type.includes('login')) return 'warning'
   return 'info'
-}
-
-function formatVal(val) {
-  if (val === null || val === undefined) return '-'
-  if (typeof val === 'object') return JSON.stringify(val, null, 2)
-  return String(val)
 }
 </script>
 

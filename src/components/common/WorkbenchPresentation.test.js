@@ -3,6 +3,7 @@ import { defineComponent, h, nextTick, reactive } from 'vue'
 import { compileClientComponent, createSlotStub as stub, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
+import { createUserMenuItems } from '@/constants/app.js'
 import { icons } from '@/utils/icons.js'
 import * as format from '@/utils/format.js'
 import * as pluginForms from '@/utils/plugin.js'
@@ -22,6 +23,7 @@ const ManagerLayout = compileClientComponent(new URL('./ManagerLayout.vue', impo
 const AppHeader = compileClientComponent(new URL('./AppHeader.vue', import.meta.url), {
   '@iconify/vue': { Icon: stub('Icon') },
   '@/components/common/ThemeSwitcher.vue': { default: stub('ThemeSwitcher') },
+  '@/constants/app.js': { createUserMenuItems },
   '@/utils/icons.js': { icons }
 })
 const validate = vi.fn()
@@ -162,6 +164,8 @@ describe('shared workbench presentation', () => {
     expect(view.nodes('ElDropdownItem').map(node => node.props.command)).toEqual(['profile', 'changePassword', 'logout'])
     view.nodes('ElDropdown')[0].props.onCommand('profile')
     expect(command).toHaveBeenCalledExactlyOnceWith('profile')
+    const custom = mount(AppHeader, { menuItems: [{ command: 'custom', label: '自定义菜单' }] })
+    expect(custom.nodes('ElDropdownItem').map(node => node.props.command)).toEqual(['custom'])
   })
 
   it('preserves directory slots, splitter bounds and reactive list sizing without the retired toolbar', async () => {

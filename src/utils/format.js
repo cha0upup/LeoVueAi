@@ -1,3 +1,10 @@
+/** 详情字段保留空文本、布尔值与 JSON 结构；序列化失败由业务视图处理。 */
+export function formatDetailValue(value) {
+  if (value === null || value === undefined) return '-'
+  if (typeof value === 'object') return JSON.stringify(value, null, 2)
+  return String(value)
+}
+
 /**
  * 文件大小格式化（统一实现）
  * @param {number|string} bytes - 文件大小（字节）

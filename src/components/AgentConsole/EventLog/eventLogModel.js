@@ -1,3 +1,5 @@
+import { formatDetailValue } from '@/utils/format.js'
+
 export const EVENT_LOG_FORMAT_OPTIONS = Object.freeze([
   { label: '原始行', value: '' },
   { label: 'Nginx access', value: 'nginx-access' },
@@ -96,15 +98,14 @@ export function resolveEventLogLevelTagType(level) {
 }
 
 export function formatEventLogValue(value) {
-  if (value === null || value === undefined) return '-'
   if (typeof value === 'object') {
     try {
-      return JSON.stringify(value, null, 2)
+      return formatDetailValue(value)
     } catch {
       return '[对象序列化失败]'
     }
   }
-  return String(value)
+  return formatDetailValue(value)
 }
 
 export function formatEventLogTimestamp(timestamp) {

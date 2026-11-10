@@ -120,6 +120,16 @@ export function createSubtaskNode(opts = {}) {
   }
 }
 
+export function normalizeUserInputOptions(options) {
+  return Array.isArray(options)
+    ? options.map(option => ({
+      label: String(option?.label ?? ''),
+      value: String(option?.value ?? ''),
+      intent: String(option?.intent ?? '')
+    })).filter(option => option.label && option.value)
+    : []
+}
+
 export function createUserInputNode(opts = {}) {
   return {
     kind:          NODE_KIND.USER_INPUT,
@@ -127,13 +137,7 @@ export function createUserInputNode(opts = {}) {
     questionId:    opts.questionId ?? null,
     type:          opts.type ?? 'CLARIFICATION',
     prompt:        String(opts.prompt ?? ''),
-    options:       Array.isArray(opts.options)
-      ? opts.options.map(option => ({
-        label: String(option?.label ?? ''),
-        value: String(option?.value ?? ''),
-        intent: String(option?.intent ?? '')
-      })).filter(option => option.label && option.value).slice(0, 4)
-      : [],
+    options:       normalizeUserInputOptions(opts.options).slice(0, 4),
     allowFreeText: opts.allowFreeText === true,
     actionSummary: opts.actionSummary ?? null,
     toolName:      opts.toolName ?? null,

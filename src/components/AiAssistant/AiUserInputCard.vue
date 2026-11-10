@@ -115,6 +115,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { normalizeUserInputOptions } from '@/composables/ai/aiTurnModel.js'
 
 const props = defineProps({
   request: { type: Object, required: true },
@@ -127,13 +128,7 @@ const customAnswerOpen = ref(true)
 const customAnswer = ref('')
 
 const confirmation = computed(() => props.request?.type === 'CONFIRMATION')
-const normalizedOptions = computed(() => (Array.isArray(props.request?.options)
-  ? props.request.options.map(option => ({
-    label: String(option?.label ?? ''),
-    value: String(option?.value ?? ''),
-    intent: String(option?.intent ?? '')
-  })).filter(option => option.label && option.value)
-  : []))
+const normalizedOptions = computed(() => normalizeUserInputOptions(props.request?.options))
 const canUseCustomAnswer = computed(() => Boolean(props.request?.allowFreeText) && !confirmation.value)
 const resolvedAnswer = computed(() => {
   const answer = String(props.request?.answer || '')

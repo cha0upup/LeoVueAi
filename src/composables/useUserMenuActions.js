@@ -1,10 +1,9 @@
 import { computed } from 'vue'
 
-import { DEFAULT_USERNAME, ROUTE_PATHS } from '@/constants/app.js'
+import { createUserMenuItems, DEFAULT_USERNAME, ROUTE_PATHS } from '@/constants/app.js'
 import { logoutApi } from '@/services/api/auth.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
-import { icons } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 
@@ -24,11 +23,7 @@ export function useUserMenuActions({
 
   const username = computed(() => currentUser.value?.userName || DEFAULT_USERNAME)
   const userRoleLabel = computed(() => ROLE_LABELS[currentUser.value?.privilege] || '当前用户')
-  const userMenuItems = computed(() => [
-    { command: 'profile', label: '个人信息', icon: icons.user },
-    { command: 'changePassword', label: '修改密码', icon: icons.key },
-    { command: 'logout', label: '退出登录', icon: icons.switchButton, divided: true }
-  ])
+  const userMenuItems = computed(createUserMenuItems)
 
   const handleLogout = async () => {
     const requestGeneration = sessionGeneration.value

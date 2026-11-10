@@ -27,6 +27,13 @@ export const getAgentTabPath = (tabKey) => {
 }
 
 export const DEFAULT_USERNAME = '管理员'
+
+export const createUserMenuItems = () => [
+  { command: 'profile', label: '个人信息', icon: icons.user },
+  { command: 'changePassword', label: '修改密码', icon: icons.key },
+  { command: 'logout', label: '退出登录', icon: icons.switchButton, divided: true }
+]
+
 export const DEFAULT_HOME_MENU_KEY = 'agent'
 export const MAIN_HOME_TAB_ID = 'HOME'
 export const THEME_STORAGE_KEY = 'leovue-theme'

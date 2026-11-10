@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getThreadStatus } from '@/utils/aiRuntime.js'
+import { normalizeUserInputOptions } from './aiTurnModel.js'
 import {
   buildRequestAttachments,
   findLatestAssistantPlan,
@@ -78,18 +79,25 @@ describe('aiHistoryModel', () => {
   })
 
   it.each(['CONFIRMATION', 'CLARIFICATION'])('restores persisted %s nodes', type => {
+    const options = [null, { label: '', value: 'ignored' },
+      { label: '确认', value: 'confirm', intent: 'confirm' },
+      { label: '取消', value: 'cancel', intent: 'cancel' },
+      { label: 0, value: 0 }, { label: '第四项', value: 'fourth' }, { label: '第五项', value: 'fifth' }]
     const [message] = mapPersistedMessages([{ role: 'assistant', nodes: [{
       kind: 'user_input', seq: 3, questionId: 'question-1',
-      type, prompt: '确认删除吗？', options: [
-        { label: '确认', value: 'confirm', intent: 'confirm' },
-        { label: '取消', value: 'cancel', intent: 'cancel' }
-      ],
+      type, prompt: '确认删除吗？', options,
       allowFreeText: false, risk: 'HIGH', status: 'pending'
     }] }])
 
     expect(message.nodes[0]).toMatchObject({
       kind: 'user_input', questionId: 'question-1', type, risk: 'HIGH', status: 'pending'
     })
+    expect(message.nodes[0].options).toEqual([
+      { label: '确认', value: 'confirm', intent: 'confirm' },
+      { label: '取消', value: 'cancel', intent: 'cancel' },
+      { label: '0', value: '0', intent: '' }, { label: '第四项', value: 'fourth', intent: '' }
+    ])
+    expect(normalizeUserInputOptions(options)).toHaveLength(5)
   })
 
   it('marks historical questions answered from later turn metadata', () => {
