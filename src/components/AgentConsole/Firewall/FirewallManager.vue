@@ -1,8 +1,8 @@
 <template>
-  <div class="fw-workbench">
-    <div class="fw-shell">
+  <div class="fw-workbench console-module console-module-root">
+    <div class="fw-shell console-module-body">
       <!-- 工具栏 -->
-      <section class="fw-toolbar">
+      <section class="fw-toolbar console-list-toolbar console-list-toolbar--page">
         <div class="toolbar-left">
           <el-button
             type="primary"
@@ -50,7 +50,7 @@
         <div class="toolbar-right">
           <span
             v-if="filteredRules.length > 0"
-            class="result-count"
+            class="result-count console-result-count"
           >
             {{ filteredRules.length }} / {{ rules.length }} 条规则
           </span>
@@ -138,7 +138,7 @@
       <section class="fw-table-wrap">
         <div
           v-if="!rulesLoaded && !isLoading"
-          class="empty-state"
+          class="empty-state console-list-empty"
         >
           <el-icon size="40">
             <Icon icon="mdi:shield-lock" />
@@ -576,49 +576,11 @@ function actionColor(action) {
 
 <style scoped>
 .fw-workbench {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
   background: var(--el-bg-color);
-}
-
-.fw-shell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.fw-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  background: var(--el-bg-color-page);
-}
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .search-input {
   width: 260px;
-}
-
-.result-count {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
 }
 
 /* ── 状态卡片 ── */
@@ -691,18 +653,4 @@ function actionColor(action) {
   font-weight: 500;
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--el-text-color-placeholder);
-  gap: 12px;
-  padding: 40px;
-}
-
-.empty-state p {
-  font-size: 13px;
-}
 </style>

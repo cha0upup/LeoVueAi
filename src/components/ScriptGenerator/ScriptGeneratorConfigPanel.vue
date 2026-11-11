@@ -75,6 +75,7 @@ import ScriptRuntimeSelector from './ScriptRuntimeSelector.vue'
 import DisguiseTransportPanel from './DisguiseTransportPanel.vue'
 import JavaRuntimeConfig from './JavaRuntimeConfig.vue'
 import PhpRuntimeConfig from './PhpRuntimeConfig.vue'
+import { findInjectorCapability } from './scriptGeneratorCompatibility.js'
 
 const form = defineModel('form', { type: Object, required: true })
 
@@ -142,11 +143,7 @@ const props = defineProps({
 
 const emit = defineEmits(['set-runtime', 'set-generate-type', 'server-type-change', 'generate-random-header'])
 
-const selectedInjectorCapability = computed(() => props.injectorCapabilities.find((item) =>
-  item?.serverType === form.value.serverType
-    && item?.protocol === form.value.protocol
-    && item?.injectorName === form.value.shellType
-))
+const selectedInjectorCapability = computed(() => findInjectorCapability(props.injectorCapabilities, form.value))
 
 const showHeaderGate = computed(() => {
   if (form.value.runtime === 'php' || form.value.generateType === 'webshell') return true

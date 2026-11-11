@@ -363,6 +363,109 @@ html,
   flex-shrink: 0;
 }
 
+/* Opt-in column layout shared by console module roots and their direct body. */
+.console-module.console-module-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.console-module > .console-module-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Opt-in console foundations. Compound selectors retain scoped-rule specificity. */
+.console-list-toolbar.console-list-toolbar--page,
+.console-list-toolbar.console-list-toolbar--wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  gap: 8px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.console-list-toolbar.console-list-toolbar--page {
+  background: var(--el-bg-color-page);
+}
+
+.console-list-toolbar.console-list-toolbar--wrap {
+  flex-wrap: wrap;
+}
+
+.console-list-toolbar--page > .toolbar-left,
+.console-list-toolbar--page > .toolbar-right,
+.console-list-toolbar--wrap > .toolbar-left,
+.console-list-toolbar--wrap > .toolbar-right {
+  display: flex;
+  align-items: center;
+}
+
+.console-list-toolbar--page > .toolbar-left,
+.console-list-toolbar--page > .toolbar-right {
+  gap: 8px;
+}
+
+.console-list-toolbar--wrap > .toolbar-left,
+.console-list-toolbar--wrap > .toolbar-right {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.console-list-empty.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--el-text-color-placeholder);
+  gap: 12px;
+  padding: 40px;
+}
+
+.console-list-empty.empty-state p {
+  font-size: 13px;
+}
+
+.console-result-count.result-count {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
+
+/* Opt-in structured details; narrower field names remain a view-level override. */
+.console-detail-content.detail-content,
+.console-detail-content.stats-content {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.console-detail-row.detail-row {
+  display: flex;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--el-border-color-extra-light);
+  font-size: 13px;
+}
+
+.console-detail-row > .detail-key {
+  min-width: 140px;
+  max-width: 180px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+  word-break: break-all;
+}
+
+.console-detail-row > .detail-val {
+  flex: 1;
+  word-break: break-all;
+  white-space: pre-wrap;
+  color: var(--el-text-color-secondary);
+}
+
 /* 按钮样式增强 - 现代化设计 */
 .el-button {
   border-radius: var(--app-control-radius);

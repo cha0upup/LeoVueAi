@@ -1,8 +1,8 @@
 <template>
-  <div class="registry-workbench">
-    <div class="registry-shell">
+  <div class="registry-workbench console-module console-module-root">
+    <div class="registry-shell console-module-body">
       <!-- 工具栏 -->
-      <section class="registry-toolbar">
+      <section class="registry-toolbar console-list-toolbar console-list-toolbar--page">
         <div class="toolbar-left">
           <el-input
             v-model="keyPath"
@@ -79,7 +79,7 @@
       <section class="registry-content-wrap">
         <div
           v-if="!loaded && !isLoading"
-          class="empty-state"
+          class="empty-state console-list-empty"
         >
           <el-icon size="40">
             <Icon icon="mdi:registry" />
@@ -611,40 +611,16 @@ function typeTagColor(type) {
 
 <style scoped>
 .registry-workbench {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
   background: var(--el-bg-color);
 }
 
-.registry-shell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
 /* ── 工具栏 ── */
-.registry-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  background: var(--el-bg-color-page);
-}
 
 .toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   flex: 1;
 }
 
 .toolbar-right {
-  display: flex;
-  align-items: center;
   gap: 4px;
 }
 
@@ -771,20 +747,6 @@ function typeTagColor(type) {
 }
 
 /* ── 空状态 ── */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--el-text-color-placeholder);
-  gap: 12px;
-  padding: 40px;
-}
-
-.empty-state p {
-  font-size: 13px;
-}
 
 .empty-state .hint {
   font-size: 11px;

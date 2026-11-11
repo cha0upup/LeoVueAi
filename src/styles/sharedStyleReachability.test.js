@@ -24,8 +24,9 @@ const components = sourceFiles(root).map(path => {
   const source = readFileSync(path, 'utf8')
   return path.endsWith('.vue') ? { path, ...parse(source).descriptor } : { path, source }
 })
-const usage = components.map(file => [file.path.endsWith('.vue') ? null : file.source, file.template?.content,
-  file.script?.content, file.scriptSetup?.content].filter(Boolean).join('\n')).join('\n')
+const componentUsage = file => [file.path.endsWith('.vue') ? null : file.source,
+  file.template?.content, file.script?.content, file.scriptSetup?.content].filter(Boolean).join('\n')
+const usage = components.map(componentUsage).join('\n')
 const componentStyles = components.flatMap(file => file.styles ?? []).map(style => style.content).join('\n')
 
 function rules(path) {
@@ -37,12 +38,13 @@ function rules(path) {
   return selectors
 }
 
-function orphanedSelectors(styleRules) {
+function orphanedSelectors(styleRules, consumers = usage) {
   const missing = []
   for (const rule of styleRules) {
     for (const selector of rule.selectors) {
       const classes = [...selector.matchAll(/\.([a-zA-Z_][\w-]*)/g)].map(match => match[1])
-      const absent = classes.filter(name => !/^(?:el-|is-|has-)/.test(name) && !usage.includes(name))
+      const selectorUsage = selector.includes(':global(') ? usage : consumers
+      const absent = classes.filter(name => !/^(?:el-|is-|has-)/.test(name) && !selectorUsage.includes(name))
       if (absent.length) missing.push({ selector, absent })
     }
   }
@@ -88,7 +90,10 @@ function unusedCustomTokens(styles, scripts = '') {
 
 describe('shared stylesheet reachability', () => {
   it.each(sharedStyles)('has no orphaned custom selector branches in %s', path => {
-    expect(orphanedSelectors(rules(path))).toEqual([])
+    // A scoped import is not kept alive by an unrelated component's same-named class.
+    const importers = components.filter(file => file.styles?.some(style => style.content.includes(`@/${path}`)))
+    const consumers = importers.length ? importers.map(componentUsage).join('\n') : usage
+    expect(orphanedSelectors(rules(path), consumers)).toEqual([])
   })
 
   it.each(['components/common/EntityCard.vue', 'components/common/EmptyState.vue', 'components/UserSpace/UserSpace.vue'])(

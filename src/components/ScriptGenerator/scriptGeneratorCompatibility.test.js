@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  findInjectorCapability,
   getPackerCompatibilityWarning,
   isPackerTargetCompatible,
   isServletNamespaceCompatible,
@@ -8,6 +9,16 @@ import {
 } from './scriptGeneratorCompatibility.js'
 
 describe('script generator compatibility', () => {
+  it('matches all capability coordinates and preserves the first matching record', () => {
+    const selected = { serverType: 'SERVER', protocol: 'PROTOCOL', injectorName: 'INJECTOR' }
+    const form = { serverType: 'SERVER', protocol: 'PROTOCOL', shellType: 'INJECTOR' }
+    const capabilities = [null,
+      { ...selected, serverType: 'OTHER' }, { ...selected, protocol: 'OTHER' },
+      { ...selected, injectorName: 'OTHER' }, selected, { ...selected }]
+    expect(findInjectorCapability(capabilities, form)).toBe(selected)
+    expect(findInjectorCapability([], form)).toBeUndefined()
+  })
+
   it('parses target buckets and keeps auto unknown', () => {
     expect(targetJavaMajor('17+')).toBe(17)
     expect(targetJavaMajor('auto')).toBeNull()

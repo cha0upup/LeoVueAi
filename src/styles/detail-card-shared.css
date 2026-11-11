@@ -1,39 +1,9 @@
-.summary-chip {
-  padding: 14px 16px;
-  border-radius: var(--radius-container);
-  border: 1px solid
-    var(--detail-card-border-soft, color-mix(in srgb, var(--el-border-color) 42%, transparent));
-  background: color-mix(
-    in srgb,
-    var(--detail-card-surface-raised, var(--el-bg-color-overlay)) 82%,
-    white
-  );
-  box-shadow: inset 0 1px 0 color-mix(in srgb, white 32%, transparent);
-}
-
-.summary-chip span {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
-  color: var(--el-text-color-primary);
-  font-weight: 600;
-}
-
-.summary-chip strong {
-  display: block;
-  font-size: 15px;
-  line-height: 1.4;
-  word-break: break-word;
-  color: var(--el-text-color-primary);
-}
-
 .panel,
 .code-panel {
   overflow: hidden;
-  border: 1px solid
-    var(--detail-card-border-soft, color-mix(in srgb, var(--el-border-color) 42%, transparent));
+  border: 1px solid var(--detail-border-soft);
   border-radius: var(--radius-container);
-  background: var(--detail-card-surface-raised, var(--el-bg-color-overlay));
+  background: var(--app-container-background);
 }
 
 .panel-header {
@@ -84,37 +54,189 @@
 
 .kv-list.single-column { grid-template-columns: 1fr; }
 
-.detail-actions .el-button,
-.action-row .el-button {
+.detail-actions .el-button {
   font-weight: 600;
 }
 
-.detail-actions .el-button--primary,
-.action-row .el-button--primary.is-link {
+.detail-actions .el-button--primary {
   color: var(--el-color-primary-dark-2);
 }
 
-.detail-actions .el-button--danger.is-plain,
-.action-row .el-button--danger.is-link {
+.detail-actions .el-button--danger.is-plain {
   color: var(--el-color-danger-dark-2);
   border-color: color-mix(in srgb, var(--el-color-danger) 34%, transparent);
   background: color-mix(in srgb, var(--el-color-danger-light-9) 82%, white);
 }
 
-.detail-actions .el-button--warning.is-plain,
-.action-row .el-button--warning.is-link {
+.detail-actions .el-button--warning.is-plain {
   color: var(--el-color-warning-dark-2);
   border-color: color-mix(in srgb, var(--el-color-warning) 34%, transparent);
   background: color-mix(in srgb, var(--el-color-warning-light-9) 82%, white);
 }
 
-.detail-actions .el-button--success.is-plain,
-.action-row .el-button--success.is-link {
+.detail-actions .el-button--success.is-plain {
   color: var(--el-color-success-dark-2);
   border-color: color-mix(in srgb, var(--el-color-success) 34%, transparent);
   background: color-mix(in srgb, var(--el-color-success-light-9) 82%, white);
 }
 
+/* Shared identity header; protocol-specific selectors stay in each view. */
+.identity-block {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.identity-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
 .identity-icon {
+  font-size: 18px;
   color: var(--el-color-primary);
+}
+
+.identity-title h2 {
+  margin: 0;
+  font-size: var(--font-size-page-title);
+  line-height: 1.15;
+}
+
+.identity-block p {
+  margin: 0 0 var(--space-2);
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.identity-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  border: 0;
+}
+
+.identity-id span {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.identity-id code {
+  font-family: var(--el-font-family-mono);
+  font-size: 12px;
+}
+
+.meta-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 0 18px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.meta-strip span {
+  position: relative;
+  line-height: 1.5;
+}
+
+/* Common detail shell; borders and per-view token aliases stay in each view. */
+.detail-card {
+  height: 100%;
+  min-height: 0;
+  border-radius: var(--radius-container);
+  background: var(--app-container-background);
+  overflow: auto;
+  --detail-surface-muted: color-mix(
+    in srgb,
+    var(--app-control-background) 94%,
+    var(--el-bg-color-overlay)
+  );
+  --detail-border-soft: color-mix(in srgb, var(--el-border-color) 42%, transparent);
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+}
+
+.detail-empty {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-loading,
+.detail-empty {
+  padding: 24px;
+}
+
+.detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--app-container-background);
+  border-bottom: 1px solid var(--detail-border-soft);
+}
+
+.panel-header-with-actions {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.panel-tool-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--el-border-color) 42%, transparent);
+  border-radius: 6px;
+  background: var(--detail-surface-muted);
+  color: var(--el-text-color-secondary);
+  cursor: pointer;
+}
+
+.panel-tool-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--el-color-primary) 42%, transparent);
+  color: var(--el-color-primary);
+}
+
+.panel-tool-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.empty-block {
+  padding: 14px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .detail-topbar {
+    flex-direction: column;
+  }
+
+  .detail-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .kv-list {
+    grid-template-columns: 1fr;
+  }
 }

@@ -1,11 +1,11 @@
 <template>
   <el-dialog
     :model-value="visible"
-    title="新增数据"
+    :title="editing ? '编辑数据' : '新增数据'"
     width="50vw"
     :close-on-click-modal="false"
     destroy-on-close
-    class="add-row-dialog"
+    :class="editing ? 'edit-row-dialog' : 'add-row-dialog'"
     @update:model-value="$emit('update:visible', $event)"
   >
     <div
@@ -17,7 +17,7 @@
         border
         stripe
         size="default"
-        class="add-data-table"
+        class="row-data-table"
         :max-height="500"
       >
         <el-table-column
@@ -84,7 +84,6 @@
         </el-table-column>
       </el-table>
     </div>
-    <!-- 表单操作区，参考“新增主机”页面样式 -->
     <div class="form-inline-actions">
       <el-button
         class="cancel-btn"
@@ -102,58 +101,86 @@
         @click="handleConfirm"
       >
         <el-icon v-if="!submitting">
-          <Icon :icon="iconMap.plus" />
+          <Icon :icon="editing ? iconMap.edit : iconMap.plus" />
         </el-icon>
-        {{ submitting ? '提交中...' : '确认新增' }}
+        {{ submitting ? '提交中...' : editing ? '确认修改' : '确认新增' }}
       </el-button>
     </div>
   </el-dialog>
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
-
-import sqlEngine from './SqlEngine.js'
-import { icons } from '@/utils/icons.js'
+import { computed, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
+import sqlEngine from './SqlEngine.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { executeRequest } from '@/utils/apiUtils.js'
-import { resetDatabaseRowFormData, useDatabaseRowDialog } from './database-row-dialog-shared.js'
-import { showWarning } from '@/utils/messageUtils.js'
-
-const iconMap = icons
+import {
+  buildWherePayloadFromRow,
+  getColumnMetaInfo,
+  getInputComponentByType,
+  getInputPropsByType
+} from '@/utils/database.js'
+import { getChangedRowValues, getTableColumnNames } from './database-table-model.js'
+import { showError, showInfo, showSuccess, showWarning } from '@/utils/messageUtils.js'
+import { formatDatabaseError } from '@/utils/databaseError.js'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
+  editing: { type: Boolean, default: false },
   tableColumns: { type: Array, default: () => [] },
-  loading: { type: Boolean, default: false },
+  rowData: { type: Object, default: () => ({}) },
+  originalRowData: { type: Object, default: () => ({}) },
   connection: { type: Object, required: true },
   objectRef: { type: Object, default: null },
   sessionId: { type: String, required: true }
 })
-
-const emit = defineEmits(['update:visible', 'confirm', 'cancel', 'success'])
-
+const emit = defineEmits(['update:visible', 'cancel', 'success'])
 const formData = reactive({})
 const submitting = ref(false)
-const { getColumnMeta, tableRows } = useDatabaseRowDialog({
-  props,
-  formData
-})
-
-watch(
-  () => props.visible,
-  (newVal) => {
-    if (newVal) {
-      resetDatabaseRowFormData(formData)
-    }
+const tableRows = computed(() => props.tableColumns.map(column => {
+  const fieldName = column?.name || ''
+  const meta = getColumnMetaInfo(column)
+  return {
+    fieldName,
+    type: meta.type,
+    nullable: meta.nullable,
+    inputComponent: getInputComponentByType(column?.type),
+    inputProps: getInputPropsByType(column?.type, column),
+    value: formData[fieldName]
   }
-)
+}))
+
+const resetForm = (data = {}) => {
+  Object.keys(formData).forEach(key => delete formData[key])
+  Object.assign(formData, data)
+}
+watch(() => props.visible, visible => {
+  if (visible && (!props.editing || props.rowData)) resetForm(props.editing ? props.rowData : {})
+})
+watch(() => props.rowData, data => {
+  if (props.editing && data && Object.keys(data).length > 0) resetForm(data)
+}, { immediate: true })
+
+const complete = () => {
+  emit('update:visible', false)
+  emit('success')
+  resetForm()
+}
+
+const buildWhereConditions = () => {
+  const headers = getTableColumnNames(props.tableColumns)
+  if (Object.keys(props.originalRowData || {}).length === 0 || headers.length === 0) {
+    return null
+  }
+  return buildWherePayloadFromRow(headers, props.originalRowData, props.tableColumns)
+}
 
 const validateFormData = () => {
   const headers = props.tableColumns.map((column) => column.name).filter(Boolean)
   for (let i = 0; i < headers.length; i++) {
     const header = headers[i]
-    const meta = getColumnMeta(i)
+    const meta = getColumnMetaInfo(props.tableColumns[i])
     if (
       !meta.nullable &&
       (formData[header] === undefined || formData[header] === null || formData[header] === '')
@@ -165,7 +192,7 @@ const validateFormData = () => {
   return true
 }
 
-const handleConfirm = async () => {
+const insertRow = async () => {
   if (!validateFormData()) return
 
   await executeRequest(
@@ -180,24 +207,107 @@ const handleConfirm = async () => {
       loadingRef: submitting,
       successMessage: '插入成功',
       errorMessage: '插入失败',
-      onSuccess: () => {
-        emit('update:visible', false)
-        emit('success')
-        resetDatabaseRowFormData(formData)
-      }
+      onSuccess: complete
     }
   )
 }
 
+const updateRow = async () => {
+  try {
+    const updateData = getChangedRowValues(props.originalRowData, formData, props.tableColumns)
+
+    if (Object.keys(updateData).length === 0) {
+      showInfo('没有数据变更')
+      emit('update:visible', false)
+      return
+    }
+
+    const whereCondition = buildWhereConditions()
+    if (!whereCondition) {
+      showError('无法构建更新条件')
+      return
+    }
+
+    submitting.value = true
+
+    await sqlEngine.updateRows({
+      sessionId: props.sessionId,
+      connection: props.connection,
+      objectRef: props.objectRef,
+      where: whereCondition,
+      update: updateData
+    })
+
+    showSuccess('更新成功')
+    complete()
+  } catch (e) {
+    showError(formatDatabaseError(e, '更新失败'))
+  } finally {
+    submitting.value = false
+  }
+}
+
+const handleConfirm = () => props.editing ? updateRow() : insertRow()
 const handleCancel = () => {
   emit('update:visible', false)
   emit('cancel')
-  resetDatabaseRowFormData(formData)
+  resetForm()
 }
 </script>
 
 <style scoped>
-@import '@/styles/database-row-dialog-shared.css';
+.dialog-content {
+  padding: 1.25rem;
+  background: var(--el-bg-color);
+}
+
+.field-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.field-name {
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+  font-size: 0.875rem;
+}
+
+.field-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.field-type {
+  font-size: 0.75rem;
+  color: var(--el-text-color-placeholder);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.required-tag,
+.optional-tag {
+  font-size: 0.6875rem;
+  padding: 0 0.375rem;
+  height: 1.25rem;
+  line-height: 1.25rem;
+}
+
+.form-inline-actions {
+  margin: 1rem 1.5rem 0;
+  padding-bottom: 1rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.submit-btn,
+.cancel-btn {
+  font-size: var(--el-font-size-base);
+  font-weight: 500;
+  min-width: clamp(5rem, 6.25vw, 6.25rem);
+}
 
 .add-row-dialog :deep(.el-dialog__header) {
   padding: 1.25rem 1.5rem;
@@ -205,8 +315,7 @@ const handleCancel = () => {
   background: var(--el-bg-color-page);
 }
 
-/* 表格样式 */
-.add-data-table {
+.row-data-table {
   width: 100%;
 }
 </style>

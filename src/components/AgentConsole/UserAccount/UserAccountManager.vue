@@ -1,8 +1,8 @@
 <template>
-  <div class="ua-workbench">
-    <div class="ua-shell">
+  <div class="ua-workbench console-module console-module-root">
+    <div class="ua-shell console-module-body">
       <!-- 工具栏 -->
-      <section class="ua-toolbar">
+      <section class="ua-toolbar console-list-toolbar console-list-toolbar--wrap">
         <div class="toolbar-left">
           <el-button
             type="primary"
@@ -291,12 +291,12 @@
       >
         <div
           v-if="detailData"
-          class="detail-content"
+          class="detail-content console-detail-content"
         >
           <div
             v-for="(val, key) in detailData"
             :key="key"
-            class="detail-row"
+            class="detail-row console-detail-row"
           >
             <span class="detail-key">{{ key }}</span>
             <span class="detail-val">{{ formatDetailValue(val) }}</span>
@@ -454,32 +454,6 @@ function handleExport() {
 </script>
 
 <style scoped>
-.ua-workbench {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.ua-shell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.ua-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  flex-wrap: wrap;
-}
-.toolbar-left, .toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
 .search-input {
   width: 180px;
 }
@@ -561,30 +535,7 @@ function handleExport() {
   text-decoration: underline;
 }
 /* 详情 */
-.detail-content {
-  max-height: 500px;
-  overflow-y: auto;
-}
-.detail-row {
-  display: flex;
-  gap: 12px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--el-border-color-extra-light);
-  font-size: 13px;
-}
-.detail-key {
-  min-width: 140px;
-  max-width: 180px;
-  font-weight: 500;
-  color: var(--el-text-color-regular);
-  word-break: break-all;
-}
-.detail-val {
-  flex: 1;
-  word-break: break-all;
-  white-space: pre-wrap;
-  color: var(--el-text-color-secondary);
-}
+
 .loading-placeholder {
   height: 200px;
 }

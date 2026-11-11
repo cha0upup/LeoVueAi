@@ -38,17 +38,6 @@
   min-width: 76px;
 }
 
-.form-section {
-  margin-bottom: 18px;
-  padding: 0;
-  background: transparent;
-  border-radius: 0;
-  border: 0;
-  transition:
-    background-color var(--el-transition-duration) var(--el-transition-function),
-    border-color var(--el-transition-duration) var(--el-transition-function);
-}
-
 .config-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -57,23 +46,6 @@
 
 .config-form-grid .el-form-item {
   min-width: 0;
-}
-
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: var(--el-spacing-base);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
-
-.section-title .el-icon {
-  font-size: var(--el-font-size-large);
-  color: var(--el-color-primary);
 }
 
 .form-tip {

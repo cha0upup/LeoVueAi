@@ -1,8 +1,8 @@
 <template>
-  <div class="schtask-workbench">
-    <div class="schtask-shell">
+  <div class="schtask-workbench console-module console-module-root">
+    <div class="schtask-shell console-module-body">
       <!-- 工具栏 -->
-      <section class="schtask-toolbar">
+      <section class="schtask-toolbar console-list-toolbar console-list-toolbar--page">
         <div class="toolbar-left">
           <el-input
             v-model="searchText"
@@ -29,7 +29,7 @@
         <div class="toolbar-right">
           <span
             v-if="filteredTasks.length > 0"
-            class="result-count"
+            class="result-count console-result-count"
           >
             {{ filteredTasks.length }} / {{ tasks.length }} 个任务
           </span>
@@ -57,7 +57,7 @@
       <section class="schtask-table-wrap">
         <div
           v-if="!loaded && !isLoading"
-          class="empty-state"
+          class="empty-state console-list-empty"
         >
           <el-icon size="40">
             <Icon icon="mdi:clock-outline" />
@@ -540,49 +540,11 @@ function statusColor(status) {
 
 <style scoped>
 .schtask-workbench {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
   background: var(--el-bg-color);
-}
-
-.schtask-shell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.schtask-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  background: var(--el-bg-color-page);
-}
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .search-input {
   width: 260px;
-}
-
-.result-count {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
 }
 
 .schtask-table-wrap {
@@ -608,21 +570,6 @@ function statusColor(status) {
   font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
   font-size: 11px;
   color: var(--el-text-color-regular);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--el-text-color-placeholder);
-  gap: 12px;
-  padding: 40px;
-}
-
-.empty-state p {
-  font-size: 13px;
 }
 
 /* ── 详情 ── */

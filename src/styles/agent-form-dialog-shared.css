@@ -186,15 +186,6 @@
   font-size: 13px;
 }
 
-.form-inline-actions {
-  margin-top: 20px;
-  padding-top: 14px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  border-top: 1px solid color-mix(in srgb, var(--el-border-color) 70%, transparent);
-}
-
 .dialog-footer-actions {
   display: flex;
   justify-content: flex-end;
@@ -303,10 +294,6 @@
   }
 
   .dialog-intro {
-    flex-direction: column;
-  }
-
-  .form-inline-actions {
     flex-direction: column;
   }
 

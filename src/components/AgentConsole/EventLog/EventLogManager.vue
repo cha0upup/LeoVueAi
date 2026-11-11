@@ -1,6 +1,6 @@
 <template>
-  <div class="evlog-workbench">
-    <div class="evlog-shell">
+  <div class="evlog-workbench console-module console-module-root">
+    <div class="evlog-shell console-module-body">
       <EventLogControls
         v-model:selected-source="selectedSource"
         v-model:selected-format="selectedFormat"
@@ -471,17 +471,6 @@ function handleExport() {
 </script>
 
 <style scoped>
-.evlog-workbench {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.evlog-shell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
 .evlog-content {
   flex: 1;
   display: flex;

@@ -1,3 +1,9 @@
+export const findInjectorCapability = (capabilities, form) => capabilities.find(item =>
+  item?.serverType === form.serverType
+    && item?.protocol === form.protocol
+    && item?.injectorName === form.shellType
+)
+
 export const targetJavaMajor = (targetJavaVersion) => {
   if (!targetJavaVersion || targetJavaVersion === 'auto') return null
   const major = Number.parseInt(targetJavaVersion, 10)

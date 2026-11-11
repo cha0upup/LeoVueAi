@@ -1,8 +1,8 @@
 <template>
-  <div class="netconn-workbench">
-    <div class="netconn-shell">
+  <div class="netconn-workbench console-module console-module-root">
+    <div class="netconn-shell console-module-body">
       <!-- 工具栏 -->
-      <section class="netconn-toolbar">
+      <section class="netconn-toolbar console-list-toolbar console-list-toolbar--wrap">
         <div class="toolbar-left">
           <el-radio-group
             v-model="activeTab"
@@ -71,7 +71,7 @@
           </el-select>
           <span
             v-if="filteredConnections.length > 0"
-            class="result-count"
+            class="result-count console-result-count"
           >
             {{ filteredConnections.length }} / {{ connections.length }}
           </span>
@@ -94,7 +94,7 @@
       >
         <div
           v-if="!loaded && !isLoading"
-          class="empty-state"
+          class="empty-state console-list-empty"
         >
           <el-icon size="40">
             <Icon icon="mdi:lan-connect" />
@@ -204,7 +204,7 @@
       >
         <div
           v-if="!summaryData && !isLoading"
-          class="empty-state"
+          class="empty-state console-list-empty"
         >
           <el-icon size="40">
             <Icon icon="mdi:chart-bar" />
@@ -403,40 +403,10 @@ function stateColor(state) {
 </script>
 
 <style scoped>
-.netconn-workbench {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.netconn-shell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.netconn-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  flex-wrap: wrap;
-}
-.toolbar-left, .toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
 .search-input {
   width: 220px;
 }
-.result-count {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
-}
+
 .netconn-content {
   flex: 1;
   display: flex;
@@ -456,18 +426,10 @@ function stateColor(state) {
   font-size: 11px;
 }
 .empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--el-text-color-placeholder);
   gap: 8px;
-  padding: 40px;
 }
 .empty-state p {
   margin: 0;
-  font-size: 13px;
 }
 .hint-text {
   font-size: 11px !important;

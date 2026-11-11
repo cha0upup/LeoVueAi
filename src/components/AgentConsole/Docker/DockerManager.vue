@@ -1,11 +1,11 @@
 <template>
-  <div class="docker-workbench">
+  <div class="docker-workbench console-module console-module-root">
     <div
-      class="docker-shell"
+      class="docker-shell console-module-body"
       :class="{ 'has-terminal': terminalActive }"
     >
       <!-- 工具栏 -->
-      <section class="docker-toolbar">
+      <section class="docker-toolbar console-list-toolbar console-list-toolbar--page">
         <div class="toolbar-left">
           <el-radio-group
             v-model="activeTab"
@@ -43,7 +43,7 @@
         <div class="toolbar-right">
           <span
             v-if="currentList.length > 0"
-            class="result-count"
+            class="result-count console-result-count"
           >共 {{ currentList.length }} 项</span>
           <el-button
             size="small"
@@ -61,7 +61,7 @@
       <section class="docker-table-wrap">
         <div
           v-if="!currentLoaded && !isLoading"
-          class="empty-state"
+          class="empty-state console-list-empty"
         >
           <el-icon size="40">
             <Icon icon="mdi:docker" />
@@ -703,17 +703,7 @@ const statusTag = getDockerStatusTag
 
 <style scoped>
 .docker-workbench {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
   background: var(--el-bg-color);
-}
-
-.docker-shell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
 }
 
 .docker-shell.has-terminal .docker-table-wrap {
@@ -721,53 +711,10 @@ const statusTag = getDockerStatusTag
   min-height: 120px;
 }
 
-.docker-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  background: var(--el-bg-color-page);
-}
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.result-count {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
-}
-
 .docker-table-wrap {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--el-text-color-placeholder);
-  gap: 12px;
-  padding: 40px;
-}
-
-.empty-state p {
-  font-size: 13px;
 }
 
 /* 内嵌终端面板 */

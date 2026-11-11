@@ -272,6 +272,7 @@
 import { computed } from 'vue'
 import { icons } from '@/utils/icons.js'
 import {
+  findInjectorCapability,
   getInjectorRouteField,
   getInjectorSupportedPackers,
   getPackerCompatibilityWarning,
@@ -362,11 +363,7 @@ const moduleCompatibilityNote = computed(() => {
     ? '目标为 JDK 9+：Injector 与 Packer 已自动启用 Java Module 兼容'
     : ''
 })
-const selectedInjectorCapability = computed(() => props.injectorCapabilities.find(item =>
-  item?.serverType === form.value.serverType
-    && item?.protocol === form.value.protocol
-    && item?.injectorName === form.value.shellType
-))
+const selectedInjectorCapability = computed(() => findInjectorCapability(props.injectorCapabilities, form.value))
 const selectedInjectorPackers = computed(() => getInjectorSupportedPackers(
   selectedInjectorCapability.value,
   form.value.serverVersion

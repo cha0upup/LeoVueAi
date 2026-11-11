@@ -7,12 +7,12 @@
   >
     <div
       v-if="detailEntry"
-      class="detail-content"
+      class="detail-content console-detail-content"
     >
       <div
         v-for="(val, key) in detailEntry"
         :key="key"
-        class="detail-row"
+        class="detail-row console-detail-row"
       >
         <span class="detail-key">{{ key }}</span>
         <span class="detail-val">{{ formatVal(val) }}</span>
@@ -28,7 +28,7 @@
   >
     <div
       v-if="statsData"
-      class="stats-content"
+      class="stats-content console-detail-content"
     >
       <div class="stats-source">
         日志源: {{ statsData.source || '-' }}
@@ -40,7 +40,7 @@
         <div
           v-for="(val, key) in statsData.detail"
           :key="key"
-          class="detail-row"
+          class="detail-row console-detail-row"
         >
           <span class="detail-key">{{ key }}</span>
           <span class="detail-val">{{ formatVal(val) }}</span>
@@ -289,31 +289,12 @@ const formatVal = formatEventLogValue
 </script>
 
 <style scoped>
-.detail-content,
-.stats-content {
-  max-height: 500px;
-  overflow-y: auto;
-}
-.detail-row {
-  display: flex;
-  gap: 12px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--el-border-color-extra-light);
-  font-size: 13px;
-}
+
 .detail-key {
   min-width: 120px;
   max-width: 160px;
-  font-weight: 500;
-  color: var(--el-text-color-regular);
-  word-break: break-all;
 }
-.detail-val {
-  flex: 1;
-  word-break: break-all;
-  white-space: pre-wrap;
-  color: var(--el-text-color-secondary);
-}
+
 .stats-source {
   font-size: 14px;
   font-weight: 500;

@@ -1,8 +1,8 @@
 <template>
-  <div class="ns-workbench">
-    <div class="ns-shell">
+  <div class="ns-workbench console-module console-module-root">
+    <div class="ns-shell console-module-body">
       <!-- 工具栏 -->
-      <section class="ns-toolbar">
+      <section class="ns-toolbar console-list-toolbar console-list-toolbar--page">
         <div class="toolbar-left">
           <el-radio-group
             v-model="activeTab"
@@ -70,7 +70,7 @@
       <section class="ns-table-wrap">
         <div
           v-if="!currentLoaded && !isLoading"
-          class="empty-state"
+          class="empty-state console-list-empty"
         >
           <el-icon size="40">
             <Icon :icon="activeTab === 'shares' ? 'mdi:folder-network' : 'mdi:link-variant'" />
@@ -568,39 +568,7 @@ function handleExport() {
 
 <style scoped>
 .ns-workbench {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
   background: var(--el-bg-color);
-}
-
-.ns-shell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.ns-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  background: var(--el-bg-color-page);
-}
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .search-input {
@@ -624,21 +592,6 @@ function handleExport() {
 
 .share-name:hover {
   text-decoration: underline;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--el-text-color-placeholder);
-  gap: 12px;
-  padding: 40px;
-}
-
-.empty-state p {
-  font-size: 13px;
 }
 
 /* ── 详情 ── */

@@ -1,8 +1,8 @@
 <template>
-  <div class="persist-workbench">
-    <div class="persist-shell">
+  <div class="persist-workbench console-module console-module-root">
+    <div class="persist-shell console-module-body">
       <!-- 工具栏 -->
-      <section class="persist-toolbar">
+      <section class="persist-toolbar console-list-toolbar console-list-toolbar--wrap">
         <div class="toolbar-left">
           <el-input
             v-model="searchText"
@@ -28,7 +28,7 @@
         <div class="toolbar-right">
           <span
             v-if="filteredEntries.length > 0"
-            class="result-count"
+            class="result-count console-result-count"
           >
             {{ filteredEntries.length }} / {{ entries.length }} 个条目
             <template v-if="suspiciousCount > 0">
@@ -64,7 +64,7 @@
       <section class="persist-table-wrap">
         <div
           v-if="!loaded && !isLoading"
-          class="empty-state"
+          class="empty-state console-list-empty"
         >
           <el-icon size="40">
             <Icon icon="mdi:shield-lock-outline" />
@@ -195,12 +195,12 @@
     >
       <div
         v-if="detailData"
-        class="detail-content"
+        class="detail-content console-detail-content"
       >
         <div
           v-for="(val, key) in detailData"
           :key="key"
-          class="detail-row"
+          class="detail-row console-detail-row"
         >
           <span class="detail-key">{{ key }}</span>
           <span class="detail-val">{{ formatDetailValue(val) }}</span>
@@ -319,40 +319,10 @@ function typeColor(type) {
 </script>
 
 <style scoped>
-.persist-workbench {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.persist-shell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.persist-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  flex-wrap: wrap;
-}
-.toolbar-left, .toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
 .search-input {
   width: 260px;
 }
-.result-count {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
-}
+
 .suspicious-count {
   color: var(--el-color-danger);
   font-weight: 500;
@@ -383,18 +353,10 @@ function typeColor(type) {
   color: var(--el-text-color-regular);
 }
 .empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--el-text-color-placeholder);
   gap: 8px;
-  padding: 40px;
 }
 .empty-state p {
   margin: 0;
-  font-size: 13px;
 }
 .hint-text {
   font-size: 11px !important;
@@ -402,30 +364,7 @@ function typeColor(type) {
 }
 
 /* 详情 */
-.detail-content {
-  max-height: 500px;
-  overflow-y: auto;
-}
-.detail-row {
-  display: flex;
-  gap: 12px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--el-border-color-extra-light);
-  font-size: 13px;
-}
-.detail-key {
-  min-width: 140px;
-  max-width: 180px;
-  font-weight: 500;
-  color: var(--el-text-color-regular);
-  word-break: break-all;
-}
-.detail-val {
-  flex: 1;
-  word-break: break-all;
-  white-space: pre-wrap;
-  color: var(--el-text-color-secondary);
-}
+
 .loading-placeholder {
   height: 200px;
 }

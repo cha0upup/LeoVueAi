@@ -63,22 +63,21 @@
       @success="handleCreateTableSuccess"
     />
 
-    <AddRowDialog
+    <DatabaseRowDialog
       v-model:visible="addRowDialogVisible"
       :table-columns="tableColumns"
-      :loading="loading"
       :connection="connection"
       :object-ref="currentTableRef"
       :session-id="sessionId"
       @success="handleAddRowSuccess"
     />
 
-    <EditRowDialog
+    <DatabaseRowDialog
       v-model:visible="editRowDialogVisible"
+      editing
       :table-columns="tableColumns"
       :row-data="editingRowData"
       :original-row-data="editingOriginalRowData"
-      :loading="loading"
       :connection="connection"
       :object-ref="currentTableRef"
       :session-id="sessionId"
@@ -93,10 +92,9 @@ import { ElMessageBox } from 'element-plus'
 import { executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
 import sqlEngine from './SqlEngine.js'
 import { taskEngine } from '../File/TaskEngine.js'
-import AddRowDialog from './AddRowDialog.vue'
+import DatabaseRowDialog from './DatabaseRowDialog.vue'
 import DatabaseConsoleSidebar from './DatabaseConsoleSidebar.vue'
 import DatabaseConsoleWorkspace from './DatabaseConsoleWorkspace.vue'
-import EditRowDialog from './EditRowDialog.vue'
 import CreateTableDialog from './CreateTableDialog.vue'
 import { getTableColumnNames } from './database-table-model.js'
 import { DATABASE_OBJECT_KINDS } from './database-domain.js'

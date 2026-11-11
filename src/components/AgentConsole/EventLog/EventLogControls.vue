@@ -1,6 +1,6 @@
 <template>
   <!-- 工具栏 -->
-  <section class="evlog-toolbar">
+  <section class="evlog-toolbar console-list-toolbar console-list-toolbar--wrap">
     <div class="toolbar-left">
       <el-button
         type="primary"
@@ -262,21 +262,7 @@ const sinceOptions = EVENT_LOG_SINCE_OPTIONS
 </script>
 
 <style scoped>
-.evlog-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  flex-wrap: wrap;
-}
-.toolbar-left, .toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
+
 .keyword-input {
   width: 180px;
 }
