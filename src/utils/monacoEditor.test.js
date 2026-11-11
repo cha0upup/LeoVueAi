@@ -4,7 +4,7 @@ import { ref, toRaw } from 'vue'
 const { createEditor } = vi.hoisted(() => ({ createEditor: vi.fn() }))
 vi.mock('@/utils/monaco.js', () => ({ monaco: { editor: { create: createEditor } } }))
 
-import { disposeEditorInstance, recreateEditorInstance } from './monacoEditor.js'
+import { createMonacoEditorOptions, disposeEditorInstance, recreateEditorInstance } from './monacoEditor.js'
 
 function editorFixture(model = { dispose: vi.fn() }) {
   return { getModel: vi.fn(() => model), dispose: vi.fn() }
@@ -57,7 +57,17 @@ describe('Monaco editor utilities', () => {
     const next = editorFixture()
     const editorRef = ref(previous)
     const container = {}
-    const options = { language: 'plaintext', readOnly: true }
+    const options = createMonacoEditorOptions({
+      readOnly: true,
+      wordWrap: 'on',
+      minimapEnabled: true,
+      minimap: { enabled: false, side: 'left' }
+    })
+    expect(options).toMatchObject({
+      language: 'plaintext', automaticLayout: true, scrollBeyondLastLine: false,
+      readOnly: true, wordWrap: 'on', fontSize: 14, lineNumbers: 'on',
+      minimap: { enabled: false, side: 'left' }
+    })
     createEditor.mockImplementation((actualContainer, actualOptions) => {
       expect(model.dispose).toHaveBeenCalledOnce()
       expect(previous.dispose).toHaveBeenCalledOnce()

@@ -171,11 +171,10 @@ import { getReconSummaryApi, generateReconSummaryDigestApi } from '@/services/ap
 import { useAiChat } from '@/composables/ai/useAiChat.js'
 import { useAiHistory } from '@/composables/ai/useAiHistory.js'
 import { useAiReportArchive } from '@/composables/ai/useAiReportArchive.js'
-import { shouldRecoverAiConversation } from '@/composables/ai/aiConversationRecovery.js'
 import { useAiThreads } from '@/composables/ai/useAiThreads.js'
 import { useAiChannelSelector } from '@/composables/ai/useAiChannelSelector.js'
 import { useAppEvent, emitAppEvent } from '@/composables/useAppEvent.js'
-import { ACTIVE_AI_STATUSES, normalizeAiStatus, getThreadStatus, isDefaultThreadTitle } from '@/utils/aiRuntime.js'
+import { ACTIVE_AI_STATUSES, normalizeAiStatus, getThreadStatus, isDefaultThreadTitle, shouldRecoverAiConversation } from '@/utils/aiRuntime.js'
 import { icons } from '@/utils/icons.js'
 import NodeAiAssistantWelcome from './NodeAiAssistantWelcome.vue'
 import AiThreadSwitcher from '@/components/Ai/AiThreadSwitcher.vue'
@@ -237,9 +236,8 @@ const busyThreadIds   = ref([])
 const creatingThread  = ref(false)
 const historyLoading  = ref(false)
 let threadStatusTimer = null
-let statusSyncPromise = null
 const sendingSessionsByThread = new Map()
-const requestGuard = createLatestRequestGuard(['history', 'recon', 'config', 'init'])
+const requestGuard = createLatestRequestGuard(['history', 'recon', 'config', 'init', 'status'])
 
 // ── Channel selector ──────────────────────────────────────────────────────────
 const { selectedConfigId, configs, fetchConfigs, reasoningEffort } = useAiChannelSelector()
@@ -623,18 +621,11 @@ const recoverActiveThreadProgress = async () => {
 
 const syncThreadStatuses = async () => {
   if (!props.sessionId) return
-  if (statusSyncPromise) return statusSyncPromise
   const sessionId = props.sessionId
-  const request = (async () => {
+  return requestGuard.coalesce('status', async (isCurrent) => {
     await refreshThreadStatuses()
-    if (sessionId === props.sessionId) await recoverActiveThreadProgress()
+    if (isCurrent() && sessionId === props.sessionId) await recoverActiveThreadProgress()
   })
-  statusSyncPromise = request
-  try {
-    return await request
-  } finally {
-    if (statusSyncPromise === request) statusSyncPromise = null
-  }
 }
 
 // ── Hot-switch AI channel ─────────────────────────────────────────────────────
@@ -683,10 +674,9 @@ watch(
 
 // ── Session lifecycle ─────────────────────────────────────────────────────────
 const initializeForSession = async (sessionId, previousSessionId) => {
-  requestGuard.invalidate(['history', 'recon', 'config', 'init'])
+  requestGuard.invalidate(['history', 'recon', 'config', 'init', 'status'])
   const sequence = requestGuard.next('init')
   const previousThreadId = activeThreadId.value
-  statusSyncPromise = null
 
   if (previousSessionId && previousThreadId && composerSending.value) {
     await Promise.allSettled([
@@ -755,7 +745,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   requestGuard.invalidate()
-  statusSyncPromise = null
   document.removeEventListener('visibilitychange', onVisibilityChange)
   window.removeEventListener('online', onNetworkOnline)
   if (threadStatusTimer !== null) {

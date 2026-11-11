@@ -65,12 +65,14 @@ import { deleteFileApi } from '@/services/api/agent-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { getFileIconPresentation } from '@/utils/fileIcons.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
+import { filePathProps } from '@/composables/files/useFilePath.js'
 
 // 图标映射
 const iconMap = icons
 
 // Props
 const props = defineProps({
+  ...filePathProps,
   sessionId: {
     type: String,
     required: true
@@ -78,14 +80,6 @@ const props = defineProps({
   file: {
     type: Object,
     required: true
-  },
-  disk: {
-    type: String,
-    default: '/'
-  },
-  currentPath: {
-    type: String,
-    default: ''
   }
 })
 

@@ -150,7 +150,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ElMessage } from 'element-plus'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import { formatMBValue, formatPercent, getUsageColor, getUsageType, getResourceUsage, getNetworkOverview } from './infoModel.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 
@@ -194,14 +194,9 @@ const runtimeFacts = computed(() => [
       : `${props.basicInfo.JavaRuntimeInfo?.JVMName || '—'} / ${props.basicInfo.JavaRuntimeInfo?.ThreadCount ?? '—'}`
   }
 ])
-async function copyProcessName() {
-  try {
-    await navigator.clipboard.writeText(props.basicInfo.ProcessInfo.ProcessName)
-    ElMessage.success('已复制进程名称')
-  } catch {
-    ElMessage.error('复制失败，请手动复制')
-  }
-}
+const copyProcessName = () => copyTextWithFeedback(
+  () => props.basicInfo.ProcessInfo.ProcessName, '已复制进程名称'
+)
 </script>
 
 <style scoped>

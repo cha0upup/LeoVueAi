@@ -397,6 +397,7 @@
 import { ref, reactive, computed, nextTick, onUnmounted, watch } from 'vue'
 import { Search, Filter, Download, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { copyTextWithFeedback as copyToClipboard } from '@/utils/clipboard.js'
 import { queryNetworkProbeWorkflowResultsApi } from '@/services/api/scan.js'
 import FingerprintResults from './FingerprintResults.vue'
 import { exportCsv } from '@/utils/exportUtils.js'
@@ -603,13 +604,6 @@ function endpointAddress(row) {
   return row.port != null ? `${formattedHost}:${row.port}` : formattedHost
 }
 const endpointKey = (row) => `${row.protocol || 'tcp'}://${endpointAddress(row)}`
-
-function copyToClipboard(text) {
-  navigator.clipboard
-    .writeText(text)
-    .then(() => ElMessage.success('已复制到剪贴板'))
-    .catch(() => ElMessage.error('复制失败，请手动复制'))
-}
 
 function openInBrowser(row) {
   const protocol = row.service === 'https' ? 'https' : 'http'

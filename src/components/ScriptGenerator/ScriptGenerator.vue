@@ -50,8 +50,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRaw, watch } from 'vue'
 
 import { monaco } from '@/utils/monaco.js'
-import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEditor.js'
-import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
+import { disposeEditorInstance, recreateEditorInstance, createMonacoEditorOptions } from '@/utils/monacoEditor.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { copyTextWithFeedback as writeTextToClipboard } from '@/utils/clipboard.js'

@@ -35,6 +35,7 @@ import { formatFilePath } from '@/utils/format.js'
 import { getFileListApi, deleteFileApi } from '@/services/api/agent-files.js'
 import { parseAbsolutePath } from '@/composables/files/useFilePath.js'
 import { showSuccess, showError } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
@@ -143,13 +144,7 @@ const handleCopyPath = async (file) => {
     disk: disk.value,
     currentPath: currentPath.value
   })
-  try {
-    if (!globalThis.navigator?.clipboard?.writeText) throw new Error('clipboard unavailable')
-    await globalThis.navigator.clipboard.writeText(path)
-    showSuccess('路径已复制')
-  } catch {
-    showError('复制失败，请手动复制')
-  }
+  return copyTextWithFeedback(path, '路径已复制')
 }
 
 const handleFileAction = (action, file) => {

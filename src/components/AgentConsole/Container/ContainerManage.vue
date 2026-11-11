@@ -290,6 +290,7 @@ import { inspectWebRuntimeApi } from '@/services/api/container.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { icons } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import ContextDetail from './ContextDetail.vue'
 import ClassBytecodeDialog from './ClassBytecodeDialog.vue'
 import {
@@ -354,12 +355,10 @@ const viewAssetDetail = asset => {
 }
 const copyAssetDetails = async () => {
   if (!selectedAsset.value) return
-  try {
-    await navigator.clipboard.writeText(selectedAsset.value.fields.map(([label, value]) => `${label}: ${detailValue(value)}`).join('\n'))
-    showSuccess('组件详情已复制')
-  } catch {
-    showError('复制失败，请手动选择内容复制')
-  }
+  return copyTextWithFeedback(
+    () => selectedAsset.value.fields.map(([label, value]) => `${label}: ${detailValue(value)}`).join('\n'),
+    '组件详情已复制', '复制失败，请手动选择内容复制'
+  )
 }
 
 const viewBytecode = className => {

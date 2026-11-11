@@ -174,9 +174,11 @@ import { compressFileApi } from '@/services/api/agent-files.js'
 import { showError, showInfo, showSuccess } from '@/utils/messageUtils.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
+import { filePathProps } from '@/composables/files/useFilePath.js'
 
 // Props
 const props = defineProps({
+  ...filePathProps,
   sessionId: {
     type: String,
     required: true
@@ -184,14 +186,6 @@ const props = defineProps({
   file: {
     type: Object,
     required: true
-  },
-  disk: {
-    type: String,
-    default: '/'
-  },
-  currentPath: {
-    type: String,
-    default: ''
   }
 })
 

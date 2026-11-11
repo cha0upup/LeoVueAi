@@ -70,7 +70,7 @@
 
 <script setup>
 import { toRef } from 'vue'
-import { useContainerAssetList } from './useContainerAssetList.js'
+import { containerAssetListProps, useContainerAssetList } from './useContainerAssetList.js'
 import ContainerAssetPanel from './ContainerAssetPanel.vue'
 import ContainerAssetActions from './ContainerAssetActions.vue'
 import { useWebRuntimeComponentRemoval } from './useWebRuntimeComponentRemoval.js'
@@ -78,26 +78,14 @@ import { showWarning } from '@/utils/messageUtils.js'
 
 // Props
 const props = defineProps({
-  searchKeyword: { type: String, default: '' },
+  ...containerAssetListProps,
   interceptors: {
     type: Array,
     default: () => []
   },
-  contextId: {
-    type: String,
-    default: ''
-  },
   contextName: {
     type: String,
     default: ''
-  },
-  removable: {
-    type: Boolean,
-    default: false
-  },
-  sessionId: {
-    type: String,
-    required: true
   }
 })
 

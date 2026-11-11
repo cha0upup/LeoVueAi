@@ -118,8 +118,7 @@ import { downloadBlob } from '@/utils/downloadBlob.js'
 import { base64ToBytes } from '@/utils/base64.js'
 import { getClassBytecodeApi } from '@/services/api/container.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
-import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEditor.js'
-import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
+import { disposeEditorInstance, recreateEditorInstance, createMonacoEditorOptions } from '@/utils/monacoEditor.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { useResponsiveDialogWidth } from '@/composables/useResponsiveDialogWidth.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
@@ -187,10 +186,7 @@ const initMonacoEditor = () => {
         language: 'java',
         theme: monacoTheme.value,
         readOnly: true,
-        fontSize: 14,
-        minimapEnabled: false,
         wordWrap: 'on',
-        lineNumbers: 'on',
         folding: true,
         renderWhitespace: 'selection'
       }),

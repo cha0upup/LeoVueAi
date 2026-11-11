@@ -212,8 +212,17 @@
       @submit="handleSaveDisguise"
     />
 
-    <ImportDisguiseDialog
+    <ArchiveImportDialog
       v-model="importVisible"
+      title="导入伪装"
+      extension=".disguise"
+      upload-tip="支持单个 .disguise 文件或 .zip（内含若干 .disguise）"
+      conflict-tip="disguiseId 由名称 + 版本号派生，同 ID 视为冲突。 重命名会在 ID 后追加时间戳。"
+      name-field="disguiseName"
+      id-label="伪装 ID"
+      id-field="disguiseId"
+      allow-rename
+      :request="importDisguisesApi"
       @imported="handleImported"
     />
   </ManagerLayout>
@@ -234,12 +243,13 @@ import {
   testDisguiseApi,
   updateDisguiseApi,
   exportDisguiseApi,
-  exportDisguisesBatchApi
+  exportDisguisesBatchApi,
+  importDisguisesApi
 } from '@/services/api/disguises.js'
 import { showSuccess, showWarning } from '@/utils/messageUtils.js'
 import DisguiseDetail from './DisguiseDetail.vue'
 import DisguiseEditorDialog from './DisguiseEditorDialog.vue'
-import ImportDisguiseDialog from './ImportDisguiseDialog.vue'
+import ArchiveImportDialog from '@/components/common/ArchiveImportDialog.vue'
 import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import EntityCard from '@/components/common/EntityCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'

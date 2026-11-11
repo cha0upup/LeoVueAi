@@ -210,8 +210,17 @@
       @submit="handleSave"
     />
 
-    <ImportFingerprintDialog
+    <ArchiveImportDialog
       v-model="showImportDialog"
+      title="导入指纹"
+      extension=".json"
+      upload-tip="支持单条 .json、对象数组 .json 或 .zip（内含若干 .json）"
+      conflict-tip="fingerprintId 由 name + version 派生，同名同版本视为冲突。 重命名会在 version 后追加时间戳。"
+      name-field="name"
+      id-label="指纹 ID"
+      id-field="fingerprintId"
+      allow-rename
+      :request="importFingerprintsApi"
       @imported="handleImported"
     />
   </ManagerLayout>
@@ -229,12 +238,13 @@ import {
   saveFingerprintApi,
   deleteFingerprintApi,
   exportFingerprintApi,
-  exportFingerprintsBatchApi
+  exportFingerprintsBatchApi,
+  importFingerprintsApi
 } from '@/services/api/fingerprints.js'
 import FingerprintDetail from './FingerprintDetail.vue'
 import FingerprintDebugPanel from './FingerprintDebugPanel.vue'
 import SaveFingerprintDialog from './SaveFingerprintDialog.vue'
-import ImportFingerprintDialog from './ImportFingerprintDialog.vue'
+import ArchiveImportDialog from '@/components/common/ArchiveImportDialog.vue'
 import ManagerLayout from '@/components/common/ManagerLayout.vue'
 import EntityCard from '@/components/common/EntityCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'

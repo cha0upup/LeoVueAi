@@ -11,6 +11,11 @@
 import { computed } from 'vue'
 import { formatFilePath } from '@/utils/format.js'
 
+export const filePathProps = {
+  disk: { type: String, default: '/' },
+  currentPath: { type: String, default: '' }
+}
+
 // Windows 盘符正则表达式
 const WINDOWS_DISK_REGEX = /^[A-Za-z]:[\\/]*$/
 

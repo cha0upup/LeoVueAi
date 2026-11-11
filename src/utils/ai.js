@@ -1,6 +1,4 @@
-/**
- * AI 相关工具函数：Markdown 渲染与时间格式化。
- */
+/** 助理消息 Markdown 渲染与交互标记处理。 */
 
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -82,29 +80,4 @@ function injectShellChips(html) {
            `<span class="ai-shell-chip__icon">⬇</span>` +
            `<span class="ai-shell-chip__label">${safeLabel}</span></button>`
   })
-}
-
-// ==================== 时间格式化 ====================
-/**
- * 格式化时间为时钟格式 (HH:mm)
- */
-export function formatTurnClock(ts) {
-  return typeof ts === 'number'
-    ? new Date(ts).toLocaleTimeString('zh-CN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      })
-    : '--:--'
-}
-
-/**
- * 格式化处理耗时标签
- */
-export function formatElapsedLabel(startedAt, completedAt) {
-  if (typeof startedAt !== 'number') return '处理中'
-  const end = typeof completedAt === 'number' ? completedAt : Date.now()
-  const deltaMs = Math.max(0, end - startedAt)
-  const seconds = Math.max(1, Math.round(deltaMs / 1000))
-  return `已处理 ${seconds}s`
 }

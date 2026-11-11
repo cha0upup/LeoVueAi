@@ -70,8 +70,7 @@
 <script setup>
 import { computed, nextTick, onUnmounted, ref, toRaw, watch } from 'vue'
 import { monaco } from '@/utils/monaco.js'
-import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
-import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEditor.js'
+import { disposeEditorInstance, recreateEditorInstance, createMonacoEditorOptions } from '@/utils/monacoEditor.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { formatFileSize } from '@/utils/format.js'
@@ -121,8 +120,6 @@ const initEditor = () => {
       language: previewLanguage.value,
       theme: monacoTheme.value,
       readOnly: true,
-      lineNumbers: 'on',
-      minimapEnabled: false,
       wordWrap: 'on',
       contextmenu: true,
       fontSize: 13,

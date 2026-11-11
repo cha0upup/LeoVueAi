@@ -1,7 +1,5 @@
-/* eslint-disable vue/one-component-per-file -- Small Element Plus fixtures exercise the current password workflow. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h } from 'vue'
-import { compileClientComponent, findNode } from '@/test-support/vueComponent.js'
+import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { AUTH_FIELD_LIMITS, ROUTE_PATHS } from '@/constants/app.js'
 import { createPasswordRules, createPasswordMatchValidator } from '@/utils/formUtils.js'
@@ -29,13 +27,10 @@ describe('required password update page', () => {
     })
     const renderer = createTestRenderer()
     const app = renderer.createApp(View)
-    app.component('ElForm', defineComponent({
-      props: { model: Object, rules: Object },
-      setup: (props, { slots }) => () => h('form-fixture', { model: props.model, rules: props.rules }, slots.default())
-    }))
-    app.component('ElFormItem', { render() { return h('item', this.$slots.default?.()) } })
-    app.component('ElInput', { render() { return h('input', this.$attrs) } })
-    app.component('ElButton', { render() { return h('button', this.$attrs, this.$slots.default?.()) } })
+    app.component('ElForm', createSlotStub('form-fixture'))
+    app.component('ElFormItem', createSlotStub('item'))
+    app.component('ElInput', createSlotStub('input', []))
+    app.component('ElButton', createSlotStub('button'))
     for (const name of ['ElIcon', 'Icon']) app.component(name, { render: () => null })
     app.mount(renderer.root)
     apps.push(app)

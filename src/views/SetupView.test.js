@@ -1,7 +1,6 @@
-/* eslint-disable vue/one-component-per-file -- Lightweight Element Plus form fixtures. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, ref } from 'vue'
-import { compileClientComponent, findNode } from '@/test-support/vueComponent.js'
+import { nextTick, ref } from 'vue'
+import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { createPasswordMatchValidator } from '@/utils/formUtils.js'
 import { deferred } from '@/test-support/deferred.js'
@@ -30,13 +29,10 @@ describe('first-deployment setup page', () => {
     })
     const renderer = createTestRenderer()
     const app = renderer.createApp(View)
-    app.component('ElForm', defineComponent({
-      props: { model: Object, rules: Object },
-      setup: (props, { slots }) => () => h('form-fixture', { model: props.model, rules: props.rules }, slots.default())
-    }))
-    app.component('ElFormItem', { render() { return h('item', this.$slots.default?.()) } })
+    app.component('ElForm', createSlotStub('form-fixture'))
+    app.component('ElFormItem', createSlotStub('item'))
     app.component('ElInput', { render: () => null })
-    app.component('ElButton', { render() { return h('button', this.$attrs, this.$slots.default?.()) } })
+    app.component('ElButton', createSlotStub('button'))
     app.mount(renderer.root)
     apps.push(app)
     await nextTick()

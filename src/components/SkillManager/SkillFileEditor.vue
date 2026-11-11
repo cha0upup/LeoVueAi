@@ -172,8 +172,7 @@ import { base64ToBytes } from '@/utils/base64.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { saveSkillFileApi } from '@/services/api/skills.js'
 import { useTheme } from '@/stores/theme'
-import { disposeEditorInstance } from '@/utils/monacoEditor.js'
-import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
+import { disposeEditorInstance, createMonacoEditorOptions } from '@/utils/monacoEditor.js'
 import { formatFileSize as formatBytes } from '@/utils/format.js'
 
 const iconMap = icons
@@ -290,7 +289,6 @@ watch(
         language: detectLanguage(props.filePath),
         theme: monacoTheme.value,
         wordWrap: 'on',
-        minimapEnabled: false,
         readOnly: props.readOnly
       })
       editor.value = monaco.editor.create(monacoContainer.value, opts)

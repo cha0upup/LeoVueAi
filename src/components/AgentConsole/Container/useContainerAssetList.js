@@ -1,5 +1,12 @@
 import { computed, inject, ref, unref, watch } from 'vue'
 
+export const containerAssetListProps = {
+  searchKeyword: { type: String, default: '' },
+  contextId: { type: String, default: '' },
+  removable: { type: Boolean, default: false },
+  sessionId: { type: String, required: true }
+}
+
 export function useContainerAssetList(getItems, searchValues, searchKeyword = ref('')) {
   const currentPage = ref(1)
   const configuredPageSize = inject('agentListPageSize', 50)

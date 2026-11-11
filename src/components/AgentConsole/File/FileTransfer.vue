@@ -206,9 +206,11 @@ import {
 } from '@/utils/fileValidator.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
+import { filePathProps } from '@/composables/files/useFilePath.js'
 
 // Props
 const props = defineProps({
+  ...filePathProps,
   sessionId: {
     type: String,
     required: true
@@ -216,14 +218,6 @@ const props = defineProps({
   file: {
     type: Object,
     required: true
-  },
-  disk: {
-    type: String,
-    default: '/'
-  },
-  currentPath: {
-    type: String,
-    default: ''
   },
   mode: {
     type: String,

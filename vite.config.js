@@ -17,6 +17,9 @@ const MANUAL_CHUNK_RULES = [
 ]
 
 function getManualChunk(id) {
+  // The shared preload helper must not inherit Monaco's otherwise lazy chunk.
+  if (id === '\0vite/preload-helper.js') return 'preload-helper'
+
   if (!id.includes('node_modules')) {
     return undefined
   }
@@ -29,19 +32,36 @@ function getManualChunk(id) {
   return 'vendor-misc'
 }
 
+function editorEntryBoundary() {
+  return {
+    name: 'editor-entry-boundary',
+    generateBundle(_options, bundle) {
+      const pending = Object.values(bundle)
+        .filter(chunk => chunk.type === 'chunk' && chunk.isEntry)
+        .map(chunk => chunk.fileName)
+      const visited = new Set()
+      while (pending.length) {
+        const file = pending.pop()
+        if (visited.has(file)) continue
+        visited.add(file)
+        const chunk = bundle[file]
+        if (!chunk || chunk.type !== 'chunk') continue
+        if (Object.keys(chunk.modules).some(id => /node_modules\/monaco-editor\//.test(id))) {
+          this.error(`Monaco must stay outside the initial static import graph: ${file}`)
+        }
+        pending.push(...chunk.imports)
+      }
+    }
+  }
+}
+
 export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000
   },
-  plugins: [vue()],
+  plugins: [vue(), editorEntryBoundary()],
   build: {
-    modulePreload: {
-      resolveDependencies(_filename, deps) {
-        // 编辑器按实际功能入口加载，避免路由和普通页面仅因共享依赖而预取近 4 MB 的 Monaco。
-        return deps.filter(dep => !dep.includes('vendor-editor') && !dep.includes('codicon'))
-      }
-    },
     // Monaco/editor 与导出能力是明确的大型工作台依赖，当前分包已按稳定边界收敛。
     // 保留真实异常空间，避免每次构建都被已知的大型 vendor chunk 噪声淹没。
     chunkSizeWarningLimit: 4200,

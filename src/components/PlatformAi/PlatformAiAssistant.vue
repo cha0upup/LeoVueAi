@@ -184,9 +184,8 @@ import {
 import { useAiChat } from '@/composables/ai/useAiChat.js'
 import { useAiHistory } from '@/composables/ai/useAiHistory.js'
 import { useAiReportArchive } from '@/composables/ai/useAiReportArchive.js'
-import { shouldRecoverAiConversation } from '@/composables/ai/aiConversationRecovery.js'
 import { useAiChannelSelector } from '@/composables/ai/useAiChannelSelector.js'
-import { ACTIVE_AI_STATUSES, normalizeAiStatus, getThreadStatus, isDefaultThreadTitle } from '@/utils/aiRuntime.js'
+import { ACTIVE_AI_STATUSES, normalizeAiStatus, getThreadStatus, isDefaultThreadTitle, shouldRecoverAiConversation } from '@/utils/aiRuntime.js'
 import PlatformAiWelcome from './PlatformAiWelcome.vue'
 import PlatformAiComposer from './PlatformAiComposer.vue'
 import AiThreadSwitcher from '@/components/Ai/AiThreadSwitcher.vue'
@@ -206,10 +205,9 @@ import { createLogger } from '@/utils/logger.js'
 defineEmits(['close'])
 
 const logger = createLogger('PlatformAiAssistant')
-const requestGuard = createLatestRequestGuard(['threads', 'history', 'events', 'activate', 'config', 'init'])
+const requestGuard = createLatestRequestGuard(['threads', 'history', 'events', 'activate', 'config', 'init', 'status'])
 const renameSequences = new Map()
 let mounted = false
-let statusSyncPromise = null
 
 const { selectedConfigId, configs, fetchConfigs, reasoningEffort } = useAiChannelSelector()
 const attachments = ref([])
@@ -406,8 +404,7 @@ const recoverActiveThreadProgress = async ({ force = false, allowDuringHistoryLo
 
 const syncThreadStatuses = async () => {
   if (!mounted) return
-  if (statusSyncPromise) return statusSyncPromise
-  const request = (async () => {
+  return requestGuard.coalesce('status', async () => {
     const currentThreadId = activeThreadId.value
     const result = await fetchThreadsSilently()
     if (!result || !mounted) return
@@ -424,13 +421,7 @@ const syncThreadStatuses = async () => {
       return
     }
     await recoverActiveThreadProgress()
-  })()
-  statusSyncPromise = request
-  try {
-    return await request
-  } finally {
-    if (statusSyncPromise === request) statusSyncPromise = null
-  }
+  })
 }
 
 const scrollToBottom = () => {
@@ -709,7 +700,6 @@ onUnmounted(() => {
   agentReady.value = false
   requestGuard.invalidate()
   renameSequences.clear()
-  statusSyncPromise = null
   document.removeEventListener('visibilitychange', onVisibilityChange)
   window.removeEventListener('online', onNetworkOnline)
   if (threadStatusTimer) {

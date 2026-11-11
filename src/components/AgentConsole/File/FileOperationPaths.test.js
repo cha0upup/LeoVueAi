@@ -3,6 +3,7 @@ import { defineComponent, h, nextTick, ref } from 'vue'
 import { compileClientComponent, createSlotStub, findNode, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import * as format from '@/utils/format.js'
+import * as filePath from '@/composables/files/useFilePath.js'
 import * as capabilities from './fileCapabilities.js'
 import * as fileValidator from '@/utils/fileValidator.js'
 import * as fileIcons from '@/utils/fileIcons.js'
@@ -14,6 +15,7 @@ const modules = {
   '@iconify/vue': { Icon: createSlotStub('Icon') },
   '@/utils/icons.js': { icons },
   '@/utils/format.js': format,
+  '@/composables/files/useFilePath.js': filePath,
   './fileCapabilities.js': capabilities,
   '@/utils/fileValidator.js': fileValidator,
   '@/utils/fileIcons.js': fileIcons,

@@ -71,7 +71,7 @@
 
 <script setup>
 import { toRef } from 'vue'
-import { useContainerAssetList } from './useContainerAssetList.js'
+import { containerAssetListProps, useContainerAssetList } from './useContainerAssetList.js'
 import { getControllerClassName as getClassName, getControllerMethodName as getMethodName } from './containerManageModel.js'
 import ContainerAssetPanel from './ContainerAssetPanel.vue'
 import ContainerAssetActions from './ContainerAssetActions.vue'
@@ -80,26 +80,14 @@ import { showWarning } from '@/utils/messageUtils.js'
 
 // Props
 const props = defineProps({
-  searchKeyword: { type: String, default: '' },
+  ...containerAssetListProps,
   controllers: {
     type: Array,
     default: () => []
   },
-  contextId: {
-    type: String,
-    default: ''
-  },
   contextName: {
     type: String,
     default: ''
-  },
-  removable: {
-    type: Boolean,
-    default: false
-  },
-  sessionId: {
-    type: String,
-    required: true
   }
 })
 

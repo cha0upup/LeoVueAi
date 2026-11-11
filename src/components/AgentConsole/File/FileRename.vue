@@ -85,15 +85,15 @@ import { renameFileApi } from '@/services/api/agent-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { FILE_NAME_PATTERN, FILE_NAME_ERROR_MESSAGE } from '@/utils/fileValidator.js'
 import { getFileIconPresentation } from '@/utils/fileIcons.js'
+import { filePathProps } from '@/composables/files/useFilePath.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
 
 const iconMap = icons
 
 const props = defineProps({
+  ...filePathProps,
   sessionId: { type: String, required: true },
-  file: { type: Object, required: true },
-  disk: { type: String, default: '/' },
-  currentPath: { type: String, default: '' }
+  file: { type: Object, required: true }
 })
 
 const emit = defineEmits(['refresh', 'close'])

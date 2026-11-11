@@ -13,11 +13,13 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
 
 describe('copyTextWithFeedback', () => {
-  it('preserves content and only reports success after the clipboard write completes', async () => {
+  it.each(['text', 'reader'])('preserves %s content and reports success only after the write completes', async source => {
     const pending = deferred()
     writeText.mockReturnValue(pending.promise)
     const text = '  中文\n多行  '
-    const copy = copyTextWithFeedback(text, '已复制目录路径')
+    const read = vi.fn(() => text)
+    const copy = copyTextWithFeedback(source === 'reader' ? read : text, '已复制目录路径')
+    expect(read).toHaveBeenCalledTimes(source === 'reader' ? 1 : 0)
     expect(writeText).toHaveBeenCalledExactlyOnceWith(text)
     expect(showSuccess).not.toHaveBeenCalled()
     pending.resolve()
@@ -26,9 +28,11 @@ describe('copyTextWithFeedback', () => {
     expect(showError).not.toHaveBeenCalled()
   })
 
-  it('preserves custom failure messages without emitting success', async () => {
+  it.each(['write', 'prepare'])('preserves custom failure feedback when %s fails', async failure => {
     writeText.mockRejectedValue(new Error('denied'))
-    await copyTextWithFeedback('code', 'copied', '复制失败，请手动选择复制')
+    const source = failure === 'prepare' ? () => { throw new Error('invalid data') } : 'code'
+    await copyTextWithFeedback(source, 'copied', '复制失败，请手动选择复制')
+    expect(writeText).toHaveBeenCalledTimes(failure === 'prepare' ? 0 : 1)
     expect(showError).toHaveBeenCalledExactlyOnceWith('复制失败，请手动选择复制')
     expect(showSuccess).not.toHaveBeenCalled()
   })

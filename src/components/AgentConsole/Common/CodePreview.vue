@@ -8,8 +8,7 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 
-import { disposeEditorInstance, recreateEditorInstance } from '@/utils/monacoEditor.js'
-import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
+import { disposeEditorInstance, recreateEditorInstance, createMonacoEditorOptions } from '@/utils/monacoEditor.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 
 const props = defineProps({
@@ -34,7 +33,6 @@ const buildOptions = () => createMonacoEditorOptions({
   fontSize: props.fontSize,
   minimapEnabled: props.minimap,
   wordWrap: props.wordWrap,
-  lineNumbers: 'on',
   folding: true,
   renderWhitespace: 'selection'
 })

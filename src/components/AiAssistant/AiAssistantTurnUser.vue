@@ -33,8 +33,8 @@
 
 <script setup>
 import { icons } from '@/utils/icons.js'
-import { formatTurnClock } from '@/utils/ai.js'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { formatTurnClock } from '@/utils/aiRuntime.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import AiAttachmentList from '@/components/Ai/AiAttachmentList.vue'
 
 const iconMap = icons
@@ -51,18 +51,12 @@ const props = defineProps({
   attachments: { type: Array, default: () => [] }
 })
 
-const copyText = async () => {
-  try {
-    const attachmentNames = props.attachments.map(file => file.name).filter(Boolean)
-    const text = [props.content, attachmentNames.length ? `附件：${attachmentNames.join('、')}` : '']
-      .filter(Boolean)
-      .join('\n')
-    await navigator.clipboard.writeText(text)
-    showSuccess('已复制消息')
-  } catch {
-    showError('复制失败')
-  }
-}
+const copyText = () => copyTextWithFeedback(() => {
+  const attachmentNames = props.attachments.map(file => file.name).filter(Boolean)
+  return [props.content, attachmentNames.length ? `附件：${attachmentNames.join('、')}` : '']
+    .filter(Boolean)
+    .join('\n')
+}, '已复制消息', '复制失败')
 </script>
 
 <style scoped>

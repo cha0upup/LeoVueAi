@@ -9,7 +9,7 @@ import { isCurrentSession, resetSessionState, sessionGeneration } from '@/servic
 import pkg from '../../package.json'
 import { normalizeAuthRedirect } from '@/routerGuards.js'
 
-const { defineComponent, h, nextTick } = Vue
+const { h, nextTick } = Vue
 
 const apps = []
 beforeEach(() => { vi.useFakeTimers(); resetSessionState() })
@@ -44,10 +44,7 @@ function mount(query = {}) {
   })
   const renderer = createTestRenderer()
   const app = renderer.createApp(View)
-  app.component('ElForm', defineComponent({
-    props: { model: Object },
-    setup: (props, { slots }) => () => h('form-fixture', { model: props.model }, slots.default())
-  }))
+  app.component('ElForm', createSlotStub('form-fixture'))
   for (const name of ['ElFormItem', 'ElInput', 'ElButton', 'ElTag', 'ElIcon', 'Icon']) {
     app.component(name, createSlotStub(name))
   }

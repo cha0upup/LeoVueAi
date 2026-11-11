@@ -1,19 +1,22 @@
 /* eslint-disable vue/one-component-per-file -- In-memory Element Plus fixtures exercise the real table template. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, reactive } from 'vue'
+import { computed, defineComponent, h, inject, nextTick, provide, reactive } from 'vue'
 import { compileClientComponent, createSlotStub, findNodes as findAll } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
+import { copyTextWithFeedback } from '@/utils/clipboard.js'
 
 const queryResults = vi.fn()
 const exportCsv = vi.fn()
-const message = { success: vi.fn(), warning: vi.fn(), error: vi.fn() }
+const message = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
+vi.mock('@/utils/messageUtils.js', () => ({ showSuccess: message.success, showError: message.error }))
 const icon = { render: () => null }
 const Table = compileClientComponent(new URL('./AssetResultTable.vue', import.meta.url), {
   '@element-plus/icons-vue': { Search: icon, Filter: icon, Download: icon, Refresh: icon },
   'element-plus': { ElMessage: message },
   '@/services/api/scan.js': { queryNetworkProbeWorkflowResultsApi: queryResults },
   '@/utils/exportUtils.js': { exportCsv },
+  '@/utils/clipboard.js': { copyTextWithFeedback },
   './FingerprintResults.vue': { default: icon }
 })
 
@@ -38,11 +41,19 @@ function mount() {
   }))
   app.component('ElTable', defineComponent({
     setup(_props, { attrs, slots, emit, expose }) {
+      provide('assetRows', computed(() => attrs.data || []))
       expose({ clearSelection: () => emit('selection-change', []), toggleRowSelection: vi.fn() })
       return () => h('ElTable', attrs, slots.default?.())
     }
   }))
-  app.component('ElTableColumn', { render: () => null })
+  app.component('ElTableColumn', defineComponent({
+    props: { label: String },
+    setup(column, { slots }) {
+      const rows = inject('assetRows')
+      return () => column.label === '操作'
+        ? h('actions', rows.value.flatMap(row => slots.default?.({ row }) || [])) : null
+    }
+  }))
   app.directive('loading', {})
   app.mount(renderer.root)
   apps.push(app)
@@ -66,7 +77,24 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('asset result CSV export', () => {
+describe('asset result table interactions', () => {
+  it('copies IPv6 endpoint addresses and reports missing clipboard support without throwing', async () => {
+    queryResults.mockResolvedValue(result([{ ...endpoint(1), host: '2001:db8::1', port: 443 }]))
+    const view = mount()
+    await flush()
+    view.button('详情').props.onClick()
+    await flush()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    await view.button('复制地址').props.onClick()
+    expect(writeText).toHaveBeenCalledExactlyOnceWith('[2001:db8::1]:443')
+    expect(message.success).toHaveBeenCalledExactlyOnceWith('已复制到剪贴板')
+    vi.stubGlobal('navigator', {})
+    await expect(view.button('复制地址').props.onClick()).resolves.toBeUndefined()
+    expect(message.error).toHaveBeenCalledExactlyOnceWith('复制失败，请手动复制')
+    expect(message.success).toHaveBeenCalledTimes(1)
+  })
+
   it('allows more than 256 HTTP assets to be selected for a supplemental task', async () => {
     const view = mount()
     await flush()

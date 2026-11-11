@@ -192,9 +192,8 @@
 import { computed, nextTick, onBeforeUnmount, reactive, ref, toRaw, watch } from 'vue'
 
 import { monaco } from '@/utils/monaco.js'
-import { disposeEditorInstance } from '@/utils/monacoEditor.js'
+import { disposeEditorInstance, createMonacoEditorOptions } from '@/utils/monacoEditor.js'
 import { icons } from '@/utils/icons.js'
-import { createMonacoEditorOptions } from '@/composables/useMonacoEditorOptions.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { useDirtyTracker } from '@/composables/useDirtyTracker.js'
@@ -463,10 +462,8 @@ function createEditorOptions(value) {
     value,
     language: 'java',
     theme: monacoTheme.value,
-    minimapEnabled: false,
     fontSize: 13,
     lineHeight: 20,
-    lineNumbers: 'on',
     roundedSelection: false,
     folding: true,
     tabSize: 4

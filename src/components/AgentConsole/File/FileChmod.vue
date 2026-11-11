@@ -104,15 +104,15 @@ import { formatFilePath } from '@/utils/format.js'
 import { chmodFileApi } from '@/services/api/agent-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { getFileIconPresentation } from '@/utils/fileIcons.js'
+import { filePathProps } from '@/composables/files/useFilePath.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
 
 const iconMap = icons
 
 const props = defineProps({
+  ...filePathProps,
   sessionId: { type: String, required: true },
-  file: { type: Object, required: true },
-  disk: { type: String, default: '/' },
-  currentPath: { type: String, default: '' }
+  file: { type: Object, required: true }
 })
 
 const emit = defineEmits(['refresh', 'close'])

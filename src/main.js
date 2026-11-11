@@ -21,7 +21,7 @@ app.component('Icon', Icon)
 
 app.use(router)
 
-// Element Plus 按需引入（仅注册 ~50 个实际使用的组件，替代全量 import）
+// Element Plus 按需引入，仅注册实际使用的组件。
 setupElementPlus(app)
 
 /**

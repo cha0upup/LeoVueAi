@@ -232,8 +232,7 @@
 
 <script setup>
 import { computed, onUnmounted, ref } from 'vue'
-import { formatElapsedLabel } from '@/utils/ai.js'
-import { formatRuntimeMs } from '@/utils/aiRuntime.js'
+import { formatElapsedLabel, formatRuntimeMs } from '@/utils/aiRuntime.js'
 import { groupConsecutiveToolNodes, isInternalToolNode } from '@/utils/aiProcessPresentation.js'
 import TaskNode from './TaskNode.vue'
 import AiUserInputCard from './AiUserInputCard.vue'
