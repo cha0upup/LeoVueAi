@@ -59,7 +59,7 @@ import { defineAsyncComponent, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/constants/app.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { useMainTabs } from '@/composables/useMainTabs.js'
 import { showWarning } from '@/utils/messageUtils.js'
@@ -72,7 +72,6 @@ const Home = defineAsyncComponent(() => import('@/components/Home.vue'))
 const AgentConsoleView = defineAsyncComponent(
   () => import('@/components/AgentConsole/AgentConsoleView.vue')
 )
-const iconMap = icons
 const route = useRoute()
 const router = useRouter()
 

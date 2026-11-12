@@ -58,7 +58,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { formatFilePath } from '@/utils/format.js'
 import { deleteFileApi } from '@/services/api/agent-files.js'
@@ -66,9 +66,6 @@ import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { getFileIconPresentation } from '@/utils/fileIcons.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
 import { filePathProps } from '@/composables/files/useFilePath.js'
-
-// 图标映射
-const iconMap = icons
 
 // Props
 const props = defineProps({

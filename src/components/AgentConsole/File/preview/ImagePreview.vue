@@ -50,9 +50,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { icons } from '@/utils/icons.js'
-
-const iconMap = icons
+import { icons as iconMap } from '@/utils/icons.js'
 
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 3

@@ -123,7 +123,7 @@
 import { Icon } from '@iconify/vue'
 
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 defineProps({
   sessions: {
@@ -141,8 +141,6 @@ defineProps({
 })
 
 defineEmits(['select', 'open', 'delete'])
-
-const iconMap = icons
 
 const shortSessionId = (sessionId) => {
   const value = String(sessionId || '')

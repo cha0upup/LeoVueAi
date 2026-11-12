@@ -116,7 +116,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { generatePayloadKey } from '@/utils/payloadKey.js'
 
 const form = defineModel('form', { type: Object, required: true })
@@ -126,7 +126,6 @@ defineProps({
 })
 const emit = defineEmits(['generate-random-header'])
 
-const iconMap = icons
 const headerGateTitle = computed(() => {
   if (form.value.runtime === 'php') return '可选 Header 校验'
   return form.value.protocol === 'websocket' ? 'WebSocket 查询校验' : 'Header 校验'

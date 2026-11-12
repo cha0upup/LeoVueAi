@@ -167,7 +167,7 @@
 
 <script setup>
 import { computed, inject, ref, watch } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate } from '@/utils/format.js'
 import { useBasicInfo } from './info/useBasicInfo.js'
 import { hasJavaInfo, hasPhpInfo, hasMiddlewareInfo } from './info/infoModel.js'
@@ -177,7 +177,6 @@ import ResourcesSection from './info/ResourcesSection.vue'
 import EnvironmentSection from './info/EnvironmentSection.vue'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 
-const iconMap = icons
 const props = defineProps({ sessionId: { type: String, required: true } })
 const cacheMode = inject('cacheMode', ref(false))
 const { basicInfo, loading, error, load, reset } = useBasicInfo()

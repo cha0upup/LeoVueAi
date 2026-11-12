@@ -83,7 +83,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { useTheme } from '@/stores/theme'
 
 const themeStore = useTheme()
@@ -91,7 +91,6 @@ const { currentTheme } = themeStore
 const availableThemes = themeStore.getAvailableThemes()
 const currentThemeMeta = computed(() => themeStore.getCurrentTheme())
 const themeButtonLabel = computed(() => `切换主题（当前：${currentThemeMeta.value?.name || '默认主题'}）`)
-const iconMap = icons
 
 const currentThemeIcon = computed(() => currentTheme.value === 'light' ? iconMap.sunny : iconMap.moon)
 </script>

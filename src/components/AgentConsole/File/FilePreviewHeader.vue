@@ -284,7 +284,7 @@
 
 <script setup>
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatFileSize } from '@/utils/format.js'
 
 defineProps({
@@ -320,7 +320,6 @@ const emit = defineEmits(['action', 'encoding-change', 'line-ending-change'])
 const fontSize = defineModel('fontSize', { type: Number, default: 14 })
 const currentEncoding = defineModel('currentEncoding', { type: String, default: 'utf-8' })
 const lineEnding = defineModel('lineEnding', { type: String, default: 'LF' })
-const iconMap = icons
 </script>
 
 <style scoped>

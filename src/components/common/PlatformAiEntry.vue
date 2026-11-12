@@ -85,7 +85,7 @@ import { safeLocalStorage } from '@/utils/browserStorage.js'
 
 import AiNotConfiguredEmpty from '@/components/common/AiNotConfiguredEmpty.vue'
 import { useAiAvailability } from '@/composables/ai/useAiAvailability.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 const PlatformAiAssistant = defineAsyncComponent(
   () => import('@/components/PlatformAi/PlatformAiAssistant.vue')
@@ -95,7 +95,6 @@ const warmPlatformAiAssistant = () => {
   if (aiAvailable.value) import('@/components/PlatformAi/PlatformAiAssistant.vue')
 }
 
-const iconMap = icons
 const panelOpen = ref(false)
 const platformAiMounted = ref(false)
 

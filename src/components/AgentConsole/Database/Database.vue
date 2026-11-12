@@ -60,10 +60,9 @@ import {
   DATABASE_TAB_CONSTANTS as TAB_CONSTANTS,
   formatDatabaseConnectionTarget
 } from '@/utils/database.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 
-const iconMap = icons
 const DatabaseHomeView = markRaw(DatabaseHome)
 const DatabaseConsoleView = markRaw(DatabaseConsole)
 

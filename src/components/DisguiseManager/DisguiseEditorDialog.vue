@@ -193,7 +193,7 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref, toRaw, watch } from
 
 import { monaco } from '@/utils/monaco.js'
 import { disposeEditorInstance, createMonacoEditorOptions } from '@/utils/monacoEditor.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { useDirtyTracker } from '@/composables/useDirtyTracker.js'
@@ -239,7 +239,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'submit'])
 
-const iconMap = icons
 const visible = useDialogVisible(props, emit)
 const activeTab = ref('edit')
 

@@ -184,12 +184,10 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import {
   MEMSHELL_DEFAULTS,
 } from './scriptGeneratorConstants.js'
-
-const iconMap = icons
 
 const props = defineProps({
   obfuscationSteps:      { type: Array,  default: () => [] },

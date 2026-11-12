@@ -133,7 +133,7 @@ import { computed, nextTick, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import { getProfileApi, updateProfileApi } from '@/services/api/auth.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
 const ROLE_LABELS = {
@@ -142,7 +142,6 @@ const ROLE_LABELS = {
   normal: '普通用户'
 }
 
-const iconMap = icons
 const visible = ref(false)
 const loading = ref(false)
 const saving = ref(false)

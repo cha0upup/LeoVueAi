@@ -58,11 +58,10 @@
 
 <script setup>
 import { ref } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import AiComposerControls from '@/components/Ai/AiComposerControls.vue'
 import AiAttachmentList from '@/components/Ai/AiAttachmentList.vue'
 
-const iconMap = icons
 const inputRef = ref(null)
 defineExpose({ focus: () => inputRef.value?.focus() })
 

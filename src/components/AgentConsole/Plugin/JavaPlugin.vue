@@ -266,7 +266,7 @@
 <script setup>
 import { inject, ref, reactive, onMounted } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { getPluginsApi } from '@/services/api/plugins.js'
 import { invokePluginApi } from '@/services/api/agent-tools.js'
 import { useResponsiveDialogWidth } from '@/composables/useResponsiveDialogWidth.js'
@@ -274,7 +274,6 @@ import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import { formatExecutionResult } from './scriptEditorModel.js'
 
-const iconMap = icons
 const agentRuntime = inject('agentRuntime', ref('java'))
 
 // 插件类型常量：保持与后端 PLUGIN_TYPE_JAVA / JavaPluginService.PLUGIN_TYPE_JAVA 一致

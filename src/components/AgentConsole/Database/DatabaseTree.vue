@@ -30,10 +30,8 @@
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { getDatabaseObjectLabel } from './database-domain.js'
-
-const iconMap = icons
 
 const props = defineProps({
   namespaces: { type: Array, default: () => [] },

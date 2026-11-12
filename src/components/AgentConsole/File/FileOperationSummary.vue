@@ -48,9 +48,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
-
-const iconMap = icons
+import { icons as iconMap } from '@/utils/icons.js'
 
 const props = defineProps({
   name: {

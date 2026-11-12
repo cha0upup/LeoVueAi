@@ -232,7 +232,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { executeBatchDelete, executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import {
@@ -259,7 +259,6 @@ import { useAuth } from '@/composables/useAuth.js'
 import { useBatchSelection } from '@/composables/useBatchSelection.js'
 import { createDisguiseIdPreview } from './disguiseEditorModel.js'
 
-const iconMap = icons
 const { isAdmin } = useAuth()
 
 const disguises = ref([])

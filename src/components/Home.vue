@@ -91,7 +91,7 @@
 <script setup>
 import { defineAsyncComponent, onMounted, reactive, ref, watch } from 'vue'
 import { DEFAULT_HOME_MENU_KEY, HOME_MENU_GROUPS as menuGroups } from '@/constants/app.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 
 const ScriptGenerator = defineAsyncComponent(
@@ -118,7 +118,6 @@ const emit = defineEmits(['open-agent-console'])
 const selectedMenu = ref(DEFAULT_HOME_MENU_KEY)
 const SIDEBAR_COLLAPSED_KEY = 'leovue-home-sidebar-collapsed'
 const sidebarCollapsed = ref(false)
-const iconMap = icons
 // 记录已挂载过的模块 key，首次访问时懒挂载，之后用 v-show 保留状态
 const initializedModules = reactive({ [DEFAULT_HOME_MENU_KEY]: true })
 

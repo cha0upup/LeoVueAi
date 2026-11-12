@@ -194,7 +194,7 @@ import { computed, ref, reactive, onMounted } from 'vue'
 import { ElNotification } from 'element-plus'
 import { confirmDelete } from '@/utils/confirmUtils.js'
 import { v4 as uuidV4 } from 'uuid'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import {
   addTeamApi,
   deleteTeamApi,
@@ -208,7 +208,6 @@ import AdminToolbar from '@/components/Admin/shared/AdminToolbar.vue'
 import StatsStrip from '@/components/common/StatsStrip.vue'
 import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
 
-const iconMap = icons
 const BUILT_IN_TEAM_ID = 'system-admin'
 const BUILT_IN_TEAM_NAME = '系统管理员'
 

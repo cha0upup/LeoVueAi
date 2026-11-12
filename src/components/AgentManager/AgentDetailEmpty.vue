@@ -27,7 +27,7 @@
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 const props = defineProps({
   hasHosts: {
@@ -49,7 +49,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['add', 'import'])
-const iconMap = icons
 
 const emptyTitle = computed(() =>
   props.hasHosts ? '选择一个主机' : props.title || '还没有主机'

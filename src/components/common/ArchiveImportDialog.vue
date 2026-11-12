@@ -187,12 +187,11 @@
 
 <script setup>
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatFileSize } from '@/utils/format.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { useArchiveImport } from '@/composables/useArchiveImport.js'
 
-const iconMap = icons
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   title: { type: String, required: true },

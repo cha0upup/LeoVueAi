@@ -187,12 +187,10 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { fileGrepApi } from '@/services/api/agent-files.js'
 import { formatFilePath } from '@/utils/format.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
-
-const iconMap = icons
 
 const props = defineProps({
   sessionId: { type: String, required: true }

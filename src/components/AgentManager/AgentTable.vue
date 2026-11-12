@@ -132,13 +132,11 @@
 
 <script setup>
 import { ref, watch, nextTick } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import { getHostDisplayName, getHostIcon, isChildHost } from './agentDetailUtils.js'
 import { collectVisibleAgents } from './agentTreeSelection.js'
-
-const iconMap = icons
 
 const props = defineProps({
   agents: { type: Array, default: () => [] },

@@ -137,7 +137,7 @@
 
 <script setup>
 import EmptyState from '@/components/common/EmptyState.vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate as formatTime } from '@/utils/format.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
 
@@ -165,8 +165,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['edit', 'delete', 'export'])
-
-const iconMap = icons
 
 function handleActionCommand(command) {
   if (command === 'delete') {

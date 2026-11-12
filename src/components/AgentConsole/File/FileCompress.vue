@@ -167,7 +167,7 @@
 <script setup>
 import { ref, computed, reactive, nextTick } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { formatFilePath, joinFilePath, normalizeDirectoryPath } from '@/utils/format.js'
 import { compressFileApi } from '@/services/api/agent-files.js'
@@ -188,8 +188,6 @@ const props = defineProps({
     required: true
   }
 })
-
-const iconMap = icons
 
 // Emits
 const emit = defineEmits(['refresh', 'close'])

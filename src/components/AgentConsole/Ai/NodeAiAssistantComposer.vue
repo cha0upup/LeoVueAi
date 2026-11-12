@@ -80,11 +80,9 @@
 
 <script setup>
 import { ref, computed, nextTick, watch, onUnmounted } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import AiComposerControls from '@/components/Ai/AiComposerControls.vue'
 import AiAttachmentList from '@/components/Ai/AiAttachmentList.vue'
-
-const iconMap = icons
 
 const props = defineProps({
   modelValue: { type: String, default: '' },

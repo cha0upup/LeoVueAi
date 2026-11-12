@@ -113,7 +113,7 @@
 <script setup>
 import { ref, nextTick, onUnmounted, watch } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { base64ToBytes } from '@/utils/base64.js'
 import { getClassBytecodeApi } from '@/services/api/container.js'
@@ -124,8 +124,6 @@ import { useResponsiveDialogWidth } from '@/composables/useResponsiveDialogWidth
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
-
-const iconMap = icons
 
 // Props
 const props = defineProps({

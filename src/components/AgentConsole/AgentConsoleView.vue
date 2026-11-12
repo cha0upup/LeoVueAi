@@ -160,7 +160,7 @@
 <script setup>
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { getConnLinkChainApi, getCurrentHostIdApi } from '@/services/api/sessions.js'
 import { getAgentNodeCapabilitiesApi } from '@/services/api/agent-node.js'
 import {
@@ -257,7 +257,6 @@ const serverCapabilities = ref([])
 const agentRuntime = ref('')
 const runtimeProfile = ref(null)
 let initializationVersion = 0
-const iconMap = icons
 const paletteVisible = ref(false)
 const viewActive = ref(false)
 const shortcutsActive = computed(() => props.active && viewActive.value)

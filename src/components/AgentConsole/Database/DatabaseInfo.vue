@@ -169,12 +169,10 @@
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { getDialectTagType } from '@/utils/database.js'
 import sqlEngine from './SqlEngine.js'
 import { normalizeDatabaseObjectRef } from './database-domain.js'
-
-const iconMap = icons
 
 const props = defineProps({
   connection: {

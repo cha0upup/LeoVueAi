@@ -166,7 +166,7 @@ import { computed, nextTick, onBeforeUnmount, ref, shallowRef, toRaw, watch } fr
 import { Icon } from '@iconify/vue'
 import { monaco } from '@/utils/monaco.js'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { base64ToBytes } from '@/utils/base64.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
@@ -175,7 +175,6 @@ import { useTheme } from '@/stores/theme'
 import { disposeEditorInstance, createMonacoEditorOptions } from '@/utils/monacoEditor.js'
 import { formatFileSize as formatBytes } from '@/utils/format.js'
 
-const iconMap = icons
 const themeStore = useTheme()
 
 const props = defineProps({

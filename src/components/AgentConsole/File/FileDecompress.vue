@@ -101,7 +101,7 @@
 import { ref, computed, reactive, inject } from 'vue'
 
 import { FILE_CAPABILITIES_KEY, archiveFormat, stripArchiveExtension } from './fileCapabilities.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { formatFilePath, joinFilePath } from '@/utils/format.js'
 import { decompressFileApi } from '@/services/api/agent-files.js'
@@ -121,8 +121,6 @@ const props = defineProps({
     required: true
   }
 })
-
-const iconMap = icons
 
 // Emits
 const emit = defineEmits(['refresh', 'close'])

@@ -95,7 +95,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { useAgentForm } from '@/composables/agent/useAgentForm.js'
@@ -104,7 +104,6 @@ import AgentConnectionResultBanner from './AgentConnectionResultBanner.vue'
 import ParentHostSummary from './ParentHostSummary.vue'
 import { updateAgentApi } from '@/services/api/agent-manage.js'
 
-const iconMap = icons
 const emit = defineEmits(['refresh'])
 const dialog = useDialog()
 const editAgentDialog = dialog.visible

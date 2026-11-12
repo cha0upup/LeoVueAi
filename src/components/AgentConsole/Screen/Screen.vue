@@ -71,11 +71,9 @@
 <script setup>
 import { ref } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { startScreenCaptureApi } from '@/services/api/agent-tools.js'
 import { showError } from '@/utils/messageUtils.js'
-
-const iconMap = icons
 
 const props = defineProps({
   sessionId: {

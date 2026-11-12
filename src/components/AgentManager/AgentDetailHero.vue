@@ -91,10 +91,9 @@ import AgentCacheModeBanner from './AgentCacheModeBanner.vue'
 import AgentConnectionResultBanner from './AgentConnectionResultBanner.vue'
 import AgentHeroActions from './AgentHeroActions.vue'
 import AgentHeroIdentity from './AgentHeroIdentity.vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate } from '@/utils/format.js'
-
-const iconMap = icons
+import { agentDetailStatusProps } from './agentDetailUtils.js'
 
 defineProps({
   agent: {
@@ -105,38 +104,7 @@ defineProps({
     type: Number,
     default: 0
   },
-  connectionTestLoading: {
-    type: Boolean,
-    default: false
-  },
-  isCurrentAgentTesting: {
-    type: Boolean,
-    default: false
-  },
-  batchTestLoading: {
-    type: Boolean,
-    default: false
-  },
-  testConnResult: {
-    type: Object,
-    default: null
-  },
-  cacheCheckResult: {
-    type: Object,
-    default: null
-  },
-  cacheCheckLoading: {
-    type: Boolean,
-    default: false
-  },
-  cacheAvailability: {
-    type: Object,
-    default: () => ({ checked: false, hasCache: false, saveTime: null })
-  },
-  cacheAvailabilityLoading: {
-    type: Boolean,
-    default: false
-  },
+  ...agentDetailStatusProps,
   canCreateSession: {
     type: Boolean,
     default: true

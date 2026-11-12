@@ -248,7 +248,7 @@
 <script setup>
 import { computed } from 'vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate } from '@/utils/format.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
 
@@ -281,7 +281,6 @@ const props = defineProps({
 
 const emit = defineEmits(['edit', 'delete', 'test', 'export'])
 
-const iconMap = icons
 const isBuiltIn = computed(() => props.disguise?.disguiseId?.startsWith('inner_'))
 const headerEntries = computed(() => Object.entries(props.disguise?.headers || {}))
 const headersText = computed(() =>

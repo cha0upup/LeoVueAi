@@ -154,10 +154,9 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { CopyDocument } from '@element-plus/icons-vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatClassArtifactLabel } from './scriptGeneratorArtifacts.js'
 
-const iconMap = icons
 const monacoContainer = ref(null)
 
 const props = defineProps({

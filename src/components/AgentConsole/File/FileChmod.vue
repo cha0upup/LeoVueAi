@@ -99,15 +99,13 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatFilePath } from '@/utils/format.js'
 import { chmodFileApi } from '@/services/api/agent-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { getFileIconPresentation } from '@/utils/fileIcons.js'
 import { filePathProps } from '@/composables/files/useFilePath.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
-
-const iconMap = icons
 
 const props = defineProps({
   ...filePathProps,

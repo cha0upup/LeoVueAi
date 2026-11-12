@@ -282,7 +282,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { confirmDelete } from '@/utils/confirmUtils.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import DatabaseConfigDialog from '@/components/AgentConsole/Database/DatabaseConfigDialog.vue'
 import {
   getDatabaseConnectionsApi,
@@ -303,8 +303,6 @@ import {
   getDialectTagType,
   isStatusEnabled
 } from '@/utils/database.js'
-
-const iconMap = icons
 
 const props = defineProps({
   sessionId: {

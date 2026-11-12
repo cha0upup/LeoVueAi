@@ -1,6 +1,18 @@
 import { ElMessage } from 'element-plus'
 import { icons } from '@/utils/icons.js'
 
+/** Shared connection and cache status; identity and session props stay with each component. */
+export const agentDetailStatusProps = {
+  connectionTestLoading: { type: Boolean, default: false },
+  isCurrentAgentTesting: { type: Boolean, default: false },
+  batchTestLoading: { type: Boolean, default: false },
+  testConnResult: { type: Object, default: null },
+  cacheCheckResult: { type: Object, default: null },
+  cacheCheckLoading: { type: Boolean, default: false },
+  cacheAvailability: { type: Object, default: () => ({ checked: false, hasCache: false, saveTime: null }) },
+  cacheAvailabilityLoading: { type: Boolean, default: false }
+}
+
 export const isChildHost = (row) => row?.parentAgentId && row.parentAgentId !== 'root'
 
 export const getHostIcon = (row) => (isChildHost(row) ? icons.connection : icons.server)

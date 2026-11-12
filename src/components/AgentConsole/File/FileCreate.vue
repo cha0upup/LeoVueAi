@@ -207,14 +207,13 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { Check } from '@element-plus/icons-vue'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { joinFilePath, normalizeDirectoryPath } from '@/utils/format.js'
 import { validateForm } from '@/utils/formUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { newDirApi, newFileApi } from '@/services/api/agent-files.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
 
-const iconMap = icons
 const emit = defineEmits(['refresh', 'created'])
 
 const dialogVisible = ref(false)

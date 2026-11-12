@@ -192,7 +192,7 @@ import { Link, Monitor } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
 
 import { exportAgentsApi } from '@/services/api/agent-manage.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
@@ -200,8 +200,6 @@ import {
   buildAgentTransferBundle,
   encodeAgentTransferPayload
 } from '@/utils/agentTransfer.js'
-
-const iconMap = icons
 
 const shareAgentDialog = ref(false)
 const copying = ref(false)

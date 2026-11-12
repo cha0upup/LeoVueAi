@@ -65,12 +65,10 @@
 <script setup>
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatDatabaseConnectionTarget } from '@/utils/database.js'
 import sqlEngine from './SqlEngine.js'
 import { getDatabaseConnectionStatusPresentation } from './useDatabaseConnectionState.js'
-
-const iconMap = icons
 
 const props = defineProps({
   connection: {

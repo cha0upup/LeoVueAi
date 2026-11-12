@@ -272,7 +272,7 @@
 <script setup>
 import { computed, inject, onMounted, onUnmounted, ref, unref, watch } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { execClassApi, execScriptApi } from '@/services/api/agent-tools.js'
 import { addPluginApi } from '@/services/api/plugins.js'
 import { supportsCapabilityRequirements } from '@/composables/agent/useAgentConsoleModules.js'
@@ -289,7 +289,6 @@ import {
   SCRIPT_PLACEHOLDERS
 } from './scriptEditorModel.js'
 
-const iconMap = icons
 const agentCapabilities = inject('agentCapabilities', ref([]))
 const agentRuntime = inject('agentRuntime', ref('java'))
 const requestGuard = createLatestRequestGuard(['execute', 'save'])

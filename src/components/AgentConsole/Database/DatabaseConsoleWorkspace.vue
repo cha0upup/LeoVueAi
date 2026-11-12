@@ -275,7 +275,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import sqlEngine from './SqlEngine.js'
 import { DATABASE_OBJECT_KINDS, normalizeDatabaseObjectRef } from './database-domain.js'
 import ConnectionInfo from './ConnectionInfo.vue'
@@ -284,8 +284,6 @@ import DatabaseTable from './DatabaseTable.vue'
 import SqlQuery from './SqlQuery.vue'
 import TableInfo from './TableInfo.vue'
 import TableStructure from './TableStructure.vue'
-
-const iconMap = icons
 
 const pagination = defineModel('pagination', { type: Object, required: true })
 

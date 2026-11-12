@@ -40,7 +40,7 @@
 <script setup>
 import { computed, inject } from 'vue'
 import { FILE_CAPABILITIES_KEY, archiveFormat, supportsFileAction } from './fileCapabilities.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 // Props
 const props = defineProps({
@@ -57,7 +57,6 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(['action'])
 
-const iconMap = icons
 const capabilities = inject(FILE_CAPABILITIES_KEY, { value: {} })
 
 const actionItems = [

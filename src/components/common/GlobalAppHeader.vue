@@ -114,11 +114,10 @@ import { useAuth } from '@/composables/useAuth.js'
 import { useMainTabs } from '@/composables/useMainTabs.js'
 import { useUserMenuActions } from '@/composables/useUserMenuActions.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 const ADMIN_TAB_ID = 'ADMIN'
 const HOME_TAB_ID = MAIN_HOME_TAB_ID
-const iconMap = icons
 const router = useRouter()
 const route = useRoute()
 const changePasswordDialog = ref(null)

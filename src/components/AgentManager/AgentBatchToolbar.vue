@@ -133,7 +133,7 @@
 
 <script setup>
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 defineProps({
   selectedCount: { type: Number, default: 0 },
@@ -150,7 +150,6 @@ defineProps({
   progress: { type: Object, default: null }
 })
 defineEmits(['toggle-all', 'clear', 'test', 'export', 'assign', 'detach', 'delete'])
-const iconMap = icons
 const actionLabels = { export: '正在导出配置', delete: '正在删除资产', detach: '正在移出项目' }
 </script>
 

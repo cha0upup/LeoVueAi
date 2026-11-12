@@ -222,7 +222,7 @@
 <script setup>
 import { ref } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { createDefaultAgent } from '@/utils/constants.js'
 import { useDialog } from '@/utils/dialogUtils.js'
 import { addAgentApi } from '@/services/api/agent-manage.js'
@@ -239,7 +239,6 @@ const props = defineProps({
 const dialog = useDialog()
 const importDialogVisible = dialog.visible
 
-const iconMap = icons
 const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024
 
 const fileContent = ref('')

@@ -222,7 +222,7 @@
 <script setup>
 import { computed } from 'vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 const emit = defineEmits(['edit', 'export', 'delete', 'debug'])
 
@@ -245,7 +245,6 @@ const props = defineProps({
   }
 })
 
-const iconMap = icons
 const requestList = computed(() =>
   Array.isArray(props.detail?.rule?.requests) ? props.detail.rule.requests : []
 )

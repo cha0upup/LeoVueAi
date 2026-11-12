@@ -88,7 +88,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { useAgentForm } from '@/composables/agent/useAgentForm.js'
@@ -96,7 +96,6 @@ import AgentFormFields from './AgentFormFields.vue'
 import AgentConnectionResultBanner from './AgentConnectionResultBanner.vue'
 import { addAgentApi } from '@/services/api/agent-manage.js'
 
-const iconMap = icons
 const props = defineProps({
   projectId: { type: String, default: '' }
 })

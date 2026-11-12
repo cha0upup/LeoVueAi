@@ -80,11 +80,10 @@
 import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 const props = defineProps({ projects: { type: Array, default: () => [] } })
 const emit = defineEmits(['open-session', 'create-session'])
-const iconMap = icons
 const visible = ref(false)
 const agent = ref(null)
 const sessions = ref([])

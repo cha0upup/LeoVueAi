@@ -76,7 +76,7 @@
 
 <script setup>
 import { computed, inject, provide, ref, unref, useId, watch } from 'vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { supportsCapabilityRequirements } from '@/composables/agent/useAgentConsoleModules.js'
 import Socks5Proxy from './Socks5Proxy.vue'
@@ -84,7 +84,6 @@ import HttpProxy from './HttpProxy.vue'
 import LocalForward from './LocalForward.vue'
 import ReverseTunnel from './ReverseTunnel.vue'
 
-const iconMap = icons
 const agentCapabilities = inject('agentCapabilities', ref([]))
 const activeModule = inject('agentActiveModule', null)
 provide('proxyActive', computed(() => !activeModule || unref(activeModule) === 'proxy'))

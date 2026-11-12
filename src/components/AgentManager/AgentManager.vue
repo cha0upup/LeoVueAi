@@ -243,7 +243,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { executeDeleteWithConfirm, executeBatchDelete } from '@/utils/confirmUtils.js'
@@ -398,7 +398,6 @@ const cacheAvailability = ref({
 })
 let cacheAvailabilityRequestToken = 0
 
-const iconMap = icons
 const sessionsByAgentId = computed(() => {
   return liveSessions.value.reduce((groups, session) => {
     const agentId = session?.agentId

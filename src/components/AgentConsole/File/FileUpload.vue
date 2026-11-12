@@ -107,7 +107,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { Icon } from '@iconify/vue'
 import { formatFilePath, formatFileSize as formatSize } from '@/utils/format.js'
 import { FILE_TRANSFER_CHUNK_OPTIONS } from '@/constants/task.js'
@@ -245,8 +245,6 @@ const startUpload = async () => {
     showError(`上传失败: ${error.message}`)
   }
 }
-
-const iconMap = icons
 
 // 暴露方法
 defineExpose({

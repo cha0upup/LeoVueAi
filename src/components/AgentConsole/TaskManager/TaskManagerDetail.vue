@@ -186,7 +186,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { TaskType } from '@/constants/task.js'
 import { clampProgress, formatFileSize, formatDate as formatDateTime } from '@/utils/format.js'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
@@ -207,7 +207,6 @@ const props = defineProps({
 
 defineEmits(['action'])
 
-const iconMap = icons
 const normalizedProgress = computed(() => clampProgress(props.task?.progress))
 const errorMessage = computed(() => props.task?.error || props.task?.lastError)
 

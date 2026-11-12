@@ -32,12 +32,10 @@
 </template>
 
 <script setup>
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatTurnClock } from '@/utils/aiRuntime.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import AiAttachmentList from '@/components/Ai/AiAttachmentList.vue'
-
-const iconMap = icons
 
 const props = defineProps({
   content: {

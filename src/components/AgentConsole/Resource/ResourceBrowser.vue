@@ -187,15 +187,13 @@
 <script setup>
 import { computed, ref } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { fetchResourceApi } from '@/services/api/resource.js'
 import { showError, showWarning } from '@/utils/messageUtils.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { base64ToBytes } from '@/utils/base64.js'
 import CodePreview from '@/components/AgentConsole/Common/CodePreview.vue'
-
-const iconMap = icons
 
 const props = defineProps({
   sessionId: {

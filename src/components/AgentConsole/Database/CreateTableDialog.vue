@@ -165,12 +165,10 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import sqlEngine from './SqlEngine.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { formatDatabaseError } from '@/utils/databaseError.js'
-
-const iconMap = icons
 
 const props = defineProps({
   visible: {

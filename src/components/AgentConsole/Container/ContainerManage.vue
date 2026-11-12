@@ -288,7 +288,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 
 import { inspectWebRuntimeApi } from '@/services/api/container.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
 import ContextDetail from './ContextDetail.vue'
@@ -306,7 +306,6 @@ import {
   writeWorkbookSpec
 } from './containerExport.js'
 
-const iconMap = icons
 const props = defineProps({
   sessionId: {
     type: String,

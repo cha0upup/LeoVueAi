@@ -103,9 +103,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { icons } from '@/utils/icons.js'
-
-const iconMap = icons
+import { icons as iconMap } from '@/utils/icons.js'
 
 const SCROLL_STEP = 120
 

@@ -216,14 +216,12 @@
 import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { bytesToBase64 } from '@/utils/base64.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
 import { saveSkillFileApi, deleteSkillFileApi, moveSkillFileApi } from '@/services/api/skills.js'
-
-const iconMap = icons
 
 const props = defineProps({
   scope: { type: String, required: true },

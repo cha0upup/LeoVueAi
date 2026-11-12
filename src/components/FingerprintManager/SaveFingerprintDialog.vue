@@ -196,7 +196,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { showWarning } from '@/utils/messageUtils.js'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import FingerprintRequestEditor from './FingerprintRequestEditor.vue'
@@ -215,7 +215,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'submit'])
 const visible = useDialogVisible(props, emit)
-const iconMap = icons
 const formRef = ref(null)
 const formData = ref(createEmptyFingerprintForm())
 const debugVisible = ref(false)

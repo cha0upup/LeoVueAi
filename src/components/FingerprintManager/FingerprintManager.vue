@@ -229,7 +229,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { executeBatchDelete, executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
 import {
@@ -278,8 +278,6 @@ const currentEditDetail = ref(null)
 const batchExportLoading = ref(false)
 const batchDeleteLoading = ref(false)
 const detailExportLoading = ref(false)
-
-const iconMap = icons
 
 const filteredFingerprints = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()

@@ -33,10 +33,8 @@
 </template>
 
 <script setup>
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate } from '@/utils/format.js'
-
-const iconMap = icons
 
 defineProps({
   result: {

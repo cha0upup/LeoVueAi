@@ -79,7 +79,7 @@
 <script setup>
 import { ref, computed, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { joinFilePath } from '@/utils/format.js'
 import { renameFileApi } from '@/services/api/agent-files.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
@@ -87,8 +87,6 @@ import { FILE_NAME_PATTERN, FILE_NAME_ERROR_MESSAGE } from '@/utils/fileValidato
 import { getFileIconPresentation } from '@/utils/fileIcons.js'
 import { filePathProps } from '@/composables/files/useFilePath.js'
 import FileOperationSummary from '@/components/AgentConsole/File/FileOperationSummary.vue'
-
-const iconMap = icons
 
 const props = defineProps({
   ...filePathProps,

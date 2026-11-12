@@ -76,6 +76,7 @@ import DisguiseTransportPanel from './DisguiseTransportPanel.vue'
 import JavaRuntimeConfig from './JavaRuntimeConfig.vue'
 import PhpRuntimeConfig from './PhpRuntimeConfig.vue'
 import { findInjectorCapability } from './scriptGeneratorCompatibility.js'
+import { javaRuntimeConfigProps } from './scriptGeneratorConstants.js'
 
 const form = defineModel('form', { type: Object, required: true })
 
@@ -88,45 +89,7 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
-  serverTypes: {
-    type: Array,
-    default: () => []
-  },
-  availableInjectorShellTypes: {
-    type: Array,
-    default: () => []
-  },
-  injectorCapabilities: {
-    type: Array,
-    default: () => []
-  },
-  packerTypesStructure: {
-    type: Object,
-    required: true
-  },
-  packerTypesFlat: {
-    type: Array,
-    default: () => []
-  },
-  targetJavaVersions: {
-    type: Array,
-    default: () => ['auto', '6', '7', '8', '9+', '17+']
-  },
-  packerCompatibility: {
-    type: Object,
-    default: () => ({})
-  },
-  servletNamespaces: {
-    type: Array,
-    default: () => ['auto', 'javax', 'jakarta']
-  },
-  transportProtocols: {
-    type: Object,
-    default: () => ({
-      webshell: ['http', 'httpchunk'],
-      memoryshell: ['http', 'httpchunk', 'websocket']
-    })
-  },
+  ...javaRuntimeConfigProps,
   obfuscationSteps: {
     type: Array,
     default: () => []

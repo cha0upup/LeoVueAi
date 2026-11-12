@@ -69,44 +69,14 @@ import AgentDetailHero from './AgentDetailHero.vue'
 import AgentDetailInfoGrid from './AgentDetailInfoGrid.vue'
 import AgentDetailStrategyPanel from './AgentDetailStrategyPanel.vue'
 import AgentSessionsPanel from './AgentSessionsPanel.vue'
+import { agentDetailStatusProps } from './agentDetailUtils.js'
 
 defineProps({
   agent: {
     type: Object,
     default: null
   },
-  connectionTestLoading: {
-    type: Boolean,
-    default: false
-  },
-  isCurrentAgentTesting: {
-    type: Boolean,
-    default: false
-  },
-  batchTestLoading: {
-    type: Boolean,
-    default: false
-  },
-  testConnResult: {
-    type: Object,
-    default: null
-  },
-  cacheCheckResult: {
-    type: Object,
-    default: null
-  },
-  cacheCheckLoading: {
-    type: Boolean,
-    default: false
-  },
-  cacheAvailability: {
-    type: Object,
-    default: () => ({ checked: false, hasCache: false, saveTime: null })
-  },
-  cacheAvailabilityLoading: {
-    type: Boolean,
-    default: false
-  },
+  ...agentDetailStatusProps,
   quickSavingKey: {
     type: String,
     default: ''

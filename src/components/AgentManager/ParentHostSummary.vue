@@ -33,9 +33,7 @@
 <script setup>
 import { Icon } from '@iconify/vue'
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
-import { icons } from '@/utils/icons.js'
-
-const iconMap = icons
+import { icons as iconMap } from '@/utils/icons.js'
 
 defineProps({
   host: { type: Object, default: null },

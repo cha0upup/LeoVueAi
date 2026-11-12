@@ -157,7 +157,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, toRef, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { confirmDelete } from '@/utils/confirmUtils.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { taskEngine } from '../File/TaskEngine.js'
 import { ACTIVE_TASK_STATUSES, TaskStatus, TaskType } from '@/constants/task.js'
@@ -204,7 +204,6 @@ const props = defineProps({
   sessionId: { type: String, required: true }
 })
 
-const iconMap = icons
 const activeTaskType = ref('all')
 const statusFilter = ref('all')
 const searchKeyword = ref('')

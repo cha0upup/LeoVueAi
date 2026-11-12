@@ -121,10 +121,9 @@ import { useAuth } from '@/composables/useAuth.js'
 import { normalizeAuthRedirect } from '@/routerGuards.js'
 import { changePasswordApi, logoutApi } from '@/services/api/auth.js'
 import { createPasswordRules, createPasswordMatchValidator, validateForm } from '@/utils/formUtils.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
-const iconMap = icons
 const route = useRoute()
 const router = useRouter()
 const { fetchAuth, resetAuth } = useAuth()

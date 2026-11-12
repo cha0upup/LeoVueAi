@@ -72,9 +72,7 @@
 </template>
 
 <script setup>
-import { icons } from '@/utils/icons.js'
-
-const iconMap = icons
+import { icons as iconMap } from '@/utils/icons.js'
 
 const props = defineProps({
   agent: {

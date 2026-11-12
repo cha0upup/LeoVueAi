@@ -83,7 +83,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
 import { createPasswordRules, createPasswordMatchValidator, validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
@@ -91,7 +91,6 @@ import { changePasswordApi } from '@/services/api/auth.js'
 
 const dialog = useDialog()
 const changePasswordVisible = dialog.visible
-const iconMap = icons
 
 const passwordFields = [
   { prop: 'oldPassword', label: '旧密码', hint: '验证当前身份', placeholder: '请输入旧密码', icon: 'key' },

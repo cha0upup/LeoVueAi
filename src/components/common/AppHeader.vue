@@ -87,7 +87,7 @@
 import { Icon } from '@iconify/vue'
 import ThemeSwitcher from '@/components/common/ThemeSwitcher.vue'
 import { createUserMenuItems } from '@/constants/app.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 
 defineProps({
   title: {
@@ -118,7 +118,6 @@ defineProps({
 
 defineEmits(['command'])
 
-const iconMap = icons
 </script>
 
 <style scoped>

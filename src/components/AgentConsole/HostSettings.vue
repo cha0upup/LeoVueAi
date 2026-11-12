@@ -222,7 +222,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { getLoadedComponentsApi, reloadComponentApi, loadComponentApi } from '@/services/api/container.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
 import { AGENT_CONSOLE_SETTINGS_STORAGE_KEY } from '@/constants/app.js'
@@ -236,7 +236,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:settings'])
 
-const iconMap = icons
 const activeTab = ref('general')
 
 const localSettings = reactive({

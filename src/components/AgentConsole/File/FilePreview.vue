@@ -108,7 +108,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { confirmAction } from '@/utils/confirmUtils.js'
-import { icons } from '@/utils/icons.js'
+import { icons as iconMap } from '@/utils/icons.js'
 import { formatFilePath, formatFileSize } from '@/utils/format.js'
 import { useFileSave } from '@/composables/files/useFileSave.js'
 import FileDownload from '@/components/AgentConsole/File/FileDownload.vue'
@@ -134,8 +134,6 @@ import {
   shortenPreviewPath,
   splitPreviewDownloadPath
 } from './filePreviewModel.js'
-
-const iconMap = icons
 
 // ── Composables ──
 const {
