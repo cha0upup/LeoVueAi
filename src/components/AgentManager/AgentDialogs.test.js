@@ -1,16 +1,21 @@
 /* eslint-disable vue/one-component-per-file -- Fixture components render the real dialog templates. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick } from 'vue'
-import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
+import { compileClientComponent, createSlotStub, findNode, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
+import { deferred } from '@/test-support/deferred.js'
 import { icons } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
+import { createDefaultAgent } from '@/utils/constants.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { useAgentForm } from '@/composables/agent/useAgentForm.js'
+import { useAgentImportBatch } from '@/composables/agent/useAgentImportBatch.js'
+import { MAX_AGENT_TRANSFER_BYTES, buildAgentTransferBundle, parseAgentTransferPayload } from '@/utils/agentTransfer.js'
 
 const mocks = vi.hoisted(() => ({
   add: vi.fn(), update: vi.fn(), validate: vi.fn(),
   resetFields: vi.fn(), clearValidate: vi.fn(), scrollToTop: vi.fn(),
+  export: vi.fn(), encode: vi.fn(), decode: vi.fn(), copy: vi.fn(), download: vi.fn(),
   showError: vi.fn(), showSuccess: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn()
 }))
 vi.mock('@/services/api/agent-manage.js', () => ({
@@ -44,10 +49,20 @@ const ParentHostSummary = defineComponent({
 })
 const modules = {
   '@/utils/icons.js': { icons },
+  '@/utils/messageUtils.js': mocks,
   '@/utils/dialogUtils.js': { useDialog },
+  '@/utils/constants.js': { createDefaultAgent },
   '@/utils/apiUtils.js': { executeRequest },
   '@/composables/agent/useAgentForm.js': { useAgentForm },
-  '@/services/api/agent-manage.js': { addAgentApi: mocks.add, updateAgentApi: mocks.update },
+  '@/services/api/agent-manage.js': { addAgentApi: mocks.add, updateAgentApi: mocks.update, exportAgentsApi: mocks.export },
+  '@element-plus/icons-vue': { Link: { render: () => null }, Monitor: { render: () => null } },
+  '@/utils/downloadBlob.js': { downloadBlob: mocks.download },
+  '@/utils/clipboard.js': { copyTextWithFeedback: mocks.copy },
+  '@/composables/agent/useAgentImportBatch.js': { useAgentImportBatch },
+  '@/utils/agentTransfer.js': {
+    MAX_AGENT_TRANSFER_BYTES, buildAgentTransferBundle, parseAgentTransferPayload,
+    encodeAgentTransferPayload: mocks.encode, decodeAgentTransferPayload: mocks.decode
+  },
   './AgentFormFields.vue': { default: AgentFormFields },
   './AgentConnectionResultBanner.vue': { default: { render: () => null } },
   './ParentHostSummary.vue': { default: ParentHostSummary }
@@ -56,6 +71,8 @@ const modules = {
 const compileDialog = name => compileClientComponent(new URL(`./${name}.vue`, import.meta.url), modules, `${name}-test`)
 const AddAgent = compileDialog('AddAgent')
 const EditAgent = compileDialog('EditAgent')
+const ShareAgent = compileDialog('ShareAgent')
+const ImportAgent = compileDialog('ImportAgent')
 
 describe('Agent dialog shared form integration', () => {
   const apps = []
@@ -63,21 +80,89 @@ describe('Agent dialog shared form integration', () => {
     const renderer = createTestRenderer()
     const refresh = vi.fn()
     const app = renderer.createApp(component, { projectId: 'project-1', onRefresh: refresh })
-    for (const name of ['ElDialog', 'ElButton', 'ElIcon', 'Icon']) {
+    for (const name of ['ElDialog', 'ElButton', 'ElIcon', 'Icon', 'ElForm', 'ElFormItem',
+      'ElInput', 'ElRow', 'ElCol', 'ElTooltip', 'ElTag', 'ElCheckbox', 'ElRadioGroup', 'ElRadioButton']) {
       app.component(name, createSlotStub(name, ['header', 'default', 'footer']))
     }
+    app.directive('loading', {})
     const vm = app.mount(renderer.root)
     apps.push(app)
-    return { vm, refresh, node: type => findNode(renderer.root, type) }
+    return {
+      vm, refresh, node: type => findNode(renderer.root, type),
+      nodes: type => findNodes(renderer.root, node => node.type === type)
+    }
   }
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubGlobal('FileReader', { LOADING: 1 })
     mocks.validate.mockResolvedValue(true)
     mocks.add.mockResolvedValue({ data: {} })
     mocks.update.mockResolvedValue({ data: {} })
+    mocks.encode.mockReset()
+    mocks.decode.mockReset()
+    mocks.export.mockReset()
   })
   afterEach(() => {
     for (const app of apps.splice(0)) app.unmount()
+    vi.unstubAllGlobals()
+  })
+
+  it('waits for compression and only copies or downloads the current share', async () => {
+    const first = deferred()
+    const second = deferred()
+    mocks.encode.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const hosts = ['first', 'second'].map(agentId => ({ agentId, parentAgentId: 'root', agentName: agentId }))
+    mocks.export.mockResolvedValueOnce({ data: [hosts[0]] }).mockResolvedValueOnce({ data: [hosts[1]] })
+    const dialog = mountDialog(ShareAgent)
+    await dialog.vm.openShareAgent(hosts[0])
+    await nextTick()
+    expect(dialog.nodes('ElButton').at(-1).props.disabled).toBe(true)
+    await dialog.vm.openShareAgent(hosts[1])
+    await nextTick()
+    second.resolve('current-compressed-config')
+    await vi.waitFor(() => expect(dialog.nodes('ElInput').at(-1).props['model-value']).toBe('current-compressed-config'))
+    first.resolve('outdated-config')
+    await nextTick()
+    const buttons = dialog.nodes('ElButton')
+    await buttons.at(-1).props.onClick()
+    buttons.at(-2).props.onClick()
+    expect(mocks.copy).toHaveBeenCalledWith('current-compressed-config', expect.any(String), expect.any(String))
+    expect(await mocks.download.mock.calls[0][0].text()).toBe('current-compressed-config')
+  })
+
+  it('cancels late decompression on close and imports resolved configuration with its ancestors', async () => {
+    const pending = deferred()
+    const bundle = buildAgentTransferBundle([
+      { agentId: 'parent', parentAgentId: 'root', agentName: 'parent' },
+      { agentId: 'child', parentAgentId: 'parent', agentName: 'child' }
+    ], ['child'])
+    mocks.decode.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(bundle)
+    const dialog = mountDialog(ImportAgent)
+    const parse = async () => {
+      dialog.node('ElInput').props['onUpdate:modelValue']('compressed-config')
+      await nextTick()
+      return dialog.nodes('ElButton').find(node => node.props.class === 'submit-btn').props.onClick()
+    }
+    dialog.vm.openImportAgent()
+    await nextTick()
+    const cancelled = parse()
+    await nextTick()
+    dialog.node('ElDialog').props.onClose()
+    pending.resolve(bundle)
+    await cancelled
+    expect(mocks.showSuccess).not.toHaveBeenCalled()
+    expect(dialog.node('ElDialog').props.modelValue).toBe(false)
+
+    dialog.vm.openImportAgent()
+    await nextTick()
+    await parse()
+    mocks.add.mockResolvedValueOnce({ data: { agentId: 'imported-parent' } })
+      .mockResolvedValueOnce({ data: { agentId: 'imported-child' } })
+    await nextTick()
+    await dialog.nodes('ElButton').find(node => node.props.class === 'submit-btn').props.onClick()
+    expect(mocks.add.mock.calls.map(([agent]) => [agent.agentName, agent.parentAgentId]))
+      .toEqual([['parent', 'root'], ['child', 'imported-parent']])
+    expect(dialog.refresh).toHaveBeenCalledOnce()
   })
 
   it('adds the current form with project context and resets it after success', async () => {

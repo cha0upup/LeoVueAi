@@ -86,7 +86,7 @@
             v-model="fileContent"
             type="textarea"
             :autosize="{ minRows: 8, maxRows: 14 }"
-            placeholder="请粘贴 Base64 编码的配置文件内容"
+            placeholder="请粘贴先 gzip 压缩、再 Base64 编码的主机配置"
             class="config-textarea"
           />
         </div>
@@ -189,7 +189,8 @@
           v-if="currentStep === 1"
           type="primary"
           class="submit-btn"
-          :disabled="!fileContent.trim()"
+          :loading="isParsing"
+          :disabled="!fileContent.trim() || isParsing"
           @click="parseContent"
         >
           <el-icon><Icon :icon="iconMap.codeGenerator" /></el-icon>
@@ -228,7 +229,7 @@ import { useDialog } from '@/utils/dialogUtils.js'
 import { addAgentApi } from '@/services/api/agent-manage.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { useAgentImportBatch } from '@/composables/agent/useAgentImportBatch.js'
-import { decodeAgentTransferPayload, parseAgentTransferPayload } from '@/utils/agentTransfer.js'
+import { MAX_AGENT_TRANSFER_BYTES, decodeAgentTransferPayload, parseAgentTransferPayload } from '@/utils/agentTransfer.js'
 
 const emit = defineEmits(['refresh'])
 const props = defineProps({
@@ -239,13 +240,12 @@ const props = defineProps({
 const dialog = useDialog()
 const importDialogVisible = dialog.visible
 
-const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024
-
 const fileContent = ref('')
 const currentStep = ref(1)
 const importType = ref('paste')
 const isDragOver = ref(false)
 const isSubmitting = ref(false)
+const isParsing = ref(false)
 
 const {
   batchAgents,
@@ -266,7 +266,7 @@ const {
 
 const fileInput = ref(null)
 let activeFileReader = null
-let fileReadSequence = 0
+let inputSequence = 0
 
 const selectFile = () => {
   if (fileInput.value) fileInput.value.value = ''
@@ -291,43 +291,50 @@ const handleDragLeave = (event) => {
   isDragOver.value = false
 }
 
-const cancelFileRead = () => {
-  fileReadSequence += 1
+const cancelPendingInput = () => {
+  inputSequence += 1
+  isParsing.value = false
   if (activeFileReader?.readyState === FileReader.LOADING) activeFileReader.abort()
   activeFileReader = null
 }
 
 const readFile = (file) => {
   if (!file) return
-  if (file.size > MAX_IMPORT_FILE_BYTES) {
+  if (file.size > MAX_AGENT_TRANSFER_BYTES) {
     showWarning('配置文件超过 10 MB，请拆分后再导入')
     return
   }
 
-  cancelFileRead()
-  const requestId = fileReadSequence
+  cancelPendingInput()
+  const requestId = inputSequence
   const reader = new FileReader()
   activeFileReader = reader
   reader.onload = (e) => {
-    if (requestId !== fileReadSequence) return
+    if (requestId !== inputSequence) return
     fileContent.value = String(e.target?.result || '')
     activeFileReader = null
   }
   reader.onerror = () => {
-    if (requestId !== fileReadSequence) return
+    if (requestId !== inputSequence) return
     activeFileReader = null
     showError('读取配置文件失败，请重新选择文件')
   }
   reader.readAsText(file)
 }
 
-const parseContent = () => {
+const parseContent = async () => {
+  if (isParsing.value) return
   if (!fileContent.value.trim()) {
     showError('请输入有效的配置内容')
     return
   }
+  const content = fileContent.value
+  const requestId = inputSequence
+  const isCurrent = () => requestId === inputSequence && content === fileContent.value && importDialogVisible.value
+  isParsing.value = true
   try {
-    const parsed = decodeAgentTransferPayload(fileContent.value)
+    const parsed = await decodeAgentTransferPayload(content)
+    if (!isCurrent()) return
     const transfer = parseAgentTransferPayload(parsed)
 
     // 解析器已按父节点优先排序，层级只需顺序计算一次。
@@ -351,12 +358,14 @@ const parseContent = () => {
       `配置包解析成功：${transfer.targetIds.size} 台目标主机，${importedAgents.length - transfer.targetIds.size} 台祖先依赖`
     )
   } catch (error) {
-    showError(error?.message || '解析配置失败，请确保文件格式正确')
+    if (isCurrent()) showError(error?.message || '解析配置失败，请检查 gzip + Base64 格式')
+  } finally {
+    if (requestId === inputSequence) isParsing.value = false
   }
 }
 
 const clearContent = () => {
-  cancelFileRead()
+  cancelPendingInput()
   fileContent.value = ''
   if (fileInput.value) fileInput.value.value = ''
 }
@@ -423,7 +432,7 @@ const close = () => {
 const resetForm = () => {
   currentStep.value = 1
   importType.value = 'paste'
-  cancelFileRead()
+  cancelPendingInput()
   fileContent.value = ''
   isDragOver.value = false
   resetBatch()

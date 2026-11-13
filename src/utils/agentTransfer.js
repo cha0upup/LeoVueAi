@@ -2,6 +2,7 @@ import { base64ToBytes, bytesToBase64 } from './base64.js'
 
 const AGENT_TRANSFER_FORMAT = 'leo-agent-bundle'
 const AGENT_TRANSFER_VERSION = 2
+export const MAX_AGENT_TRANSFER_BYTES = 10 * 1024 * 1024
 
 const EXPORT_OMIT_FIELDS = new Set([
   'agentId',
@@ -85,14 +86,36 @@ export const buildAgentTransferBundle = (agents = [], selectedAgentIds = []) => 
   }
 }
 
-export const encodeAgentTransferPayload = (payload) => {
+export const encodeAgentTransferPayload = async (payload) => {
+  if (!globalThis.CompressionStream) throw new Error('请使用支持 gzip 压缩的新版浏览器')
   const bytes = new TextEncoder().encode(JSON.stringify(payload))
-  return bytesToBase64(bytes)
+  if (bytes.length > MAX_AGENT_TRANSFER_BYTES) throw new Error('配置包超过 10 MB，请拆分后再分享')
+  const stream = new Blob([bytes]).stream().pipeThrough(new globalThis.CompressionStream('gzip'))
+  const encoded = bytesToBase64(new Uint8Array(await new globalThis.Response(stream).arrayBuffer()))
+  if (encoded.length > MAX_AGENT_TRANSFER_BYTES) throw new Error('配置包超过 10 MB，请拆分后再分享')
+  return encoded
 }
 
-export const decodeAgentTransferPayload = (content) => {
-  const bytes = base64ToBytes(String(content || '').trim())
-  return JSON.parse(new TextDecoder().decode(bytes))
+export const decodeAgentTransferPayload = async (content) => {
+  const encoded = String(content || '').trim()
+  if (encoded.length > MAX_AGENT_TRANSFER_BYTES) throw new Error('配置包超过 10 MB，请拆分后再导入')
+  const compressed = base64ToBytes(encoded)
+  let stream = new Blob([compressed]).stream()
+  // 旧版分享包是未压缩的 Base64 JSON；新分享统一使用 gzip。
+  if (compressed[0] === 0x1f && compressed[1] === 0x8b) {
+    if (!globalThis.DecompressionStream) throw new Error('请使用支持 gzip 解压的新版浏览器')
+    let size = 0
+    stream = stream.pipeThrough(new globalThis.DecompressionStream('gzip'))
+      .pipeThrough(new globalThis.TransformStream({
+        transform(chunk, controller) {
+          size += chunk.byteLength
+          if (size > MAX_AGENT_TRANSFER_BYTES) throw new Error('解压后的配置包超过 10 MB，请拆分后再导入')
+          controller.enqueue(chunk)
+        }
+      }))
+  }
+  const bytes = await new globalThis.Response(stream).arrayBuffer()
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
 }
 
 export const parseAgentTransferPayload = (payload) => {

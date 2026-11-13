@@ -12,7 +12,7 @@ import { executeDeleteWithConfirm, executeBatchDelete } from '@/utils/confirmUti
 
 const mocks = vi.hoisted(() => ({
   agents: vi.fn(), children: vi.fn(), sessions: vi.fn(), cache: vi.fn(), memberships: vi.fn(),
-  test: vi.fn(), export: vi.fn(), delete: vi.fn(), detach: vi.fn(),
+  test: vi.fn(), export: vi.fn(), encode: vi.fn(), delete: vi.fn(), detach: vi.fn(),
   confirm: vi.fn(), download: vi.fn(), assign: vi.fn(), warn: vi.fn(),
   showError: vi.fn(), showWarning: vi.fn(), showSuccess: vi.fn(),
   init: vi.fn(), selectHost: vi.fn(), openConsole: vi.fn()
@@ -74,7 +74,7 @@ const modules = {
   '@/composables/agent/useAgentSelection.js': { useAgentSelection },
   '@/composables/useProjectDirectory.js': { useProjectDirectory: () => fixture.project },
   '@/utils/agentTransfer.js': {
-    buildAgentTransferBundle: agents => ({ agents }), encodeAgentTransferPayload: () => 'encoded-config'
+    buildAgentTransferBundle: agents => ({ agents }), encodeAgentTransferPayload: mocks.encode
   },
   '@/components/common/ManagerLayout.vue': { default: defineComponent({
     setup(_props, { slots }) { return () => h('main', [slots.list?.(), slots.detail?.(), slots.default?.()]) }
@@ -128,6 +128,7 @@ describe('AgentManager batch workflow', () => {
     mocks.confirm.mockResolvedValue()
     mocks.delete.mockResolvedValue({})
     mocks.detach.mockResolvedValue({})
+    mocks.encode.mockResolvedValue('encoded-config')
   })
   afterEach(() => {
     for (const app of apps.splice(0)) app.unmount()
@@ -231,6 +232,7 @@ describe('AgentManager batch workflow', () => {
     await view.toolbar().onExport()
     expect(mocks.export).toHaveBeenLastCalledWith(['host-0'])
     expect(mocks.download).toHaveBeenCalledOnce()
+    expect(await mocks.download.mock.calls[0][0].text()).toBe('encoded-config')
   })
 
   it('preserves selection when deletion is cancelled and deduplicates loaded descendants on confirmation', async () => {

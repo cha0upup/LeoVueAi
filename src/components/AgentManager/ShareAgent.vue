@@ -24,7 +24,7 @@
     </template>
 
     <el-form
-      v-loading="loading"
+      v-loading="loading || encoding"
       :model="agent"
       label-width="120px"
       label-position="left"
@@ -138,7 +138,7 @@
             <strong>配置代码</strong>
           </div>
         </div>
-        <el-form-item label="Base64 配置">
+        <el-form-item label="gzip + Base64">
           <el-input
             :model-value="output"
             type="textarea"
@@ -148,7 +148,7 @@
           />
         </el-form-item>
         <p class="form-tip share-form-tip">
-          配置包采用 Base64 编码，不包含原数据库 ID、创建人和团队信息。
+          配置包先 gzip 压缩再 Base64 编码，不包含原数据库 ID、创建人和团队信息。
         </p>
       </div>
     </el-form>
@@ -166,7 +166,7 @@
           type="primary"
           plain
           class="cancel-btn"
-          :disabled="!output || loading"
+          :disabled="!output || loading || encoding"
           @click="downloadFile"
         >
           <el-icon><Icon :icon="iconMap.download" /></el-icon>
@@ -175,7 +175,7 @@
         <el-button
           type="primary"
           :loading="copying"
-          :disabled="!output || loading"
+          :disabled="!output || loading || encoding"
           class="submit-btn"
           @click="copyToClipboard"
         >
@@ -189,7 +189,7 @@
 
 <script setup>
 import { Link, Monitor } from '@element-plus/icons-vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { exportAgentsApi } from '@/services/api/agent-manage.js'
 import { icons as iconMap } from '@/utils/icons.js'
@@ -204,6 +204,8 @@ import {
 const shareAgentDialog = ref(false)
 const copying = ref(false)
 const loading = ref(false)
+const encoding = ref(false)
+const output = ref('')
 const availableAgents = ref([])
 const selectedDescendantIds = ref(new Set())
 let shareRequestToken = 0
@@ -244,9 +246,21 @@ const bundleAgentIds = computed(() =>
 const bundleAgents = computed(() =>
   availableAgents.value.filter((item) => bundleAgentIds.value.has(item.agentId))
 )
-const output = computed(() =>
-  transferBundle.value.agents.length ? encodeAgentTransferPayload(transferBundle.value) : ''
-)
+watch(() => shareAgentDialog.value ? transferBundle.value : null, async (bundle, _previous, onCleanup) => {
+  let active = true
+  onCleanup(() => { active = false })
+  output.value = ''
+  encoding.value = Boolean(bundle?.agents.length)
+  if (!encoding.value) return
+  try {
+    const encoded = await encodeAgentTransferPayload(bundle)
+    if (active) output.value = encoded
+  } catch (error) {
+    if (active) showError(error?.message || '生成压缩配置失败')
+  } finally {
+    if (active) encoding.value = false
+  }
+})
 
 const getAgentDepth = (item) => {
   let depth = 0

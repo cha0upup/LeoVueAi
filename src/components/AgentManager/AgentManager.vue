@@ -986,7 +986,8 @@ const batchExportAgents = () => runBatchAction('export', async () => {
     const filename = targets.length === 1
       ? `${targets[0].agentName || 'agent'}_bundle_${date}.txt`
       : `agents_bundle_${date}.txt`
-    downloadBlob(new Blob([encodeAgentTransferPayload(bundle)], { type: 'text/plain' }), filename)
+    const encoded = await encodeAgentTransferPayload(bundle)
+    downloadBlob(new Blob([encoded], { type: 'text/plain' }), filename)
     const dependencyCount = Math.max(0, bundle.agents.length - targets.length)
     showSuccess(dependencyCount
       ? `已导出 ${targets.length} 台目标主机，并携带 ${dependencyCount} 台祖先依赖`
