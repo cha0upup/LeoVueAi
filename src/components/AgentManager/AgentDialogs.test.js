@@ -326,7 +326,7 @@ describe('Agent dialog shared form integration', () => {
     expect(mocks.transferProject).not.toHaveBeenCalled()
   })
 
-  it('assigns selected hosts without requesting an environment label', async () => {
+  it('assigns selected hosts to the chosen project using only their IDs', async () => {
     const dialog = mountDialog(ProjectAssignmentDialog, {
       projects: [{ projectId: 'p1', projectName: '目标项目', contentEditable: true }]
     })
