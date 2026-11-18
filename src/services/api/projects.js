@@ -46,8 +46,8 @@ export function getWorkspaceAgentChildrenApi(projectId, parentAgentId) {
   return getProjectAgentChildrenApi(normalizedProjectId, parentAgentId)
 }
 
-export function attachProjectAgentsApi(projectId, agentIds, options = {}) {
-  return http.post('/platform/projects/hosts/attach', { projectId, agentIds, ...options })
+export function attachProjectAgentsApi(projectId, agentIds) {
+  return http.post('/platform/projects/hosts/attach', { projectId, agentIds })
 }
 
 export function detachProjectAgentsApi(projectId, agentIds) {

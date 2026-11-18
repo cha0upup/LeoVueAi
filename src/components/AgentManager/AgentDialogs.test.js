@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   resetFields: vi.fn(), clearValidate: vi.fn(), scrollToTop: vi.fn(),
   export: vi.fn(), encode: vi.fn(), decode: vi.fn(), copy: vi.fn(), download: vi.fn(),
   listAccounts: vi.fn(), transferProject: vi.fn(), updateProject: vi.fn(), confirm: vi.fn(),
+  attachProjectHosts: vi.fn(),
   showError: vi.fn(), showSuccess: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn()
 }))
 vi.mock('@/services/api/agent-manage.js', () => ({
@@ -65,7 +66,8 @@ const modules = {
   '@/services/api/admin.js': { getAllUsersApi: mocks.listAccounts },
   '@/services/api/projects.js': {
     addProjectApi: vi.fn(), archiveProjectApi: vi.fn(), deleteProjectApi: vi.fn(),
-    transferProjectApi: mocks.transferProject, updateProjectApi: mocks.updateProject
+    transferProjectApi: mocks.transferProject, updateProjectApi: mocks.updateProject,
+    attachProjectAgentsApi: mocks.attachProjectHosts
   },
   '@element-plus/icons-vue': { Link: { render: () => null }, Monitor: { render: () => null } },
   '@/utils/downloadBlob.js': { downloadBlob: mocks.download },
@@ -86,14 +88,15 @@ const EditAgent = compileDialog('EditAgent')
 const ShareAgent = compileDialog('ShareAgent')
 const ImportAgent = compileDialog('ImportAgent')
 const ProjectEditorDialog = compileDialog('ProjectEditorDialog')
+const ProjectAssignmentDialog = compileDialog('ProjectAssignmentDialog')
 
 describe('Agent dialog shared form integration', () => {
   const apps = []
-  const mountDialog = (component) => {
+  const mountDialog = (component, props = {}) => {
     const renderer = createTestRenderer()
     const refresh = vi.fn()
     const saved = vi.fn()
-    const app = renderer.createApp(component, { projectId: 'project-1', onRefresh: refresh, onSaved: saved })
+    const app = renderer.createApp(component, { projectId: 'project-1', onRefresh: refresh, onSaved: saved, ...props })
     app.component('ElDialog', defineComponent({
       inheritAttrs: false,
       setup(_props, { attrs, slots }) {
@@ -132,6 +135,7 @@ describe('Agent dialog shared form integration', () => {
     ] })
     mocks.confirm.mockReset().mockResolvedValue(true)
     mocks.transferProject.mockReset().mockResolvedValue({ data: { projectId: 'p1', ownerUserId: 'next' } })
+    mocks.attachProjectHosts.mockReset().mockResolvedValue({ data: { changedCount: 2 } })
   })
   afterEach(() => {
     for (const app of apps.splice(0)) app.unmount()
@@ -320,5 +324,17 @@ describe('Agent dialog shared form integration', () => {
     confirmation.resolve(true)
     await oldTransfer
     expect(mocks.transferProject).not.toHaveBeenCalled()
+  })
+
+  it('assigns selected hosts without requesting an environment label', async () => {
+    const dialog = mountDialog(ProjectAssignmentDialog, {
+      projects: [{ projectId: 'p1', projectName: '目标项目', contentEditable: true }]
+    })
+    await dialog.vm.open([{ agentId: 'host-1' }, { agentId: 'host-2' }], 'p1')
+
+    expect(dialog.node('ElSelect')).toBeNull()
+    await dialog.button('确认加入').props.onClick()
+    expect(mocks.attachProjectHosts).toHaveBeenCalledExactlyOnceWith('p1', ['host-1', 'host-2'])
+    expect(dialog.saved).toHaveBeenCalledExactlyOnceWith('p1')
   })
 })

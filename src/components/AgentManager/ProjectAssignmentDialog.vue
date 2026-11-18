@@ -81,29 +81,6 @@
       </div>
     </div>
 
-    <div
-      v-if="selectedProject"
-      class="assignment-options"
-    >
-      <div>
-        <strong>项目环境</strong>
-        <small>用于标记这批主机在项目中的用途</small>
-      </div>
-      <el-select
-        v-model="environment"
-        clearable
-        placeholder="暂不标记"
-        style="width: 150px"
-      >
-        <el-option
-          v-for="(label, value) in environmentOptions"
-          :key="value"
-          :label="label"
-          :value="value"
-        />
-      </el-select>
-    </div>
-
     <template #footer>
       <div class="assignment-footer">
         <span class="assignment-footer__destination">
@@ -141,11 +118,9 @@ const props = defineProps({
   currentProjectId: { type: String, default: '' }
 })
 const emit = defineEmits(['saved'])
-const environmentOptions = { dev: '开发', test: '测试', staging: '预发布', prod: '生产' }
 const visible = ref(false)
 const saving = ref(false)
 const projectId = ref('')
-const environment = ref('')
 const agents = ref([])
 const query = ref('')
 const searchInput = ref(null)
@@ -178,7 +153,6 @@ const agentNames = computed(() =>
 const reset = () => {
   saving.value = false
   projectId.value = ''
-  environment.value = ''
   agents.value = []
   query.value = ''
 }
@@ -200,8 +174,7 @@ const save = async () => {
   try {
     const response = await attachProjectAgentsApi(
       projectId.value,
-      agents.value.map((item) => item.agentId),
-      { environment: environment.value || null }
+      agents.value.map((item) => item.agentId)
     )
     const changedCount = Number(response.data?.changedCount ?? agents.value.length)
     showSuccess(`已将 ${changedCount} 台入口主机加入 ${selectedProject.value?.projectName || '项目'}`)
@@ -223,8 +196,6 @@ defineExpose({ open })
 .assignment-section-title,
 .assignment-project,
 .assignment-project__body,
-.assignment-options,
-.assignment-options > div,
 .assignment-footer {
   display: flex;
 }
@@ -246,8 +217,7 @@ defineExpose({ open })
 }
 
 .assignment-title > span:last-child,
-.assignment-project__body,
-.assignment-options > div {
+.assignment-project__body {
   flex-direction: column;
 }
 
@@ -255,8 +225,7 @@ defineExpose({ open })
   font-size: 15px;
 }
 
-.assignment-title small,
-.assignment-options small {
+.assignment-title small {
   color: var(--el-text-color-placeholder);
   font-size: 11px;
 }
@@ -425,19 +394,6 @@ defineExpose({ open })
 
 .assignment-empty small {
   font-size: 10px;
-}
-
-.assignment-options {
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 11px 12px;
-  margin-top: 10px;
-  border-top: 1px solid var(--app-divider-color);
-}
-
-.assignment-options strong {
-  font-size: 12px;
 }
 
 .assignment-footer {
