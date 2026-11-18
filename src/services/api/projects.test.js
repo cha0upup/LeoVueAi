@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../http.js', () => ({ default: { post: vi.fn() } }))
 import http from '../http.js'
-import { getWorkspaceAgentChildrenApi } from './projects.js'
+import { getWorkspaceAgentChildrenApi, transferProjectApi } from './projects.js'
 
 describe('getWorkspaceAgentChildrenApi', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -14,5 +14,13 @@ describe('getWorkspaceAgentChildrenApi', () => {
     expect(http.post).toHaveBeenCalledExactlyOnceWith(endpoint, {
       parentAgentId: 'parent-1'
     })
+  })
+})
+
+it('posts project ownership transfers with only the project and recipient IDs', () => {
+  http.post.mockClear()
+  transferProjectApi('project-1', 'next-owner')
+  expect(http.post).toHaveBeenCalledExactlyOnceWith('/platform/projects/transfer', {
+    projectId: 'project-1', newOwnerUserId: 'next-owner'
   })
 })

@@ -12,6 +12,10 @@ export function updateProjectApi(project) {
   return http.post('/platform/projects/update', project)
 }
 
+export function transferProjectApi(projectId, newOwnerUserId) {
+  return http.post('/platform/projects/transfer', { projectId, newOwnerUserId })
+}
+
 export function archiveProjectApi(projectId) {
   return http.post('/platform/projects/archive', { projectId })
 }

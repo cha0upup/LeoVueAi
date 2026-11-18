@@ -86,6 +86,53 @@
           placeholder="记录项目目标、范围或交接说明"
         />
       </el-form-item>
+      <el-form-item
+        v-if="canTransferOwner"
+        label="项目负责人"
+      >
+        <el-button
+          v-if="!ownerTransfer"
+          :disabled="saving"
+          @click="openOwnerTransfer"
+        >
+          交接负责人
+        </el-button>
+        <div
+          v-else
+          class="project-owner-transfer"
+        >
+          <el-select
+            v-model="ownerTransfer.newOwnerUserId"
+            aria-label="接任账号"
+            filterable
+            placeholder="选择接任账号"
+            no-data-text="暂无可接任的已启用账号"
+            :loading="ownerTransfer.loading"
+            :disabled="ownerTransfer.loading || ownerTransfer.busy || saving"
+          >
+            <el-option
+              v-for="account in ownerTransfer.accounts"
+              :key="account.userId"
+              :label="account.userName || account.userId"
+              :value="account.userId"
+            />
+          </el-select>
+          <el-button
+            type="primary"
+            :disabled="!ownerTransfer.newOwnerUserId || ownerTransfer.busy || saving"
+            @click="confirmOwnerTransfer"
+          >
+            提交交接
+          </el-button>
+          <el-button
+            text
+            :disabled="ownerTransfer.busy"
+            @click="ownerTransfer = null"
+          >
+            取消交接
+          </el-button>
+        </div>
+      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -94,6 +141,7 @@
           v-if="editing"
           type="button"
           class="project-lifecycle-action delete"
+          :disabled="saving || ownerTransfer?.busy"
           @click="remove"
         >
           <el-icon><Icon icon="mdi:trash-can-outline" /></el-icon>删除项目
@@ -102,6 +150,7 @@
           v-if="editing && form.status !== 'archived'"
           type="button"
           class="project-lifecycle-action archive"
+          :disabled="saving || ownerTransfer?.busy"
           @click="archive"
         >
           <el-icon><Icon icon="mdi:archive-arrow-down-outline" /></el-icon>归档
@@ -110,6 +159,7 @@
           v-if="editing && form.status === 'archived'"
           type="button"
           class="project-lifecycle-action restore"
+          :disabled="saving || ownerTransfer?.busy"
           @click="restore"
         >
           <el-icon><Icon icon="mdi:archive-arrow-up-outline" /></el-icon>恢复项目
@@ -121,6 +171,7 @@
         <el-button
           type="primary"
           :loading="saving"
+          :disabled="ownerTransfer?.busy"
           @click="save"
         >
           保存
@@ -131,20 +182,25 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import {
   addProjectApi,
   archiveProjectApi,
   deleteProjectApi,
+  transferProjectApi,
   updateProjectApi
 } from '@/services/api/projects.js'
+import { getAllUsersApi } from '@/services/api/admin.js'
+import { useAuth } from '@/composables/useAuth.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
+import { handleError } from '@/utils/errorHandler.js'
 import { icons as iconMap } from '@/utils/icons.js'
 
 const emit = defineEmits(['saved'])
+const { isAdmin } = useAuth()
 const permissionOptions = [
   { value: 'private', label: '仅自己', description: '只有项目负责人和管理员可查看与维护', icon: iconMap.lock },
   { value: 'team', label: '团队协作', description: '同团队成员可查看并整理项目主机', icon: 'mdi:account-group-outline' }
@@ -153,6 +209,7 @@ const visible = ref(false)
 const editing = ref(false)
 const saving = ref(false)
 const formRef = ref(null)
+const ownerTransfer = ref(null)
 const createForm = () => ({
   projectId: '',
   projectName: '',
@@ -160,12 +217,19 @@ const createForm = () => ({
   description: '',
   permission: 'private',
   status: 'active',
+  ownerUserId: '',
   teamId: ''
 })
 const form = reactive(createForm())
+const canTransferOwner = computed(() => isAdmin.value && editing.value && Boolean(form.projectId && form.ownerUserId))
 const rules = { projectName: [{ required: true, message: '请输入项目名称', trigger: 'blur' }] }
 
+watch([visible, isAdmin], ([isOpen, admin]) => {
+  if (!isOpen || !admin) ownerTransfer.value = null
+}, { flush: 'sync' })
+
 const reset = () => {
+  ownerTransfer.value = null
   Object.assign(form, createForm())
   editing.value = false
   formRef.value?.clearValidate?.()
@@ -188,6 +252,55 @@ const handleSaved = (response) => {
 
 const submit = (request, successMessage, onSuccess = handleSaved) =>
   executeRequest(request, { loadingRef: saving, successMessage, errorMessage: null, onSuccess })
+
+const isCurrentTransfer = (transfer) =>
+  visible.value && canTransferOwner.value && ownerTransfer.value === transfer
+
+const openOwnerTransfer = async () => {
+  if (!visible.value || !canTransferOwner.value || ownerTransfer.value || saving.value) return
+  const transfer = reactive({ accounts: [], newOwnerUserId: '', loading: true, busy: false })
+  ownerTransfer.value = transfer
+  try {
+    const { data } = await getAllUsersApi()
+    if (!isCurrentTransfer(transfer)) return
+    const accounts = Array.isArray(data) ? data : []
+    transfer.accounts = accounts.filter(
+      account => account?.userId && Number(account.status) === 1 && account.userId !== form.ownerUserId
+    )
+  } catch (error) {
+    if (isCurrentTransfer(transfer)) {
+      ownerTransfer.value = null
+      handleError(error, { defaultMessage: '加载接任账号失败，请重试' })
+    }
+  } finally {
+    transfer.loading = false
+  }
+}
+
+const confirmOwnerTransfer = async () => {
+  const transfer = ownerTransfer.value
+  if (!transfer || !isCurrentTransfer(transfer) || transfer.busy || saving.value) return
+  const recipient = transfer.accounts.find(account => account.userId === transfer.newOwnerUserId)
+  if (!recipient) return
+  const projectId = form.projectId
+  transfer.busy = true
+  try {
+    const confirmed = await confirmAction({
+      title: '交接项目负责人',
+      message: `将项目“${form.projectName}”交接给“${recipient.userName || recipient.userId}”？共享团队和归档状态保持原样，其他未保存的修改将丢弃。`,
+      confirmButtonText: '确认交接'
+    })
+    if (!confirmed || !isCurrentTransfer(transfer)) return
+    await submit(() => transferProjectApi(projectId, recipient.userId), '项目负责人已交接', (response) => {
+      if (isCurrentTransfer(transfer)) handleSaved(response)
+      else emit('saved')
+    })
+  } catch (error) {
+    if (isCurrentTransfer(transfer)) handleError(error, { defaultMessage: '项目交接失败，请重试' })
+  } finally {
+    transfer.busy = false
+  }
+}
 
 const save = async () => {
   await formRef.value?.validate?.()
@@ -295,6 +408,21 @@ defineExpose({ open })
   gap: 12px;
 }
 
+.project-owner-transfer {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-owner-transfer .el-select {
+  flex: 1 1 180px;
+}
+
+.project-owner-transfer .el-button + .el-button {
+  margin-left: 0;
+}
+
 .permission-options {
   width: 100%;
   display: grid;
@@ -391,5 +519,10 @@ defineExpose({ open })
 
 .project-lifecycle-action.delete {
   color: var(--el-color-danger);
+}
+
+.project-lifecycle-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
