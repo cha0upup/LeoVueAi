@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import http from '../http.js'
-import { getAuditLogDetailApi, getAuditLogSummaryPageApi, getTeamLeaderOptionsApi } from './admin.js'
+import { getAuditLogDetailApi, getAuditLogSummaryPageApi, getEnabledUserOptionsApi, getTeamLeaderOptionsApi } from './admin.js'
 
 vi.mock('../http.js', () => ({ default: { get: vi.fn() } }))
 
@@ -29,4 +29,10 @@ it('requests only the identity fields for leader candidates', () => {
     params: { view: 'options' },
     signal
   })
+})
+
+it('requests the enabled account picker instead of full user profiles', () => {
+  const { signal } = new AbortController()
+  getEnabledUserOptionsApi({ signal })
+  expect(http.get).toHaveBeenLastCalledWith('/platform/admin/users/enabled-options', { signal })
 })

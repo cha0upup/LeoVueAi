@@ -63,7 +63,7 @@ const modules = {
   '@/composables/useAuth.js': { useAuth: () => ({ isAdmin: projectAdmin }) },
   '@/composables/agent/useAgentForm.js': { useAgentForm },
   '@/services/api/agent-manage.js': { addAgentApi: mocks.add, updateAgentApi: mocks.update, exportAgentsApi: mocks.export },
-  '@/services/api/admin.js': { getAllUsersApi: mocks.listAccounts },
+  '@/services/api/admin.js': { getEnabledUserOptionsApi: mocks.listAccounts },
   '@/services/api/projects.js': {
     addProjectApi: vi.fn(), archiveProjectApi: vi.fn(), deleteProjectApi: vi.fn(),
     transferProjectApi: mocks.transferProject, updateProjectApi: mocks.updateProject,
@@ -105,7 +105,7 @@ describe('Agent dialog shared form integration', () => {
     }))
     for (const name of ['ElButton', 'ElIcon', 'Icon', 'ElForm', 'ElFormItem',
       'ElInput', 'ElRow', 'ElCol', 'ElTooltip', 'ElTag', 'ElCheckbox', 'ElRadioGroup', 'ElRadioButton',
-      'ElSelect', 'ElOption']) {
+      'ElSelect', 'ElOption', 'ElAlert']) {
       app.component(name, createSlotStub(name, ['header', 'default', 'footer']))
     }
     app.directive('loading', {})
@@ -129,9 +129,8 @@ describe('Agent dialog shared form integration', () => {
     mocks.export.mockReset()
     projectAdmin.value = false
     mocks.listAccounts.mockReset().mockResolvedValue({ data: [
-      { userId: 'current', userName: 'Current', status: 1 },
-      { userId: 'next', userName: 'Next', status: 1 },
-      { userId: 'disabled', userName: 'Disabled', status: 0 }
+      { userId: 'current', userName: 'Current' },
+      { userId: 'next', userName: 'Next' }
     ] })
     mocks.confirm.mockReset().mockResolvedValue(true)
     mocks.transferProject.mockReset().mockResolvedValue({ data: { projectId: 'p1', ownerUserId: 'next' } })
@@ -275,6 +274,24 @@ describe('Agent dialog shared form integration', () => {
     expect(dialog.button('提交交接').props.disabled).toBe(true)
   })
 
+  it('shows account loading failures inline and retries without reopening the dialog', async () => {
+    projectAdmin.value = true
+    mocks.listAccounts.mockRejectedValueOnce(new Error('账号目录暂时不可用'))
+    const dialog = mountDialog(ProjectEditorDialog)
+    dialog.vm.open({ projectId: 'p1', ownerUserId: 'current' })
+    await nextTick()
+    await dialog.button('交接负责人').props.onClick()
+    await nextTick()
+
+    expect(dialog.node('ElAlert').props.title).toBe('账号目录暂时不可用')
+    expect(dialog.button('提交交接')).toBeUndefined()
+    await dialog.button('重新加载').props.onClick()
+    await nextTick()
+    expect(dialog.node('ElAlert')).toBeNull()
+    expect(dialog.nodes('ElOption').map(option => option.props.value)).toEqual(['next'])
+    expect(mocks.listAccounts).toHaveBeenCalledTimes(2)
+  })
+
   it('confirms a transfer without saving project edits and refreshes the directory on success', async () => {
     projectAdmin.value = true
     const dialog = mountDialog(ProjectEditorDialog)
@@ -308,9 +325,10 @@ describe('Agent dialog shared form integration', () => {
     await nextTick()
     const oldList = dialog.button('交接负责人').props.onClick()
     dialog.vm.open({ projectId: 'p2', ownerUserId: 'current' })
+    expect(mocks.listAccounts.mock.calls[0][0].signal.aborted).toBe(true)
     await nextTick()
     await dialog.button('交接负责人').props.onClick()
-    pending.resolve({ data: [{ userId: 'late', status: 1 }] })
+    pending.resolve({ data: [{ userId: 'late', userName: 'Late' }] })
     await oldList
     await nextTick()
     expect(dialog.nodes('ElOption').map(option => option.props.value)).toEqual(['next'])

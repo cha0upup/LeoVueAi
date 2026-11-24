@@ -8,6 +8,10 @@ export function getTeamLeaderOptionsApi({ signal } = {}) {
   return http.get('/platform/admin/users/no-team', { params: { view: 'options' }, signal })
 }
 
+export function getEnabledUserOptionsApi({ signal } = {}) {
+  return http.get('/platform/admin/users/enabled-options', { signal })
+}
+
 export function getAuditLogSummaryPageApi(params, { signal } = {}) {
   return http.get('/platform/admin/audit-logs', { params: { ...params, view: 'summary' }, signal })
 }

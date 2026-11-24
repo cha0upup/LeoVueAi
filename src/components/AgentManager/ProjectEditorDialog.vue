@@ -101,6 +101,13 @@
           v-else
           class="project-owner-transfer"
         >
+          <el-alert
+            v-if="ownerTransfer.error"
+            :title="ownerTransfer.error"
+            type="error"
+            :closable="false"
+            show-icon
+          />
           <el-select
             v-model="ownerTransfer.newOwnerUserId"
             aria-label="接任账号"
@@ -108,7 +115,7 @@
             placeholder="选择接任账号"
             no-data-text="暂无可接任的已启用账号"
             :loading="ownerTransfer.loading"
-            :disabled="ownerTransfer.loading || ownerTransfer.busy || saving"
+            :disabled="ownerTransfer.loading || ownerTransfer.busy || Boolean(ownerTransfer.error) || saving"
           >
             <el-option
               v-for="account in ownerTransfer.accounts"
@@ -118,6 +125,15 @@
             />
           </el-select>
           <el-button
+            v-if="ownerTransfer.error"
+            type="primary"
+            plain
+            @click="loadOwnerOptions"
+          >
+            重新加载
+          </el-button>
+          <el-button
+            v-else
             type="primary"
             :disabled="!ownerTransfer.newOwnerUserId || ownerTransfer.busy || saving"
             @click="confirmOwnerTransfer"
@@ -127,7 +143,7 @@
           <el-button
             text
             :disabled="ownerTransfer.busy"
-            @click="ownerTransfer = null"
+            @click="closeOwnerTransfer"
           >
             取消交接
           </el-button>
@@ -182,7 +198,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import {
@@ -192,7 +208,7 @@ import {
   transferProjectApi,
   updateProjectApi
 } from '@/services/api/projects.js'
-import { getAllUsersApi } from '@/services/api/admin.js'
+import { getEnabledUserOptionsApi } from '@/services/api/admin.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
@@ -210,6 +226,7 @@ const editing = ref(false)
 const saving = ref(false)
 const formRef = ref(null)
 const ownerTransfer = ref(null)
+let ownerOptionsRequest
 const createForm = () => ({
   projectId: '',
   projectName: '',
@@ -224,12 +241,19 @@ const form = reactive(createForm())
 const canTransferOwner = computed(() => isAdmin.value && editing.value && Boolean(form.projectId && form.ownerUserId))
 const rules = { projectName: [{ required: true, message: '请输入项目名称', trigger: 'blur' }] }
 
+function closeOwnerTransfer() {
+  ownerOptionsRequest?.abort()
+  ownerOptionsRequest = undefined
+  ownerTransfer.value = null
+}
+
 watch([visible, isAdmin], ([isOpen, admin]) => {
-  if (!isOpen || !admin) ownerTransfer.value = null
+  if (!isOpen || !admin) closeOwnerTransfer()
 }, { flush: 'sync' })
+onScopeDispose(closeOwnerTransfer)
 
 const reset = () => {
-  ownerTransfer.value = null
+  closeOwnerTransfer()
   Object.assign(form, createForm())
   editing.value = false
   formRef.value?.clearValidate?.()
@@ -256,23 +280,30 @@ const submit = (request, successMessage, onSuccess = handleSaved) =>
 const isCurrentTransfer = (transfer) =>
   visible.value && canTransferOwner.value && ownerTransfer.value === transfer
 
-const openOwnerTransfer = async () => {
+const openOwnerTransfer = () => {
   if (!visible.value || !canTransferOwner.value || ownerTransfer.value || saving.value) return
-  const transfer = reactive({ accounts: [], newOwnerUserId: '', loading: true, busy: false })
-  ownerTransfer.value = transfer
+  ownerTransfer.value = { accounts: [], newOwnerUserId: '', loading: false, busy: false, error: '' }
+  return loadOwnerOptions()
+}
+
+async function loadOwnerOptions() {
+  const transfer = ownerTransfer.value
+  if (!transfer || !isCurrentTransfer(transfer) || transfer.loading || transfer.busy || saving.value) return
+  const request = new AbortController()
+  ownerOptionsRequest = request
+  transfer.loading = true
+  transfer.error = ''
   try {
-    const { data } = await getAllUsersApi()
-    if (!isCurrentTransfer(transfer)) return
-    const accounts = Array.isArray(data) ? data : []
-    transfer.accounts = accounts.filter(
-      account => account?.userId && Number(account.status) === 1 && account.userId !== form.ownerUserId
-    )
+    const { data } = await getEnabledUserOptionsApi({ signal: request.signal })
+    if (request.signal.aborted || !isCurrentTransfer(transfer)) return
+    if (!Array.isArray(data)) throw new Error('接任账号响应格式异常')
+    transfer.accounts = data.filter(account => account?.userId && account.userId !== form.ownerUserId)
   } catch (error) {
-    if (isCurrentTransfer(transfer)) {
-      ownerTransfer.value = null
-      handleError(error, { defaultMessage: '加载接任账号失败，请重试' })
+    if (!request.signal.aborted && isCurrentTransfer(transfer)) {
+      transfer.error = handleError(error, { defaultMessage: '加载接任账号失败，请重试', showMessage: false })
     }
   } finally {
+    if (ownerOptionsRequest === request) ownerOptionsRequest = undefined
     transfer.loading = false
   }
 }
