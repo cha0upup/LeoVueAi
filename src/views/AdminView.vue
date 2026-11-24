@@ -63,13 +63,10 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, watch } from 'vue'
+import { computed, defineAsyncComponent, h, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import AuditManager from '@/components/Admin/audit/AuditManager.vue'
-import AuditStatistics from '@/components/Admin/audit/AuditStatistics.vue'
-import TeamManager from '@/components/Admin/teams/TeamManager.vue'
-import UserManager from '@/components/Admin/users/UserManager.vue'
-import AiChannelSettings from '@/components/Settings/AiChannelSettings.vue'
+import { adminTabGroups } from '@/components/Admin/adminTabs.js'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { ROUTE_PATHS } from '@/constants/app.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import { useAppModeNavigation } from '@/composables/useAppModeNavigation.js'
@@ -82,54 +79,27 @@ const route = useRoute()
 const { currentUser, isAdmin, isLeader, fetchAuth } = useAuth()
 const { rememberAdminRoute } = useAppModeNavigation()
 
-const tabs = [
-  {
-    name: 'users',
-    label: '用户管理',
-    adminOnly: false,
-    icon: iconMap.user,
-    component: UserManager
-  },
-  {
-    name: 'teams',
-    label: '团队管理',
-    adminOnly: false,
-    icon: iconMap.userFilled,
-    component: TeamManager
-  },
-  {
-    name: 'audit',
-    label: '审计日志',
-    adminOnly: true,
-    icon: iconMap.document,
-    component: AuditManager
-  },
-  {
-    name: 'statistics',
-    label: '审计统计',
-    adminOnly: true,
-    icon: iconMap.trendCharts,
-    component: AuditStatistics
-  },
-  {
-    name: 'system',
-    label: 'AI 模型接入',
-    adminOnly: true,
-    icon: iconMap.settings,
-    component: AiChannelSettings
-  }
-]
+const PanelLoading = () => h('p', { class: 'admin-panel-feedback', role: 'status' }, '正在加载管理模块…')
+const PanelLoadError = () => h(EmptyState, {
+  workbench: true,
+  title: '管理模块加载失败',
+  description: '请刷新页面后重试。',
+  actionLabel: '刷新页面',
+  onAction: () => router.go(0)
+})
+const groups = adminTabGroups.map(({ tabs, ...group }) => ({
+  ...group,
+  tabs: tabs.map(({ load, ...tab }) => ({
+    ...tab,
+    component: defineAsyncComponent({ loader: load, loadingComponent: PanelLoading, errorComponent: PanelLoadError })
+  }))
+}))
 
 const ADMIN_SIDEBAR_COLLAPSED_KEY = 'leovue-admin-sidebar-collapsed'
 const sidebarCollapsed = ref(false)
 
-// 根据角色过滤可见模块：只有 admin 可见 adminOnly 标记的模块
-const visibleTabs = computed(() => tabs.filter((tab) => !tab.adminOnly || isAdmin.value))
-const tabGroups = computed(() => [
-  { name: 'Identity', label: '账号与组织', tabs: visibleTabs.value.filter((tab) => ['users', 'teams'].includes(tab.name)) },
-  { name: 'Governance', label: '审计治理', tabs: visibleTabs.value.filter((tab) => ['audit', 'statistics'].includes(tab.name)) },
-  { name: 'System', label: '系统能力', tabs: visibleTabs.value.filter((tab) => tab.name === 'system') }
-])
+const tabGroups = computed(() => groups.filter((group) => !group.adminOnly || isAdmin.value))
+const visibleTabs = computed(() => tabGroups.value.flatMap((group) => group.tabs))
 
 const getQueryTab = (tabName) => Array.isArray(tabName) ? tabName[0] : tabName
 
@@ -150,6 +120,7 @@ const getAdminTabLocation = (tabName) => ({
 })
 
 const syncActiveTabFromRoute = ({ normalizeUrl = false } = {}) => {
+  if (route.path !== ROUTE_PATHS.admin) return
   const queryTab = getQueryTab(route.query.tab)
   const nextTab = activeTab.value
   if (!nextTab) return
@@ -171,7 +142,7 @@ const selectTab = (tabName) => {
 }
 
 watch(
-  () => route.query.tab,
+  [() => route.query.tab, activeTab],
   () => syncActiveTabFromRoute({ normalizeUrl: true })
 )
 
@@ -182,6 +153,7 @@ watch(sidebarCollapsed, (collapsed) => {
 onMounted(async () => {
   sidebarCollapsed.value = safeLocalStorage.getItem(ADMIN_SIDEBAR_COLLAPSED_KEY) === '1'
   await fetchAuth()
+  if (route.path !== ROUTE_PATHS.admin) return
   if (!currentUser.value) {
     router.replace(ROUTE_PATHS.login)
     return
@@ -203,6 +175,12 @@ onMounted(async () => {
   min-height: 0;
   background: var(--el-bg-color-page);
   color: var(--el-text-color-primary);
+}
+
+.admin-panel-feedback {
+  align-self: center;
+  color: var(--el-text-color-secondary);
+  margin: var(--space-4);
 }
 
 .admin-body {
