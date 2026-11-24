@@ -4,12 +4,15 @@
     :title="editing ? '编辑用户' : '添加用户'"
     width="600px"
     class="user-dialog"
-    @closed="$emit('closed')"
+    :show-close="!submitting"
+    :close-on-click-modal="!submitting"
+    :close-on-press-escape="!submitting"
   >
     <el-form
       :ref="setFormRef"
       :model="form"
       :rules="rules"
+      :disabled="submitting"
       label-width="100px"
       class="user-form"
     >
@@ -37,6 +40,7 @@
             type="password"
             :placeholder="field.placeholder"
             :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
+            autocomplete="new-password"
             show-password
           />
         </el-form-item>
@@ -49,7 +53,6 @@
         <el-select
           v-model="form.privilege"
           placeholder="请选择角色"
-          :disabled="editingBuiltInAdmin"
           style="width: 100%"
         >
           <el-option
@@ -77,7 +80,7 @@
           v-model="form.teamId"
           placeholder="请选择团队，不加入团队请置空"
           clearable
-          :disabled="isLeader || editingBuiltInAdmin"
+          :disabled="isLeader"
           style="width: 100%"
         >
           <el-option
@@ -97,10 +100,7 @@
           <el-radio :value="1">
             启用
           </el-radio>
-          <el-radio
-            :value="0"
-            :disabled="editingBuiltInAdmin"
-          >
+          <el-radio :value="0">
             禁用
           </el-radio>
         </el-radio-group>
@@ -109,11 +109,15 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="visible = false">
+        <el-button
+          :disabled="submitting"
+          @click="visible = false"
+        >
           取消
         </el-button>
         <el-button
           type="primary"
+          :disabled="submitting"
           :loading="submitting"
           @click="$emit('submit')"
         >
@@ -137,7 +141,6 @@ const passwordFields = [
 
 const props = defineProps({
   editing: { type: Boolean, default: false },
-  editingBuiltInAdmin: { type: Boolean, default: false },
   formState: { type: Object, required: true },
   rules: { type: Object, required: true },
   teams: { type: Array, default: () => [] },
@@ -147,7 +150,7 @@ const props = defineProps({
 })
 
 const form = reactive(props.formState)
-const emit = defineEmits(['submit', 'closed', 'form-ready'])
+const emit = defineEmits(['submit', 'form-ready'])
 const setFormRef = (instance) => emit('form-ready', instance)
 </script>
 

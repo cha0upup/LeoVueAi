@@ -4,6 +4,9 @@
     title="重置密码"
     width="400px"
     class="reset-password-dialog"
+    :show-close="!resetting"
+    :close-on-click-modal="!resetting"
+    :close-on-press-escape="!resetting"
   >
     <div class="reset-content">
       <el-alert
@@ -18,6 +21,7 @@
         :ref="setFormRef"
         :model="form"
         :rules="rules"
+        :disabled="resetting"
         class="reset-form"
       >
         <el-form-item
@@ -31,6 +35,7 @@
             type="password"
             :placeholder="field.placeholder"
             :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
+            autocomplete="new-password"
             show-password
           />
         </el-form-item>
@@ -39,11 +44,15 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="visible = false">
+        <el-button
+          :disabled="resetting"
+          @click="visible = false"
+        >
           取消
         </el-button>
         <el-button
           type="primary"
+          :disabled="resetting"
           :loading="resetting"
           @click="$emit('submit')"
         >

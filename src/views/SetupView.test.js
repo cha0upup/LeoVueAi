@@ -12,16 +12,17 @@ describe('first-deployment setup page', () => {
 
   const mount = async () => {
     const initialize = vi.fn().mockResolvedValue({})
-    const fetchAuth = vi.fn().mockResolvedValue(null)
+    const required = ref(true)
+    const authFetched = ref(true)
+    const fetchAuth = vi.fn(async () => { required.value = false })
     const replace = vi.fn().mockResolvedValue(undefined)
     const validate = vi.fn().mockResolvedValue(true)
     const showError = vi.fn(), showSuccess = vi.fn()
-    const required = ref(true)
     const View = compileClientComponent(new URL('./SetupView.vue', import.meta.url), {
       'vue-router': { useRouter: () => ({ replace }) },
       '@/constants/app.js': { ROUTE_PATHS },
       '@/composables/useAuth.js': { useAuth: () => ({
-        fetchAuth, initializationRequired: required, passwordMinLength: ref(12), passwordMaxLength: ref(256)
+        fetchAuth, authFetched, initializationRequired: required, passwordMinLength: ref(12), passwordMaxLength: ref(256)
       }) },
       '@/services/api/auth.js': { initializeSystemApi: initialize },
       '@/utils/formUtils.js': { createPasswordMatchValidator, validateForm: validate },
@@ -40,7 +41,9 @@ describe('first-deployment setup page', () => {
     const submit = () => findNode(renderer.root, 'button').props.onClick()
     form.model.password = ' chosen-fixture-password '
     form.model.confirmPassword = ' chosen-fixture-password '
-    return { initialize, fetchAuth, replace, validate, showError, showSuccess, required, form, submit, renderer }
+    const unmount = () => { app.unmount(); apps.splice(apps.indexOf(app), 1) }
+    return { initialize, fetchAuth, replace, validate, showError, showSuccess, required, authFetched,
+      form, submit, renderer, unmount }
   }
 
   it('uses the server password bounds and requires an exact confirmation', async () => {
@@ -101,5 +104,31 @@ describe('first-deployment setup page', () => {
     await view.submit()
     expect(view.fetchAuth).toHaveBeenCalledWith({ force: true })
     expect(view.replace).toHaveBeenCalledWith(ROUTE_PATHS.login)
+    expect(view.form.model.password).toBe('')
+  })
+
+  it.each([false, true])('goes to status recovery without resubmitting after setup (conflict=%s)', async conflict => {
+    const view = await mount()
+    if (conflict) view.initialize.mockRejectedValue({ response: { status: 409 } })
+    view.fetchAuth.mockImplementation(async () => { view.authFetched.value = false })
+    await view.submit()
+    expect(view.initialize).toHaveBeenCalledOnce()
+    expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
+    expect(view.replace).toHaveBeenCalledExactlyOnceWith(ROUTE_PATHS.startup)
+    expect(view.showError).not.toHaveBeenCalled()
+    expect(view.showSuccess).toHaveBeenCalledTimes(conflict ? 0 : 1)
+  })
+
+  it('clears the form on unmount and does not submit if validation completes afterwards', async () => {
+    const view = await mount()
+    const validation = deferred()
+    view.validate.mockReturnValue(validation.promise)
+    const submit = view.submit()
+    view.unmount()
+    validation.resolve(true)
+    await submit
+    expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
+    expect(view.initialize).not.toHaveBeenCalled()
+    expect(view.replace).not.toHaveBeenCalled()
   })
 })

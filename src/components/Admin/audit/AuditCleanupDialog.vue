@@ -24,6 +24,7 @@
       </el-button>
       <el-button
         type="danger"
+        :disabled="!Number.isInteger(days) || days < 1 || days > 365"
         :loading="loading"
         @click="$emit('confirm')"
       >

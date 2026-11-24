@@ -8,6 +8,7 @@
         <el-button
           v-if="isAdmin"
           type="primary"
+          :disabled="mutationBusy"
           @click="openAddTeamDialog"
         >
           <el-icon><Icon :icon="iconMap.plus" /></el-icon>
@@ -63,11 +64,18 @@
         </el-tag>
       </template>
 
+      <el-alert
+        v-if="listError"
+        :title="listError"
+        type="error"
+        :closable="false"
+        show-icon
+      />
       <el-table
         v-loading="loading"
         :data="filteredTeams"
         class="team-table"
-        empty-text="暂无团队"
+        :empty-text="emptyText"
       >
         <el-table-column
           prop="teamId"
@@ -127,7 +135,8 @@
               type="danger"
               text
               size="small"
-              @click="delTeam(row.teamId)"
+              :disabled="mutationBusy || loading"
+              @click="delTeam(row)"
             >
               <el-icon><Icon :icon="iconMap.delete" /></el-icon>
               删除
@@ -143,10 +152,20 @@
       width="560px"
       class="admin-entity-dialog"
       draggable
-      @close="close"
+      :show-close="!submitting"
+      :close-on-click-modal="!submitting"
+      :close-on-press-escape="!submitting"
     >
+      <el-alert
+        v-if="candidateError"
+        :title="candidateError"
+        type="error"
+        :closable="false"
+        show-icon
+      />
       <el-form
         :model="team"
+        :disabled="submitting"
         label-width="100px"
         label-position="left"
       >
@@ -154,13 +173,18 @@
           <el-input
             v-model="team.teamName"
             placeholder="请输入团队名称"
+            maxlength="100"
           />
         </el-form-item>
         <el-form-item label="队长">
           <el-select
             v-model="team.leaderId"
             placeholder="请选择队长"
+            :loading="candidatesLoading"
+            :no-data-text="candidateError ? '加载失败' : '没有可选择的未入队用户'"
+            :disabled="Boolean(candidateError)"
             clearable
+            filterable
           >
             <el-option
               v-for="item in users"
@@ -174,11 +198,23 @@
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="close">
+          <el-button
+            v-if="candidateError"
+            text
+            @click="loadCandidates"
+          >
+            重新加载队长候选
+          </el-button>
+          <el-button
+            :disabled="submitting"
+            @click="addTeamDialog = false"
+          >
             取消
           </el-button>
           <el-button
             type="primary"
+            :loading="submitting"
+            :disabled="!canSubmitTeam"
             @click="addTeam"
           >
             提交
@@ -191,16 +227,17 @@
 
 <script setup>
 import PageHeader from '@/components/common/PageHeader.vue'
-import { computed, ref, reactive, onMounted } from 'vue'
-import { ElNotification } from 'element-plus'
+import { computed, ref, reactive, onMounted, onScopeDispose, watch } from 'vue'
 import { confirmDelete } from '@/utils/confirmUtils.js'
-import { v4 as uuidV4 } from 'uuid'
+import { executeRequest } from '@/utils/apiUtils.js'
+import { handleError } from '@/utils/errorHandler.js'
+import { showWarning } from '@/utils/messageUtils.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import {
   addTeamApi,
   deleteTeamApi,
   getAllTeamsApi,
-  getUsersNoTeamApi
+  getTeamLeaderOptionsApi
 } from '@/services/api/admin.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import { useAuth } from '@/composables/useAuth.js'
@@ -215,10 +252,24 @@ const { isAdmin, fetchAuth } = useAuth()
 
 const addTeamDialog = ref(false)
 const loading = ref(false)
+const listError = ref('')
 const searchKeyword = ref('')
-const team = reactive({})
+const team = reactive({ teamName: '', leaderId: '' })
 const teamData = ref([])
-const users = ref([])        // 无团队用户，用于新建团队时选队长
+
+const users = ref([])
+const candidatesLoading = ref(false)
+const candidateError = ref('')
+const submitting = ref(false)
+const deleting = ref(false)
+const mutationBusy = computed(() => submitting.value || deleting.value)
+const canSubmitTeam = computed(() => !mutationBusy.value && !candidatesLoading.value
+  && !candidateError.value && !!team.teamName.trim()
+  && users.value.some(({ userId }) => userId === team.leaderId))
+
+let directoryRequest
+let candidatesRequest
+let disposed = false
 
 const filteredTeams = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
@@ -229,103 +280,123 @@ const filteredTeams = computed(() => {
       .some(value => value?.toLowerCase().includes(keyword))
   )
 })
+const emptyText = computed(() => {
+  if (loading.value) return '正在加载…'
+  if (listError.value) return '请刷新后重试'
+  return searchKeyword.value.trim() ? '没有匹配的团队' : '暂无团队'
+})
 
 const assignedLeaderCount = computed(() => teamData.value.filter((item) => item.leaderId).length)
-const unassignedLeaderCount = computed(() => teamData.value.filter((item) => !item.leaderId).length)
-
-const getAllTeams = async () => {
-  loading.value = true
-  try {
-    const resp = await getAllTeamsApi()
-    teamData.value = resp.data || []
-  } finally {
-    loading.value = false
-  }
-}
-
-const loadLeaderCandidates = async () => {
-  const { data } = await getUsersNoTeamApi()
-  users.value = data || []
-}
-
-const openAddTeamDialog = async () => {
-  addTeamDialog.value = true
-  try {
-    await loadLeaderCandidates()
-  } catch (error) {
-    users.value = []
-    ElNotification({ title: '错误', message: error?.message || '加载队长候选失败，请重试', type: 'error' })
-  }
-}
-
-const addTeam = async () => {
-  if (!team.teamName || !team.teamName.trim()) {
-    ElNotification({ title: '验证失败', message: '请输入团队名称！', type: 'warning' })
-    return
-  }
-  if (!team.leaderId) {
-    ElNotification({ title: '验证失败', message: '请选择队长！', type: 'warning' })
-    return
-  }
-
-  const payload = {
-    teamId: uuidV4(),
-    teamName: team.teamName.trim(),
-    leaderId: team.leaderId
-  }
-  try {
-    await addTeamApi(payload)
-    ElNotification({ title: '通知', message: '添加团队成功！', type: 'success' })
-    close()
-    await refreshData()
-  } catch (error) {
-    ElNotification({ title: '错误', message: error?.message || '添加团队失败，请稍后重试！', type: 'error' })
-  }
-}
-
-const close = () => {
-  addTeamDialog.value = false
-  Object.keys(team).forEach((k) => delete team[k])
-}
-
-const delTeam = async (id) => {
-  const found = teamData.value.find((t) => t.teamId === id)
-  const teamName = found ? found.teamName : '该团队'
-  if (isBuiltInTeam(found || { teamId: id })) {
-    ElNotification({ title: '禁止操作', message: '内置系统管理员团队禁止删除。', type: 'warning' })
-    return
-  }
-
-  const confirmed = await confirmDelete({
-    message: `确定要删除团队 "${teamName}" 吗？此操作不可撤销。`
-  })
-  if (!confirmed) return
-
-  try {
-    await deleteTeamApi({ id })
-    ElNotification({ title: '通知', message: '删除团队成功！', type: 'success' })
-    await refreshData()
-  } catch (error) {
-    ElNotification({ title: '错误', message: error?.message || '删除团队失败，请稍后重试！', type: 'error' })
-  }
-}
+const unassignedLeaderCount = computed(() => teamData.value.length - assignedLeaderCount.value)
 
 const refreshData = async () => {
+  directoryRequest?.abort()
+  const request = new AbortController()
+  directoryRequest = request
+  const { signal } = request
+  loading.value = true
+  listError.value = ''
   try {
-    await getAllTeams()
-  } catch {
-    ElNotification({ title: '错误', message: '刷新数据失败！', type: 'error' })
+    const { data } = await getAllTeamsApi({ signal })
+    if (signal.aborted) return
+    if (!Array.isArray(data)) throw new Error('团队目录响应格式异常')
+    teamData.value = data
+  } catch (error) {
+    if (signal.aborted) return
+    teamData.value = []
+    listError.value = handleError(error, { defaultMessage: '加载团队列表失败', showMessage: false })
+  } finally {
+    if (directoryRequest === request) {
+      directoryRequest = undefined
+      loading.value = false
+    }
   }
 }
 
-const isBuiltInTeam = (item) => {
-  if (!item) return false
-  return item.teamId === BUILT_IN_TEAM_ID || item.teamName === BUILT_IN_TEAM_NAME
+const loadCandidates = async () => {
+  if (!addTeamDialog.value || candidatesLoading.value) return
+  const request = new AbortController()
+  candidatesRequest = request
+  const { signal } = request
+  candidatesLoading.value = true
+  candidateError.value = ''
+  try {
+    const { data } = await getTeamLeaderOptionsApi({ signal })
+    if (!Array.isArray(data)) throw new Error('队长候选响应格式异常')
+    if (!signal.aborted) users.value = data
+  } catch (error) {
+    if (!signal.aborted) {
+      candidateError.value = handleError(error, { defaultMessage: '加载队长候选失败', showMessage: false })
+    }
+  } finally {
+    if (candidatesRequest === request) {
+      candidatesRequest = undefined
+      candidatesLoading.value = false
+    }
+  }
+}
+
+const openAddTeamDialog = () => {
+  if (!isAdmin.value || mutationBusy.value || addTeamDialog.value) return
+  Object.assign(team, { teamName: '', leaderId: '' })
+  users.value = []
+  addTeamDialog.value = true
+  return loadCandidates()
+}
+
+watch(addTeamDialog, (visible) => {
+  if (visible) return
+  candidatesRequest?.abort()
+  candidatesRequest = undefined
+  candidatesLoading.value = false
+}, { flush: 'sync' })
+
+const addTeam = () => {
+  if (!isAdmin.value || !addTeamDialog.value || !canSubmitTeam.value) return
+  const payload = { teamName: team.teamName.trim(), leaderId: team.leaderId }
+  return executeRequest(() => addTeamApi(payload), {
+    loadingRef: submitting,
+    successMessage: '已创建团队',
+    errorMessage: '创建团队失败',
+    onSuccess: async () => {
+      addTeamDialog.value = false
+      if (!disposed) await refreshData()
+    }
+  }).catch(() => false)
+}
+
+const isBuiltInTeam = (item) =>
+  item.teamId === BUILT_IN_TEAM_ID || item.teamName === BUILT_IN_TEAM_NAME
+
+const delTeam = async (row) => {
+  if (!isAdmin.value || mutationBusy.value || loading.value) return
+  if (isBuiltInTeam(row)) {
+    showWarning('内置系统管理员团队禁止删除')
+    return
+  }
+  const { teamId, teamName } = row
+  deleting.value = true
+  try {
+    const confirmed = await confirmDelete({ message: `确定要删除团队「${teamName}」吗？此操作不可撤销。` })
+    if (!confirmed || disposed) return
+    await executeRequest(() => deleteTeamApi({ id: teamId }), {
+      successMessage: '已删除团队',
+      errorMessage: '删除团队失败',
+      onSuccess: () => { if (!disposed) return refreshData() }
+    }).catch(() => false)
+  } finally {
+    deleting.value = false
+  }
 }
 
 onMounted(async () => {
   await fetchAuth()
-  await refreshData()
+  if (!disposed) await refreshData()
+})
+onScopeDispose(() => {
+  disposed = true
+  directoryRequest?.abort()
+  candidatesRequest?.abort()
 })
 </script>
 

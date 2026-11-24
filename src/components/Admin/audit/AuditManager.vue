@@ -24,6 +24,7 @@
         :placeholder="label"
         clearable
         class="toolbar-field"
+        @keyup.enter="handleFilter"
       />
 
       <el-select
@@ -91,6 +92,7 @@
         :placeholder="label"
         clearable
         :class="field === 'sessionId' ? 'toolbar-wide' : 'toolbar-field'"
+        @keyup.enter="handleFilter"
       />
       <el-date-picker
         v-model="filterForm.dateRange"
@@ -106,6 +108,7 @@
         placeholder="客户端IP"
         clearable
         class="toolbar-field"
+        @keyup.enter="handleFilter"
       />
     </section>
 
@@ -126,7 +129,7 @@
         v-model="auditMode"
         class="audit-mode__switch"
         size="small"
-        :disabled="auditModeLoading"
+        :disabled="auditModeLoading || !lastAuditMode"
         @change="handleAuditModeChange"
       >
         <el-radio-button
@@ -148,25 +151,30 @@
       >
         <span class="metric-label">{{ card.label }}</span>
         <strong class="metric-value">
-          {{ card.format ? card.format(statistics[card.key]) : statistics[card.key] }}
+          {{ card.format ? card.format(statistics[card.key]) : (statistics[card.key] ?? '—') }}
         </strong>
       </article>
     </StatsStrip>
 
     <section
-      v-if="hasActiveFilter"
+      v-if="activeFilterSummary.length || filtersDirty"
       class="filter-tags"
     >
+      <span
+        v-if="filtersDirty"
+        role="status"
+      >筛选已编辑，点击「查询」应用</span>
       <el-tag
-        v-for="(value, key) in activeFilterSummary"
-        :key="key"
+        v-for="{ field, label, value } in activeFilterSummary"
+        :key="field"
         closable
         effect="light"
-        @close="clearFilterItem(key)"
+        @close="clearFilterItem(field)"
       >
-        {{ key }}: {{ value }}
+        {{ label }}: {{ value }}
       </el-tag>
       <el-button
+        v-if="activeFilterSummary.length"
         text
         @click="resetFilter"
       >
@@ -177,10 +185,10 @@
     <AdminWorkspacePanel title="日志列表">
       <template #tags>
         <el-tag effect="light">
-          总量 {{ totalCount }}
+          总量 {{ page?.total ?? '—' }}
         </el-tag>
         <el-tag
-          v-if="hasActiveFilter"
+          v-if="activeFilterSummary.length"
           type="warning"
           effect="light"
         >
@@ -192,7 +200,7 @@
         <el-button
           type="danger"
           plain
-          :disabled="selectedLogIds.length === 0"
+          :disabled="!canDeleteRows || selectedLogIds.length === 0"
           :loading="deleteLoading"
           @click="handleDeleteSelected"
         >
@@ -202,7 +210,7 @@
         <el-button
           type="danger"
           plain
-          :disabled="!hasActiveFilter || totalCount === 0"
+          :disabled="!canDeleteFiltered"
           :loading="deleteLoading"
           @click="handleDeleteFiltered"
         >
@@ -212,6 +220,7 @@
         <el-button
           type="danger"
           plain
+          :disabled="deleteLoading"
           :loading="cleanupLoading"
           @click="handleCleanup"
         >
@@ -229,13 +238,20 @@
         </el-button>
       </template>
 
+      <el-alert
+        v-if="errorMessage"
+        :title="errorMessage"
+        type="error"
+        :closable="false"
+        show-icon
+      />
       <el-table
         v-loading="loading"
-        :data="logs"
+        :data="page?.logs ?? []"
         class="logs-table"
         height="100%"
         row-key="logId"
-        empty-text="暂无审计日志"
+        :empty-text="emptyText"
         @selection-change="handleSelectionChange"
       >
         <el-table-column
@@ -354,6 +370,7 @@
               type="danger"
               text
               size="small"
+              :disabled="!canDeleteRows"
               :loading="deleteLoading"
               @click="handleDeleteOne(row)"
             >
@@ -365,17 +382,18 @@
       </el-table>
 
       <div
-        v-if="totalCount > 0"
+        v-if="page?.total > 0"
         class="pagination-wrapper"
       >
         <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
+          :current-page="currentPage"
+          :page-size="pageSize"
           :page-sizes="[10, 20, 50, 100]"
-          :total="totalCount"
+          :pager-count="5"
+          :total="page.total"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
+          @update:page-size="changePageSize"
+          @update:current-page="changePage"
         />
       </div>
     </AdminWorkspacePanel>
@@ -384,11 +402,12 @@
       v-model="detailsVisible"
       :log="selectedLog"
       :loading="detailLoading"
+      :error-message="detailError"
     />
 
     <AuditCleanupDialog
       v-model="cleanupDialogVisible"
-      v-model:days="cleanupForm.days"
+      v-model:days="cleanupDays"
       :loading="cleanupLoading"
       @confirm="confirmCleanup"
     />
@@ -396,18 +415,16 @@
 </template>
 
 <script setup>
+import { computed, onMounted, onScopeDispose, reactive, ref, watch } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { computed, ref, reactive, onMounted, watch } from 'vue'
-
 import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import { executeRequest } from '@/utils/apiUtils.js'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
-import { executeDeleteWithConfirm } from '@/utils/confirmUtils.js'
+import { handleError } from '@/utils/errorHandler.js'
+import { showSuccess } from '@/utils/messageUtils.js'
+import { confirmDelete } from '@/utils/confirmUtils.js'
 import {
-  getAuditLogsApi,
   getAuditLogDetailApi,
-  getAuditLogCountApi,
   cleanupAuditLogsApi,
   deleteAuditLogsApi,
   deleteFilteredAuditLogsApi,
@@ -421,378 +438,235 @@ import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.v
 import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import AuditCleanupDialog from './AuditCleanupDialog.vue'
 import AuditLogDetailsDialog from './AuditLogDetailsDialog.vue'
+import { useAuditLogPage } from './useAuditLogPage.js'
 import {
   AUDIT_OPERATION_TYPE_LABELS,
   buildAuditFilterParams,
-  clearAuditFilterField,
   createAuditFilter,
   formatAuditTime,
   getActiveAuditFilterSummary,
   getOperationTagType,
   getOperationTypeLabel,
   getStatusIndicatorStatus,
-  getStatusLabel,
-  hasActiveAuditFilter
+  getStatusLabel
 } from './auditManagerModel.js'
 
 const basicFilterFields = { userId: '用户ID', agentId: '主机ID' }
 const advancedFilterFields = { userName: '用户名', agentName: '主机名', sessionId: '会话ID' }
+const statsCardConfigs = [
+  { key: 'total', label: '总日志数' },
+  { key: 'successCount', label: '成功日志', className: 'metric-card--success' },
+  { key: 'failedCount', label: '失败日志', className: 'metric-card--danger' },
+  { key: 'updatedAt', label: '最近查询', className: 'metric-card--time', format: formatAuditTime }
+]
 
-// 响应式数据
-const loading = ref(false)
-const detailLoading = ref(false)
-const cleanupLoading = ref(false)
-const deleteLoading = ref(false)
-const auditModeLoading = ref(false)
-const detailsVisible = ref(false)
-const cleanupDialogVisible = ref(false)
-const selectedLog = ref(null)
-let detailRequestSequence = 0
-let logsRequestSequence = 0
-let statisticsRequestSequence = 0
-const selectedLogIds = ref([])
-const currentPage = ref(1)
-const pageSize = ref(20)
-const totalCount = ref(0)
+const { appliedFilters, currentPage, pageSize, page, updatedAt, loading, errorMessage,
+  applyFilters, loadPage, changePage, changePageSize } = useAuditLogPage()
+const filterForm = reactive(createAuditFilter())
 const showAdvancedFilter = ref(false)
+const draftFilters = computed(() => buildAuditFilterParams(filterForm))
+const activeFilterSummary = computed(() => getActiveAuditFilterSummary(appliedFilters.value))
+const filtersDirty = computed(() =>
+  JSON.stringify(draftFilters.value) !== JSON.stringify(appliedFilters.value)
+)
+const statistics = computed(() => ({ ...page.value, updatedAt: updatedAt.value }))
+const emptyText = computed(() => {
+  if (loading.value) return '正在查询…'
+  if (errorMessage.value) return '请刷新后重试'
+  return activeFilterSummary.value.length ? '没有匹配的日志' : '暂无审计日志'
+})
 
-// 操作类型列表
-const operationTypes = ref([])
+const handleFilter = () => applyFilters(draftFilters.value)
 
+const resetFilter = () => {
+  Object.assign(filterForm, createAuditFilter())
+  return applyFilters({})
+}
+
+const clearFilterItem = (field) => {
+  const filters = { ...appliedFilters.value }
+  if (field === 'dateRange') {
+    filterForm.dateRange = []
+    delete filters.startTime
+    delete filters.endTime
+  } else {
+    filterForm[field] = ''
+    delete filters[field]
+  }
+  return applyFilters(filters)
+}
+
+const operationTypes = ref(Object.keys(AUDIT_OPERATION_TYPE_LABELS))
 const defaultAuditModeOptions = [
   { value: 'on', label: '开启' },
   { value: 'write', label: '关闭低风险读操作' },
   { value: 'off', label: '完全关闭' }
 ]
-
-const auditMode = ref('on')
-const lastAuditMode = ref('on')
-const auditModeOptions = ref([...defaultAuditModeOptions])
-
-// 统计数据
-const statistics = reactive({
-  totalLogs: 0,
-  successLogs: 0,
-  failedLogs: 0,
-  lastUpdate: ''
-})
-
-// 筛选表单
-const filterForm = reactive(createAuditFilter())
-
-// 清理表单
-const cleanupForm = reactive({
-  days: 30
-})
-
-// 日志列表
-const logs = ref([])
-
-const auditModeLabel = computed(() => {
-  return auditModeOptions.value.find((option) => option.value === auditMode.value)?.label || '开启'
-})
-
-const auditModeTagType = computed(() => {
-  const tagTypes = {
-    on: 'success',
-    write: 'warning',
-    off: 'danger'
-  }
-  return tagTypes[auditMode.value] || 'info'
-})
-const activeFilterSummary = computed(() => getActiveAuditFilterSummary(filterForm))
-const hasActiveFilter = computed(() => hasActiveAuditFilter(filterForm))
-const buildFilterParams = (overrides = {}) => buildAuditFilterParams(filterForm, overrides)
+const auditMode = ref('')
+const lastAuditMode = ref('')
+const auditModeOptions = ref(defaultAuditModeOptions)
+const auditModeLoading = ref(false)
+const auditModeLabel = computed(() =>
+  auditModeOptions.value.find((option) => option.value === auditMode.value)?.label ?? '未获取'
+)
+const auditModeTagType = computed(() =>
+  ({ on: 'success', write: 'warning', off: 'danger' })[auditMode.value] ?? 'info'
+)
 const executeHandled = (request, options) => executeRequest(request, options).catch(() => false)
 
-// 方法
-const refreshAll = async () => {
-  await executeHandled(
-    async () => {
-      await Promise.all([fetchAuditMode(), fetchStatistics(), loadOperationTypes(), fetchLogs()])
-      return true
-    },
-    {
-      loadingRef: loading,
-      errorMessage: '数据刷新失败'
-    }
-  )
+function applyAuditModeData(data, mode = data?.mode) {
+  auditMode.value = lastAuditMode.value = mode || ''
+  if (Array.isArray(data?.options) && data.options.length) auditModeOptions.value = data.options
 }
 
-const applyAuditModeData = (data, fallbackMode = 'on') => {
-  const resolvedMode = data?.mode || fallbackMode || 'on'
-  auditMode.value = resolvedMode
-  lastAuditMode.value = resolvedMode
-  if (Array.isArray(data?.options) && data.options.length > 0) {
-    auditModeOptions.value = data.options
-  }
-}
-
-const fetchAuditMode = async () => {
-  try {
-    const res = await getAuditModeApi()
-    applyAuditModeData(res.data)
-  } catch {
-    auditModeOptions.value = [...defaultAuditModeOptions]
-  }
+const fetchAuditMode = () => {
+  if (auditModeLoading.value) return
+  return executeHandled(getAuditModeApi, {
+    loadingRef: auditModeLoading,
+    errorMessage: '获取审计模式失败',
+    onSuccess: ({ data }) => applyAuditModeData(data)
+  })
 }
 
 const handleAuditModeChange = async (mode) => {
-  const previousMode = lastAuditMode.value || 'on'
-  if (mode === previousMode) return
-  try {
-    await executeRequest(
-      async () => updateAuditModeApi({ mode }),
-      {
-        loadingRef: auditModeLoading,
-        successMessage: null,
-        errorMessage: '更新审计模式失败',
-        onSuccess: async (res) => {
-          applyAuditModeData(res.data, mode)
-          showSuccess(res.msg || '审计模式已更新')
-          await Promise.all([fetchLogs(), fetchStatistics()])
-        }
-      }
-    )
-  } catch {
-    auditMode.value = previousMode
-  }
-}
-
-const fetchStatistics = async () => {
-  const requestSequence = ++statisticsRequestSequence
-  const baseParams = buildFilterParams()
-  const filterStatus = baseParams.status || ''
-  try {
-    const totalRes = await getAuditLogCountApi(baseParams)
-    if (requestSequence !== statisticsRequestSequence) return
-    const totalLogs = Number(totalRes.data?.count || 0)
-
-    const successOnly = filterStatus === 'SUCCESS'
-    const failedOnly = filterStatus === 'FAILED' || filterStatus === 'ERROR'
-    if (successOnly || failedOnly) {
-      statistics.totalLogs = totalLogs
-      statistics.successLogs = successOnly ? totalLogs : 0
-      statistics.failedLogs = failedOnly ? totalLogs : 0
-      statistics.lastUpdate = new Date().toLocaleString('zh-CN')
-      return
+  const previousMode = lastAuditMode.value
+  if (!previousMode || mode === previousMode || auditModeLoading.value) return
+  const result = await executeHandled(() => updateAuditModeApi({ mode }), {
+    loadingRef: auditModeLoading,
+    successMessage: '审计模式已更新',
+    errorMessage: '更新审计模式失败',
+    onSuccess: async ({ data }) => {
+      applyAuditModeData(data, data?.mode || mode)
+      if (!disposed) await loadPage()
     }
-
-    const [successRes, failedRes, errorRes] = await Promise.all([
-      getAuditLogCountApi({ ...baseParams, status: 'SUCCESS' }),
-      getAuditLogCountApi({ ...baseParams, status: 'FAILED' }),
-      getAuditLogCountApi({ ...baseParams, status: 'ERROR' })
-    ])
-    if (requestSequence !== statisticsRequestSequence) return
-    statistics.totalLogs = totalLogs
-    statistics.successLogs = successRes.data?.count || 0
-    statistics.failedLogs = (failedRes.data?.count || 0) + (errorRes.data?.count || 0)
-    statistics.lastUpdate = new Date().toLocaleString('zh-CN')
-  } catch { /* ignore */ }
+  })
+  if (!result) auditMode.value = previousMode
 }
 
 const loadOperationTypes = async () => {
   try {
-    const res = await getAuditLogOperationTypesApi()
-    operationTypes.value = Array.isArray(res.data) ? res.data : []
+    const { data } = await getAuditLogOperationTypesApi()
+    if (Array.isArray(data)) operationTypes.value = data
   } catch {
-    operationTypes.value = Object.keys(AUDIT_OPERATION_TYPE_LABELS)
+    // 服务不可用时仍可按本地已知类型筛选。
   }
 }
 
-const fetchLogs = async () => {
-  const requestSequence = ++logsRequestSequence
-  const params = buildFilterParams({
-    limit: pageSize.value,
-    offset: (currentPage.value - 1) * pageSize.value
-  })
-  await executeHandled(
-    async () => {
-      const res = await getAuditLogsApi(params)
-      if (requestSequence === logsRequestSequence) {
-        logs.value = Array.isArray(res.data?.logs) ? res.data.logs : []
-        totalCount.value = Number(res.data?.total || 0)
-      }
+const refreshAll = () => Promise.all([fetchAuditMode(), loadOperationTypes(), loadPage()])
 
-      return res
-    },
-    {
-      loadingRef: loading,
-      successMessage: null,
-      errorMessage: '获取日志列表失败'
-    }
-  )
-}
+const detailsVisible = ref(false)
+const selectedLog = ref(null)
+const detailLoading = ref(false)
+const detailError = ref('')
+let detailRequest
+let disposed = false
 
-const handleFilter = async () => {
-  currentPage.value = 1
-  await Promise.all([fetchLogs(), fetchStatistics()])
-}
-
-const resetFilter = async () => {
-  Object.assign(filterForm, createAuditFilter())
-  currentPage.value = 1
-  await Promise.all([fetchLogs(), fetchStatistics()])
-}
-
-const clearFilterItem = (key) => {
-  if (clearAuditFilterField(filterForm, key)) handleFilter()
-}
-
-const viewDetails = async (log) => {
-  const requestSequence = ++detailRequestSequence
-  selectedLog.value = log
+const viewDetails = async ({ logId }) => {
+  if (!logId) return
+  detailRequest?.abort()
+  const request = new AbortController()
+  detailRequest = request
+  selectedLog.value = null
+  detailError.value = ''
+  detailLoading.value = true
   detailsVisible.value = true
-
-  if (log.logId) {
-    detailLoading.value = true
-    try {
-      const res = await getAuditLogDetailApi({ logId: log.logId })
-      if (requestSequence === detailRequestSequence && res.data) {
-        selectedLog.value = res.data
-      }
-    } catch (error) {
-      if (requestSequence === detailRequestSequence) {
-        showError(error?.message || '获取日志详情失败')
-      }
-    } finally {
-      if (requestSequence === detailRequestSequence) detailLoading.value = false
+  try {
+    const { data } = await getAuditLogDetailApi(logId, { signal: request.signal })
+    if (!data) throw new Error('日志详情为空')
+    if (!request.signal.aborted) selectedLog.value = data
+  } catch (error) {
+    if (!request.signal.aborted) {
+      detailError.value = handleError(error, { defaultMessage: '获取日志详情失败', showMessage: false })
     }
+  } finally {
+    if (!request.signal.aborted) detailLoading.value = false
   }
 }
 
 watch(detailsVisible, (visible) => {
   if (visible) return
-  detailRequestSequence += 1
+  detailRequest?.abort()
+  selectedLog.value = null
   detailLoading.value = false
 })
 
+onScopeDispose(() => {
+  disposed = true
+  detailRequest?.abort()
+})
+
+const selectedLogIds = ref([])
+const deleteLoading = ref(false)
+const cleanupLoading = ref(false)
+const cleanupDialogVisible = ref(false)
+const cleanupDays = ref(30)
+const canDeleteRows = computed(() => Boolean(page.value)
+  && !loading.value && !deleteLoading.value && !cleanupLoading.value)
+const canDeleteFiltered = computed(() => canDeleteRows.value && !filtersDirty.value
+  && Boolean(page.value?.total) && activeFilterSummary.value.length > 0)
+
 const handleSelectionChange = (selection) => {
-  selectedLogIds.value = selection
-    .map((item) => item.logId)
-    .filter(Boolean)
+  selectedLogIds.value = selection.map(({ logId }) => logId).filter(Boolean)
 }
+watch(page, () => { selectedLogIds.value = [] }, { flush: 'sync' })
 
-const refreshAfterDelete = async (deleted = 1) => {
-  selectedLogIds.value = []
-  const maxPage = Math.max(1, Math.ceil(Math.max(0, totalCount.value - deleted) / pageSize.value))
-  if (currentPage.value > maxPage) {
-    currentPage.value = maxPage
+const confirmLogDeletion = async (request, title, message) => {
+  deleteLoading.value = true
+  try {
+    const confirmed = await confirmDelete({ title, message, confirmButtonText: '删除' })
+    if (!confirmed || disposed) return
+    await executeHandled(request, {
+      errorMessage: '删除审计日志失败',
+      onSuccess: async ({ data }) => {
+        showSuccess(`已删除 ${data?.deleted ?? 0} 条日志`)
+        if (!disposed) await loadPage()
+      }
+    })
+  } finally {
+    deleteLoading.value = false
   }
-  await Promise.all([fetchLogs(), fetchStatistics()])
 }
 
-const handleDeleteOne = async (row) => {
-  if (!row?.logId) return
-  await executeDeleteWithConfirm(
-    () => deleteAuditLogsApi({ logIds: [row.logId] }),
-    {
-      title: '删除审计日志',
-      message: `确定删除日志 ${row.logId} 吗？此操作不可恢复。`,
-      confirmButtonText: '删除',
-      loadingRef: deleteLoading,
-      successMessage: null,
-      errorMessage: '删除失败',
-      onSuccess: async (res) => {
-        showSuccess(res.msg || '删除成功')
-        await refreshAfterDelete(res.data?.deleted || 1)
-      }
-    }
-  ).catch(() => false)
+const handleDeleteOne = ({ logId }) => {
+  if (!canDeleteRows.value || !logId) return
+  return confirmLogDeletion(() => deleteAuditLogsApi({ logIds: [logId] }),
+    '删除审计日志', `确定删除日志 ${logId} 吗？此操作不可恢复。`)
 }
 
-const handleDeleteSelected = async () => {
-  if (selectedLogIds.value.length === 0) return
-  await executeDeleteWithConfirm(
-    () => deleteAuditLogsApi({ logIds: selectedLogIds.value }),
-    {
-      title: '删除选中日志',
-      message: `确定删除选中的 ${selectedLogIds.value.length} 条审计日志吗？此操作不可恢复。`,
-      confirmButtonText: '删除',
-      loadingRef: deleteLoading,
-      successMessage: null,
-      errorMessage: '删除失败',
-      onSuccess: async (res) => {
-        showSuccess(res.msg || '删除成功')
-        await refreshAfterDelete(res.data?.deleted || selectedLogIds.value.length)
-      }
-    }
-  ).catch(() => false)
+const handleDeleteSelected = () => {
+  if (!canDeleteRows.value || !selectedLogIds.value.length) return
+  const logIds = [...selectedLogIds.value]
+  return confirmLogDeletion(() => deleteAuditLogsApi({ logIds }),
+    '删除选中日志', `确定删除选中的 ${logIds.length} 条审计日志吗？此操作不可恢复。`)
 }
 
-const handleDeleteFiltered = async () => {
-  if (!hasActiveFilter.value) return
-  await executeDeleteWithConfirm(
-    () => deleteFilteredAuditLogsApi({
-      ...buildFilterParams(),
-      confirm: 'DELETE'
-    }),
-    {
-      title: '删除筛选结果',
-      message: `确定删除当前筛选条件命中的 ${totalCount.value} 条审计日志吗？此操作不可恢复。`,
-      confirmButtonText: '删除',
-      loadingRef: deleteLoading,
-      successMessage: null,
-      errorMessage: '删除筛选结果失败',
-      onSuccess: async (res) => {
-        showSuccess(res.msg || '删除成功')
-        currentPage.value = 1
-        await refreshAfterDelete(res.data?.deleted || totalCount.value)
-      }
-    }
-  ).catch(() => false)
+const handleDeleteFiltered = () => {
+  if (!canDeleteFiltered.value) return
+  // 对话框与提交使用同一份已应用筛选，避免误删尚未查询的草稿条件。
+  const params = { ...appliedFilters.value, confirm: 'DELETE' }
+  return confirmLogDeletion(() => deleteFilteredAuditLogsApi(params), '删除筛选结果',
+    `确定删除这些筛选条件匹配的审计日志吗？最近查询为 ${page.value.total} 条，此操作不可恢复。`)
 }
 
 const handleCleanup = () => {
-  cleanupDialogVisible.value = true
+  if (!deleteLoading.value) cleanupDialogVisible.value = true
 }
 
-const confirmCleanup = async () => {
-  await executeHandled(
-    async () => {
-      return cleanupAuditLogsApi({ days: cleanupForm.days })
-    },
-    {
-      loadingRef: cleanupLoading,
-      successMessage: null,
-      errorMessage: '清理失败',
-      onSuccess: async (res) => {
-        showSuccess(res.msg || '清理成功')
-        cleanupDialogVisible.value = false
-        await Promise.all([fetchLogs(), fetchStatistics()])
-      }
+const confirmCleanup = () => {
+  const days = cleanupDays.value
+  if (cleanupLoading.value || deleteLoading.value || !Number.isInteger(days) || days < 1 || days > 365) return
+  return executeHandled(() => cleanupAuditLogsApi({ days }), {
+    loadingRef: cleanupLoading,
+    errorMessage: '清理失败',
+    onSuccess: async ({ data }) => {
+      showSuccess(`已清理 ${data?.deleted ?? 0} 条旧日志`)
+      cleanupDialogVisible.value = false
+      if (!disposed) await loadPage()
     }
-  )
+  })
 }
 
-const handleSizeChange = (size) => {
-  pageSize.value = size
-  currentPage.value = 1
-  fetchLogs()
-}
-
-const handleCurrentChange = (page) => {
-  currentPage.value = page
-  fetchLogs()
-}
-
-// 统计卡片配置
-const statsCardConfigs = [
-  { key: 'totalLogs', label: '总日志数', className: '' },
-  { key: 'successLogs', label: '成功日志', className: 'metric-card--success' },
-  { key: 'failedLogs', label: '失败日志', className: 'metric-card--danger' },
-  {
-    key: 'lastUpdate',
-    label: '最后更新',
-    className: 'metric-card--time',
-    format: formatAuditTime
-  }
-]
-
-// 生命周期
-onMounted(() => {
-  refreshAll()
-})
+onMounted(refreshAll)
 </script>
 
 <style scoped>
@@ -935,6 +809,19 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .audit-manager {
+    overflow-y: auto;
+  }
+
+  .audit-manager :deep(.admin-workspace-panel) {
+    min-height: 320px;
+  }
+
+  .pagination-wrapper {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
   :deep(.admin-toolbar__actions) {
     width: 100%;
   }

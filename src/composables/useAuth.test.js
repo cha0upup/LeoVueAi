@@ -107,4 +107,32 @@ describe('login identity cache', () => {
     expect(auth.authCheckState.value).toBe('error')
     expect(auth.authFetched.value).toBe(false)
   })
+
+  it('keeps a valid readiness hint only for the failed check that returned it', async () => {
+    const auth = useAuth()
+    const getHeader = vi.fn().mockReturnValue('2')
+    const ready = deferred()
+    getLoginStatusApi.mockRejectedValueOnce({
+      response: { status: 503, headers: { get: getHeader } }
+    }).mockReturnValueOnce(ready.promise)
+    await auth.fetchAuth()
+    expect(getHeader).toHaveBeenCalledWith('Retry-After')
+    expect(auth.startupRetryDelay.value).toBe(2000)
+    const retry = auth.fetchAuth({ force: true })
+    expect(auth.startupRetryDelay.value).toBeNull()
+    ready.resolve({ data: { isLoggedIn: false } })
+    await retry
+    expect(auth.startupRetryDelay.value).toBeNull()
+  })
+
+  it.each([[503, '0'], [503, '31'], [503, '1.5'], [503, undefined], [500, '2']])(
+    'leaves failures with status %s and hint %s for manual retry',
+    async (status, hint) => {
+      const auth = useAuth()
+      getLoginStatusApi.mockRejectedValue({ response: { status, headers: { 'retry-after': hint } } })
+      await auth.fetchAuth()
+      expect(auth.startupRetryDelay.value).toBeNull()
+      expect(auth.authCheckState.value).toBe('error')
+    }
+  )
 })

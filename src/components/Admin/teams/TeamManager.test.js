@@ -1,0 +1,122 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { nextTick, ref } from 'vue'
+import { compileClientComponent, createSlotStub, findNodes } from '@/test-support/vueComponent.js'
+import { createTestRenderer } from '@/test-support/vueRenderer.js'
+import { deferred } from '@/test-support/deferred.js'
+import { executeRequest } from '@/utils/apiUtils.js'
+import { handleError } from '@/utils/errorHandler.js'
+import { icons } from '@/utils/icons.js'
+import { formatDate } from '@/utils/format.js'
+
+const api = Object.fromEntries(['getAllTeamsApi', 'getAllUsersApi', 'getTeamLeaderOptionsApi',
+  'addTeamApi', 'deleteTeamApi'].map(name => [name, vi.fn()]))
+const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showWarning: vi.fn(), showError: vi.fn() }))
+vi.mock('@/utils/messageUtils.js', () => messages)
+const isAdmin = ref(true)
+const stub = (name, slots) => ({ default: createSlotStub(name, slots) })
+const View = compileClientComponent(new URL('./TeamManager.vue', import.meta.url), {
+  '@/components/common/PageHeader.vue': stub('PageHeader', ['actions']),
+  '@/components/Admin/shared/AdminToolbar.vue': stub('AdminToolbar', ['default', 'actions']),
+  '@/components/common/StatsStrip.vue': stub('StatsStrip'),
+  '@/components/Admin/shared/AdminWorkspacePanel.vue': stub('AdminWorkspacePanel', ['tags', 'default']),
+  '@/utils/icons.js': { icons },
+  '@/utils/format.js': { formatDate },
+  '@/utils/apiUtils.js': { executeRequest },
+  '@/utils/errorHandler.js': { handleError },
+  '@/utils/messageUtils.js': messages,
+  '@/utils/confirmUtils.js': { confirmDelete: vi.fn() },
+  '@/services/api/admin.js': api,
+  '@/composables/useAuth.js': { useAuth: () => ({ isAdmin, fetchAuth: async () => {} }) }
+})
+const apps = []
+const text = node => [node.text, ...node.children.map(text)].join('').trim()
+const flush = async () => { for (let i = 0; i < 5; i++) await nextTick() }
+
+async function mount() {
+  const renderer = createTestRenderer()
+  const app = renderer.createApp(View)
+  app.directive('loading', {})
+  for (const name of ['Icon', 'ElIcon', 'ElButton', 'ElInput', 'ElSelect', 'ElOption', 'ElTag',
+    'ElTable', 'ElForm', 'ElFormItem', 'ElAlert']) {
+    app.component(name, createSlotStub(name))
+  }
+  app.component('ElTableColumn', createSlotStub('ElTableColumn', []))
+  app.component('ElDialog', createSlotStub('ElDialog', ['default', 'footer']))
+  app.mount(renderer.root)
+  apps.push(app)
+  await flush()
+  const nodes = type => findNodes(renderer.root, node => node.type === type)
+  return {
+    button: label => nodes('ElButton').find(node => text(node) === label)?.props,
+    change: (type, placeholder, value) =>
+      nodes(type).find(node => node.props.placeholder === placeholder).props['onUpdate:modelValue'](value),
+    options: () => nodes('ElOption').map(node => node.props.value),
+    rows: () => nodes('ElTable')[0].props.data,
+    alerts: () => nodes('ElAlert').map(node => node.props.title)
+  }
+}
+
+beforeEach(() => {
+  vi.resetAllMocks()
+  isAdmin.value = true
+  api.getAllTeamsApi.mockResolvedValue({ data: [{ teamId: 'team', teamName: 'Example', leaderId: 'lead-123', leaderName: 'Alice' }] })
+  api.getTeamLeaderOptionsApi.mockResolvedValue({ data: [{ userId: 'candidate', userName: 'Bob' }] })
+})
+afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
+
+it('searches by the loaded leader and only requests candidates when creating a team', async () => {
+  const view = await mount()
+  expect(api.getAllTeamsApi).toHaveBeenCalledOnce()
+  expect(api.getAllUsersApi).not.toHaveBeenCalled()
+  expect(api.getTeamLeaderOptionsApi).not.toHaveBeenCalled()
+  view.change('ElInput', '搜索团队名称、团队ID、队长', 'alice')
+  await nextTick()
+  expect(view.rows().map(row => row.teamId)).toEqual(['team'])
+  view.change('ElInput', '搜索团队名称、团队ID、队长', 'lead-123')
+  await nextTick()
+  expect(view.rows().map(row => row.teamId)).toEqual(['team'])
+  await view.button('新增团队').onClick()
+  await nextTick()
+  expect(view.options()).toEqual(['candidate'])
+  expect(api.getAllUsersApi).not.toHaveBeenCalled()
+
+  view.change('ElInput', '请输入团队名称', ' Team B ')
+  view.change('ElSelect', '请选择队长', 'candidate')
+  await nextTick()
+  const saving = deferred()
+  api.addTeamApi.mockReturnValue(saving.promise)
+  const submit = view.button('提交').onClick()
+  await view.button('提交').onClick()
+  expect(api.addTeamApi).toHaveBeenCalledExactlyOnceWith({ teamName: 'Team B', leaderId: 'candidate' })
+  saving.resolve({ data: null })
+  await submit
+  expect(api.getAllTeamsApi).toHaveBeenCalledTimes(2)
+  expect(api.getTeamLeaderOptionsApi).toHaveBeenCalledOnce()
+})
+
+it('aborts a closed dialog and retries failed candidate requests without applying old results', async () => {
+  const view = await mount()
+  const earlier = deferred()
+  api.getTeamLeaderOptionsApi.mockReturnValueOnce(earlier.promise).mockRejectedValueOnce(new Error('加载失败'))
+  const oldLoad = view.button('新增团队').onClick()
+  view.button('取消').onClick()
+  expect(api.getTeamLeaderOptionsApi.mock.calls[0][0].signal.aborted).toBe(true)
+  await view.button('新增团队').onClick()
+  await nextTick()
+  expect(view.alerts()).toContain('加载失败')
+  expect(view.button('提交').disabled).toBe(true)
+  await view.button('重新加载队长候选').onClick()
+  earlier.resolve({ data: [{ userId: 'obsolete' }] })
+  await oldLoad
+  await nextTick()
+  expect(view.alerts()).toEqual([])
+  expect(view.options()).toEqual(['candidate'])
+})
+
+it('does not load admin candidates for a team leader', async () => {
+  isAdmin.value = false
+  const view = await mount()
+  expect(view.button('新增团队')).toBeUndefined()
+  expect(api.getTeamLeaderOptionsApi).not.toHaveBeenCalled()
+  expect(view.rows()).toHaveLength(1)
+})

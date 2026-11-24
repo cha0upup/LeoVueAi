@@ -120,7 +120,6 @@ const tabs = [
   }
 ]
 
-const activeTab = ref('users')
 const ADMIN_SIDEBAR_COLLAPSED_KEY = 'leovue-admin-sidebar-collapsed'
 const sidebarCollapsed = ref(false)
 
@@ -132,9 +131,6 @@ const tabGroups = computed(() => [
   { name: 'System', label: '系统能力', tabs: visibleTabs.value.filter((tab) => tab.name === 'system') }
 ])
 
-const activeTabMeta = computed(
-  () => visibleTabs.value.find((tab) => tab.name === activeTab.value) ?? visibleTabs.value[0]
-)
 const getQueryTab = (tabName) => Array.isArray(tabName) ? tabName[0] : tabName
 
 const normalizeTabName = (tabName) => {
@@ -143,6 +139,10 @@ const normalizeTabName = (tabName) => {
     ? value
     : visibleTabs.value[0]?.name
 }
+const activeTab = computed(() => normalizeTabName(route.query.tab))
+const activeTabMeta = computed(
+  () => visibleTabs.value.find((tab) => tab.name === activeTab.value) ?? visibleTabs.value[0]
+)
 
 const getAdminTabLocation = (tabName) => ({
   path: ROUTE_PATHS.admin,
@@ -151,9 +151,8 @@ const getAdminTabLocation = (tabName) => ({
 
 const syncActiveTabFromRoute = ({ normalizeUrl = false } = {}) => {
   const queryTab = getQueryTab(route.query.tab)
-  const nextTab = normalizeTabName(queryTab)
+  const nextTab = activeTab.value
   if (!nextTab) return
-  activeTab.value = nextTab
   if (normalizeUrl && queryTab !== nextTab) {
     const normalizedLocation = getAdminTabLocation(nextTab)
     rememberAdminRoute(router.resolve(normalizedLocation).fullPath)

@@ -1,31 +1,18 @@
-const FILTER_FIELDS = [
-  'userId',
-  'userName',
-  'agentId',
-  'agentName',
-  'sessionId',
-  'operationType',
-  'status',
-  'clientIp',
-  'keyword'
-]
-
-const FILTER_LABEL_TO_FIELD = Object.freeze({
-  用户ID: 'userId',
-  用户名: 'userName',
-  主机ID: 'agentId',
-  主机名: 'agentName',
-  会话ID: 'sessionId',
-  操作类型: 'operationType',
-  状态: 'status',
-  客户端IP: 'clientIp',
-  关键词: 'keyword',
-  时间范围: 'dateRange'
-})
+const FILTER_LABELS = {
+  userId: '用户ID',
+  userName: '用户名',
+  agentId: '主机ID',
+  agentName: '主机名',
+  sessionId: '会话ID',
+  operationType: '操作类型',
+  status: '状态',
+  clientIp: '客户端IP',
+  keyword: '关键词'
+}
 
 export function createAuditFilter() {
   return {
-    ...Object.fromEntries(FILTER_FIELDS.map((field) => [field, ''])),
+    ...Object.fromEntries(Object.keys(FILTER_LABELS).map((field) => [field, ''])),
     dateRange: []
   }
 }
@@ -136,17 +123,15 @@ export const AUDIT_OPERATION_TYPE_LABELS = Object.freeze({
   AUDIT_LOG_CLEANUP: '清理审计日志'
 })
 
-export function buildAuditFilterParams(filter, overrides = {}) {
+export function buildAuditFilterParams(filter) {
   const params = {}
-  FILTER_FIELDS.forEach((field) => {
-    const value = filter?.[field]
-    if (typeof value === 'string' && value.trim()) params[field] = value.trim()
-  })
-  if (Array.isArray(filter?.dateRange) && filter.dateRange.length === 2) {
-    if (filter.dateRange[0]) params.startTime = filter.dateRange[0]
-    if (filter.dateRange[1]) params.endTime = filter.dateRange[1]
+  for (const field of Object.keys(FILTER_LABELS)) {
+    const value = filter[field]?.trim()
+    if (value) params[field] = value
   }
-  return { ...params, ...overrides }
+  const [startTime, endTime] = filter.dateRange || []
+  if (startTime && endTime) Object.assign(params, { startTime, endTime })
+  return params
 }
 
 export function getOperationTypeLabel(type) {
@@ -179,31 +164,18 @@ export function getStatusIndicatorStatus(status) {
   return 'unconfigured'
 }
 
-export function getActiveAuditFilterSummary(filter) {
-  const summary = {}
+export function getActiveAuditFilterSummary(params) {
+  const summary = []
   const formatters = { operationType: getOperationTypeLabel, status: getStatusLabel }
-  for (const [label, field] of Object.entries(FILTER_LABEL_TO_FIELD)) {
-    if (field === 'dateRange') continue
-    const value = filter?.[field]
-    const normalized = typeof value === 'string' ? value.trim() : ''
-    if (normalized) summary[label] = formatters[field]?.(normalized) ?? normalized
+  for (const [field, label] of Object.entries(FILTER_LABELS)) {
+    const value = params[field]
+    if (value) summary.push({ field, label, value: formatters[field]?.(value) ?? value })
   }
-  const [startTime, endTime] = Array.isArray(filter?.dateRange) ? filter.dateRange : []
+  const { startTime, endTime } = params
   if (startTime && endTime) {
-    summary['时间范围'] = `${startTime} ~ ${endTime}`
+    summary.push({ field: 'dateRange', label: '时间范围', value: `${startTime} ~ ${endTime}` })
   }
   return summary
-}
-
-export function hasActiveAuditFilter(filter) {
-  return Object.keys(getActiveAuditFilterSummary(filter)).length > 0
-}
-
-export function clearAuditFilterField(filter, label) {
-  const field = FILTER_LABEL_TO_FIELD[label]
-  if (!field || !filter) return false
-  filter[field] = field === 'dateRange' ? [] : ''
-  return true
 }
 
 export function formatAuditJson(value) {

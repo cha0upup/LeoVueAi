@@ -6,11 +6,19 @@
     class="log-details-dialog"
   >
     <div
-      v-if="log"
       v-loading="loading"
       class="log-details"
+      :aria-busy="loading"
     >
+      <el-alert
+        v-if="errorMessage"
+        :title="errorMessage"
+        type="error"
+        :closable="false"
+        show-icon
+      />
       <el-descriptions
+        v-else-if="log"
         :column="2"
         border
       >
@@ -61,7 +69,7 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="响应码">
-          {{ log.responseCode || '-' }}
+          {{ log.responseCode ?? '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="响应消息">
           <span :class="{ 'error-text': log.status !== 'SUCCESS' }">
@@ -113,7 +121,8 @@ const visible = defineModel({ type: Boolean, default: false })
 
 defineProps({
   log: { type: Object, default: null },
-  loading: { type: Boolean, default: false }
+  loading: { type: Boolean, default: false },
+  errorMessage: { type: String, default: '' }
 })
 </script>
 
@@ -140,6 +149,7 @@ defineProps({
 }
 
 .log-details-dialog .log-details {
+  min-height: 88px;
   max-height: 70vh;
   overflow-y: auto;
 }

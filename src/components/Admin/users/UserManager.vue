@@ -7,6 +7,7 @@
       <template #actions>
         <el-button
           type="primary"
+          :disabled="actionsDisabled"
           @click="openAddDialog"
         >
           <el-icon><Icon :icon="iconMap.plus" /></el-icon>
@@ -70,6 +71,7 @@
         <el-button
           type="primary"
           plain
+          :disabled="mutationBusy"
           :loading="loading"
           @click="refreshData"
         >
@@ -97,11 +99,18 @@
         </el-tag>
       </template>
 
+      <el-alert
+        v-if="listError"
+        :title="listError"
+        type="error"
+        :closable="false"
+        show-icon
+      />
       <el-table
         v-loading="loading"
         :data="filteredUsers"
         class="users-table"
-        empty-text="暂无用户"
+        :empty-text="emptyText"
       >
         <el-table-column
           prop="userId"
@@ -202,7 +211,7 @@
                 type="primary"
                 text
                 size="small"
-                :disabled="!canEditUser(row)"
+                :disabled="actionsDisabled || !canEditUser(row)"
                 :title="getEditDisabledReason(row)"
                 @click="editUser(row)"
               >
@@ -213,7 +222,7 @@
                 type="warning"
                 text
                 size="small"
-                :disabled="!canManageUser(row)"
+                :disabled="actionsDisabled || !canManageUser(row)"
                 :title="getManageDisabledReason(row)"
                 @click="resetPassword(row)"
               >
@@ -224,7 +233,7 @@
                 type="danger"
                 text
                 size="small"
-                :disabled="!canManageUser(row) || isBuiltInAdmin(row)"
+                :disabled="actionsDisabled || !canManageUser(row) || isBuiltInAdmin(row)"
                 :title="isBuiltInAdmin(row) ? '系统内置 admin 禁止删除' : getManageDisabledReason(row)"
                 @click="deleteUser(row)"
               >
@@ -240,7 +249,6 @@
     <UserEditorDialog
       v-model="userDialogVisible"
       :editing="isEdit"
-      :editing-built-in-admin="isEditingBuiltInAdmin"
       :form-state="userForm"
       :rules="userRules"
       :teams="teams"
@@ -248,7 +256,6 @@
       :is-leader="isLeader"
       :submitting="submitting"
       @submit="submitUser"
-      @closed="closeUserDialog"
       @form-ready="userFormRef = $event"
     />
 
@@ -265,17 +272,15 @@
 
 <script setup>
 import PageHeader from '@/components/common/PageHeader.vue'
-import { ref, reactive, computed, onMounted } from 'vue'
-import { ElNotification } from 'element-plus'
-import { v4 as uuidV4 } from 'uuid'
+import { ref, reactive, computed, onMounted, onScopeDispose, watch } from 'vue'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
-import { executeRequest } from '@/utils/apiUtils.js'
-import { executeDeleteWithConfirm, confirmAction } from '@/utils/confirmUtils.js'
-import { omitFields } from '@/utils/dataUtils.js'
+import { executeRequest, withLoading } from '@/utils/apiUtils.js'
+import { handleError } from '@/utils/errorHandler.js'
+import { confirmDelete, confirmAction } from '@/utils/confirmUtils.js'
 import { useEditDialog, useDialog } from '@/utils/dialogUtils.js'
-import { createPasswordRules, createPasswordMatchValidator, validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
+import { createPasswordRules, createPasswordMatchValidator, validateForm } from '@/utils/formUtils.js'
 import {
   addUserApi,
   deleteUserApi,
@@ -284,7 +289,7 @@ import {
   updateUserApi,
   resetUserPasswordApi
 } from '@/services/api/admin.js'
-import { showError } from '@/utils/messageUtils.js'
+import { showWarning } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
 import AdminToolbar from '@/components/Admin/shared/AdminToolbar.vue'
@@ -324,14 +329,17 @@ const { currentUser, isAdmin, isLeader, fetchAuth } = useAuth()
 const loading = ref(false)
 const submitting = ref(false)
 const resetting = ref(false)
+const deleting = ref(false)
+const listError = ref('')
+const mutationBusy = computed(() => submitting.value || resetting.value || deleting.value)
+const actionsDisabled = computed(() => loading.value || mutationBusy.value || Boolean(listError.value))
+let directoryRequest
+let disposed = false
 
 // 使用对话框工具
 const userDialog = useEditDialog()
 const userDialogVisible = userDialog.visible
 const isEdit = computed(() => !!userDialog.currentItem.value)
-const isEditingBuiltInAdmin = computed(() =>
-  isBuiltInAdmin(userDialog.currentItem.value) || isBuiltInAdmin(userForm)
-)
 const resetPasswordDialog = useDialog()
 const resetPasswordVisible = resetPasswordDialog.visible
 
@@ -393,172 +401,151 @@ const actorContext = computed(() => ({
   currentUser: currentUser.value
 }))
 
-// 方法
-const notifyUser = (type, message) => {
-  ElNotification({
-    title: { warning: '禁止操作', success: '成功', error: '失败' }[type],
-    message,
-    type
-  })
-}
+const emptyText = computed(() => {
+  if (loading.value) return '正在加载…'
+  if (listError.value) return '请刷新后重试'
+  return userData.value.length ? '没有匹配的用户' : '暂无用户'
+})
 
-const refreshData = async () => {
-  await executeRequest(
-    () => Promise.all([getAllUsers(), getAllTeams()]),
-    {
-      loadingRef: loading,
-      errorMessage: '数据刷新失败'
+const loadDirectory = async (includeTeams) => {
+  directoryRequest?.abort()
+  const request = new AbortController()
+  directoryRequest = request
+  const { signal } = request
+  loading.value = true
+  listError.value = ''
+  try {
+    const [usersResponse, teamsResponse] = await Promise.all([
+      getAllUsersApi({ signal }),
+      includeTeams ? getAllTeamsApi({ signal }) : null
+    ])
+    if (signal.aborted) return
+    if (!Array.isArray(usersResponse.data) || (includeTeams && !Array.isArray(teamsResponse.data))) {
+      throw new Error('用户目录响应格式异常')
     }
-  )
+    userData.value = usersResponse.data
+    if (includeTeams) teams.value = teamsResponse.data
+  } catch (error) {
+    if (signal.aborted) return
+    request.abort()
+    listError.value = handleError(error, { defaultMessage: '加载用户目录失败，请重试', showMessage: false })
+  } finally {
+    if (directoryRequest === request) {
+      directoryRequest = undefined
+      loading.value = false
+    }
+  }
 }
 
-const getAllUsers = async () => {
-  const response = await getAllUsersApi()
-  userData.value = Array.isArray(response?.data) ? response.data : []
-}
-
-const getAllTeams = async () => {
-  const response = await getAllTeamsApi()
-  teams.value = Array.isArray(response?.data) ? response.data : []
-}
+const refreshData = () => loadDirectory(true)
 
 const openAddDialog = () => {
-  userDialog.open()
-  Object.assign(userForm, defaultUserForm)
-  // 队长创建用户时预填充并锁定团队
+  if (actionsDisabled.value || userDialogVisible.value || resetPasswordVisible.value) return
+  Object.assign(userForm, createUserForm())
+  // 队长创建用户时预填充其团队，写入时仍由后端判断归属。
   if (isLeader.value && currentUser.value?.teamId) userForm.teamId = currentUser.value.teamId
+  userDialog.open()
 }
 
 const editUser = (user) => {
-  if (isBuiltInAdmin(user)) {
-    notifyUser('warning', 'admin 是系统内置账户，不能编辑。')
+  if (actionsDisabled.value || userDialogVisible.value || resetPasswordVisible.value) return
+  if (!canEditUser(user)) {
+    showWarning(getEditDisabledReason(user))
     return
   }
-  if (!canManageUser(user)) {
-    notifyUser('warning', getManageDisabledReason(user) || '无权编辑该用户。')
-    return
-  }
-  userDialog.open(user)
-  Object.assign(userForm, {
+  Object.assign(userForm, createUserForm(), {
     userId: user.userId,
     userName: user.userName,
     privilege: user.privilege || 'normal',
     teamId: user.teamId,
-    status: isBuiltInAdmin(user) ? 1 : normalizeUserStatus(user.status)
+    status: normalizeUserStatus(user.status)
+  })
+  userDialog.open(user)
+}
+
+watch(userDialogVisible, (visible) => {
+  if (visible) return
+  userDialog.close()
+  Object.assign(userForm, createUserForm())
+  userFormRef.value?.clearValidate?.()
+}, { flush: 'sync' })
+
+watch(resetPasswordVisible, (visible) => {
+  if (visible) return
+  Object.assign(resetForm, createPasswordResetForm())
+  resetFormRef.value?.clearValidate?.()
+}, { flush: 'sync' })
+
+const submitUser = () => {
+  if (!userDialogVisible.value || actionsDisabled.value) return
+  return withLoading(submitting, async () => {
+    if (!await validateForm(userFormRef) || disposed || !userDialogVisible.value) return
+    const editing = isEdit.value
+    const fields = {
+      privilege: userForm.privilege,
+      teamId: userForm.teamId,
+      status: normalizeUserStatus(userForm.status)
+    }
+
+    await executeRequest(
+      () => editing
+        ? updateUserApi({ userId: userForm.userId, ...fields })
+        : addUserApi({ userName: userForm.userName.trim(), password: userForm.password, ...fields }),
+      {
+        successMessage: editing ? '用户已更新' : '用户已创建',
+        errorMessage: editing ? '更新用户失败' : '创建用户失败',
+        onSuccess: async () => {
+          userDialog.close()
+          if (!disposed) await loadDirectory(false)
+        }
+      }
+    ).catch(() => false)
   })
 }
 
-const defaultUserForm = createUserForm()
-
-const closeUserDialog = () => {
-  userDialog.close()
-  resetFormUtil(userFormRef, userForm, defaultUserForm)
-}
-
-const submitUser = async () => {
-  // 验证表单
-  if (!await validateForm(userFormRef)) return
-
-  const editing = isEdit.value
-
-  await executeRequest(
-    () => {
-      // 构建用户数据，排除确认密码字段
-      const userData = omitFields(userForm, ['confirmPassword'])
-      userData.status = normalizeUserStatus(userData.status)
-      if (editing && isBuiltInAdmin(userData)) {
-        const originalUser = userDialog.currentItem.value || {}
-        userData.privilege = originalUser.privilege || 'admin'
-        userData.teamId = originalUser.teamId || ''
-        userData.status = 1
-      }
-
-      if (!editing) {
-        userData.userId = uuidV4()
-      } else {
-        // 编辑时排除密码字段（如果为空）
-        delete userData.password
-      }
-      return editing ? updateUserApi(userData) : addUserApi(userData)
-    },
-    {
-      loadingRef: submitting,
-      successMessage: null, // 使用ElNotification，不显示ElMessage
-      errorMessage: null,
-      onSuccess: () => {
-        notifyUser('success', editing ? '用户更新成功！' : '用户添加成功！')
-        closeUserDialog()
-        return getAllUsers()
-      },
-      onError: (error) => {
-        notifyUser('error', error?.message || (editing ? '用户更新失败！' : '用户添加失败！'))
-      }
-    }
-  ).catch(() => false)
-}
-
-const deleteUser = async (user) => {
-  if (isBuiltInAdmin(user)) {
-    notifyUser('warning', 'admin 是系统内置账户，不能删除。')
-    return
-  }
-  if (!canManageUser(user)) {
-    notifyUser('warning', getManageDisabledReason(user) || '无权删除该用户。')
+const deleteUser = (user) => {
+  if (actionsDisabled.value || userDialogVisible.value || resetPasswordVisible.value) return
+  if (isBuiltInAdmin(user) || !canManageUser(user)) {
+    showWarning(isBuiltInAdmin(user) ? '系统内置 admin 禁止删除' : getManageDisabledReason(user))
     return
   }
 
-  await executeDeleteWithConfirm(
-    () => deleteUserApi({ id: user.userId }),
-    {
+  const { userId, userName } = user
+  return withLoading(deleting, async () => {
+    const confirmed = await confirmDelete({
       title: '删除确认',
-      message: `确定要删除用户 "${user.userName || '未知用户'}" 吗？此操作不可撤销。`,
-      successMessage: null, // 使用ElNotification
-      errorMessage: null,
-      onSuccess: () => {
-        notifyUser('success', '用户删除成功！')
-        return getAllUsers()
-      },
-      onError: () => {
-        notifyUser('error', '用户删除失败！')
-      }
-    }
-  )
+      message: `确定要删除用户「${userName || '未知用户'}」吗？此操作不可撤销。`
+    })
+    if (!confirmed || disposed) return
+    await executeRequest(() => deleteUserApi({ id: userId }), {
+      successMessage: '用户已删除',
+      errorMessage: '删除用户失败',
+      onSuccess: () => { if (!disposed) return loadDirectory(false) }
+    }).catch(() => false)
+  })
 }
 
 const resetPassword = (user) => {
+  if (actionsDisabled.value || userDialogVisible.value || resetPasswordVisible.value) return
   if (!canManageUser(user)) {
-    notifyUser('warning', getManageDisabledReason(user) || '无权重置该用户密码。')
+    showWarning(getManageDisabledReason(user))
     return
   }
-  resetForm.userId = user.userId
-  resetForm.newPassword = ''
-  resetForm.confirmPassword = ''
+  Object.assign(resetForm, createPasswordResetForm(), { userId: user.userId })
   resetPasswordDialog.open()
 }
 
-const submitResetPassword = async () => {
-  // 验证表单
-  if (!await validateForm(resetFormRef)) return
-
-  await executeRequest(
-    () =>
-      resetUserPasswordApi({
-        userId: resetForm.userId,
-        newPassword: resetForm.newPassword
-      }),
-    {
-      loadingRef: resetting,
-      successMessage: null, // 使用ElNotification
-      errorMessage: null,
-      onSuccess: () => {
-        notifyUser('success', '密码重置成功！')
-        resetPasswordDialog.close()
-      },
-      onError: (error) => {
-        notifyUser('error', error?.message || '密码重置失败！')
-      }
-    }
-  ).catch(() => false)
+const submitResetPassword = () => {
+  if (!resetPasswordVisible.value || actionsDisabled.value) return
+  return withLoading(resetting, async () => {
+    if (!await validateForm(resetFormRef) || disposed || !resetPasswordVisible.value) return
+    const { userId, newPassword } = resetForm
+    await executeRequest(() => resetUserPasswordApi({ userId, newPassword }), {
+      successMessage: '密码已重置',
+      errorMessage: '重置密码失败',
+      onSuccess: resetPasswordDialog.close
+    }).catch(() => false)
+  })
 }
 
 const exportUsers = async () => {
@@ -591,14 +578,20 @@ const getManageDisabledReason = (user) => getManageDisabledReasonForActor(user, 
 
 const getEditDisabledReason = (user) => getEditDisabledReasonForActor(user, actorContext.value)
 
-// 生命周期
 onMounted(async () => {
   try {
     await fetchAuth()
-    refreshData()
-  } catch {
-    showError('初始化数据失败')
+    if (!disposed) await refreshData()
+  } catch (error) {
+    if (!disposed) listError.value = handleError(error, { defaultMessage: '初始化用户目录失败', showMessage: false })
   }
+})
+
+onScopeDispose(() => {
+  disposed = true
+  directoryRequest?.abort()
+  Object.assign(userForm, createUserForm())
+  Object.assign(resetForm, createPasswordResetForm())
 })
 </script>
 

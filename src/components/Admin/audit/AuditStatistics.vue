@@ -8,7 +8,6 @@
       <article
         v-for="card in queryCards"
         :key="card.idField"
-        v-loading="card.loading"
         class="query-card surface"
       >
         <header class="query-card__header">
@@ -19,6 +18,7 @@
           <el-button
             text
             :loading="card.loading"
+            :disabled="!card.submittedId"
             @click="card.refresh"
           >
             刷新
@@ -26,7 +26,7 @@
         </header>
         <div class="query-card__form">
           <el-input
-            v-model="card.form[card.idField]"
+            v-model="card.draftId"
             :placeholder="`输入${card.label}ID`"
             clearable
             @keyup.enter="card.query"
@@ -40,11 +40,18 @@
           </el-button>
         </div>
         <div
-          v-if="card.result"
+          v-if="card.validationError || card.error"
+          role="alert"
+          class="query-message"
+        >
+          {{ card.validationError || card.error }}
+        </div>
+        <div
+          v-else-if="card.result"
           class="query-result"
         >
           <div class="result-item">
-            <span>{{ card.label }}ID</span><strong>{{ card.result[card.idField] }}</strong>
+            <span>{{ card.label }}ID</span><strong>{{ card.submittedId }}</strong>
           </div>
           <div class="result-item">
             <span>总操作数</span><strong>{{ card.result.totalOperations }}</strong>
@@ -52,10 +59,7 @@
           <div class="result-item">
             <span>最近操作</span><strong>{{ card.result.recentOperations }}</strong>
           </div>
-          <div
-            v-if="card.idField === 'userId'"
-            class="result-item"
-          >
+          <div class="result-item">
             <span>最后操作</span><strong>{{ formatDateTime(card.result.lastOperation) }}</strong>
           </div>
         </div>
@@ -84,8 +88,15 @@
           v-loading="operationStatsLoading"
           class="chart-panel__body"
         >
+          <el-alert
+            v-if="operationError"
+            :title="operationError"
+            type="error"
+            :closable="false"
+            show-icon
+          />
           <div
-            v-if="operationStats.length > 0"
+            v-else-if="operationStats.length > 0"
             class="operation-stats"
           >
             <div
@@ -111,7 +122,7 @@
             </div>
           </div>
           <el-empty
-            v-else
+            v-else-if="!operationStatsLoading"
             description="暂无操作统计数据"
           />
         </div>
@@ -129,6 +140,7 @@
             <el-select
               v-model="trendTimeRange"
               size="small"
+              aria-label="统计时间范围"
               @change="refreshTrendStats"
             >
               <el-option
@@ -152,8 +164,15 @@
           v-loading="trendStatsLoading"
           class="chart-panel__body"
         >
+          <el-alert
+            v-if="trendError"
+            :title="trendError"
+            type="error"
+            :closable="false"
+            show-icon
+          />
           <div
-            v-if="trendStats.length > 0"
+            v-else-if="trendStats.length > 0"
             class="trend-stats"
           >
             <div class="trend-summary">
@@ -168,23 +187,30 @@
               </div>
             </div>
 
-            <div class="trend-chart">
+            <div
+              class="trend-chart"
+              tabindex="0"
+              role="region"
+              aria-label="按日操作数，可横向滚动"
+            >
               <div
-                v-for="(stat, index) in trendStats"
-                :key="index"
+                v-for="stat in trendStats"
+                :key="stat.day"
                 class="trend-bar-shell"
                 :title="`${stat.date}: ${stat.count}次操作`"
               >
-                <div
-                  class="trend-bar"
-                  :style="{ height: getTrendBarHeight(stat.count) + '%' }"
-                />
+                <div class="trend-bar-track">
+                  <div
+                    class="trend-bar"
+                    :style="{ height: getTrendBarHeight(stat.count) + '%' }"
+                  />
+                </div>
                 <span class="trend-date">{{ stat.date }}</span>
               </div>
             </div>
           </div>
           <el-empty
-            v-else
+            v-else-if="!trendStatsLoading"
             description="暂无趋势数据"
           />
         </div>
@@ -194,11 +220,12 @@
 </template>
 
 <script setup>
+import { computed, onMounted, onScopeDispose, reactive, ref, shallowRef } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { computed, ref, reactive, onMounted } from 'vue'
-
+import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
 import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
+import { handleError } from '@/utils/errorHandler.js'
 import {
   getAuditOperationStatisticsApi,
   getAuditAgentStatisticsApi,
@@ -206,118 +233,105 @@ import {
   getAuditTrendStatisticsApi,
   getAuditUserStatisticsApi
 } from '@/services/api/admin.js'
-import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
-import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
+import { getOperationTagType } from './auditManagerModel.js'
 
-// 响应式数据
-const operationStatsLoading = ref(false)
-const trendStatsLoading = ref(false)
-
-const queryCards = reactive([
-  createStatsCard('用户', 'userId', params => getAuditUserStatisticsApi(params), iconMap.user),
-  createStatsCard('团队', 'teamId', params => getAuditTeamStatisticsApi(params), iconMap.userFilled),
-  createStatsCard('主机', 'hostId', params => getAuditAgentStatisticsApi(params), iconMap.server, 'agentId')
-])
-
-// 操作类型统计
-const operationStats = ref([])
-
-// 趋势统计
-const trendTimeRange = ref('7')
-const trendStats = ref([])
-const totalTrendCount = computed(() => trendStats.value.reduce((sum, item) => sum + item.count, 0))
-const averageDailyCount = computed(() =>
-  trendStats.value.length > 0 ? Math.round(totalTrendCount.value / trendStats.value.length) : 0
-)
-const maxDailyCount = computed(() =>
-  trendStats.value.length > 0 ? Math.max(...trendStats.value.map((item) => item.count)) : 0
-)
-
-// 方法
-function createStatsCard(label, idField, request, icon, requestField = idField) {
-  const form = reactive({ [idField]: '' })
+function useStatsRequest(request, defaultMessage) {
+  const result = shallowRef(null)
   const loading = ref(false)
-  const result = ref(null)
+  const error = ref('')
+  let pending
 
-  const query = async () => {
-    if (!form[idField]) {
-      showWarning(`请输入${label}ID`)
-      return
-    }
+  onScopeDispose(() => pending?.abort())
+
+  async function run(params) {
+    pending?.abort()
+    const current = new AbortController()
+    pending = current
+    const { signal } = current
     loading.value = true
+    result.value = null
+    error.value = ''
     try {
-      const response = await request({ [requestField]: form[idField] })
-      result.value = response.data
-      showSuccess(`${label}统计查询成功`)
-    } catch {
-      showError(`获取${label}统计失败`)
+      const { data } = await request(params, signal)
+      if (!signal.aborted) result.value = data
+    } catch (failure) {
+      if (!signal.aborted) error.value = handleError(failure, { defaultMessage, showMessage: false })
     } finally {
-      loading.value = false
+      if (pending === current) {
+        pending = undefined
+        loading.value = false
+      }
     }
   }
+
+  return { result, loading, error, run }
+}
+
+function createStatsCard(label, idField, icon, request) {
+  const draftId = ref('')
+  const submittedId = ref('')
+  const validationError = ref('')
+  const stats = useStatsRequest(
+    (id, signal) => request({ [idField]: id }, { signal }),
+    `获取${label}统计失败`
+  )
 
   const refresh = () => {
-    if (form[idField]) query()
+    if (!submittedId.value) return
+    validationError.value = ''
+    return stats.run(submittedId.value)
   }
 
-  return { label, idField, icon, form, loading, result, query, refresh }
-}
-
-const refreshOperationStats = async () => {
-  operationStatsLoading.value = true
-  try {
-    const response = await getAuditOperationStatisticsApi()
-    const rows = Array.isArray(response.data) ? response.data : []
-    const total = rows.reduce((sum, item) => sum + Number(item.count || 0), 0)
-    operationStats.value = rows.map((item) => ({
-      operation: item.operation,
-      operationName: item.operationName || item.operation,
-      count: Number(item.count || 0),
-      percentage: total > 0 ? Math.round((Number(item.count || 0) / total) * 100) : 0
-    }))
-  } catch {
-    showError('获取操作类型统计失败')
-  } finally {
-    operationStatsLoading.value = false
+  const query = () => {
+    const id = draftId.value.trim()
+    if (!id) {
+      validationError.value = `请输入${label}ID`
+      return
+    }
+    submittedId.value = id
+    return refresh()
   }
+
+  return { label, idField, icon, draftId, submittedId, validationError, ...stats, query, refresh }
 }
 
-const refreshTrendStats = async () => {
-  trendStatsLoading.value = true
-  try {
-    const response = await getAuditTrendStatisticsApi({ days: Number(trendTimeRange.value) })
-    trendStats.value = Array.isArray(response.data) ? response.data : []
-  } catch {
-    showError('获取趋势统计失败')
-  } finally {
-    trendStatsLoading.value = false
-  }
+const queryCards = reactive([
+  createStatsCard('用户', 'userId', iconMap.user, getAuditUserStatisticsApi),
+  createStatsCard('团队', 'teamId', iconMap.userFilled, getAuditTeamStatisticsApi),
+  createStatsCard('主机', 'agentId', iconMap.server, getAuditAgentStatisticsApi)
+])
+
+async function readStatsRows(request) {
+  const response = await request
+  if (!Array.isArray(response.data)) throw new Error('审计统计响应格式异常')
+  return response
 }
 
-const operationTagTypes = {
-  命令执行: 'primary',
-  文件上传: 'success',
-  文件下载: 'info',
-  新增Agent: 'success',
-  修改Agent: 'warning',
-  删除Agent: 'danger',
-  初始化: 'info',
-  基础信息: 'info',
-  加载插件: 'primary'
-}
-const operationColors = Object.fromEntries(
-  Object.entries(operationTagTypes).map(([operation, type]) => [operation, `var(--el-color-${type})`])
+const { result: operationRows, loading: operationStatsLoading, error: operationError,
+  run: refreshOperationStats } = useStatsRequest(
+  (_params, signal) => readStatsRows(getAuditOperationStatisticsApi({ signal })), '获取操作分布失败'
 )
 
-const getOperationTagType = (operation) => operationTagTypes[operation]
-const getOperationColor = (operation) => operationColors[operation] || 'var(--el-color-info)'
+const operationStats = computed(() => {
+  const rows = (operationRows.value ?? []).map((row) => ({ ...row, count: Number(row.count) }))
+  const total = rows.reduce((sum, row) => sum + row.count, 0)
+  return rows.map((row) => ({ ...row, percentage: total > 0 ? Math.round(row.count * 100 / total) : 0 }))
+})
+const getOperationColor = (operation) => `var(--el-color-${getOperationTagType(operation) || 'info'})`
 
-const getTrendBarHeight = (count) => {
-  const maxCount = maxDailyCount.value
-  return maxCount > 0 ? Math.round((count / maxCount) * 100) : 0
-}
+const trendTimeRange = ref('7')
+const { result: trendRows, loading: trendStatsLoading, error: trendError, run: runTrend } = useStatsRequest(
+  (days, signal) => readStatsRows(getAuditTrendStatisticsApi({ days }, { signal })), '获取操作趋势失败'
+)
+const trendStats = computed(() => trendRows.value ?? [])
+const totalTrendCount = computed(() => trendStats.value.reduce((sum, { count }) => sum + count, 0))
+const averageDailyCount = computed(() =>
+  trendStats.value.length ? Math.round(totalTrendCount.value / trendStats.value.length) : 0
+)
+const maxDailyCount = computed(() => trendStats.value.reduce((max, { count }) => Math.max(max, count), 0))
+const getTrendBarHeight = (count) => maxDailyCount.value > 0 ? Math.round(count * 100 / maxDailyCount.value) : 0
+const refreshTrendStats = () => runTrend(Number(trendTimeRange.value))
 
-// 生命周期
 onMounted(() => {
   refreshOperationStats()
   refreshTrendStats()
@@ -382,6 +396,13 @@ onMounted(() => {
   display: grid;
   gap: 10px;
   padding: 16px 18px 18px;
+}
+
+.query-message {
+  margin: 0;
+  padding: 8px 18px 16px;
+  color: var(--el-color-danger);
+  font-size: var(--el-font-size-small);
 }
 
 .result-item,
@@ -458,24 +479,31 @@ onMounted(() => {
 
 .trend-chart {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(28px, 1fr));
-  align-items: end;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(28px, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 10px;
   height: 240px;
+  overflow-x: auto;
 }
 
 .trend-bar-shell {
   display: flex;
   flex-direction: column;
-  justify-content: end;
   align-items: center;
   gap: 8px;
-  height: 100%;
+}
+
+.trend-bar-track {
+  display: flex;
+  align-items: flex-end;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
 
 .trend-bar {
   width: 100%;
-  min-height: 6px;
   border-radius: var(--radius-tag) var(--radius-tag) 0 0;
   background: var(--el-color-primary);
   box-shadow: none;

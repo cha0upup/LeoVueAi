@@ -1,23 +1,19 @@
 import http from '../http.js'
 
-export function getAllUsersApi() {
-  return http.get('/platform/admin/users')
+export function getAllUsersApi(options) {
+  return http.get('/platform/admin/users', options)
 }
 
-export function getUsersNoTeamApi() {
-  return http.get('/platform/admin/users/no-team')
+export function getTeamLeaderOptionsApi({ signal } = {}) {
+  return http.get('/platform/admin/users/no-team', { params: { view: 'options' }, signal })
 }
 
-export function getAuditLogsApi(params) {
-  return http.get('/platform/admin/audit-logs', { params })
+export function getAuditLogSummaryPageApi(params, { signal } = {}) {
+  return http.get('/platform/admin/audit-logs', { params: { ...params, view: 'summary' }, signal })
 }
 
-export function getAuditLogDetailApi(params) {
-  return http.get('/platform/admin/audit-logs/detail', { params })
-}
-
-export function getAuditLogCountApi(params = {}) {
-  return http.get('/platform/admin/audit-logs/count', { params })
+export function getAuditLogDetailApi(logId, { signal } = {}) {
+  return http.get('/platform/admin/audit-logs/detail', { params: { logId }, signal })
 }
 
 export function cleanupAuditLogsApi(params) {
@@ -44,24 +40,24 @@ export function updateAuditModeApi(params) {
   return http.post('/platform/admin/audit-logs/mode', params)
 }
 
-export function getAuditUserStatisticsApi(params) {
-  return http.get('/platform/admin/audit-logs/statistics/user', { params })
+export function getAuditUserStatisticsApi(params, { signal } = {}) {
+  return http.get('/platform/admin/audit-logs/statistics/user', { params, signal })
 }
 
-export function getAuditTeamStatisticsApi(params) {
-  return http.get('/platform/admin/audit-logs/statistics/team', { params })
+export function getAuditTeamStatisticsApi(params, { signal } = {}) {
+  return http.get('/platform/admin/audit-logs/statistics/team', { params, signal })
 }
 
-export function getAuditAgentStatisticsApi(params) {
-  return http.get('/platform/admin/audit-logs/statistics/agent', { params })
+export function getAuditAgentStatisticsApi(params, { signal } = {}) {
+  return http.get('/platform/admin/audit-logs/statistics/agent', { params, signal })
 }
 
-export function getAuditOperationStatisticsApi() {
-  return http.get('/platform/admin/audit-logs/statistics/operations')
+export function getAuditOperationStatisticsApi({ signal } = {}) {
+  return http.get('/platform/admin/audit-logs/statistics/operations', { signal })
 }
 
-export function getAuditTrendStatisticsApi(params) {
-  return http.get('/platform/admin/audit-logs/statistics/trend', { params })
+export function getAuditTrendStatisticsApi(params, { signal } = {}) {
+  return http.get('/platform/admin/audit-logs/statistics/trend', { params, signal })
 }
 
 export function addUserApi(userData) {
@@ -80,8 +76,8 @@ export function resetUserPasswordApi(params) {
   return http.post('/platform/admin/users/reset-password', params)
 }
 
-export function getAllTeamsApi() {
-  return http.get('/platform/admin/teams')
+export function getAllTeamsApi(options) {
+  return http.get('/platform/admin/teams', options)
 }
 
 export function addTeamApi(teamData) {

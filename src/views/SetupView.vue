@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onScopeDispose, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ROUTE_PATHS } from '@/constants/app.js'
 import { useAuth } from '@/composables/useAuth.js'
@@ -88,10 +88,11 @@ import { createPasswordMatchValidator, validateForm } from '@/utils/formUtils.js
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
 const router = useRouter()
-const { fetchAuth, initializationRequired, passwordMinLength, passwordMaxLength } = useAuth()
+const { fetchAuth, authFetched, initializationRequired, passwordMinLength, passwordMaxLength } = useAuth()
 const formRef = ref(null)
 const submitting = ref(false)
 const form = reactive({ password: '', confirmPassword: '' })
+let disposed = false
 const rules = computed(() => ({
   password: [
     { required: true, message: '请输入管理员密码', trigger: 'blur' },
@@ -108,23 +109,45 @@ const rules = computed(() => ({
   ]
 }))
 
+const clearPasswords = () => Object.assign(form, { password: '', confirmPassword: '' })
+
+onScopeDispose(() => {
+  disposed = true
+  clearPasswords()
+})
+
 const submitForm = async () => {
-  if (submitting.value) return
+  if (submitting.value || disposed) return
   submitting.value = true
   try {
-    if (!await validateForm(formRef, { errorMessage: '请检查密码输入' })) return
-    await initializeSystemApi({ password: form.password, confirmPassword: form.confirmPassword })
-    form.password = ''
-    form.confirmPassword = ''
-    await fetchAuth({ force: true })
-    showSuccess('初始化完成，请使用 admin 登录')
-    await router.replace(ROUTE_PATHS.login)
-  } catch (error) {
-    showError(error?.response?.data?.msg || error?.message || '初始化失败，请稍后重试')
-    if (error?.response?.status === 409) {
-      await fetchAuth({ force: true })
-      if (!initializationRequired.value) await router.replace(ROUTE_PATHS.login)
+    if (!await validateForm(formRef, { errorMessage: '请检查密码输入' }) || disposed) return
+    let completedElsewhere = false
+    try {
+      await initializeSystemApi({ password: form.password, confirmPassword: form.confirmPassword })
+    } catch (error) {
+      if (disposed) return
+      if (error?.response?.status !== 409) {
+        showError(error?.response?.data?.msg || error?.message || '初始化失败，请稍后重试')
+        return
+      }
+      completedElsewhere = true
     }
+    if (disposed) return
+    clearPasswords()
+    if (!completedElsewhere) showSuccess('初始化完成，请使用 admin 登录')
+
+    // POST 已结束；若后续状态读取失败，仅重试状态检查，不再提交初始化。
+    await fetchAuth({ force: true })
+    if (disposed) return
+    if (!authFetched.value) {
+      await router.replace(ROUTE_PATHS.startup)
+    } else if (!initializationRequired.value) {
+      await router.replace(ROUTE_PATHS.login)
+    } else {
+      showError('初始化状态尚未同步，请重新进入页面检查')
+    }
+  } catch {
+    if (!disposed) showError('初始化后的状态确认失败，请重新进入页面检查')
   } finally {
     submitting.value = false
   }

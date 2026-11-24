@@ -1,0 +1,32 @@
+import { expect, it, vi } from 'vitest'
+import http from '../http.js'
+import { getAuditLogDetailApi, getAuditLogSummaryPageApi, getTeamLeaderOptionsApi } from './admin.js'
+
+vi.mock('../http.js', () => ({ default: { get: vi.fn() } }))
+
+it('opts in to the audit summary without fetching detail fields', () => {
+  const { signal } = new AbortController()
+  getAuditLogSummaryPageApi({ limit: 20, offset: 40, userId: 'user' }, { signal })
+  expect(http.get).toHaveBeenLastCalledWith('/platform/admin/audit-logs', {
+    params: { limit: 20, offset: 40, userId: 'user', view: 'summary' },
+    signal
+  })
+})
+
+it('requests the complete audit detail only by log id', () => {
+  const { signal } = new AbortController()
+  getAuditLogDetailApi('id', { signal })
+  expect(http.get).toHaveBeenLastCalledWith('/platform/admin/audit-logs/detail', {
+    params: { logId: 'id' },
+    signal
+  })
+})
+
+it('requests only the identity fields for leader candidates', () => {
+  const { signal } = new AbortController()
+  getTeamLeaderOptionsApi({ signal })
+  expect(http.get).toHaveBeenLastCalledWith('/platform/admin/users/no-team', {
+    params: { view: 'options' },
+    signal
+  })
+})

@@ -16,10 +16,21 @@ const authLoading = ref(false)
 const authFetched = ref(false)
 const authCheckState = ref('unknown')
 const authError = ref('')
+const startupRetryDelay = ref(null)
 const initializationRequired = ref(false)
 const passwordMinLength = ref(8)
 const passwordMaxLength = ref(256)
 let authInflight = null
+
+function readStartupRetryDelay(error) {
+  const { status, headers } = error?.response ?? {}
+  if (status !== 503) return null
+  const hint = headers?.get?.('Retry-After') ?? headers?.['retry-after']
+  // 当前后端返回秒数；异常提示仅保留手动重试，避免紧密轮询或长期等待。
+  if (!/^\d{1,2}$/.test(String(hint ?? ''))) return null
+  const seconds = Number(hint)
+  return seconds >= 1 && seconds <= 30 ? seconds * 1000 : null
+}
 
 /**
  * 从后端 /platform/user/status 拉取当前会话用户信息。
@@ -32,6 +43,7 @@ async function fetchAuth({ force = false } = {}) {
   authLoading.value = true
   authCheckState.value = 'checking'
   authError.value = ''
+  startupRetryDelay.value = null
   const requestGeneration = sessionGeneration.value
   authInflight = (async () => {
     try {
@@ -51,6 +63,7 @@ async function fetchAuth({ force = false } = {}) {
         authFetched.value = false
         authCheckState.value = 'error'
         authError.value = error?.response?.data?.msg || error?.message || '系统状态检查失败，请重试'
+        startupRetryDelay.value = readStartupRetryDelay(error)
       }
     } finally {
       if (isCurrentSession(requestGeneration)) {
@@ -69,6 +82,7 @@ const unregister = registerSessionCleanup('auth', () => {
   authFetched.value = false
   authCheckState.value = 'unknown'
   authError.value = ''
+  startupRetryDelay.value = null
   authInflight = null
   initializationRequired.value = false
   passwordMinLength.value = 8
@@ -88,6 +102,7 @@ export function useAuth() {
     authFetched,
     authCheckState,
     authError,
+    startupRetryDelay,
     initializationRequired,
     passwordMinLength,
     passwordMaxLength,

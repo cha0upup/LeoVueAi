@@ -2,16 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildAuditFilterParams,
-  clearAuditFilterField,
   createAuditFilter,
   formatAuditJson,
   formatAuditTime,
-  getActiveAuditFilterSummary,
-  hasActiveAuditFilter
+  getActiveAuditFilterSummary
 } from './auditManagerModel.js'
 
 describe('auditManagerModel', () => {
-  it('builds trimmed API parameters with pagination overrides', () => {
+  it('builds trimmed filter parameters and a complete date range', () => {
     const filter = createAuditFilter()
     Object.assign(filter, {
       userId: ' user-1 ',
@@ -19,38 +17,30 @@ describe('auditManagerModel', () => {
       dateRange: ['2026-01-01 00:00:00', '2026-01-02 00:00:00']
     })
 
-    expect(buildAuditFilterParams(filter, { limit: 20, offset: 40 })).toEqual({
+    expect(buildAuditFilterParams(filter)).toEqual({
       userId: 'user-1',
       keyword: 'command',
       startTime: '2026-01-01 00:00:00',
-      endTime: '2026-01-02 00:00:00',
-      limit: 20,
-      offset: 40
+      endTime: '2026-01-02 00:00:00'
     })
   })
 
-  it('creates labels for active filters and clears them by label', () => {
-    const filter = createAuditFilter()
-    filter.operationType = 'FILE_READ'
-    filter.status = 'FAILED'
-
-    expect(hasActiveAuditFilter(filter)).toBe(true)
-    expect(getActiveAuditFilterSummary(filter)).toEqual({
-      操作类型: '读取文件',
-      状态: '失败'
-    })
-    expect(clearAuditFilterField(filter, '操作类型')).toBe(true)
-    expect(filter.operationType).toBe('')
-    expect(clearAuditFilterField(filter, '未知')).toBe(false)
+  it('creates filter labels from the submitted parameters only', () => {
+    expect(getActiveAuditFilterSummary({
+      operationType: 'FILE_READ', status: 'FAILED', startTime: '1', endTime: '2'
+    })).toEqual([
+      { field: 'operationType', label: '操作类型', value: '读取文件' },
+      { field: 'status', label: '状态', value: '失败' },
+      { field: 'dateRange', label: '时间范围', value: '1 ~ 2' }
+    ])
   })
 
   it('does not treat whitespace-only values as an active deletion filter', () => {
     const filter = createAuditFilter()
     filter.keyword = '   '
     filter.userId = '\t'
+    filter.dateRange = ['2026-01-01 00:00:00', '']
 
-    expect(hasActiveAuditFilter(filter)).toBe(false)
-    expect(getActiveAuditFilterSummary(filter)).toEqual({})
     expect(buildAuditFilterParams(filter)).toEqual({})
   })
 
