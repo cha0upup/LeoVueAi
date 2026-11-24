@@ -81,12 +81,7 @@ export function normalizeWorkspaceOverview(data) {
   }
   return {
     totalFiles: toNumber(source.totalFiles),
-    totalDirectories: toNumber(source.totalDirectories),
     totalBytes: toNumber(source.totalBytes),
-    maxUploadBytes: toNumber(source.maxUploadBytes),
-    rootItems: toNumber(source.rootItems),
-    updatedAt: toNumber(source.updatedAt),
-    recentFiles: Array.isArray(source.recentFiles) ? source.recentFiles : [],
     categories: Array.isArray(source.categories) ? source.categories : []
   }
 }

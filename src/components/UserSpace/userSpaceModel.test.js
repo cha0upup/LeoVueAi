@@ -29,15 +29,10 @@ describe('userSpaceModel', () => {
 
   it('normalizes incomplete overview payloads', () => {
     expect(
-      normalizeWorkspaceOverview({ totalFiles: '3', totalBytes: 'invalid', recentFiles: null })
+      normalizeWorkspaceOverview({ totalFiles: '3', totalBytes: 'invalid', categories: null })
     ).toEqual({
       totalFiles: 3,
-      totalDirectories: 0,
       totalBytes: 0,
-      maxUploadBytes: 0,
-      rootItems: 0,
-      updatedAt: 0,
-      recentFiles: [],
       categories: []
     })
   })

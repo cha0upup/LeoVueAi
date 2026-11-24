@@ -1,15 +1,15 @@
 import http from '../http.js'
 
-export function userFileListApi(params = {}) {
-  return http.get('/platform/user/file/list', { params })
+export function userFileListApi(params = {}, { signal } = {}) {
+  return http.get('/platform/user/file/list', { params, signal })
 }
 
 export function archiveUserArtifactApi(data) {
   return http.post('/platform/user/file/archive', data)
 }
 
-export function userWorkspaceOverviewApi() {
-  return http.get('/platform/user/file/overview')
+export function userWorkspaceOverviewApi({ signal } = {}) {
+  return http.get('/platform/user/file/overview', { params: { includeRecent: false }, signal })
 }
 
 export function userFileUploadApi(file, options = {}) {
@@ -30,8 +30,8 @@ export function userFileDownloadApi(params) {
   })
 }
 
-export function userFilePreviewApi(params) {
-  return http.get('/platform/user/file/preview', { params })
+export function userFilePreviewApi(params, { signal } = {}) {
+  return http.get('/platform/user/file/preview', { params: { ...params, includeBase64: false }, signal })
 }
 
 export function userFileDeleteApi(params) {

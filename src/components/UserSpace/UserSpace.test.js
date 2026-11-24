@@ -1,0 +1,157 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
+import { ARTIFACT_CATEGORIES, ARTIFACT_SOURCE_LABELS } from '@/constants/artifacts.js'
+import { compileClientComponent, createSlotStub, findNode, findNodes } from '@/test-support/vueComponent.js'
+import { createTestRenderer } from '@/test-support/vueRenderer.js'
+import { deferred } from '@/test-support/deferred.js'
+import { formatDate, formatFileSize } from '@/utils/format.js'
+import { handleError } from '@/utils/errorHandler.js'
+import { icons } from '@/utils/icons.js'
+import * as model from './userSpaceModel.js'
+
+const api = {
+  userFileListApi: vi.fn(), userWorkspaceOverviewApi: vi.fn(), userFilePreviewApi: vi.fn(),
+  userFileUploadApi: vi.fn(), userFileDownloadApi: vi.fn(), userFileDeleteApi: vi.fn()
+}
+const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showError: vi.fn() }))
+vi.mock('@/utils/messageUtils.js', () => messages)
+
+const stub = (name, slots) => ({ default: createSlotStub(name, slots) })
+const view = compileClientComponent(new URL('./UserSpace.vue', import.meta.url), {
+  '@/components/common/PageHeader.vue': stub('PageHeader', ['actions']),
+  '@/components/common/EmptyState.vue': stub('EmptyState'),
+  './UserSpaceDetail.vue': stub('Detail'),
+  './UserSpacePreviewDialog.vue': stub('PreviewDialog'),
+  '@/constants/artifacts.js': { ARTIFACT_CATEGORIES, ARTIFACT_SOURCE_LABELS },
+  '@/utils/icons.js': { icons },
+  '@/utils/format.js': { formatDate, formatFileSize },
+  '@/utils/downloadBlob.js': { downloadBlob: vi.fn() },
+  '@/utils/confirmUtils.js': { confirmAction: vi.fn(), confirmDelete: vi.fn() },
+  '@/utils/messageUtils.js': messages,
+  '@/utils/errorHandler.js': { handleError },
+  '@/services/api/user-space.js': api,
+  './userSpaceModel.js': model
+})
+const original = { name: 'note.md', path: 'imports/note.md' }
+const replacement = { name: 'latest.txt', path: 'imports/latest.txt' }
+const result = (page, fileList, count = fileList.length) => ({ data: { page, fileList, count } })
+const apps = []
+const flush = async () => { for (let i = 0; i < 5; i++) await nextTick() }
+
+function mount() {
+  const renderer = createTestRenderer()
+  const app = renderer.createApp(view)
+  app.directive('loading', {})
+  for (const name of ['Icon', 'ElIcon', 'ElButton', 'ElInput', 'ElSelect', 'ElOption', 'ElPagination', 'ElDrawer']) {
+    app.component(name, createSlotStub(name))
+  }
+  app.component('ElTable', createSlotStub('ElTable', ['default', 'empty']))
+  app.component('ElTableColumn', createSlotStub('ElTableColumn', []))
+  app.mount(renderer.root)
+  apps.push(app)
+  const props = (type) => findNode(renderer.root, type)?.props
+  return {
+    search: (value) => props('ElInput')['onUpdate:modelValue'](value),
+    selectCategory: (path) => {
+      const index = ARTIFACT_CATEGORIES.findIndex((category) => category.path === path) + 1
+      findNodes(renderer.root, (node) => node.type === 'button' && node.props['aria-pressed'] != null)[index].props.onClick()
+    },
+    rows: () => props('ElTable').data,
+    empty: () => props('EmptyState'),
+    pagination: () => props('ElPagination'),
+    openPreview: (file) => props('ElTable').onRowDblclick(file),
+    preview: () => props('PreviewDialog')
+  }
+}
+
+beforeEach(() => {
+  vi.resetAllMocks()
+  api.userFileListApi.mockResolvedValue(result(1, [original]))
+  api.userWorkspaceOverviewApi.mockResolvedValue({ data: { categories: [] } })
+})
+
+afterEach(() => {
+  for (const app of apps.splice(0)) app.unmount()
+  vi.useRealTimers()
+})
+
+it('debounces text search, aborts stale pages and loads a changed category immediately', async () => {
+  vi.useFakeTimers()
+  const older = deferred()
+  api.userFileListApi.mockReturnValueOnce(older.promise)
+  const workspace = mount()
+
+  workspace.search(' a ')
+  await nextTick()
+  expect(api.userFileListApi.mock.calls[0][1].signal.aborted).toBe(true)
+  workspace.search(' ab ')
+  await nextTick()
+  await vi.advanceTimersByTimeAsync(249)
+  expect(api.userFileListApi).toHaveBeenCalledTimes(1)
+
+  api.userFileListApi.mockResolvedValueOnce(result(1, [replacement]))
+  workspace.selectCategory('imports')
+  await flush()
+  expect(api.userFileListApi).toHaveBeenLastCalledWith(
+    expect.objectContaining({ path: 'imports', search: 'ab', page: 1 }), expect.any(Object)
+  )
+  older.resolve(result(1, [original]))
+  await vi.runAllTimersAsync()
+  expect(api.userFileListApi).toHaveBeenCalledTimes(2)
+  expect(workspace.rows()).toEqual([replacement])
+})
+
+it('shows a read failure instead of an empty catalog and retries with the same parameters', async () => {
+  api.userFileListApi.mockRejectedValueOnce(new Error('目录暂时不可用'))
+  const workspace = mount()
+  await flush()
+
+  expect(workspace.empty()).toMatchObject({ title: '成果列表读取失败', description: '目录暂时不可用' })
+  await workspace.empty().onAction()
+  await flush()
+  expect(workspace.rows()).toEqual([original])
+  expect(api.userFileListApi.mock.calls[0][0]).toEqual(api.userFileListApi.mock.calls[1][0])
+  expect(api.userWorkspaceOverviewApi).toHaveBeenCalledOnce()
+})
+
+it('returns to the first page once when a previously valid page no longer exists', async () => {
+  api.userFileListApi.mockResolvedValueOnce(result(1, [original], 51))
+    .mockResolvedValueOnce(result(2, [], 1))
+    .mockResolvedValueOnce(result(1, [replacement]))
+  const workspace = mount()
+  await flush()
+
+  workspace.pagination().onCurrentChange(2)
+  await flush()
+  expect(api.userFileListApi.mock.calls.map(([params]) => params.page)).toEqual([1, 2, 1])
+  expect(workspace.pagination()['current-page']).toBe(1)
+  expect(workspace.rows()).toEqual([replacement])
+})
+
+it('opens preview immediately, aborts on close and retries a failed file without stale content', async () => {
+  const earlier = deferred()
+  api.userFilePreviewApi.mockReturnValueOnce(earlier.promise)
+    .mockRejectedValueOnce(new Error('读取失败'))
+    .mockResolvedValueOnce({ data: { content: 'current text' } })
+  const workspace = mount()
+  await flush()
+
+  const closed = workspace.openPreview(original)
+  workspace.openPreview(original)
+  await nextTick()
+  expect(api.userFilePreviewApi).toHaveBeenCalledExactlyOnceWith(
+    { path: original.path, size: 1024 * 1024 }, expect.any(Object)
+  )
+  expect(workspace.preview()).toMatchObject({ path: original.path, modelValue: true, loading: true, data: null })
+  workspace.preview()['onUpdate:modelValue'](false)
+  expect(api.userFilePreviewApi.mock.calls[0][1].signal.aborted).toBe(true)
+
+  await workspace.openPreview(replacement)
+  earlier.resolve({ data: { content: 'outdated text' } })
+  await closed
+  await nextTick()
+  expect(workspace.preview()).toMatchObject({ path: replacement.path, error: '读取失败', data: null })
+  await workspace.preview().onRetry()
+  await nextTick()
+  expect(workspace.preview()).toMatchObject({ path: replacement.path, error: '', data: { content: 'current text' } })
+})

@@ -19,6 +19,7 @@
       <el-input
         v-model="searchKeyword"
         placeholder="搜索团队名称、团队ID、队长"
+        aria-label="搜索团队名称、团队ID、队长姓名或ID"
         clearable
         class="toolbar-search"
       >
@@ -90,7 +91,7 @@
               effect="light"
               size="small"
             >
-              {{ getUserName(row.leaderId) }}
+              {{ row.leaderName || row.leaderId }}
             </el-tag>
             <span
               v-else
@@ -199,8 +200,7 @@ import {
   addTeamApi,
   deleteTeamApi,
   getAllTeamsApi,
-  getUsersNoTeamApi,
-  getAllUsersApi
+  getUsersNoTeamApi
 } from '@/services/api/admin.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import { useAuth } from '@/composables/useAuth.js'
@@ -219,18 +219,15 @@ const searchKeyword = ref('')
 const team = reactive({})
 const teamData = ref([])
 const users = ref([])        // 无团队用户，用于新建团队时选队长
-const allUsers = ref([])     // 全部用户，用于显示队长名称
 
 const filteredTeams = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
   if (!keyword) return teamData.value
 
-  return teamData.value.filter((item) => {
-    const leaderName = getUserName(item.leaderId).toLowerCase()
-    return [item.teamId, item.teamName, leaderName]
-      .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(keyword))
-  })
+  return teamData.value.filter(({ teamId, teamName, leaderId, leaderName }) =>
+    [teamId, teamName, leaderId, leaderName]
+      .some(value => value?.toLowerCase().includes(keyword))
+  )
 })
 
 const assignedLeaderCount = computed(() => teamData.value.filter((item) => item.leaderId).length)
@@ -246,21 +243,19 @@ const getAllTeams = async () => {
   }
 }
 
-const getAllUsers = async () => {
-  if (isAdmin.value) {
-    const [noTeamResp, allResp] = await Promise.all([getUsersNoTeamApi(), getAllUsersApi()])
-    users.value = noTeamResp.data || []
-    allUsers.value = allResp.data || []
-    return
-  }
-  const allResp = await getAllUsersApi()
-  users.value = []
-  allUsers.value = allResp.data || []
+const loadLeaderCandidates = async () => {
+  const { data } = await getUsersNoTeamApi()
+  users.value = data || []
 }
 
 const openAddTeamDialog = async () => {
   addTeamDialog.value = true
-  await getAllUsers()
+  try {
+    await loadLeaderCandidates()
+  } catch (error) {
+    users.value = []
+    ElNotification({ title: '错误', message: error?.message || '加载队长候选失败，请重试', type: 'error' })
+  }
 }
 
 const addTeam = async () => {
@@ -317,15 +312,10 @@ const delTeam = async (id) => {
 
 const refreshData = async () => {
   try {
-    await Promise.all([getAllTeams(), getAllUsers()])
+    await getAllTeams()
   } catch {
     ElNotification({ title: '错误', message: '刷新数据失败！', type: 'error' })
   }
-}
-
-const getUserName = (userId) => {
-  const user = allUsers.value.find((u) => u.userId === userId)
-  return user ? user.userName : '未知用户'
 }
 
 const isBuiltInTeam = (item) => {
@@ -335,8 +325,7 @@ const isBuiltInTeam = (item) => {
 
 onMounted(async () => {
   await fetchAuth()
-  getAllTeams()
-  getAllUsers()
+  await refreshData()
 })
 </script>
 

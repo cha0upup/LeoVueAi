@@ -71,7 +71,10 @@
         >
           清空筛选
         </el-button>
-        <span class="result-count">{{ loading ? '读取中…' : `共 ${total} 项` }}</span>
+        <span
+          class="result-count"
+          aria-live="polite"
+        >{{ loading ? '读取中…' : listError ? '读取失败' : `共 ${total} 项` }}</span>
         <el-button
           :loading="loading"
           aria-label="刷新成果库"
@@ -197,12 +200,13 @@
           </el-table-column>
           <template #empty>
             <EmptyState
+              v-if="!loading"
               workbench
               :title="emptyState.title"
               :description="emptyState.description"
               :icon="iconMap.folderOpened"
               :action-label="emptyState.actionLabel"
-              @action="hasFilters ? clearFilters() : triggerUpload()"
+              @action="listError ? fetchList() : hasFilters ? clearFilters() : triggerUpload()"
             />
           </template>
         </el-table>
@@ -214,6 +218,7 @@
           :current-page="page"
           :page-size="PAGE_SIZE"
           :total="total"
+          :disabled="loading || Boolean(listError)"
           :pager-count="5"
           layout="prev, pager, next"
           @current-change="changePage"
@@ -243,20 +248,25 @@
     </el-drawer>
     <UserSpacePreviewDialog
       v-model="previewVisible"
-      :data="previewData"
+      :path="preview?.file.path"
+      :data="preview?.data"
+      :loading="previewLoading"
+      :error="preview?.error"
+      @retry="previewFile(preview?.file)"
     />
   </section>
 </template>
 
 <script setup>
 import PageHeader from '@/components/common/PageHeader.vue'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { ARTIFACT_CATEGORIES, ARTIFACT_SOURCE_LABELS } from '@/constants/artifacts.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate, formatFileSize } from '@/utils/format.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { confirmAction, confirmDelete } from '@/utils/confirmUtils.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { handleError } from '@/utils/errorHandler.js'
 import { userFileListApi, userWorkspaceOverviewApi, userFileUploadApi, userFileDownloadApi, userFilePreviewApi, userFileDeleteApi } from '@/services/api/user-space.js'
 import EmptyState from '@/components/common/EmptyState.vue'
 import UserSpaceDetail from './UserSpaceDetail.vue'
@@ -274,15 +284,26 @@ const files = ref([])
 const detailEntry = ref(null)
 const detailVisible = ref(false)
 const loading = ref(false)
+const listError = ref('')
 const uploading = ref(false)
 const uploadInputRef = ref(null)
 const overview = ref(normalizeWorkspaceOverview())
-const previewVisible = ref(false)
-const previewData = ref({})
-let listSequence = 0
-let previewSequence = 0
-let overviewSequence = 0
+const preview = shallowRef(null)
+let listRequest
+let previewRequest
+let overviewRequest
 let searchTimer
+let disposed = false
+const previewVisible = computed({
+  get: () => preview.value !== null,
+  set: (visible) => {
+    if (visible) return
+    previewRequest?.abort()
+    previewRequest = undefined
+    preview.value = null
+  }
+})
+const previewLoading = computed(() => preview.value !== null && !preview.value.data && !preview.value.error)
 const categories = computed(() => [
   { path: '', label: '全部成果', files: overview.value.totalFiles },
   ...ARTIFACT_CATEGORIES.map(category => ({
@@ -290,9 +311,13 @@ const categories = computed(() => [
     files: Number(overview.value.categories.find(item => item.path === category.path)?.files || 0)
   }))
 ])
-const hasFilters = computed(() => Boolean(currentPath.value || source.value || search.value.trim()))
+const keyword = computed(() => search.value.trim())
+const hasFilters = computed(() => Boolean(currentPath.value || source.value || keyword.value))
 const emptyState = computed(() => {
-  if (source.value || search.value.trim()) return {
+  if (listError.value) return {
+    title: '成果列表读取失败', description: listError.value, actionLabel: '重新加载'
+  }
+  if (source.value || keyword.value) return {
     title: '没有匹配的成果', description: '尝试调整分类、来源或搜索关键词。', actionLabel: '清空筛选'
   }
   if (currentPath.value) return {
@@ -313,65 +338,93 @@ const emptyState = computed(() => {
 })
 
 async function fetchList() {
-  const sequence = ++listSequence
-  loading.value = true
-  try {
-    const response = await userFileListApi({ recursive: true, path: currentPath.value || undefined,
-      search: search.value, source: source.value, page: page.value, pageSize: PAGE_SIZE })
-    if (sequence !== listSequence) return
-    const data = response.data || {}
-    if (!Number.isInteger(data.page)) throw new Error('成果库接口尚未加载，请重启后端后刷新')
-    total.value = Number(data.count || 0)
-    const lastPage = Math.max(1, Math.ceil(total.value / PAGE_SIZE))
-    if (page.value > lastPage) {
-      page.value = lastPage
-      return fetchList()
+  clearTimeout(searchTimer)
+  if (disposed) return
+  listRequest?.abort()
+  const request = new AbortController()
+  listRequest = request
+  const { signal } = request
+  const params = { recursive: true, path: currentPath.value || undefined,
+    search: keyword.value, source: source.value, pageSize: PAGE_SIZE }
+  const loadPage = async (requestedPage) => {
+    const { data } = await userFileListApi({ ...params, page: requestedPage }, { signal })
+    if (!Number.isSafeInteger(data?.count) || data.count < 0 || data.page !== requestedPage || !Array.isArray(data.fileList)) {
+      throw new Error('成果库列表响应格式异常')
     }
-    files.value = Array.isArray(data.fileList) ? data.fileList : []
+    return data
+  }
+  loading.value = true
+  listError.value = ''
+  try {
+    const requestedPage = page.value
+    let data = await loadPage(requestedPage)
+    if (signal.aborted) return
+    if (requestedPage > 1 && (requestedPage - 1) * PAGE_SIZE >= data.count) {
+      if (data.count > 0) data = await loadPage(1)
+      if (signal.aborted) return
+      page.value = 1
+    }
+    total.value = data.count
+    files.value = data.fileList
     if (detailVisible.value) {
       detailEntry.value = files.value.find(file => file.path === detailEntry.value?.path) || null
       if (!detailEntry.value) detailVisible.value = false
     }
   } catch (error) {
-    if (sequence === listSequence) showError(`读取成果失败：${error?.message || '未知错误'}`)
+    if (signal.aborted) return
+    files.value = []
+    listError.value = handleError(error, { showMessage: false, defaultMessage: '读取成果失败，请重试' })
   } finally {
-    if (sequence === listSequence) loading.value = false
+    if (listRequest === request) {
+      listRequest = undefined
+      if (!signal.aborted) loading.value = false
+    }
   }
 }
 
 async function fetchOverview() {
-  const sequence = ++overviewSequence
+  if (disposed) return
+  overviewRequest?.abort()
+  const request = new AbortController()
+  overviewRequest = request
+  const { signal } = request
   try {
-    const response = await userWorkspaceOverviewApi()
-    if (sequence === overviewSequence && Array.isArray(response.data?.categories)) overview.value = normalizeWorkspaceOverview(response.data)
-  } catch { /* Keep the previous counters; the artifact list remains usable. */ }
+    const { data } = await userWorkspaceOverviewApi({ signal })
+    if (!signal.aborted && Array.isArray(data?.categories)) overview.value = normalizeWorkspaceOverview(data)
+  } catch { /* 保留已有计数，列表仍可独立使用。 */ }
+  finally { if (overviewRequest === request) overviewRequest = undefined }
 }
 
 async function refreshWorkspace() {
-  clearTimeout(searchTimer)
   await Promise.all([fetchList(), fetchOverview()])
+}
+
+function closeFilePanels() {
+  previewVisible.value = false
+  detailVisible.value = false
 }
 
 function changePage(value) {
   if (page.value === value) return
   page.value = value
-  previewVisible.value = false
-  detailVisible.value = false
-  ++previewSequence
+  closeFilePanels()
   fetchList()
 }
 
-watch([currentPath, source, search], () => {
-  ++listSequence
-  ++previewSequence
-  previewVisible.value = false
-  detailVisible.value = false
+watch([currentPath, source, keyword], ([path, sourceId, query], [previousPath, previousSource]) => {
+  clearTimeout(searchTimer)
+  listRequest?.abort()
+  closeFilePanels()
   loading.value = true
+  listError.value = ''
   files.value = []
   total.value = 0
   page.value = 1
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(fetchList, 250)
+  if (path === previousPath && sourceId === previousSource && query) {
+    searchTimer = setTimeout(fetchList, 250)
+  } else {
+    fetchList()
+  }
 })
 
 function clearFilters() {
@@ -401,11 +454,14 @@ async function uploadFile(event) {
     try { await userFileUploadApi(file, { path }) }
     catch (error) {
       if (error?.code !== 409) throw error
-      if (!await confirmAction({ title: '覆盖同名成果', message: `确认覆盖「${file.name}」？`, type: 'warning' })) return
+      if (disposed) return
+      const overwrite = await confirmAction({ title: '覆盖同名成果', message: `确认覆盖「${file.name}」？`, type: 'warning' })
+      if (!overwrite || disposed) return
       await userFileUploadApi(file, { path, overwrite: true })
     }
     showSuccess('已导入到「导入与其他」')
-    if (currentPath.value !== path || source.value || search.value) {
+    if (disposed) return
+    if (currentPath.value !== path || source.value || keyword.value) {
       currentPath.value = path
       source.value = ''
       search.value = ''
@@ -419,16 +475,24 @@ async function uploadFile(event) {
 }
 
 async function previewFile(file) {
+  if (!file?.path || disposed || (previewLoading.value && preview.value.file.path === file.path)) return
+  previewRequest?.abort()
+  const request = new AbortController()
+  previewRequest = request
+  const { signal } = request
   detailVisible.value = false
-  const sequence = ++previewSequence
+  preview.value = { file, data: null, error: '' }
   try {
     const markdown = ['md', 'markdown'].includes(getUserSpaceFileExtension(file.name))
-    const response = await userFilePreviewApi({ path: file.path, size: markdown ? 1024 * 1024 : undefined })
-    if (sequence !== previewSequence) return
-    previewData.value = response.data
-    previewVisible.value = true
+    const { data } = await userFilePreviewApi({ path: file.path, size: markdown ? 1024 * 1024 : undefined }, { signal })
+    if (signal.aborted) return
+    if (typeof data?.content !== 'string') throw new Error('成果预览响应格式异常')
+    preview.value = { file, data, error: '' }
   } catch (error) {
-    if (sequence === previewSequence) showError(`预览失败：${error?.message || '未知错误'}`)
+    if (signal.aborted) return
+    preview.value = { file, data: null, error: handleError(error, { showMessage: false, defaultMessage: '读取成果预览失败' }) }
+  } finally {
+    if (previewRequest === request) previewRequest = undefined
   }
 }
 
@@ -441,17 +505,23 @@ async function downloadFile(file) {
 
 async function deleteFile(file) {
   if (!await confirmDelete({ title: '删除成果', message: `确认删除「${file.metadata?.title || file.name}」？` })) return
+  if (disposed) return
   try {
     await userFileDeleteApi({ path: file.path })
     if (detailEntry.value?.path === file.path) detailVisible.value = false
-    previewVisible.value = false
-    ++previewSequence
+    if (preview.value?.file.path === file.path) previewVisible.value = false
     await refreshWorkspace()
   } catch (error) { showError(`删除失败：${error?.message || '未知错误'}`) }
 }
 
 onMounted(refreshWorkspace)
-onUnmounted(() => { clearTimeout(searchTimer); ++listSequence; ++overviewSequence; ++previewSequence })
+onScopeDispose(() => {
+  disposed = true
+  clearTimeout(searchTimer)
+  listRequest?.abort()
+  overviewRequest?.abort()
+  previewRequest?.abort()
+})
 </script>
 
 <style scoped>

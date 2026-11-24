@@ -26,24 +26,30 @@ describe('artifact library API contract', () => {
   it('preserves listing, overview and archive requests', () => {
     const filter = { category: 'imports', page: 2 }
     const artifact = { filename: 'report.md', content: 'fixture report' }
+    const { signal } = new AbortController()
 
-    userSpace.userFileListApi(filter)
-    userSpace.userWorkspaceOverviewApi()
+    userSpace.userFileListApi(filter, { signal })
+    userSpace.userWorkspaceOverviewApi({ signal })
     userSpace.archiveUserArtifactApi(artifact)
 
-    expect(mocks.get).toHaveBeenNthCalledWith(1, '/platform/user/file/list', { params: filter })
-    expect(mocks.get).toHaveBeenNthCalledWith(2, '/platform/user/file/overview')
+    expect(mocks.get).toHaveBeenNthCalledWith(1, '/platform/user/file/list', { params: filter, signal })
+    expect(mocks.get).toHaveBeenNthCalledWith(2, '/platform/user/file/overview', {
+      params: { includeRecent: false }, signal
+    })
     expect(mocks.post).toHaveBeenCalledExactlyOnceWith('/platform/user/file/archive', artifact)
   })
 
   it('preserves preview, download and delete requests', () => {
     const params = { path: 'imports/fixture.txt' }
+    const { signal } = new AbortController()
 
-    userSpace.userFilePreviewApi(params)
+    userSpace.userFilePreviewApi(params, { signal })
     userSpace.userFileDownloadApi(params)
     userSpace.userFileDeleteApi(params)
 
-    expect(mocks.get).toHaveBeenNthCalledWith(1, '/platform/user/file/preview', { params })
+    expect(mocks.get).toHaveBeenNthCalledWith(1, '/platform/user/file/preview', {
+      params: { ...params, includeBase64: false }, signal
+    })
     expect(mocks.get).toHaveBeenNthCalledWith(2, '/platform/user/file/download', {
       params,
       responseType: 'blob'
