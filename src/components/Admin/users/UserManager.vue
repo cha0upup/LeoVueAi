@@ -7,7 +7,7 @@
       <template #actions>
         <el-button
           type="primary"
-          :disabled="actionsDisabled"
+          :disabled="editorDisabled"
           @click="openAddDialog"
         >
           <el-icon><Icon :icon="iconMap.plus" /></el-icon>
@@ -72,7 +72,7 @@
           type="primary"
           plain
           :disabled="mutationBusy"
-          :loading="loading"
+          :loading="loading || teamsLoading"
           @click="refreshData"
         >
           <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
@@ -103,6 +103,14 @@
         v-if="listError"
         :title="listError"
         type="error"
+        :closable="false"
+        show-icon
+      />
+      <el-alert
+        v-if="teamsError"
+        :title="`团队目录加载失败：${teamsError}`"
+        :description="isAdmin ? '用户列表可独立查看。请刷新团队目录后再新增或编辑账号。' : '用户列表可独立查看。点击刷新重新获取团队信息。'"
+        type="warning"
         :closable="false"
         show-icon
       />
@@ -162,6 +170,7 @@
           prop="teamId"
           label="所属团队"
           min-width="150"
+          show-overflow-tooltip
         >
           <template #default="{ row }">
             <el-tag
@@ -169,8 +178,9 @@
               type="info"
               size="small"
               effect="plain"
+              :title="row.teamId"
             >
-              {{ row.teamId }}
+              {{ teamNames.get(row.teamId) || row.teamId }}
             </el-tag>
             <span
               v-else
@@ -211,7 +221,7 @@
                 type="primary"
                 text
                 size="small"
-                :disabled="actionsDisabled || !canEditUser(row)"
+                :disabled="editorDisabled || !canEditUser(row)"
                 :title="getEditDisabledReason(row)"
                 @click="editUser(row)"
               >
@@ -327,13 +337,18 @@ const { currentUser, isAdmin, isLeader, fetchAuth } = useAuth()
 
 // 响应式数据
 const loading = ref(false)
+const teamsLoading = ref(false)
 const submitting = ref(false)
 const resetting = ref(false)
 const deleting = ref(false)
 const listError = ref('')
+const teamsError = ref('')
 const mutationBusy = computed(() => submitting.value || resetting.value || deleting.value)
 const actionsDisabled = computed(() => loading.value || mutationBusy.value || Boolean(listError.value))
-let directoryRequest
+const editorDisabled = computed(() => actionsDisabled.value
+  || isAdmin.value && (teamsLoading.value || Boolean(teamsError.value)))
+let usersRequest
+let teamsRequest
 let disposed = false
 
 // 使用对话框工具
@@ -346,6 +361,7 @@ const resetPasswordVisible = resetPasswordDialog.visible
 // 数据
 const userData = ref([])
 const teams = ref([])
+const teamNames = computed(() => new Map(teams.value.map(({ teamId, teamName }) => [teamId, teamName])))
 const searchKeyword = ref('')
 const filterRole = ref('')
 const filterTeam = ref('')
@@ -407,40 +423,56 @@ const emptyText = computed(() => {
   return userData.value.length ? '没有匹配的用户' : '暂无用户'
 })
 
-const loadDirectory = async (includeTeams) => {
-  directoryRequest?.abort()
+const loadUsers = async () => {
+  usersRequest?.abort()
   const request = new AbortController()
-  directoryRequest = request
+  usersRequest = request
   const { signal } = request
   loading.value = true
   listError.value = ''
   try {
-    const [usersResponse, teamsResponse] = await Promise.all([
-      getAllUsersApi({ signal }),
-      includeTeams ? getAllTeamsApi({ signal }) : null
-    ])
+    const { data } = await getAllUsersApi({ signal })
     if (signal.aborted) return
-    if (!Array.isArray(usersResponse.data) || (includeTeams && !Array.isArray(teamsResponse.data))) {
-      throw new Error('用户目录响应格式异常')
-    }
-    userData.value = usersResponse.data
-    if (includeTeams) teams.value = teamsResponse.data
+    if (!Array.isArray(data)) throw new Error('用户目录响应格式异常')
+    userData.value = data
   } catch (error) {
     if (signal.aborted) return
-    request.abort()
     listError.value = handleError(error, { defaultMessage: '加载用户目录失败，请重试', showMessage: false })
   } finally {
-    if (directoryRequest === request) {
-      directoryRequest = undefined
+    if (usersRequest === request) {
+      usersRequest = undefined
       loading.value = false
     }
   }
 }
 
-const refreshData = () => loadDirectory(true)
+const loadTeams = async () => {
+  teamsRequest?.abort()
+  const request = new AbortController()
+  teamsRequest = request
+  const { signal } = request
+  teamsLoading.value = true
+  teamsError.value = ''
+  try {
+    const { data } = await getAllTeamsApi({ signal })
+    if (signal.aborted) return
+    if (!Array.isArray(data)) throw new Error('团队目录响应格式异常')
+    teams.value = data
+  } catch (error) {
+    if (signal.aborted) return
+    teamsError.value = handleError(error, { defaultMessage: '请重试', showMessage: false })
+  } finally {
+    if (teamsRequest === request) {
+      teamsRequest = undefined
+      teamsLoading.value = false
+    }
+  }
+}
+
+const refreshData = () => Promise.all([loadUsers(), loadTeams()])
 
 const openAddDialog = () => {
-  if (actionsDisabled.value || userDialogVisible.value || resetPasswordVisible.value) return
+  if (editorDisabled.value || userDialogVisible.value || resetPasswordVisible.value) return
   Object.assign(userForm, createUserForm())
   // 队长创建用户时预填充其团队，写入时仍由后端判断归属。
   if (isLeader.value && currentUser.value?.teamId) userForm.teamId = currentUser.value.teamId
@@ -448,7 +480,7 @@ const openAddDialog = () => {
 }
 
 const editUser = (user) => {
-  if (actionsDisabled.value || userDialogVisible.value || resetPasswordVisible.value) return
+  if (editorDisabled.value || userDialogVisible.value || resetPasswordVisible.value) return
   if (!canEditUser(user)) {
     showWarning(getEditDisabledReason(user))
     return
@@ -477,7 +509,7 @@ watch(resetPasswordVisible, (visible) => {
 }, { flush: 'sync' })
 
 const submitUser = () => {
-  if (!userDialogVisible.value || actionsDisabled.value) return
+  if (!userDialogVisible.value || editorDisabled.value) return
   return withLoading(submitting, async () => {
     if (!await validateForm(userFormRef) || disposed || !userDialogVisible.value) return
     const editing = isEdit.value
@@ -496,7 +528,7 @@ const submitUser = () => {
         errorMessage: editing ? '更新用户失败' : '创建用户失败',
         onSuccess: async () => {
           userDialog.close()
-          if (!disposed) await loadDirectory(false)
+          if (!disposed) await loadUsers()
         }
       }
     ).catch(() => false)
@@ -520,7 +552,7 @@ const deleteUser = (user) => {
     await executeRequest(() => deleteUserApi({ id: userId }), {
       successMessage: '用户已删除',
       errorMessage: '删除用户失败',
-      onSuccess: () => { if (!disposed) return loadDirectory(false) }
+      onSuccess: () => { if (!disposed) return loadUsers() }
     }).catch(() => false)
   })
 }
@@ -589,7 +621,8 @@ onMounted(async () => {
 
 onScopeDispose(() => {
   disposed = true
-  directoryRequest?.abort()
+  usersRequest?.abort()
+  teamsRequest?.abort()
   Object.assign(userForm, createUserForm())
   Object.assign(resetForm, createPasswordResetForm())
 })

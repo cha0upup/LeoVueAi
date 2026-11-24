@@ -53,7 +53,7 @@ async function mount() {
   app.component('ElTableColumn', {
     inheritAttrs: false,
     setup(_props, { attrs, slots }) {
-      return () => h('ElTableColumn', attrs, attrs.label === '操作' ? slots.default?.({ row }) : [])
+      return () => h('ElTableColumn', attrs, ['操作', '所属团队'].includes(attrs.label) ? slots.default?.({ row }) : [])
     }
   })
   app.mount(renderer.root)
@@ -64,7 +64,8 @@ async function mount() {
     dialog: type => nodes(node => node.type === type)[0].props,
     button: label => nodes(node => node.type === 'ElButton' && text(node) === label)[0].props,
     alert: () => nodes(node => node.type === 'ElAlert')[0]?.props.title,
-    rows: () => nodes(node => node.type === 'ElTable')[0].props.data
+    rows: () => nodes(node => node.type === 'ElTable')[0].props.data,
+    teamLabel: () => text(nodes(node => node.type === 'ElTag' && node.props.title === row.teamId)[0])
   }
 }
 
@@ -142,4 +143,26 @@ it('does not let an old refresh replace newer rows', async () => {
   stale.resolve({ data: [{ ...row, userName: 'Stale' }] })
   await previous
   expect(view.rows().map(({ userName }) => userName)).toEqual(['Latest'])
+})
+
+it('shows user rows while teams are pending or unavailable, then resolves their team names after refresh', async () => {
+  const pending = deferred()
+  api.getAllTeamsApi.mockReturnValueOnce(pending.promise)
+  const view = await mount()
+
+  expect(view.rows()).toEqual([row])
+  expect(view.teamLabel()).toBe('team')
+  expect(view.button('新增用户').disabled).toBe(true)
+  pending.reject(new Error('暂时不可用'))
+  await flush()
+  expect(view.alert()).toBe('团队目录加载失败：暂时不可用')
+  expect(view.rows()).toEqual([row])
+  expect(view.button('重置密码').disabled).toBe(false)
+  expect(view.button('编辑').disabled).toBe(true)
+
+  await view.button('刷新').onClick()
+  await flush()
+  expect(view.alert()).toBeUndefined()
+  expect(view.teamLabel()).toBe('Example')
+  expect(view.button('新增用户').disabled).toBe(false)
 })
