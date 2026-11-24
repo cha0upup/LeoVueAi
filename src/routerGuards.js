@@ -1,23 +1,21 @@
 import { ROUTE_PATHS } from '@/constants/app.js'
 
+const AUTH_PAGES = [ROUTE_PATHS.login, ROUTE_PATHS.changePassword, ROUTE_PATHS.setup, ROUTE_PATHS.startup]
+
 export function normalizeAuthRedirect(value) {
   const candidate = Array.isArray(value) ? value[0] : value
   if (typeof candidate !== 'string' || !candidate.startsWith('/') || candidate.startsWith('//')) return null
-  if ([ROUTE_PATHS.login, ROUTE_PATHS.changePassword, ROUTE_PATHS.setup, ROUTE_PATHS.startup]
-    .some(path => candidate.startsWith(path))) return null
+  if (candidate.startsWith('/\\') || AUTH_PAGES.some(path => candidate.startsWith(path))) return null
   return candidate
 }
 
-const getRequestedRedirect = (to) => normalizeAuthRedirect(
-  [ROUTE_PATHS.login, ROUTE_PATHS.startup].includes(to.path) ? to.query?.redirect : to.fullPath
-)
-
-const passwordChangeTarget = (to) => {
-  const redirect = getRequestedRedirect(to)
-  return redirect
-    ? { path: ROUTE_PATHS.changePassword, query: { redirect } }
-    : { path: ROUTE_PATHS.changePassword }
+export function authPageTarget(path, requested) {
+  const redirect = normalizeAuthRedirect(requested)
+  return redirect ? { path, query: { redirect } } : { path }
 }
+
+const getRequestedRedirect = (to) => AUTH_PAGES.includes(to.path) ? to.query?.redirect : to.fullPath
+const passwordChangeTarget = (to) => authPageTarget(ROUTE_PATHS.changePassword, getRequestedRedirect(to))
 
 /**
  * 返回路由守卫应跳转到的位置；返回 null 表示允许当前导航。
@@ -25,31 +23,23 @@ const passwordChangeTarget = (to) => {
 export function resolveAuthNavigation(to, currentUser, initializationRequired = false, checkState = 'ready') {
   if (!['ready', 'required'].includes(checkState)) {
     if (to.path === ROUTE_PATHS.startup) return null
-    const redirect = getRequestedRedirect(to)
-    return { path: ROUTE_PATHS.startup, ...(redirect ? { query: { redirect } } : {}) }
+    return authPageTarget(ROUTE_PATHS.startup, getRequestedRedirect(to))
   }
   if (initializationRequired) {
-    return to.path === ROUTE_PATHS.setup ? null : { path: ROUTE_PATHS.setup }
+    return to.path === ROUTE_PATHS.setup ? null : authPageTarget(ROUTE_PATHS.setup, getRequestedRedirect(to))
   }
-  if (to.path === ROUTE_PATHS.startup) {
-    if (currentUser?.passwordChangeRequired) return passwordChangeTarget(to)
-    const redirect = getRequestedRedirect(to)
-    return currentUser ? { path: redirect || ROUTE_PATHS.main }
-      : { path: ROUTE_PATHS.login, ...(redirect ? { query: { redirect } } : {}) }
-  }
-  if (to.path === ROUTE_PATHS.login || to.path === ROUTE_PATHS.setup) {
-    if (!currentUser) return to.path === ROUTE_PATHS.setup ? { path: ROUTE_PATHS.login } : null
+  if ([ROUTE_PATHS.startup, ROUTE_PATHS.login, ROUTE_PATHS.setup].includes(to.path)) {
+    if (!currentUser) {
+      return to.path === ROUTE_PATHS.login ? null : authPageTarget(ROUTE_PATHS.login, getRequestedRedirect(to))
+    }
     if (currentUser.passwordChangeRequired) return passwordChangeTarget(to)
-    return { path: ROUTE_PATHS.main }
+    return normalizeAuthRedirect(getRequestedRedirect(to)) || { path: ROUTE_PATHS.main }
   }
 
   if (!to.meta?.requiresAuth) return null
 
   if (!currentUser) {
-    return {
-      path: ROUTE_PATHS.login,
-      query: { redirect: to.fullPath }
-    }
+    return authPageTarget(ROUTE_PATHS.login, to.fullPath)
   }
 
   if (currentUser.passwordChangeRequired) {

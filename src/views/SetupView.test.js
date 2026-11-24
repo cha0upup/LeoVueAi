@@ -5,12 +5,13 @@ import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { createPasswordMatchValidator } from '@/utils/formUtils.js'
 import { deferred } from '@/test-support/deferred.js'
 import { ROUTE_PATHS } from '@/constants/app.js'
+import { authPageTarget } from '@/routerGuards.js'
 
 describe('first-deployment setup page', () => {
   const apps = []
   afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
 
-  const mount = async () => {
+  const mount = async (redirect) => {
     const initialize = vi.fn().mockResolvedValue({})
     const required = ref(true)
     const authFetched = ref(true)
@@ -19,12 +20,13 @@ describe('first-deployment setup page', () => {
     const validate = vi.fn().mockResolvedValue(true)
     const showError = vi.fn(), showSuccess = vi.fn()
     const View = compileClientComponent(new URL('./SetupView.vue', import.meta.url), {
-      'vue-router': { useRouter: () => ({ replace }) },
+      'vue-router': { useRouter: () => ({ replace }), useRoute: () => ({ query: { redirect } }) },
       '@/constants/app.js': { ROUTE_PATHS },
       '@/composables/useAuth.js': { useAuth: () => ({
         fetchAuth, authFetched, initializationRequired: required, passwordMinLength: ref(12), passwordMaxLength: ref(256)
       }) },
       '@/services/api/auth.js': { initializeSystemApi: initialize },
+      '@/routerGuards.js': { authPageTarget },
       '@/utils/formUtils.js': { createPasswordMatchValidator, validateForm: validate },
       '@/utils/messageUtils.js': { showError, showSuccess }
     })
@@ -62,7 +64,7 @@ describe('first-deployment setup page', () => {
     })
     expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
     expect(view.fetchAuth).toHaveBeenCalledWith({ force: true })
-    expect(view.replace).toHaveBeenCalledWith(ROUTE_PATHS.login)
+    expect(view.replace).toHaveBeenCalledWith({ path: ROUTE_PATHS.login })
     expect(view.showSuccess).toHaveBeenCalledOnce()
   })
 
@@ -86,15 +88,53 @@ describe('first-deployment setup page', () => {
     await first
   })
 
-  it('keeps the form retryable after a network failure', async () => {
+  it('reopens the form after a network failure only if a fresh status says setup is required', async () => {
     const view = await mount()
     view.initialize.mockRejectedValue(new Error('network-fixture'))
+    view.fetchAuth.mockResolvedValue(null)
     await view.submit()
-    expect(view.showError).toHaveBeenCalledWith('network-fixture')
+    expect(view.fetchAuth).toHaveBeenCalledOnce()
+    expect(view.showError).toHaveBeenCalledWith('系统仍待初始化，请重试提交')
     expect(view.form.model.password).toBe(' chosen-fixture-password ')
     expect(view.replace).not.toHaveBeenCalled()
     await nextTick()
     expect(findNode(view.renderer.root, 'button').props.loading).toBe(false)
+  })
+
+  it('returns to the original login destination if setup finished before a response was lost', async () => {
+    const redirect = '/admin?tab=statistics#latest'
+    const view = await mount(redirect)
+    view.initialize.mockRejectedValue(new Error('connection lost'))
+    await view.submit()
+
+    expect(view.initialize).toHaveBeenCalledOnce()
+    expect(view.fetchAuth).toHaveBeenCalledOnce()
+    expect(view.replace).toHaveBeenCalledWith({ path: ROUTE_PATHS.login, query: { redirect } })
+    expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
+    expect(view.showSuccess).not.toHaveBeenCalled()
+  })
+
+  it('keeps an acknowledged submission read-only while the server still reports setup required', async () => {
+    const view = await mount()
+    view.fetchAuth.mockResolvedValueOnce(null)
+    await view.submit()
+    await nextTick()
+
+    expect(findNode(view.renderer.root, 'form-fixture')).toBeNull()
+    expect(view.replace).not.toHaveBeenCalled()
+    await view.submit()
+    expect(view.initialize).toHaveBeenCalledOnce()
+    expect(view.fetchAuth).toHaveBeenCalledTimes(2)
+    expect(view.replace).toHaveBeenCalledWith({ path: ROUTE_PATHS.login })
+  })
+
+  it('keeps explicit server validation failures on the form without checking status', async () => {
+    const view = await mount()
+    view.initialize.mockRejectedValue({ response: { status: 400, data: { msg: '密码不符合策略' } } })
+    await view.submit()
+    expect(view.fetchAuth).not.toHaveBeenCalled()
+    expect(view.showError).toHaveBeenCalledWith('密码不符合策略')
+    expect(view.form.model.password).toBe(' chosen-fixture-password ')
   })
 
   it('refreshes stale setup state if another browser has completed initialization', async () => {
@@ -103,7 +143,7 @@ describe('first-deployment setup page', () => {
     view.fetchAuth.mockImplementation(async () => { view.required.value = false })
     await view.submit()
     expect(view.fetchAuth).toHaveBeenCalledWith({ force: true })
-    expect(view.replace).toHaveBeenCalledWith(ROUTE_PATHS.login)
+    expect(view.replace).toHaveBeenCalledWith({ path: ROUTE_PATHS.login })
     expect(view.form.model.password).toBe('')
   })
 
@@ -114,9 +154,21 @@ describe('first-deployment setup page', () => {
     await view.submit()
     expect(view.initialize).toHaveBeenCalledOnce()
     expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
-    expect(view.replace).toHaveBeenCalledExactlyOnceWith(ROUTE_PATHS.startup)
+    expect(view.replace).toHaveBeenCalledExactlyOnceWith({ path: ROUTE_PATHS.startup })
     expect(view.showError).not.toHaveBeenCalled()
     expect(view.showSuccess).toHaveBeenCalledTimes(conflict ? 0 : 1)
+  })
+
+  it('opens read-only status recovery for an unconfirmed POST when status is also unavailable', async () => {
+    const redirect = '/admin?tab=statistics'
+    const view = await mount(redirect)
+    view.initialize.mockRejectedValue(new Error('connection lost'))
+    view.fetchAuth.mockImplementation(async () => { view.authFetched.value = false })
+
+    await view.submit()
+    expect(view.initialize).toHaveBeenCalledOnce()
+    expect(view.replace).toHaveBeenCalledWith({ path: ROUTE_PATHS.startup, query: { redirect } })
+    expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
   })
 
   it('clears the form on unmount and does not submit if validation completes afterwards', async () => {

@@ -78,20 +78,22 @@ configureHttpErrorHandling({
  * 全局前置守卫：未登录时拦截受保护路由，避免页面闪烁。
  * 登录状态通过 /platform/user/status 接口判断，结果缓存在 useAuth composable 中。
  */
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, from) => {
   const { currentUser, authFetched, authCheckState, initializationRequired, fetchAuth } = useAuth()
 
   if (![ROUTE_PATHS.login, ROUTE_PATHS.setup, ROUTE_PATHS.startup].includes(to.path) && !to.meta.requiresAuth) {
-    return next()
+    return true
   }
 
   const showingError = to.path === ROUTE_PATHS.startup && authCheckState.value === 'error'
-  if (!showingError && (!authFetched.value || initializationRequired.value || to.path === ROUTE_PATHS.setup)) {
+  // A guard redirect or a successful retry from /startup already carries a fresh status result.
+  const continuingCheck = Boolean(to.redirectedFrom) || from.path === ROUTE_PATHS.startup
+  const directSetupCheck = !continuingCheck && (initializationRequired.value || to.path === ROUTE_PATHS.setup)
+  if (!showingError && (authCheckState.value === 'checking' || !authFetched.value || directSetupCheck)) {
     await fetchAuth({ force: true })
   }
 
-  const redirect = resolveAuthNavigation(to, currentUser.value, initializationRequired.value, authCheckState.value)
-  return redirect ? next(redirect) : next()
+  return resolveAuthNavigation(to, currentUser.value, initializationRequired.value, authCheckState.value) ?? true
 })
 
 export default router

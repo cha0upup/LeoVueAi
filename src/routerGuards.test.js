@@ -12,7 +12,7 @@ const route = (path, options = {}) => ({
 
 describe('authentication route guard', () => {
   it('normalizes shared redirect values without accepting external or authentication-page destinations', () => {
-    for (const value of [undefined, null, '', 42, {}, [], 'https://example.invalid', '//example.invalid',
+    for (const value of [undefined, null, '', 42, {}, [], 'https://example.invalid', '//example.invalid', '/\\example.invalid',
       '/login?redirect=/main', '/setup', '/change-password', '/startup']) {
       expect(normalizeAuthRedirect(value)).toBeNull()
     }
@@ -28,16 +28,19 @@ describe('authentication route guard', () => {
 
   it('continues to setup or login after a successful status retry', () => {
     const startup = route(ROUTE_PATHS.startup, { query: { redirect: ROUTE_PATHS.admin }, meta: {} })
-    expect(resolveAuthNavigation(startup, null, true, 'required')).toEqual({ path: ROUTE_PATHS.setup })
+    expect(resolveAuthNavigation(startup, null, true, 'required')).toEqual({
+      path: ROUTE_PATHS.setup, query: { redirect: ROUTE_PATHS.admin }
+    })
     expect(resolveAuthNavigation(startup, null, false, 'ready')).toEqual({
       path: ROUTE_PATHS.login, query: { redirect: ROUTE_PATHS.admin }
     })
-    expect(resolveAuthNavigation(startup, { privilege: 'admin' }, false, 'ready')).toEqual({ path: ROUTE_PATHS.admin })
+    expect(resolveAuthNavigation(startup, { privilege: 'admin' }, false, 'ready')).toBe(ROUTE_PATHS.admin)
   })
 
   it.each([ROUTE_PATHS.login, ROUTE_PATHS.main, ROUTE_PATHS.admin, ROUTE_PATHS.changePassword])(
     'sends %s to the setup wizard on a fresh deployment', path => {
-      expect(resolveAuthNavigation(route(path), null, true)).toEqual({ path: ROUTE_PATHS.setup })
+      const query = [ROUTE_PATHS.main, ROUTE_PATHS.admin].includes(path) ? { redirect: path } : undefined
+      expect(resolveAuthNavigation(route(path), null, true)).toEqual({ path: ROUTE_PATHS.setup, ...(query ? { query } : {}) })
     }
   )
 
@@ -47,6 +50,15 @@ describe('authentication route guard', () => {
       .toEqual({ path: ROUTE_PATHS.login })
     expect(resolveAuthNavigation(route(ROUTE_PATHS.setup, { meta: {} }), { privilege: 'admin' }, false))
       .toEqual({ path: ROUTE_PATHS.main })
+  })
+
+  it('isolates an unsafe setup destination and carries a valid one into login recovery', () => {
+    const redirect = '/admin?tab=statistics#latest'
+    const setupRoute = route(ROUTE_PATHS.setup, { query: { redirect }, meta: {} })
+    expect(resolveAuthNavigation(setupRoute, null, false)).toEqual({ path: ROUTE_PATHS.login, query: { redirect } })
+    expect(resolveAuthNavigation(setupRoute, null, true, 'error')).toEqual({ path: ROUTE_PATHS.startup, query: { redirect } })
+    expect(resolveAuthNavigation(route(ROUTE_PATHS.setup, { query: { redirect: '/setup' } }), null, false))
+      .toEqual({ path: ROUTE_PATHS.login })
   })
 
   it('sends a first-login session to the forced password page', () => {
