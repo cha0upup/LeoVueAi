@@ -37,7 +37,8 @@ function editorEntryBoundary() {
     name: 'editor-entry-boundary',
     generateBundle(_options, bundle) {
       const pending = Object.values(bundle)
-        .filter(chunk => chunk.type === 'chunk' && chunk.isEntry)
+        .filter(chunk => chunk.type === 'chunk' && (chunk.isEntry
+          || Object.keys(chunk.modules).some(id => id.endsWith('/src/components/UserSpace/UserSpace.vue'))))
         .map(chunk => chunk.fileName)
       const visited = new Set()
       while (pending.length) {
@@ -47,7 +48,7 @@ function editorEntryBoundary() {
         const chunk = bundle[file]
         if (!chunk || chunk.type !== 'chunk') continue
         if (Object.keys(chunk.modules).some(id => /node_modules\/monaco-editor\//.test(id))) {
-          this.error(`Monaco must stay outside the initial static import graph: ${file}`)
+          this.error(`Monaco must stay outside the initial static import graph of the app and the artifact library: ${file}`)
         }
         pending.push(...chunk.imports)
       }

@@ -5,7 +5,6 @@
     width="min(920px, calc(100vw - 32px))"
     destroy-on-close
     class="preview-dialog"
-    @opened="initEditor"
   >
     <div
       v-if="loading"
@@ -77,20 +76,18 @@
         v-html="renderedMarkdown"
       />
       <!-- eslint-enable vue/no-v-html -->
-      <div
-        v-else
-        ref="editorContainer"
-        class="preview-editor"
+      <SourcePreview
+        v-else-if="visible"
+        :key="path"
+        :content="data.content"
+        :language="previewLanguage"
       />
     </template>
   </el-dialog>
 </template>
 
 <script setup>
-import { computed, nextTick, onUnmounted, ref, toRaw, watch } from 'vue'
-import { monaco } from '@/utils/monaco.js'
-import { disposeEditorInstance, recreateEditorInstance, createMonacoEditorOptions } from '@/utils/monacoEditor.js'
-import { useMonacoTheme } from '@/composables/useMonacoTheme.js'
+import { computed, defineAsyncComponent, h, ref, watch } from 'vue'
 import { useDialogVisible } from '@/composables/useDialogVisible.js'
 import { formatFileSize } from '@/utils/format.js'
 import { detectUserSpaceLanguage } from './userSpaceModel.js'
@@ -105,72 +102,20 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue', 'retry'])
 
+const SourcePreview = defineAsyncComponent({
+  loader: () => import('./UserSpaceSourcePreview.vue'),
+  delay: 0,
+  loadingComponent: () => h('div', { class: 'preview-feedback', role: 'status' }, '正在加载源码查看器…'),
+  errorComponent: () => h('div', { class: 'preview-feedback', role: 'alert' }, '源码查看器加载失败。可重新打开预览，或下载文件查看。')
+})
 const visible = useDialogVisible(props, emit)
 const previewLanguage = computed(() => detectUserSpaceLanguage(props.path))
 const previewMode = ref('rendered')
 const previewModes = [{ label: '阅读预览', value: 'rendered' }, { label: '查看源码', value: 'source' }]
 const isReading = computed(() => previewLanguage.value === 'markdown' && previewMode.value === 'rendered')
 const renderedMarkdown = computed(() => isReading.value && props.data ? renderArtifactMarkdown(props.data.content) : '')
-const showEditor = computed(() => visible.value && Boolean(props.data) && !isReading.value)
-const editor = ref(null)
-const editorContainer = ref(null)
-const { monacoTheme, watchMonacoTheme } = useMonacoTheme()
-
-const disposeEditor = () => disposeEditorInstance(editor, { disposeModel: true })
-
-const syncEditor = () => {
-  if (!editor.value || !props.data) return
-  const rawEditor = toRaw(editor.value)
-  const model = rawEditor.getModel()
-  if (!model) return
-  model.setValue(String(props.data.content || ''))
-  monaco.editor.setModelLanguage(model, previewLanguage.value)
-  monaco.editor.setTheme(monacoTheme.value)
-  rawEditor.layout()
-}
-
-const initEditor = () => {
-  if (!showEditor.value || !editorContainer.value) return
-  if (editor.value) {
-    syncEditor()
-    return
-  }
-  recreateEditorInstance(
-    editor,
-    editorContainer,
-    createMonacoEditorOptions({
-      value: String(props.data.content || ''),
-      language: previewLanguage.value,
-      theme: monacoTheme.value,
-      readOnly: true,
-      wordWrap: 'on',
-      contextmenu: true,
-      fontSize: 13,
-      fontFamily: 'Consolas, Monaco, "Courier New", monospace'
-    }),
-    { disposeModel: true }
-  )
-}
 
 watch(() => props.path, () => { previewMode.value = 'rendered' })
-watch(showEditor, async (show) => {
-  disposeEditor()
-  if (show) {
-    await nextTick()
-    initEditor()
-  }
-}, { flush: 'post', immediate: true })
-
-watch(
-  () => props.data?.content,
-  () => { if (showEditor.value) syncEditor() }
-)
-
-const stopThemeWatch = watchMonacoTheme(() => editor.value)
-onUnmounted(() => {
-  stopThemeWatch()
-  disposeEditor()
-})
 </script>
 
 <style scoped>
@@ -193,14 +138,6 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
-}
-
-.preview-editor {
-  height: 58vh;
-  min-height: 360px;
-  overflow: hidden;
-  border: 1px solid var(--workspace-border-soft);
-  border-radius: var(--el-border-radius-base);
 }
 
 .preview-mode {

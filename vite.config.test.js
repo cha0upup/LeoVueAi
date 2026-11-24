@@ -10,6 +10,7 @@ const check = chunks => boundary.generateBundle.call({
   error: message => { throw new Error(message) }
 }, {}, Object.fromEntries(chunks.map(chunk => [chunk.fileName, chunk])))
 const editorModule = '/app/node_modules/monaco-editor/esm/vs/editor/editor.api.js'
+const artifactLibrary = '/app/src/components/UserSpace/UserSpace.vue'
 
 describe('editor build boundary', () => {
   it('keeps the shared preload helper separate without splitting Monaco internals', () => {
@@ -22,7 +23,18 @@ describe('editor build boundary', () => {
   it.each([false, true])('rejects editor modules in the initial static graph (indirect=%s)', indirect => {
     const chunks = [chunk('entry.js', [indirect ? 'shared.js' : 'large.js'], [], true),
       chunk('shared.js', ['large.js']), chunk('large.js', [], [editorModule])]
-    expect(() => check(chunks)).toThrow('Monaco must stay outside the initial static import graph: large.js')
+    expect(() => check(chunks)).toThrow(/Monaco must stay outside the initial static import graph.*large\.js/)
+  })
+
+  it('requires the artifact library to defer Monaco even though the library is already a lazy route chunk', () => {
+    const entry = chunk('entry.js', [], [], true, ['artifacts.js'])
+    const sourcePreview = chunk('source.js', [], [editorModule])
+    expect(() => check([
+      entry, chunk('artifacts.js', ['source.js'], [artifactLibrary]), sourcePreview
+    ])).toThrow(/Monaco.*artifact library: source\.js/)
+    expect(() => check([
+      entry, chunk('artifacts.js', [], [artifactLibrary], false, ['source.js']), sourcePreview
+    ])).not.toThrow()
   })
 
   it('allows lazy editor loading and terminates on shared static cycles', () => {

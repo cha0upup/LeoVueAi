@@ -526,7 +526,6 @@ onScopeDispose(() => {
 
 <style scoped>
 .artifact-library {
-  --workspace-border-soft: var(--app-divider-color);
   display: flex;
   flex-direction: column;
   height: 100%;
