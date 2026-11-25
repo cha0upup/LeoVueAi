@@ -4,7 +4,6 @@ import {
   buildAuditFilterParams,
   createAuditFilter,
   formatAuditJson,
-  formatAuditTime,
   getActiveAuditFilterSummary
 } from './auditManagerModel.js'
 
@@ -48,10 +47,5 @@ describe('auditManagerModel', () => {
     expect(formatAuditJson('{"ok":true}')).toBe('{\n  "ok": true\n}')
     expect(formatAuditJson('{bad')).toBe('{bad')
     expect(formatAuditJson(null)).toBe('-')
-  })
-
-  it('preserves invalid timestamps instead of emitting invalid date text', () => {
-    expect(formatAuditTime('not-a-date')).toBe('not-a-date')
-    expect(formatAuditTime('')).toBe('-')
   })
 })

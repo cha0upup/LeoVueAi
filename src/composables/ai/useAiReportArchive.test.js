@@ -40,13 +40,14 @@ describe('shared AI report archive', () => {
       expect(loadMessages).toHaveBeenCalledExactlyOnceWith('thread-1')
       const request = archiveUserArtifactApi.mock.calls[0][0]
       expect(request.category).toBe('ai-reports')
+      expect(request.filename).toMatch(/-报告标题\.md$/)
       expect(request.metadata).toEqual({
         title: '报告标题', sourceModule, sourceId: 'thread-1',
         ...(sourceModule === 'node-ai' ? { sessionId: 'session-1', hostName: 'host-1' } : {})
       })
       expect(request.content).toContain(`报告类型：${label} AI 分析`)
       expect(request.content).toContain('对话范围：完整会话')
-      expect(request.content).toContain('历史问题')
+      expect(request.content).toContain('## 问题 1\n\n历史问题')
       expect(request.content).toContain('完整分析')
       expect(request.content).not.toContain('仅首屏内容')
       expect(archive.archivingReport.value).toBe(false)
