@@ -51,4 +51,12 @@ describe('handleError', () => {
 
     expect(message).toBe('数据库连接中断，请检查网络和连接配置：connection reset')
   })
+
+  it('shows the supplied tracing reference with the public message', () => {
+    const traceId = '64122da2-4c38-4553-b801-92a52ad7014b'
+    const message = handleError({ response: { data: { code: 500, msg: '清理审计日志失败', traceId } } })
+
+    expect(message).toBe(`服务器错误：清理审计日志失败（追踪编号：${traceId}）`)
+    expect(showError).toHaveBeenCalledWith(message)
+  })
 })

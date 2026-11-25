@@ -55,6 +55,10 @@ export function handleError(error, options = {}) {
   if (error?.response) {
     // axios HTTP 错误：从响应体中解析
     errorMessage = resolveResponseErrorMessage(error.response, defaultMessages, defaultMessage)
+    const traceId = error.response.data?.traceId
+    if (typeof traceId === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(traceId)) {
+      errorMessage += `（追踪编号：${traceId}）`
+    }
   } else if (error?.message) {
     errorMessage = error.message
   }
