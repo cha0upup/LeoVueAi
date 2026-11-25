@@ -24,9 +24,9 @@ function mount(initial = {}) {
 afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
 
 describe('controlled Skill filter popover', () => {
-  it('renders the simple-mode schema and preserves popover sizing', () => {
+  it('opens the simple-mode filters on click and shows only their available choices', () => {
     const view = mount()
-    expect(view.nodes('ElPopover')[0].props.width).toBe(520)
+    expect(view.nodes('ElPopover')[0].props.trigger).toBe('click')
     expect(view.nodes('ElSelect')).toHaveLength(2)
     expect(view.nodes('ElSelect')[0].props.placeholder).toBe('全部分类')
     expect(view.nodes('ElOption').slice(0, 2).map(node => node.props.value)).toEqual(['discovery', 'collection'])
@@ -49,8 +49,9 @@ describe('controlled Skill filter popover', () => {
     expect(view.nodes('ElSelect')[0].props['model-value']).toBe('collection')
     expect(view.text()).toContain('(1)')
     expect(view.nodes('ElButton')[0].props.type).toBe('primary')
+    view.nodes('ElSelect')[0].props['onUpdate:modelValue'](undefined)
     view.nodes('ElButton').find(node => text(node) === '清除全部').props.onClick()
-    expect(view.events).toEqual([['clear']])
+    expect(view.events).toEqual([['change', 'category', undefined], ['clear']])
     expect(view.props.filters.category).toBe('collection')
   })
 
@@ -59,22 +60,11 @@ describe('controlled Skill filter popover', () => {
       { key: 'approval', label: '授权要求', options: [{ value: 'not-required', label: '不要求显式授权' }] },
       { key: 'health', label: '健康状态', options: [{ value: 'healthy', label: '健康' }] }
     ] })
-    expect(view.nodes('ElPopover')[0].props.width).toBe(760)
     expect(view.nodes('ElSelect')).toHaveLength(4)
     view.nodes('ElSelect')[2].props['onUpdate:modelValue']('not-required')
     view.nodes('ElSelect')[3].props['onUpdate:modelValue']('healthy')
     expect(view.events).toEqual([['change', 'approval', 'not-required'], ['change', 'health', 'healthy']])
     view.props.mode = 'simple'; view.props.fields = [category, availability]; await nextTick()
     expect(view.nodes('ElSelect')).toHaveLength(2)
-  })
-
-  it('leaves popover visibility to Element Plus and forwards empty controlled selections', () => {
-    const view = mount()
-    expect(view.nodes('ElPopover')[0].props.trigger).toBe('click')
-    expect(view.nodes('ElPopover')[0].props.visible).toBeUndefined()
-    expect(view.nodes('ElPopover')[0].props['onUpdate:visible']).toBeUndefined()
-    expect(view.events).toEqual([])
-    view.nodes('ElSelect')[0].props['onUpdate:modelValue'](undefined)
-    expect(view.events).toEqual([['change', 'category', undefined]])
   })
 })

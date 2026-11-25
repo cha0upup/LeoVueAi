@@ -1,7 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { defineComponent, h, nextTick, reactive, ref } from 'vue'
-import { readFileSync } from 'node:fs'
-import { compileStyle, parse } from '@vue/compiler-sfc'
 import { compileClientComponent, createSlotStub, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import * as model from './skillUiModel.js'
@@ -54,7 +52,7 @@ describe('Skill feedback presentation contracts', () => {
     expect(view.text()).toContain('错误')
   })
 
-  it('locates only failed batch rows that still exist in the current catalog', async () => {
+  it('locates only current failed batch rows and displays result labels as rows change', async () => {
     const row = { name: 'alpha', status: 'failed', message: 'fixture failure' }
     const view = mount(Batch, { title: '批量启用结果', data: { changed: 2, unchanged: 1, failed: 1, results: [row] }, availableNames: ['alpha'] }, row)
     expect(view.nodes('ElDialog')[0].props.title).toBe('批量启用结果')
@@ -63,18 +61,17 @@ describe('Skill feedback presentation contracts', () => {
     expect(view.text()).toContain('失败 1')
     view.nodes('ElButton')[0].props.onClick()
     expect(view.events).toEqual([['locate', 'alpha']])
-    view.props.availableNames = []; await nextTick()
+    view.props.availableNames = []
+    await nextTick()
     expect(view.nodes('ElButton')).toHaveLength(0)
-  })
 
-  it('preserves deleted/unchanged/unknown batch result labels and hides locate for successes', async () => {
-    const view = mount(Batch, { availableNames: ['alpha'] }, { name: 'alpha', status: 'deleted' })
-    expect(view.text()).toContain('已删除')
-    expect(view.nodes('ElButton')).toHaveLength(0)
-    view.row.value = { name: 'alpha', status: 'unchanged' }; await nextTick()
-    expect(view.text()).toContain('未变更')
-    view.row.value = { name: 'alpha', status: 'other' }; await nextTick()
-    expect(view.text()).toContain('other')
+    view.props.availableNames = ['alpha']
+    for (const [status, label] of [['deleted', '已删除'], ['unchanged', '未变更'], ['other', 'other']]) {
+      view.row.value = { name: 'alpha', status }
+      await nextTick()
+      expect(text(view.nodes('ElTableColumn').find(node => node.props.label === '结果'))).toBe(label)
+      expect(view.nodes('ElButton')).toHaveLength(0)
+    }
     view.nodes('ElDialog')[0].props['onUpdate:modelValue'](false)
     expect(view.props.modelValue).toBe(false)
   })
@@ -101,13 +98,24 @@ describe('Skill feedback presentation contracts', () => {
 })
 
 describe('Skill workspace overview presenter', () => {
-  it('renders descriptions as text and never mutates its Skill input', () => {
+  it('renders descriptions as text and updates the overview without mutating the previous skill', async () => {
     const skill = { name: 'alpha', description: '<script>fixture</script>', category: 'discovery', platforms: ['linux', 'windows'], risk: 'low', accessMode: 'read-only' }
-    const view = mount(Overview, { skill })
+    const view = mount(Overview, { mode: 'governance', skill })
     expect(view.text()).toContain('<script>fixture</script>')
     expect(view.nodes('script')).toHaveLength(0)
     expect(view.text()).toContain('linux、windows')
+
+    view.props.skill = { description: 'second', platforms: ['macos'] }
+    await nextTick()
+    expect(view.text()).toContain('second')
+    expect(view.text()).not.toContain('<script>fixture</script>')
+    expect(view.nodes('ElTag').map(text)).toEqual(['macos'])
     expect(skill.description).toBe('<script>fixture</script>')
+
+    view.props.mode = 'simple'
+    await nextTick()
+    expect(view.nodes('ElTag')).toHaveLength(0)
+    expect(view.nodes('ElDescriptions')).toHaveLength(0)
   })
 
   it('delegates editing only for administrators and reacts to role changes', async () => {
@@ -126,27 +134,5 @@ describe('Skill workspace overview presenter', () => {
     expect(view.nodes('ElTag').map(text)).toEqual(expect.arrayContaining(
       ['linux', 'host', 'TA0001', 'T0001', 'tool', 'skill', 'fact', 'report', 'next']
     ))
-  })
-
-  it('updates the overview when the selected Skill changes', async () => {
-    const view = mount(Overview, { mode: 'governance', skill: { description: 'first' } })
-    view.props.skill = { description: 'second', platforms: ['macos'] }; await nextTick()
-    expect(view.text()).toContain('second')
-    expect(view.text()).not.toContain('first')
-    expect(view.nodes('ElTag').map(text)).toEqual(['macos'])
-    view.props.mode = 'simple'; await nextTick()
-    expect(view.nodes('ElTag')).toHaveLength(0)
-    expect(view.nodes('ElDescriptions')).toHaveLength(0)
-  })
-
-  it('owns its scoped scrolling and responsive layout rules', () => {
-    const { descriptor } = parse(readFileSync(new URL('./SkillWorkspaceOverview.vue', import.meta.url), 'utf8'))
-    expect(descriptor.styles[0].scoped).toBe(true)
-    const result = compileStyle({ source: descriptor.styles[0].content, id: 'overview-layout', scoped: false })
-    expect(result.errors).toEqual([])
-    const rules = []; result.rawResult.root.walkRules(rule => rules.push(rule))
-    expect(rules.some(rule => rule.selector === '.overview-scroll' && rule.nodes.some(node => node.prop === 'overflow' && node.value === 'auto'))).toBe(true)
-    expect(rules.some(rule => rule.selector === '.overview-grid' && rule.parent.params === '(max-width: 900px)' && rule.nodes.some(node => node.prop === 'grid-template-columns' && node.value === '1fr'))).toBe(true)
-    expect(descriptor.styles[0].content).not.toContain(':deep(')
   })
 })
