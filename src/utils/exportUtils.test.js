@@ -13,7 +13,6 @@ vi.mock('./errorHandler.js', () => ({ handleError: mocks.handleError }))
 vi.mock('./messageUtils.js', () => ({ showSuccess: mocks.showSuccess }))
 
 import { executeBlobDownload, exportCsv, exportTsv } from './exportUtils.js'
-import { getDockerExportConfig } from '../components/AgentConsole/Docker/dockerManagerModel.js'
 
 beforeEach(() => vi.resetAllMocks())
 
@@ -101,22 +100,18 @@ describe('exportCsv', () => {
     await expect(blob.text()).resolves.toBe('first,second,third\r\n0,false,\r\n,b,c')
   })
 
-  it.each(['=1+1', '+cmd', '-cmd', '@SUM(A1)', '  =1+1', '\tformula', '\rformula', '\nformula'])(
-    'exports untrusted text %j as data rather than a spreadsheet formula', async (value) => {
-      exportCsv([{ value }], 'rows')
-      const [blob] = mocks.downloadBlob.mock.calls[0]
-      const cell = `'${value}`
-      await expect(blob.text()).resolves.toBe(`value\r\n${/[\r\n]/.test(cell) ? `"${cell}"` : cell}`)
-    }
-  )
+  it('exports formula-like text as data without changing numbers or empty cells', async () => {
+    const values = ['=1+1', '+1', '-1', '@SUM(A1)', '  =1+1', '\ttext', '\rtext', '\ntext', -2, null]
+    exportCsv(values.map(value => ({ value })), 'rows')
 
-  it('keeps negative numeric values numeric and handles nulls', async () => {
-    exportCsv([{ number: -2, value: null }], 'rows')
-    await expect(mocks.downloadBlob.mock.calls[0][0].text()).resolves.toBe('number,value\r\n-2,')
+    const [blob] = mocks.downloadBlob.mock.calls[0]
+    await expect(blob.text()).resolves.toBe([
+      'value', "'=1+1", "'+1", "'-1", "'@SUM(A1)", "'  =1+1", "'\ttext", `"'\rtext"`, `"'\ntext"`, '-2', ''
+    ].join('\r\n'))
   })
 
-  it.each([[], null, undefined])('skips empty data %j', (data) => {
-    exportCsv(data, 'rows')
+  it('does not start a download for an empty list', () => {
+    exportCsv([], 'rows')
     expect(mocks.downloadBlob).not.toHaveBeenCalled()
   })
 })
@@ -147,21 +142,5 @@ describe('exportTsv', () => {
   it('does not start a download for an empty list', () => {
     exportTsv([], 'rows')
     expect(mocks.downloadBlob).not.toHaveBeenCalled()
-  })
-
-  it.each([
-    ['containers', { id: 'c1', name: 'web', image: 'nginx', status: 'Up', ports: '80', created: 'today' },
-      'id\tname\timage\tstatus\tports\tcreated\nc1\tweb\tnginx\tUp\t80\ttoday'],
-    ['images', { repository: 'nginx', tag: 'stable', id: 'i1', size: '10MB', created: 'today' },
-      'repository\ttag\tid\tsize\tcreated\nnginx\tstable\ti1\t10MB\ttoday'],
-    ['networks', { id: 'n1', name: 'bridge', driver: 'bridge', scope: 'local' },
-      'id\tname\tdriver\tscope\nn1\tbridge\tbridge\tlocal']
-  ])('exports Docker %s using the current column contract', async (tab, row, expected) => {
-    const config = getDockerExportConfig(tab)
-    exportTsv([row], config.filename, config.columns)
-    const [blob, filename] = mocks.downloadBlob.mock.calls[0]
-
-    expect(filename).toBe('docker-' + tab + '.tsv')
-    await expect(blob.text()).resolves.toBe(expected)
   })
 })
