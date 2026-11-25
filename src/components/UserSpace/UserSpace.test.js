@@ -70,6 +70,7 @@ function mount() {
     refresh: () => findNodes(renderer.root, node => node.type === 'ElButton' && node.props['aria-label'] === '刷新成果库')[0].props.onClick(),
     input: () => props('input'),
     upload: (...files) => props('input').onChange({ target: { files } }),
+    uploadLimit: () => findNodes(renderer.root, node => node.props.class === 'upload-limit')[0]?.text,
     uploadProgress: () => findNodes(renderer.root, node => node.props.class === 'upload-progress')[0]?.text,
     stopUpload: () => findNodes(renderer.root, node => node.type === 'ElButton' && node.props.title === '当前文件处理完后停止')[0]?.props,
     uploadReport: () => props('ElAlert'),
@@ -197,21 +198,24 @@ it('imports selected files in order, confirms each collision, and refreshes only
   const first = deferred()
   const conflict = Object.assign(new Error('同名文件'), { code: 409 })
   const uploadResults = [new File(['fixture'], 'first.txt'), new File(['fixture'], 'kept.txt'),
-    new File([], 'empty.txt'), new File(['fixture'], 'replace.txt')]
+    new File([], 'empty.txt'), new File(['too long'], 'oversize.txt'), new File(['fixture'], 'replace.txt')]
   api.userFileUploadApi.mockReturnValueOnce(first.promise)
     .mockRejectedValueOnce(conflict)
     .mockRejectedValueOnce(conflict)
     .mockResolvedValueOnce({})
   confirmAction.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
-  api.userFileListApi.mockResolvedValueOnce(result(1, [original], 1, summary(1)))
+  const initial = result(1, [original], 1, summary(1))
+  initial.data.maxUploadBytes = 7
+  api.userFileListApi.mockResolvedValueOnce(initial)
     .mockResolvedValueOnce(result(1, [replacement], 1, summary(2)))
   const workspace = mount()
   await flush()
 
   expect(workspace.input()).toHaveProperty('multiple')
+  expect(workspace.uploadLimit()).toBe('单文件上限 7 B')
   const finished = workspace.upload(...uploadResults)
   await nextTick()
-  expect(workspace.uploadProgress()).toContain('正在导入 1/4')
+  expect(workspace.uploadProgress()).toContain('正在导入 1/5')
   await workspace.upload(new File(['fixture'], 'extra.txt'))
   expect(api.userFileUploadApi).toHaveBeenCalledOnce()
   expect(api.userFileListApi).toHaveBeenCalledOnce()
@@ -233,8 +237,10 @@ it('imports selected files in order, confirms each collision, and refreshes only
   expect(workspace.rows()).toEqual([replacement])
   expect(workspace.summary()).toContain('2 份成果')
   expect(workspace.uploadProgress()).toBeUndefined()
-  expect(workspace.uploadReport().title).toBe('导入完成：成功 2 · 跳过 1 · 失败 1')
-  expect(workspace.uploadIssues()).toEqual(['kept.txt：已跳过同名文件', 'empty.txt：上传文件不能为空'])
+  expect(workspace.uploadReport().title).toBe('导入完成：成功 2 · 跳过 1 · 失败 2')
+  expect(workspace.uploadIssues()).toEqual([
+    'kept.txt：已跳过同名文件', 'empty.txt：上传文件不能为空', 'oversize.txt：文件超过单文件上传上限（7 B）'
+  ])
   workspace.uploadReport().onClose()
   await nextTick()
   expect(workspace.uploadReport()).toBeUndefined()

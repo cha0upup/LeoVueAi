@@ -18,6 +18,10 @@
           <el-icon><Icon :icon="iconMap.upload" /></el-icon>
           导入成果
         </el-button>
+        <span
+          v-if="maxUploadBytes !== null"
+          class="upload-limit"
+        >单文件上限 {{ formatFileSize(maxUploadBytes) }}</span>
       </template>
     </PageHeader>
     <el-alert
@@ -344,6 +348,7 @@ const uploadReportTitle = computed(() => {
   return report.unprocessed ? `导入已停止：${counts} · 未处理 ${report.unprocessed}` : `导入完成：${counts}`
 })
 const uploadInputRef = ref(null)
+const maxUploadBytes = ref(null)
 const overview = shallowRef(null)
 const overviewOutdated = ref(false)
 let overviewNeeded = true
@@ -428,6 +433,8 @@ async function fetchList() {
     if (signal.aborted) return
     if (includeOverview) {
       overviewNeeded = false
+      const limit = data.maxUploadBytes
+      maxUploadBytes.value = Number.isSafeInteger(limit) && limit >= 0 ? limit : null
       overviewOutdated.value = !Array.isArray(data.overview?.categories)
       if (!overviewOutdated.value) overview.value = normalizeWorkspaceOverview(data.overview)
     }
@@ -523,6 +530,9 @@ function stopQueuedImports() {
 
 async function uploadImport(file, isActive) {
   if (file.size === 0) throw new Error('上传文件不能为空')
+  if (maxUploadBytes.value !== null && file.size > maxUploadBytes.value) {
+    throw new Error(`文件超过单文件上传上限（${formatFileSize(maxUploadBytes.value)}）`)
+  }
   try {
     await userFileUploadApi(file, { path: IMPORT_CATEGORY })
   } catch (error) {
@@ -668,12 +678,14 @@ onScopeDispose(() => {
   gap: 12px;
 }
 .storage-summary,
+.upload-limit,
 .upload-progress,
 .result-count,
 .catalog-footer {
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }
+.upload-limit,
 .upload-progress {
   white-space: nowrap;
 }
