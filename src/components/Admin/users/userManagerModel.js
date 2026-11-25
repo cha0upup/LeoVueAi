@@ -55,13 +55,14 @@ export function filterUsers(users, { keyword = '', role = '', team = '' } = {}) 
 
 export function userStats(users) {
   const list = Array.isArray(users) ? users : []
-  return {
-    total: list.length,
-    admin: list.filter((user) => user.privilege === 'admin').length,
-    leader: list.filter((user) => user.privilege === 'leader').length,
-    normal: list.filter((user) => user.privilege === 'normal').length,
-    assignedToTeam: list.filter((user) => user.teamId).length
+  const totals = { total: list.length, admin: 0, leader: 0, normal: 0, assignedToTeam: 0 }
+  for (const user of list) {
+    if (user.privilege === 'admin') totals.admin++
+    else if (user.privilege === 'leader') totals.leader++
+    else if (user.privilege === 'normal') totals.normal++
+    if (user.teamId) totals.assignedToTeam++
   }
+  return totals
 }
 
 export function getRoleTagType(privilege) {

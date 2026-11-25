@@ -44,7 +44,9 @@
       <el-select
         v-model="filterTeam"
         placeholder="团队"
+        aria-label="团队筛选"
         clearable
+        filterable
         class="toolbar-filter"
       >
         <el-option
@@ -61,12 +63,12 @@
 
       <template #actions>
         <el-button
-          :disabled="!filteredUsers.length"
+          :disabled="actionsDisabled || !filteredUsers.length"
           plain
           @click="exportUsers"
         >
           <el-icon><Icon :icon="iconMap.download" /></el-icon>
-          导出
+          导出筛选结果
         </el-button>
         <el-button
           type="primary"
@@ -115,8 +117,11 @@
         show-icon
       />
       <el-table
+        ref="userTable"
         v-loading="loading"
-        :data="filteredUsers"
+        :data="pageUsers"
+        row-key="userId"
+        height="100%"
         class="users-table"
         :empty-text="emptyText"
       >
@@ -254,6 +259,19 @@
           </template>
         </el-table-column>
       </el-table>
+      <nav
+        v-if="lastPage > 1"
+        class="user-pagination"
+        aria-label="用户列表分页"
+      >
+        <el-pagination
+          v-model:current-page="currentPage"
+          :page-size="PAGE_SIZE"
+          :total="filteredUsers.length"
+          :pager-count="5"
+          layout="prev, pager, next"
+        />
+      </nav>
     </AdminWorkspacePanel>
 
     <UserEditorDialog
@@ -304,6 +322,7 @@ import {
 import { showWarning } from '@/utils/messageUtils.js'
 import { exportTsv } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 import AdminToolbar from '@/components/Admin/shared/AdminToolbar.vue'
 import StatsStrip from '@/components/common/StatsStrip.vue'
 import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
@@ -327,6 +346,7 @@ import {
   userStats
 } from './userManagerModel.js'
 
+const PAGE_SIZE = 25
 const statsCardConfigs = [
   { key: 'total', label: '用户总数' },
   { key: 'admin', label: '管理员' },
@@ -367,6 +387,8 @@ const teamNames = computed(() => new Map(teams.value.map(({ teamId, teamName }) 
 const searchKeyword = ref('')
 const filterRole = ref('')
 const filterTeam = ref('')
+const currentPage = ref(1)
+const userTable = ref(null)
 
 // 表单
 const userFormRef = ref(null)
@@ -413,6 +435,15 @@ const filteredUsers = computed(() => filterUsers(userData.value, {
   role: filterRole.value,
   team: filterTeam.value
 }))
+const lastPage = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / PAGE_SIZE)))
+const pageUsers = computed(() => {
+  const offset = (currentPage.value - 1) * PAGE_SIZE
+  return filteredUsers.value.slice(offset, offset + PAGE_SIZE)
+})
+watch([searchKeyword, filterRole, filterTeam], () => { currentPage.value = 1 })
+watch(lastPage, (page) => { if (currentPage.value > page) currentPage.value = page })
+watch(pageUsers, () => userTable.value?.setScrollTop?.(0), { flush: 'post' })
+
 const stats = computed(() => userStats(userData.value))
 const actorContext = computed(() => ({
   isAdmin: isAdmin.value,
@@ -584,15 +615,18 @@ const submitResetPassword = () => {
 }
 
 const exportUsers = async () => {
+  const rows = filteredUsers.value
+  if (!rows.length || actionsDisabled.value) return
+  const generation = sessionGeneration.value
   const confirmed = await confirmAction({
     title: '导出确认',
-    message: '确定要导出当前用户列表吗？',
+    message: `确定导出当前筛选的 ${rows.length} 位用户吗？包含所有分页。`,
     type: 'info'
   })
 
-  if (!confirmed) return
+  if (!confirmed || disposed || !isCurrentSession(generation)) return
 
-  exportTsv(filteredUsers.value, `admin-users-${Date.now()}`, [
+  exportTsv(rows, `admin-users-${Date.now()}`, [
     { label: 'User ID', key: 'userId' },
     { label: 'Username', key: 'userName' },
     { label: 'Role', key: 'privilege' },
@@ -648,9 +682,31 @@ onScopeDispose(() => {
   width: 140px;
 }
 
+.user-manager :deep(.admin-workspace-panel) {
+  min-height: 300px;
+}
+
+.user-manager :deep(.admin-workspace-panel__body) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.user-manager :deep(.admin-workspace-panel__body > .el-alert) {
+  flex-shrink: 0;
+}
+
 .users-table {
   flex: 1;
   min-height: 0;
+}
+
+.user-pagination {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--app-divider-color);
 }
 
 .users-table :deep(.el-table__header th) {

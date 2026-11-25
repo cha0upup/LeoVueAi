@@ -11,11 +11,14 @@ import { executeRequest, withLoading } from '@/utils/apiUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { formatDate } from '@/utils/format.js'
 import { icons } from '@/utils/icons.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 
 const api = Object.fromEntries(['addUserApi', 'deleteUserApi', 'getAllUsersApi', 'getAllTeamsApi',
   'updateUserApi', 'resetUserPasswordApi'].map(name => [name, vi.fn()]))
 const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showWarning: vi.fn(), showError: vi.fn() }))
 vi.mock('@/utils/messageUtils.js', () => messages)
+const confirmAction = vi.fn()
+const exportTsv = vi.fn()
 const actor = { currentUser: ref({ userId: 'manager' }), isAdmin: ref(true), isLeader: ref(false),
   passwordMinLength: ref(12), passwordMaxLength: ref(256), fetchAuth: async () => {} }
 const stub = (name, slots) => ({ default: createSlotStub(name, slots) })
@@ -36,9 +39,10 @@ const View = compileClientComponent(new URL('./UserManager.vue', import.meta.url
   '@/utils/messageUtils.js': messages,
   '@/utils/formUtils.js': formUtils,
   '@/utils/dialogUtils.js': dialogUtils,
-  '@/utils/confirmUtils.js': { confirmDelete: vi.fn(), confirmAction: vi.fn() },
-  '@/utils/exportUtils.js': { exportTsv: vi.fn() },
+  '@/utils/confirmUtils.js': { confirmDelete: vi.fn(), confirmAction },
+  '@/utils/exportUtils.js': { exportTsv },
   '@/services/api/admin.js': api,
+  '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration },
   '@/composables/useAuth.js': { useAuth: () => actor }
 })
 const apps = []
@@ -50,7 +54,7 @@ async function mount() {
   const app = renderer.createApp(View)
   app.directive('loading', {})
   for (const name of ['Icon', 'ElIcon', 'ElButton', 'ElInput', 'ElSelect', 'ElOption', 'ElTag',
-    'ElTooltip', 'ElAvatar', 'ElAlert', 'ElTable']) app.component(name, createSlotStub(name))
+    'ElTooltip', 'ElAvatar', 'ElAlert', 'ElTable', 'ElPagination']) app.component(name, createSlotStub(name))
   app.component('ElTableColumn', {
     inheritAttrs: false,
     setup(_props, { attrs, slots }) {
@@ -66,6 +70,8 @@ async function mount() {
     button: label => nodes(node => node.type === 'ElButton' && text(node) === label)[0].props,
     alert: () => nodes(node => node.type === 'ElAlert')[0]?.props.title,
     rows: () => nodes(node => node.type === 'ElTable')[0].props.data,
+    pagination: () => nodes(node => node.type === 'ElPagination')[0].props,
+    search: value => nodes(node => node.type === 'ElInput')[0].props['onUpdate:modelValue'](value),
     teamLabel: () => text(nodes(node => node.type === 'ElTag' && node.props.title === row.teamId)[0])
   }
 }
@@ -168,4 +174,34 @@ it('shows user rows while teams are pending or unavailable, then resolves their 
   expect(view.alert()).toBeUndefined()
   expect(view.teamLabel()).toBe('Example')
   expect(view.button('新增用户').disabled).toBe(false)
+})
+
+it('paginates rendered users but exports the complete filter snapshot shown in the confirmation', async () => {
+  const users = Array.from({ length: 30 }, (_, index) => ({
+    ...row, userId: `user-${index}`, userName: index < 26 ? `Example ${index}` : `Other ${index}`
+  }))
+  api.getAllUsersApi.mockResolvedValue({ data: users })
+  const view = await mount()
+  expect(view.rows()).toHaveLength(25)
+  view.pagination()['onUpdate:currentPage'](2)
+  await flush()
+  expect(view.rows()).toEqual(users.slice(25))
+
+  view.search('Example')
+  await flush()
+  expect(view.pagination()['current-page']).toBe(1)
+  view.pagination()['onUpdate:currentPage'](2)
+  await flush()
+  expect(view.rows()).toEqual([users[25]])
+
+  const confirmation = deferred()
+  confirmAction.mockReturnValueOnce(confirmation.promise)
+  const pending = view.button('导出筛选结果').onClick()
+  expect(confirmAction.mock.lastCall[0].message).toContain('26 位用户')
+  view.search('Other')
+  await flush()
+  confirmation.resolve(true)
+  await pending
+  expect(exportTsv).toHaveBeenCalledExactlyOnceWith(users.slice(0, 26), expect.any(String), expect.any(Array))
+  expect(api.getAllUsersApi).toHaveBeenCalledOnce()
 })
