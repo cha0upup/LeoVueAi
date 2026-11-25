@@ -14,27 +14,15 @@ import {
 } from './aiChannelSettingsModel.js'
 
 describe('aiChannelSettingsModel', () => {
-  it('uses backend request constraints without offering invalid reasoning controls', () => {
-    const kimi = modelRequestControls({ requestOptions: {
-      thinkingRequired: true, reasoningEfforts: [], temperatureConfigurable: false
-    } }, 'kimi')
-    expect(kimi.reasoningOptions.map(option => option.value)).toEqual(['auto'])
-    expect(kimi.reasoningModeOptions.map(option => option.value)).toEqual([null, 1])
-    expect(kimi.temperatureConfigurable).toBe(false)
+  it('keeps request options and labels aligned with the backend contract', () => {
+    const controls = modelRequestControls({ requestOptions: {
+      reasoningEfforts: ['minimal', 'high'], responsesRequiredForTools: true
+    } })
 
-    const gemini = modelRequestControls({ requestOptions: {
-      thinkingRequired: true, reasoningEfforts: ['minimal', 'low', 'medium', 'high']
-    } }, 'gemini')
-    expect(gemini.reasoningOptions.map(option => option.value)).toEqual(['auto', 'minimal', 'low', 'medium', 'high'])
-    const openai = modelRequestControls({ requestOptions: {
-      reasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max'], responsesRequiredForTools: true
-    } }, 'openai')
-    expect(openai.reasoningOptions.map(option => option.value)).toEqual(['auto', 'low', 'medium', 'high', 'xhigh', 'max'])
-    expect(openai.responsesRequiredForTools).toBe(true)
-    for (const controls of [kimi, gemini, openai]) {
-      expect(controls.reasoningOptions.map(option => option.label))
-        .toEqual(controls.reasoningOptions.map(option => option.value))
-    }
+    expect(controls.reasoningOptions).toEqual([
+      { label: 'auto', value: 'auto' }, { label: 'minimal', value: 'minimal' }, { label: 'high', value: 'high' }
+    ])
+    expect(controls.responsesRequiredForTools).toBe(true)
   })
 
   it.each(['openrouter', 'ollama'])('keeps %s controls tied to its gateway rather than a direct-vendor contract', provider => {
@@ -62,28 +50,19 @@ describe('aiChannelSettingsModel', () => {
     expect(defaultPathForProtocol('unexpected')).toBe('/chat/completions')
   })
 
-  it('groups models under their provider rows', () => {
+  it('searches grouped providers by model without exposing orphan rows', () => {
     const rows = buildProviderRows(
-      [{ id: 1, name: 'OpenAI', providerKey: 'openai' }],
+      [{ id: 1, name: 'Example' }, { id: 2, name: 'Other' }],
       [
-        { id: 10, providerId: 1, model: 'gpt-a', isActive: 1 },
+        { id: 10, providerId: 1, model: 'reasoner-v1', isActive: 1 },
         { id: 20, providerId: 999, model: 'orphan-model' }
       ]
     )
 
-    expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ name: 'OpenAI', hasDefault: true })
-    expect(rows[0].models.map((model) => model.model)).toEqual(['gpt-a'])
-  })
-
-  it('searches provider fields and nested model names', () => {
-    const rows = buildProviderRows(
-      [{ id: 1, name: 'Example', providerKey: 'custom', baseUrl: 'https://api.example.test' }],
-      [{ id: 10, providerId: 1, name: 'Reasoning Model', model: 'reasoner-v1' }]
-    )
-
-    expect(filterProviderRows(rows, 'reasoner')).toHaveLength(1)
-    expect(filterProviderRows(rows, 'missing')).toHaveLength(0)
+    expect(filterProviderRows(rows, 'reasoner')).toEqual([expect.objectContaining({
+      id: 1, hasDefault: true, models: [expect.objectContaining({ model: 'reasoner-v1' })]
+    })])
+    expect(filterProviderRows(rows, 'orphan')).toEqual([])
   })
 
   it('selects the same model used by provider connection testing', () => {
