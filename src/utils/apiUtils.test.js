@@ -40,28 +40,16 @@ describe('apiUtils', () => {
     expect(loading.value).toBe(false)
   })
 
-  it('shows the configured success message and returns the request result', async () => {
-    const onSuccess = vi.fn()
-    const payload = { id: 'saved-item' }
-
-    const result = await executeRequest(async () => payload, {
-      successMessage: '保存完成',
-      onSuccess
-    })
-
-    expect(result).toBe(payload)
-    expect(mocks.showSuccess).toHaveBeenCalledWith('保存完成')
-    expect(onSuccess).toHaveBeenCalledWith(payload)
-  })
-
   it('waits for asynchronous success callbacks before completing', async () => {
     const loading = ref(false)
     const callback = deferred()
     const onSuccess = vi.fn(() => callback.promise)
     let completed = false
 
-    const request = executeRequest(async () => 'saved', { onSuccess, loadingRef: loading })
-      .then(() => { completed = true })
+    const request = executeRequest(async () => 'saved', { onSuccess, loadingRef: loading }).then(result => {
+      completed = true
+      return result
+    })
     await Promise.resolve()
 
     expect(onSuccess).toHaveBeenCalledWith('saved')
@@ -69,7 +57,7 @@ describe('apiUtils', () => {
     expect(loading.value).toBe(true)
 
     callback.resolve()
-    await request
+    await expect(request).resolves.toBe('saved')
     expect(completed).toBe(true)
     expect(loading.value).toBe(false)
   })

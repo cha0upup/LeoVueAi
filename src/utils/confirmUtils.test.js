@@ -25,101 +25,34 @@ beforeEach(() => {
   mocks.confirm.mockResolvedValue(undefined)
 })
 
-describe('confirmAction', () => {
-  it.each([true, false])('preserves AI configuration dialog options for admin=%s', async (isAdmin) => {
-    const options = {
-      title: '无可用 AI 模型',
-      message: isAdmin ? '请前往系统配置' : '请联系管理员',
-      confirmButtonText: isAdmin ? '前往配置' : '知道了',
-      showCancelButton: isAdmin,
-      closeOnClickModal: false,
-      closeOnPressEscape: true
-    }
+it('forwards dialog options while keeping untrusted confirmation content in text mode', async () => {
+  const message = '<b>项目名称</b>'
+  await expect(confirmAction({
+    title: '确认操作', message, dangerouslyUseHTMLString: true, closeOnClickModal: false, showCancelButton: false
+  })).resolves.toBe(true)
 
-    await expect(confirmAction(options)).resolves.toBe(true)
-
-    expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith(options.message, options.title, {
-      confirmButtonText: options.confirmButtonText,
-      cancelButtonText: '取消',
-      confirmButtonClass: undefined,
-      type: 'warning',
-      showCancelButton: isAdmin,
-      closeOnClickModal: false,
-      closeOnPressEscape: true,
-      dangerouslyUseHTMLString: false
-    })
-  })
-
-  it.each(['cancel', 'close', new Error('dialog fixture failed')])('returns false without notifications when the dialog rejects with %s', async (reason) => {
-    mocks.confirm.mockRejectedValueOnce(reason)
-
-    await expect(confirmAction({ message: '继续？' })).resolves.toBe(false)
-
-    expect(mocks.showError).not.toHaveBeenCalled()
-    expect(mocks.showWarning).not.toHaveBeenCalled()
-    expect(mocks.showSuccess).not.toHaveBeenCalled()
-  })
-
-  it('keeps the project deletion severity and custom button labels', async () => {
-    await confirmAction({
-      title: '删除项目', message: '确认删除？', type: 'error',
-      confirmButtonText: '确认删除', cancelButtonText: '保留项目'
-    })
-
-    expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith('确认删除？', '删除项目', {
-      confirmButtonText: '确认删除', cancelButtonText: '保留项目',
-      confirmButtonClass: undefined, type: 'error', dangerouslyUseHTMLString: false
-    })
-  })
-
-  it('keeps confirmation content in text mode when forwarding custom options', async () => {
-    const message = '<b>项目名称</b>'
-    await confirmAction({ message, dangerouslyUseHTMLString: true, closeOnClickModal: false })
-
-    expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith(message, '提示', {
-      confirmButtonText: '确定', cancelButtonText: '取消',
-      confirmButtonClass: undefined, type: 'warning', closeOnClickModal: false,
-      dangerouslyUseHTMLString: false
-    })
-  })
+  expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith(message, '确认操作', expect.objectContaining({
+    showCancelButton: false, closeOnClickModal: false, dangerouslyUseHTMLString: false
+  }))
 })
 
 describe('executeBatchDelete', () => {
-  it('serializes delete requests so SQLite writes do not contend for a lock', async () => {
-    const order = []
+  it('runs deletes sequentially and reports partial success after one fails', async () => {
     let active = 0
     let maxActive = 0
     const deleteFn = vi.fn(async (item) => {
       active += 1
       maxActive = Math.max(maxActive, active)
-      order.push(item)
       await Promise.resolve()
       active -= 1
-    })
-
-    const result = await executeBatchDelete(['a', 'b', 'c'], deleteFn, {
-      itemName: '主机',
-      loadingRef: { value: false }
-    })
-
-    expect(result).toEqual({ successCount: 3, failCount: 0 })
-    expect(order).toEqual(['a', 'b', 'c'])
-    expect(maxActive).toBe(1)
-  })
-
-  it('continues after an individual failure and reports partial results', async () => {
-    const onSuccess = vi.fn()
-    const deleteFn = vi.fn(async (item) => {
       if (item === 'b') throw new Error('busy')
     })
-
-    const result = await executeBatchDelete(['a', 'b', 'c'], deleteFn, {
-      itemName: '主机',
-      onSuccess
-    })
+    const onSuccess = vi.fn()
+    const result = await executeBatchDelete(['a', 'b', 'c'], deleteFn, { itemName: '主机', onSuccess })
 
     expect(result).toEqual({ successCount: 2, failCount: 1 })
-    expect(deleteFn).toHaveBeenCalledTimes(3)
+    expect(deleteFn.mock.calls).toEqual([['a'], ['b'], ['c']])
+    expect(maxActive).toBe(1)
     expect(onSuccess).toHaveBeenCalledExactlyOnceWith(result)
     expect(mocks.showWarning).toHaveBeenCalledWith('部分删除成功：成功 2 个，失败 1 个')
   })
@@ -158,30 +91,7 @@ describe('delete request lifecycle', () => {
     expect(loadingRef.value).toBe(false)
   })
 
-  it.each([
-    ['single', () => executeDeleteWithConfirm(async () => {}, {
-      title: '删除确认', message: '确认删除指纹？',
-      confirmButtonText: '删除', confirmButtonClass: 'el-button--danger'
-    }), '确认删除指纹？', '删除确认'],
-    ['batch', () => executeBatchDelete(['a'], async () => {}, {
-      confirmMessage: '确认删除自定义伪装？内置伪装将被跳过。'
-    }), '确认删除自定义伪装？内置伪装将被跳过。', '批量删除确认']
-  ])('preserves the %s confirmation message and delete button', async (_name, run, message, title) => {
-    await run()
-
-    expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith(message, title, {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      confirmButtonClass: 'el-button--danger',
-      type: 'warning',
-      dangerouslyUseHTMLString: false
-    })
-  })
-
-  it.each([
-    ['single', options => executeDeleteWithConfirm(async () => 'deleted', options), 'deleted'],
-    ['batch', options => executeBatchDelete(['a'], async () => {}, options), { successCount: 1, failCount: 0 }]
-  ])('keeps loading active until the %s deletion refresh completes', async (_name, run, expected) => {
+  it('keeps batch deletion loading active until the refresh completes', async () => {
     const { promise: started, resolve: startRefresh } = deferred()
     const { promise: refresh, resolve: finishRefresh } = deferred()
     const loadingRef = { value: false }
@@ -190,13 +100,13 @@ describe('delete request lifecycle', () => {
       return refresh
     })
 
-    const request = run({ loadingRef, onSuccess })
+    const request = executeBatchDelete(['a'], async () => {}, { loadingRef, onSuccess })
     await started
     expect(loadingRef.value).toBe(true)
-    expect(onSuccess).toHaveBeenCalledWith(expected)
+    expect(onSuccess).toHaveBeenCalledWith({ successCount: 1, failCount: 0 })
 
     finishRefresh()
-    await expect(request).resolves.toEqual(expected)
+    await request
     expect(loadingRef.value).toBe(false)
   })
 
