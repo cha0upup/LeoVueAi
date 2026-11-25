@@ -44,13 +44,18 @@ const CAPABILITY_SOURCE_LABELS = {
 }
 
 const HEALTH_STATUS_LABELS = {
+  loading: '正在读取健康状态',
+  error: '健康状态读取失败',
   open: '熔断中',
+  half_open: '半开观察',
   degraded: '不稳定',
   healthy: '健康'
 }
 
 const HEALTH_TAG_TYPES = {
+  error: 'warning',
   open: 'danger',
+  half_open: 'warning',
   degraded: 'warning',
   healthy: 'success'
 }
@@ -310,7 +315,7 @@ export function effectiveLimitLabel(model) {
 }
 
 export function healthStatusLabel(status) {
-  return HEALTH_STATUS_LABELS[status] || '未探测'
+  return HEALTH_STATUS_LABELS[status] || '暂无健康记录'
 }
 
 export function healthTagType(status) {

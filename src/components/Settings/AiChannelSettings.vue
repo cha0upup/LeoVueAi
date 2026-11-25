@@ -23,6 +23,7 @@
         :saved-providers="savedProviders"
         :rows="rows"
         :model-health-by-id="modelHealthById"
+        :health-read-state="healthReadState"
         :selected-model-id="selectedModelId"
         :loading="catalogLoading"
         :testing-model-id="testingId"
@@ -39,6 +40,7 @@
       <AiModelDetailPanel
         :model="selectedModel"
         :model-health-by-id="modelHealthById"
+        :health-read-state="healthReadState"
         :probing-id="probingId"
         :activating-id="activatingId"
         @edit="openEdit"
@@ -163,6 +165,7 @@ const probeResultDialogVisible = ref(false)
 const latestProbeReport = ref(null)
 const selectedModelId = ref(null)
 const modelHealthById = ref({})
+const healthReadState = ref('loading')
 
 // Initialize dialog state before watchers evaluate their computed sources.
 const dialogVisible = ref(false)
@@ -314,14 +317,17 @@ async function loadList() {
 async function loadModelHealth() {
   if (disposed) return
   const read = reads.next('health')
+  healthReadState.value = 'loading'
   try {
     const { data: list } = await listAiModelHealthApi()
     if (!reads.isCurrent('health', read)) return
-    modelHealthById.value = Array.isArray(list)
-      ? Object.fromEntries(list.filter((item) => item?.configId != null).map((item) => [item.configId, item]))
-      : {}
+    if (!Array.isArray(list)) throw new Error('模型健康响应格式异常')
+    modelHealthById.value = Object.fromEntries(list.filter((item) => item?.configId != null).map((item) => [item.configId, item]))
+    healthReadState.value = 'ready'
   } catch {
-    if (reads.isCurrent('health', read)) modelHealthById.value = {}
+    if (!reads.isCurrent('health', read)) return
+    modelHealthById.value = {}
+    healthReadState.value = 'error'
   }
 }
 

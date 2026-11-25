@@ -17,9 +17,12 @@
         <small class="metric-hint">识别率 {{ recognitionRate }}%</small>
       </div>
       <div class="metric-card">
-        <span class="metric-label">熔断保护</span>
-        <strong class="metric-value">{{ openCircuitModelCount }}</strong>
-        <small class="metric-hint">{{ openCircuitModelCount ? '已切换备用链' : '全部模型可调度' }}</small>
+        <span class="metric-label">熔断模型</span>
+        <strong class="metric-value">{{ circuitSummary.count }}</strong>
+        <small
+          class="metric-hint"
+          aria-live="polite"
+        >{{ circuitSummary.hint }}</small>
       </div>
     </StatsStrip>
 
@@ -189,11 +192,11 @@
                 </span>
                 <span>
                   <el-tag
-                    v-if="modelHealth(model).circuitOpen"
+                    v-if="healthReadState === 'ready' && modelHealthById[model.id]?.circuitOpen"
                     size="small"
                     type="danger"
                     effect="plain"
-                  >熔断中</el-tag>
+                  >熔断保护</el-tag>
                   <span v-else><span class="status-dot" />{{ model.enabled !== 0 ? '已启用' : '已禁用' }}</span>
                 </span>
               </button>
@@ -223,6 +226,7 @@ import { icons } from '@/utils/icons.js'
 import {
   buildProviderRows,
   filterProviderRows,
+  healthStatusLabel,
   providerInitial,
   providerTestModelId,
   shortTokens
@@ -234,6 +238,7 @@ const props = defineProps({
   savedProviders: { type: Array, default: () => [] },
   rows: { type: Array, default: () => [] },
   modelHealthById: { type: Object, default: () => ({}) },
+  healthReadState: { type: String, default: 'loading' },
   selectedModelId: { type: [Number, String], default: null },
   loading: { type: Boolean, default: false },
   testingModelId: { type: [Number, String], default: null },
@@ -253,13 +258,25 @@ defineEmits([
 const enabledProviderCount = computed(() => props.savedProviders.filter((item) => item.enabled !== 0).length)
 const enabledModelCount = computed(() => props.rows.filter((item) => item.enabled !== 0).length)
 const recognizedModelCount = computed(() => props.rows.filter((item) => item.capabilityRecognized).length)
-const openCircuitModelCount = computed(() => Object.values(props.modelHealthById).filter((item) => item?.circuitOpen).length)
+const circuitSummary = computed(() => {
+  if (props.healthReadState !== 'ready') return { count: '—', hint: healthStatusLabel(props.healthReadState) }
+  if (!props.rows.length) return { count: '—', hint: '暂无模型' }
+  let recorded = 0
+  let open = 0
+  for (const { id } of props.rows) {
+    const health = props.modelHealthById[id]
+    if (!health?.status || health.status === 'unknown') continue
+    recorded += 1
+    if (health.circuitOpen) open += 1
+  }
+  if (!recorded) return { count: '—', hint: healthStatusLabel('unknown') }
+  return { count: open, hint: `已有健康记录 ${recorded}/${props.rows.length}` }
+})
 const recognitionRate = computed(() => props.rows.length ? Math.round((recognizedModelCount.value / props.rows.length) * 1000) / 10 : 0)
 const providerRows = computed(() => buildProviderRows(props.savedProviders, props.rows))
 const filteredProviderRows = computed(() => filterProviderRows(providerRows.value, searchKeyword.value))
 const hasSearchKeyword = computed(() => searchKeyword.value.trim().length > 0)
 
-const modelHealth = (model) => props.modelHealthById[model?.id] || { circuitOpen: false }
 const isProviderTesting = (provider) => {
   const modelId = providerTestModelId(provider)
   return modelId != null && props.testingModelId === modelId

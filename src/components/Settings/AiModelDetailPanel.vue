@@ -34,11 +34,11 @@
             已禁用
           </el-tag>
           <el-tag
-            v-if="health.circuitOpen"
+            v-if="health?.circuitOpen"
             type="danger"
             size="small"
           >
-            熔断中
+            熔断保护
           </el-tag>
         </div>
         <div class="detail-actions">
@@ -105,23 +105,23 @@
           <div class="capability-box__title">
             <strong>调用健康</strong>
             <el-tag
-              :type="healthTagType(health.status)"
+              :type="healthTagType(healthStatus)"
               size="small"
             >
-              {{ healthStatusLabel(health.status) }}
+              {{ healthStatusLabel(healthStatus) }}
             </el-tag>
           </div>
           <p
-            v-if="health.circuitOpen"
+            v-if="health?.circuitOpen"
             class="warning-copy"
           >
-            已连续发生 {{ health.consecutiveFailures }} 次暂态故障，下一轮请求将优先使用备用模型。
+            当前处于熔断保护，连续暂态故障 {{ health.consecutiveFailures }} 次。
           </p>
           <p
-            v-else
+            v-else-if="healthReadState === 'error'"
             class="muted small"
           >
-            连接测试或一次完整回答成功后会自动恢复健康状态。
+            可刷新页面上的模型列表，重试读取健康状态。
           </p>
           <p
             v-if="model.fallbackModelName"
@@ -224,6 +224,7 @@ import {
 const props = defineProps({
   model: { type: Object, default: null },
   modelHealthById: { type: Object, default: () => ({}) },
+  healthReadState: { type: String, default: 'loading' },
   probingId: { type: [Number, String], default: null },
   activatingId: { type: [Number, String], default: null }
 })
@@ -238,11 +239,8 @@ const limitsMatchCapabilities = computed(() => props.model?.capabilityRecognized
   return Number.isFinite(limit) && limit > 0 && Number(props.model[effective]) === limit
 }))
 
-const health = computed(() => props.modelHealthById[props.model?.id] || {
-  status: 'unknown',
-  circuitOpen: false,
-  consecutiveFailures: 0
-})
+const health = computed(() => props.healthReadState === 'ready' ? props.modelHealthById[props.model?.id] : null)
+const healthStatus = computed(() => props.healthReadState === 'ready' ? health.value?.status : props.healthReadState)
 </script>
 
 <style scoped>

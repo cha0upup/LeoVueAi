@@ -25,7 +25,7 @@ const childNames = [
   'AiCapabilityRegistryDialogs', 'AiCapabilityProbeDialog', 'AiModelConfigDialog',
   'AiModelDetailPanel', 'AiProviderCatalog', 'AiProviderDialog'
 ]
-const Settings = compileClientComponent(new URL('./AiChannelSettings.vue', import.meta.url), {
+const settingsModules = {
   '@/utils/icons.js': { icons },
   '@/components/common/PageHeader.vue': { default: createSlotStub('PageHeader', ['default', 'actions']) },
   '@/services/api/admin.js': api,
@@ -36,7 +36,8 @@ const Settings = compileClientComponent(new URL('./AiChannelSettings.vue', impor
   '@/composables/ai/useAiModelRequestPreview.js': { useAiModelRequestPreview },
   './aiChannelSettingsModel.js': settingsModel,
   ...Object.fromEntries(childNames.map(name => [`./${name}.vue`, { default: createSlotStub(name) }]))
-})
+}
+const Settings = compileClientComponent(new URL('./AiChannelSettings.vue', import.meta.url), settingsModules)
 const ModelDialog = compileClientComponent(new URL('./AiModelConfigDialog.vue', import.meta.url))
 
 const flush = async () => { for (let i = 0; i < 6; i++) await nextTick() }
@@ -53,10 +54,13 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-async function mount() {
+async function mount(component = Settings) {
   const renderer = createTestRenderer()
-  const app = renderer.createApp(Settings)
-  for (const name of ['Icon', 'ElIcon', 'ElButton']) app.component(name, createSlotStub(name))
+  const app = renderer.createApp(component)
+  for (const name of ['Icon', 'ElIcon', 'ElButton', 'ElEmpty', 'ElInput', 'ElPopconfirm', 'ElTag']) {
+    app.component(name, createSlotStub(name))
+  }
+  app.directive('loading', {})
   const errors = []
   app.config.errorHandler = error => errors.push(error)
   apps.push(app)
@@ -108,15 +112,62 @@ describe('AI channel settings initialization', () => {
     const catalog = () => view.node('AiProviderCatalog').props
 
     expect(catalog().loading).toBe(true)
+    expect(catalog()['health-read-state']).toBe('loading')
     await catalog().onRefresh()
     expect(api.listAiModelConfigsApi).toHaveBeenCalledOnce()
     expect(api.listAiProvidersApi).toHaveBeenCalledOnce()
     expect(api.listAiModelHealthApi).toHaveBeenCalledOnce()
 
-    health.resolve({ data: [{ configId: 8, circuitOpen: true }] })
+    health.resolve({ data: [{ configId: 8, status: 'open', circuitOpen: true }] })
     await flush()
     expect(catalog().loading).toBe(false)
+    expect(catalog()['health-read-state']).toBe('ready')
     expect(catalog()['model-health-by-id'][8]).toMatchObject({ circuitOpen: true })
+  })
+
+  it('renders read failures, missing health records and observed breaker state distinctly', async () => {
+    const Catalog = compileClientComponent(new URL('./AiProviderCatalog.vue', import.meta.url), {
+      '@iconify/vue': { Icon: createSlotStub('Icon') },
+      '@/components/common/StatsStrip.vue': { default: createSlotStub('StatsStrip') },
+      '@/components/Admin/shared/AdminWorkspacePanel.vue': { default: createSlotStub('AdminWorkspacePanel', ['default', 'actions']) },
+      '@/components/common/StatusIndicator.vue': { default: createSlotStub('StatusIndicator') },
+      '@/utils/icons.js': { icons },
+      './aiChannelSettingsModel.js': settingsModel
+    })
+    const Detail = compileClientComponent(new URL('./AiModelDetailPanel.vue', import.meta.url), {
+      './aiChannelSettingsModel.js': settingsModel
+    })
+    const page = compileClientComponent(new URL('./AiChannelSettings.vue', import.meta.url), {
+      ...settingsModules,
+      './AiProviderCatalog.vue': { default: Catalog },
+      './AiModelDetailPanel.vue': { default: Detail }
+    })
+    api.listAiModelConfigsApi.mockResolvedValue({ data: [{ id: 8, model: 'fixture', enabled: 1 }] })
+    api.listAiModelHealthApi
+      .mockRejectedValueOnce(new Error('health unavailable'))
+      .mockResolvedValueOnce({ data: [{ configId: 8, status: 'unknown', circuitOpen: false }] })
+      .mockResolvedValueOnce({ data: [{ configId: 8, status: 'half_open', circuitOpen: true, consecutiveFailures: 2 }] })
+    const view = await mount(page)
+    const text = node => findNodes(node).map(item => item.text).join(' ')
+    const breaker = () => findNodes(view.root, node => node.props.class === 'metric-card')
+      .find(card => text(card).includes('熔断模型'))
+    const count = () => findNode(breaker(), 'strong').text
+    const refresh = async () => {
+      await findNodes(view.root, node => node.type === 'ElButton').find(button => text(button).includes('刷新')).props.onClick()
+      await flush()
+    }
+
+    expect(text(breaker())).toContain('健康状态读取失败')
+    expect(text(view.node('aside'))).toContain('健康状态读取失败')
+    expect(count()).toBe('—')
+    await refresh()
+    expect(text(breaker())).toContain('暂无健康记录')
+    expect(count()).toBe('—')
+    await refresh()
+    expect(text(view.node('aside'))).toContain('半开观察')
+    expect(count()).toBe('1')
+    expect(text(view.root)).not.toMatch(/全部模型可调度|已切换备用链|将优先使用备用模型/)
+    expect(view.errors).toEqual([])
   })
 
   it('keeps the updated catalog when a refresh started before deletion returns last', async () => {
