@@ -44,7 +44,7 @@ describe('first-deployment setup page', () => {
     form.model.password = ' chosen-fixture-password '
     form.model.confirmPassword = ' chosen-fixture-password '
     const unmount = () => { app.unmount(); apps.splice(apps.indexOf(app), 1) }
-    return { initialize, fetchAuth, replace, validate, showError, showSuccess, required, authFetched,
+    return { initialize, fetchAuth, replace, validate, showError, showSuccess, authFetched,
       form, submit, renderer, unmount }
   }
 
@@ -92,15 +92,18 @@ describe('first-deployment setup page', () => {
     expect(findNode(view.renderer.root, 'button').props.loading).toBe(false)
   })
 
-  it('returns to the original login destination if setup finished before a response was lost', async () => {
+  it.each([
+    ['the response is lost', new Error('connection lost')],
+    ['another browser finished setup', { response: { status: 409 } }]
+  ])('preserves the login destination when %s and setup is already complete', async (_, failure) => {
     const redirect = '/admin?tab=statistics#latest'
     const view = await mount(redirect)
-    view.initialize.mockRejectedValue(new Error('connection lost'))
+    view.initialize.mockRejectedValue(failure)
     await view.submit()
 
     expect(view.initialize).toHaveBeenCalledOnce()
-    expect(view.fetchAuth).toHaveBeenCalledOnce()
-    expect(view.replace).toHaveBeenCalledWith({ path: ROUTE_PATHS.login, query: { redirect } })
+    expect(view.fetchAuth).toHaveBeenCalledExactlyOnceWith({ force: true })
+    expect(view.replace).toHaveBeenCalledExactlyOnceWith({ path: ROUTE_PATHS.login, query: { redirect } })
     expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
     expect(view.showSuccess).not.toHaveBeenCalled()
   })
@@ -128,37 +131,18 @@ describe('first-deployment setup page', () => {
     expect(view.form.model.password).toBe(' chosen-fixture-password ')
   })
 
-  it('refreshes stale setup state if another browser has completed initialization', async () => {
-    const view = await mount()
-    view.initialize.mockRejectedValue({ response: { status: 409, data: { msg: 'already initialized' } } })
-    view.fetchAuth.mockImplementation(async () => { view.required.value = false })
-    await view.submit()
-    expect(view.fetchAuth).toHaveBeenCalledWith({ force: true })
-    expect(view.replace).toHaveBeenCalledWith({ path: ROUTE_PATHS.login })
-    expect(view.form.model.password).toBe('')
-  })
-
-  it('goes to status recovery without resubmitting when setup succeeded but status is unavailable', async () => {
-    const view = await mount()
-    view.fetchAuth.mockImplementation(async () => { view.authFetched.value = false })
-    await view.submit()
-    expect(view.initialize).toHaveBeenCalledOnce()
-    expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
-    expect(view.replace).toHaveBeenCalledExactlyOnceWith({ path: ROUTE_PATHS.startup })
-    expect(view.showError).not.toHaveBeenCalled()
-    expect(view.showSuccess).toHaveBeenCalledOnce()
-  })
-
-  it('opens read-only status recovery for an unconfirmed POST when status is also unavailable', async () => {
+  it.each(['acknowledged', 'unconfirmed'])('recovers status without resubmitting an %s setup request', async outcome => {
     const redirect = '/admin?tab=statistics'
     const view = await mount(redirect)
-    view.initialize.mockRejectedValue(new Error('connection lost'))
+    if (outcome === 'unconfirmed') view.initialize.mockRejectedValue(new Error('connection lost'))
     view.fetchAuth.mockImplementation(async () => { view.authFetched.value = false })
 
     await view.submit()
     expect(view.initialize).toHaveBeenCalledOnce()
-    expect(view.replace).toHaveBeenCalledWith({ path: ROUTE_PATHS.startup, query: { redirect } })
+    expect(view.replace).toHaveBeenCalledExactlyOnceWith({ path: ROUTE_PATHS.startup, query: { redirect } })
     expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
+    expect(view.showError).not.toHaveBeenCalled()
+    expect(view.showSuccess).toHaveBeenCalledTimes(outcome === 'acknowledged' ? 1 : 0)
   })
 
   it('clears the form on unmount and does not submit if validation completes afterwards', async () => {

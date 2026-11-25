@@ -35,25 +35,18 @@ describe('startup status check', () => {
     apps.push(app)
     const retry = () => findNode(renderer.root, 'button').props.onClick()
     const unmount = () => { app.unmount(); apps.splice(apps.indexOf(app), 1) }
-    return { auth, route, fetchAuth, replace, renderer, retry, unmount }
+    return { auth, route, fetchAuth, replace, retry, unmount }
   }
 
-  it('leaves failed checks retryable without navigating to login', async () => {
-    const view = mount()
-    await view.retry()
-    expect(view.fetchAuth).toHaveBeenCalledWith({ force: true })
-    expect(view.replace).not.toHaveBeenCalled()
-  })
-
-  it.each([true, false])('continues after retry when initializationRequired=%s', async required => {
+  it('opens setup when a retry detects a fresh installation', async () => {
     const view = mount()
     view.fetchAuth.mockImplementation(async () => {
       view.auth.authFetched.value = true
-      view.auth.initializationRequired.value = required
-      view.auth.authCheckState.value = required ? 'required' : 'ready'
+      view.auth.initializationRequired.value = true
+      view.auth.authCheckState.value = 'required'
     })
     await view.retry()
-    expect(view.replace).toHaveBeenCalledWith({ path: required ? ROUTE_PATHS.setup : ROUTE_PATHS.login })
+    expect(view.replace).toHaveBeenCalledExactlyOnceWith({ path: ROUTE_PATHS.setup })
   })
 
   it('does not start another check while one is pending', async () => {
@@ -76,6 +69,8 @@ describe('startup status check', () => {
     expect(view.replace).not.toHaveBeenCalled()
     await view.retry()
     expect(view.fetchAuth).toHaveBeenCalledTimes(4)
+    expect(view.fetchAuth).toHaveBeenLastCalledWith({ force: true })
+    expect(view.replace).not.toHaveBeenCalled()
   })
 
   it('stops polling and preserves the redirect when a manual check succeeds', async () => {
