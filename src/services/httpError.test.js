@@ -2,23 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { normalizeHttpError } from './httpError.js'
 
 describe('normalizeHttpError', () => {
-  it('keeps the backend envelope code and message for real HTTP failures', () => {
-    const error = new Error('Request failed with status code 409')
-    error.response = {
-      status: 409,
-      data: { code: 409, msg: '同名文件已存在' }
-    }
+  it('prefers the backend code and message over the HTTP failure and normalizes string codes', () => {
+    const error = new Error('Request failed with status code 400')
+    error.response = { status: 400, data: { code: '409', msg: '同名文件已存在' } }
 
     expect(normalizeHttpError(error)).toEqual({ code: 409, message: '同名文件已存在' })
     expect(error.code).toBe(409)
     expect(error.message).toBe('同名文件已存在')
-  })
-
-  it('normalizes numeric string codes from API envelopes', () => {
-    const error = new Error('Conflict')
-    error.response = { data: { code: '409', msg: '版本冲突' } }
-
-    expect(normalizeHttpError(error)).toEqual({ code: 409, message: '版本冲突' })
   })
 
   it('handles non-Error rejection values without throwing', () => {
@@ -42,9 +32,8 @@ describe('normalizeHttpError', () => {
     })
   })
 
-  it('falls back to the transport status for JSON errors without a business code', () => {
-    const error = new Error('Unauthorized')
-    error.response = { status: 401, data: { msg: 'session expired' } }
+  it('uses transport status and the backend message when the business code is missing', () => {
+    const error = { response: { status: 401, data: { msg: 'session expired' } } }
     expect(normalizeHttpError(error)).toEqual({ code: 401, message: 'session expired' })
   })
 
