@@ -7,6 +7,7 @@ import { deferred } from '@/test-support/deferred.js'
 import { formatDate, formatFileSize } from '@/utils/format.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { icons } from '@/utils/icons.js'
+import { isCurrentSession, resetSessionState, sessionGeneration } from '@/services/sessionLifecycle.js'
 import * as model from './userSpaceModel.js'
 
 const api = {
@@ -14,6 +15,7 @@ const api = {
   userFileUploadApi: vi.fn(), userFileDownloadApi: vi.fn(), userFileDeleteApi: vi.fn()
 }
 const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showError: vi.fn() }))
+const confirmAction = vi.fn()
 vi.mock('@/utils/messageUtils.js', () => messages)
 
 const stub = (name, slots) => ({ default: createSlotStub(name, slots) })
@@ -26,10 +28,11 @@ const view = compileClientComponent(new URL('./UserSpace.vue', import.meta.url),
   '@/utils/icons.js': { icons },
   '@/utils/format.js': { formatDate, formatFileSize },
   '@/utils/downloadBlob.js': { downloadBlob: vi.fn() },
-  '@/utils/confirmUtils.js': { confirmAction: vi.fn(), confirmDelete: vi.fn() },
+  '@/utils/confirmUtils.js': { confirmAction, confirmDelete: vi.fn() },
   '@/utils/messageUtils.js': messages,
   '@/utils/errorHandler.js': { handleError },
   '@/services/api/user-space.js': api,
+  '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration },
   './userSpaceModel.js': model
 })
 const original = { name: 'note.md', path: 'imports/note.md' }
@@ -43,7 +46,7 @@ function mount() {
   const renderer = createTestRenderer()
   const app = renderer.createApp(view)
   app.directive('loading', {})
-  for (const name of ['Icon', 'ElIcon', 'ElButton', 'ElInput', 'ElSelect', 'ElOption', 'ElPagination', 'ElDrawer']) {
+  for (const name of ['Icon', 'ElIcon', 'ElButton', 'ElInput', 'ElSelect', 'ElOption', 'ElPagination', 'ElDrawer', 'ElAlert']) {
     app.component(name, createSlotStub(name))
   }
   app.component('ElTable', createSlotStub('ElTable', ['default', 'empty']))
@@ -64,7 +67,11 @@ function mount() {
     preview: () => props('PreviewDialog'),
     summary: () => findNodes(renderer.root, node => node.type === 'span' && node.props.class === 'storage-summary')[0].text,
     refresh: () => findNodes(renderer.root, node => node.type === 'ElButton' && node.props['aria-label'] === '刷新成果库')[0].props.onClick(),
-    upload: (file) => props('input').onChange({ target: { files: [file] } })
+    input: () => props('input'),
+    upload: (...files) => props('input').onChange({ target: { files } }),
+    uploadProgress: () => findNodes(renderer.root, node => node.props.class === 'upload-progress')[0]?.text,
+    uploadReport: () => props('ElAlert'),
+    uploadIssues: () => findNodes(renderer.root, node => node.props.role === 'listitem').map(node => node.text)
   }
 }
 
@@ -186,6 +193,86 @@ it('updates counts and opens the import category with one list request after an 
   )
   expect(workspace.rows()).toEqual([replacement])
   expect(workspace.summary()).toContain('2 份成果')
+})
+
+it('imports selected files in order, confirms each collision, and refreshes only once after partial success', async () => {
+  const first = deferred()
+  const conflict = Object.assign(new Error('同名文件'), { code: 409 })
+  const uploadResults = [new File(['fixture'], 'first.txt'), new File(['fixture'], 'kept.txt'),
+    new File([], 'empty.txt'), new File(['fixture'], 'replace.txt')]
+  api.userFileUploadApi.mockReturnValueOnce(first.promise)
+    .mockRejectedValueOnce(conflict)
+    .mockRejectedValueOnce(new Error('上传文件不能为空'))
+    .mockRejectedValueOnce(conflict)
+    .mockResolvedValueOnce({})
+  confirmAction.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+  api.userFileListApi.mockResolvedValueOnce(result(1, [original], 1, summary(1)))
+    .mockResolvedValueOnce(result(1, [replacement], 1, summary(2)))
+  const workspace = mount()
+  await flush()
+
+  expect(workspace.input()).toHaveProperty('multiple')
+  const finished = workspace.upload(...uploadResults)
+  await nextTick()
+  expect(workspace.uploadProgress()).toContain('正在导入 1/4')
+  await workspace.upload(new File(['fixture'], 'extra.txt'))
+  expect(api.userFileUploadApi).toHaveBeenCalledOnce()
+  expect(api.userFileListApi).toHaveBeenCalledOnce()
+
+  first.resolve({})
+  await finished
+  await flush()
+  expect(api.userFileUploadApi.mock.calls.map(([file, options]) => [file.name, options])).toEqual([
+    ['first.txt', { path: 'imports' }],
+    ['kept.txt', { path: 'imports' }],
+    ['empty.txt', { path: 'imports' }],
+    ['replace.txt', { path: 'imports' }],
+    ['replace.txt', { path: 'imports', overwrite: true }]
+  ])
+  expect(confirmAction.mock.calls.map(([options]) => options.message)).toEqual(['确认覆盖「kept.txt」？', '确认覆盖「replace.txt」？'])
+  expect(api.userFileListApi).toHaveBeenCalledTimes(2)
+  expect(api.userFileListApi).toHaveBeenLastCalledWith(
+    expect.objectContaining({ path: 'imports', page: 1, includeOverview: true }), expect.any(Object)
+  )
+  expect(workspace.uploadProgress()).toBeUndefined()
+  expect(workspace.uploadReport().title).toBe('导入完成：成功 2 · 跳过 1 · 失败 1')
+  expect(workspace.uploadIssues()).toEqual(['kept.txt：已跳过同名文件', 'empty.txt：上传文件不能为空'])
+  workspace.uploadReport().onClose()
+  await nextTick()
+  expect(workspace.uploadReport()).toBeUndefined()
+})
+
+it('keeps the current catalog and shows the reason if nothing was imported', async () => {
+  api.userFileUploadApi.mockRejectedValueOnce(new Error('上传文件不能为空'))
+  const workspace = mount()
+  await flush()
+  await workspace.upload(new File([], 'empty.txt'))
+  await nextTick()
+
+  expect(api.userFileListApi).toHaveBeenCalledOnce()
+  expect(workspace.rows()).toEqual([original])
+  expect(workspace.uploadReport()).toMatchObject({ type: 'error', title: '导入完成：成功 0 · 跳过 0 · 失败 1' })
+  expect(workspace.uploadIssues()).toEqual(['empty.txt：上传文件不能为空'])
+})
+
+it('does not overwrite or send remaining files after the login session changes during confirmation', async () => {
+  const waiting = deferred()
+  api.userFileUploadApi.mockRejectedValueOnce(Object.assign(new Error('同名文件'), { code: 409 }))
+  confirmAction.mockReturnValueOnce(waiting.promise)
+  const workspace = mount()
+  await flush()
+  const finished = workspace.upload(new File(['fixture'], 'duplicate.txt'), new File(['fixture'], 'remaining.txt'))
+  await flush()
+  expect(confirmAction).toHaveBeenCalledOnce()
+
+  resetSessionState()
+  waiting.resolve(true)
+  await finished
+  await flush()
+  expect(api.userFileUploadApi).toHaveBeenCalledOnce()
+  expect(api.userFileListApi).toHaveBeenCalledOnce()
+  expect(workspace.uploadReport()).toBeUndefined()
+  expect(workspace.uploadProgress()).toBeUndefined()
 })
 
 it('returns to the first page once when a previously valid page no longer exists', async () => {

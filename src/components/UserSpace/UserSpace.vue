@@ -11,8 +11,8 @@
         >{{ summaryLabel }}</span>
         <el-button
           type="primary"
-          :loading="uploading"
-          title="外部文件导入到「导入与其他」"
+          :loading="Boolean(uploadProgress)"
+          title="可多选文件，导入到「导入与其他」"
           @click="triggerUpload"
         >
           <el-icon><Icon :icon="iconMap.upload" /></el-icon>
@@ -20,6 +20,25 @@
         </el-button>
       </template>
     </PageHeader>
+    <el-alert
+      v-if="uploadReport"
+      class="import-report"
+      :title="`导入完成：成功 ${uploadReport.imported} · 跳过 ${uploadReport.skipped} · 失败 ${uploadReport.failed}`"
+      :type="uploadReport.failed && !uploadReport.imported ? 'error' : 'warning'"
+      show-icon
+      @close="uploadReport = null"
+    >
+      <span
+        class="import-issues"
+        role="list"
+      >
+        <span
+          v-for="(issue, index) in uploadReport.issues"
+          :key="index"
+          role="listitem"
+        >{{ issue.name }}：{{ issue.message }}</span>
+      </span>
+    </el-alert>
     <section
       class="catalog-panel"
       aria-label="成果列表"
@@ -74,6 +93,11 @@
         >
           清空筛选
         </el-button>
+        <span
+          v-if="uploadProgress"
+          class="upload-progress"
+          role="status"
+        >正在导入 {{ uploadProgress.current }}/{{ uploadProgress.total }}</span>
         <span
           class="result-count"
           aria-live="polite"
@@ -232,7 +256,8 @@
       ref="uploadInputRef"
       type="file"
       hidden
-      @change="uploadFile"
+      multiple
+      @change="uploadFiles"
     >
     <el-drawer
       v-model="detailVisible"
@@ -272,6 +297,7 @@ import { confirmAction, confirmDelete } from '@/utils/confirmUtils.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { userFileListApi, userFileUploadApi, userFileDownloadApi, userFilePreviewApi, userFileDeleteApi } from '@/services/api/user-space.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 import EmptyState from '@/components/common/EmptyState.vue'
 import UserSpaceDetail from './UserSpaceDetail.vue'
 import UserSpacePreviewDialog from './UserSpacePreviewDialog.vue'
@@ -279,6 +305,7 @@ import { getUserSpaceEntryIconKey, getUserSpaceFileExtension, isDownloadOnlyArti
   normalizeWorkspaceOverview, resolveArtifactCategoryLabel, resolveArtifactSourceLabel } from './userSpaceModel.js'
 
 const PAGE_SIZE = 50
+const IMPORT_CATEGORY = 'imports'
 const sourceLabels = ARTIFACT_SOURCE_LABELS
 const currentPath = ref('')
 const source = ref('')
@@ -290,7 +317,8 @@ const detailEntry = ref(null)
 const detailVisible = ref(false)
 const loading = ref(false)
 const listError = ref('')
-const uploading = ref(false)
+const uploadProgress = shallowRef(null)
+const uploadReport = shallowRef(null)
 const uploadInputRef = ref(null)
 const overview = shallowRef(null)
 const overviewOutdated = ref(false)
@@ -448,38 +476,65 @@ function handleRowCommand(command, file) {
 }
 
 function triggerUpload() {
-  if (!uploadInputRef.value) return
+  if (uploadProgress.value || !uploadInputRef.value) return
   uploadInputRef.value.value = ''
   uploadInputRef.value.click()
 }
 
-async function uploadFile(event) {
-  const file = event?.target?.files?.[0]
-  if (!file || uploading.value) return
-  const path = 'imports'
-  uploading.value = true
+async function uploadImport(file, isActive) {
   try {
-    try { await userFileUploadApi(file, { path }) }
-    catch (error) {
-      if (error?.code !== 409) throw error
-      if (disposed) return
-      const overwrite = await confirmAction({ title: '覆盖同名成果', message: `确认覆盖「${file.name}」？`, type: 'warning' })
-      if (!overwrite || disposed) return
-      await userFileUploadApi(file, { path, overwrite: true })
+    await userFileUploadApi(file, { path: IMPORT_CATEGORY })
+  } catch (error) {
+    if (error?.code !== 409 || !isActive()) throw error
+    const overwrite = await confirmAction({
+      title: '覆盖同名成果', message: `确认覆盖「${file.name}」？`, confirmButtonText: '覆盖', cancelButtonText: '跳过'
+    })
+    if (!overwrite || !isActive()) return false
+    await userFileUploadApi(file, { path: IMPORT_CATEGORY, overwrite: true })
+  }
+  return true
+}
+
+async function uploadFiles(event) {
+  if (disposed || uploadProgress.value) return
+  const selectedFiles = Array.from(event?.target?.files ?? [])
+  if (!selectedFiles.length) return
+
+  const generation = sessionGeneration.value
+  const isActive = () => !disposed && isCurrentSession(generation)
+  const report = { imported: 0, skipped: 0, failed: 0, issues: [] }
+  uploadReport.value = null
+  try {
+    for (const [index, file] of selectedFiles.entries()) {
+      if (!isActive()) return
+      uploadProgress.value = { current: index + 1, total: selectedFiles.length }
+      try {
+        if (await uploadImport(file, isActive)) {
+          report.imported += 1
+        } else {
+          report.skipped += 1
+          report.issues.push({ name: file.name, message: '已跳过同名文件' })
+        }
+      } catch (error) {
+        report.failed += 1
+        report.issues.push({ name: file.name, message: handleError(error, { showMessage: false, defaultMessage: '导入失败，请重试' }) })
+      }
     }
-    showSuccess('已导入到「导入与其他」')
-    if (disposed) return
-    if (currentPath.value !== path || source.value || keyword.value) {
+    if (!isActive()) return
+    if (report.issues.length) uploadReport.value = report
+    else showSuccess(`已导入 ${report.imported} 份成果到「导入与其他」`)
+
+    if (!report.imported) return
+    if (currentPath.value !== IMPORT_CATEGORY || source.value || keyword.value) {
       overviewNeeded = true
-      currentPath.value = path
+      currentPath.value = IMPORT_CATEGORY
       source.value = ''
       search.value = ''
     } else {
       page.value = 1
       await refreshWorkspace()
     }
-  } catch (error) { showError(`导入失败：${error?.message || '未知错误'}`) }
-  finally { uploading.value = false }
+  } finally { uploadProgress.value = null }
 }
 
 async function previewFile(file) {
@@ -552,10 +607,26 @@ onScopeDispose(() => {
   gap: 12px;
 }
 .storage-summary,
+.upload-progress,
 .result-count,
 .catalog-footer {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+.upload-progress {
+  white-space: nowrap;
+}
+.import-report {
+  flex-shrink: 0;
+}
+.import-issues {
+  display: block;
+  max-height: 7rem;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.import-issues > span {
+  display: block;
 }
 .catalog-panel {
   display: flex;
