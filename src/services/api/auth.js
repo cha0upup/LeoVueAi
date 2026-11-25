@@ -20,8 +20,8 @@ export function getLoginStatusApi() {
   return http.get('/platform/user/status')
 }
 
-export function getProfileApi() {
-  return http.get('/platform/user/profile')
+export function getProfileApi({ signal } = {}) {
+  return http.get('/platform/user/profile', { signal })
 }
 
 export function updateProfileApi(params) {

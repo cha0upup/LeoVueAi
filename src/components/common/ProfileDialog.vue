@@ -1,13 +1,40 @@
 <template>
   <el-dialog
     v-model="visible"
+    title="个人资料"
     width="680px"
     class="profile-dialog"
     :close-on-click-modal="!saving"
-    @closed="resetDialog"
+    :close-on-press-escape="!saving"
+    :show-close="!saving"
   >
     <div
-      v-loading="loading"
+      v-if="loading"
+      class="profile-feedback"
+      role="status"
+    >
+      正在读取个人资料…
+    </div>
+    <div
+      v-else-if="loadError"
+      class="profile-feedback"
+    >
+      <el-alert
+        :title="loadError"
+        type="error"
+        :closable="false"
+        show-icon
+      />
+      <el-button
+        type="primary"
+        plain
+        @click="loadProfile"
+      >
+        重新加载
+      </el-button>
+    </div>
+    <div
+      v-else-if="profile"
       class="profile-shell"
     >
       <div class="profile-head">
@@ -47,10 +74,18 @@
         </div>
       </div>
 
+      <el-alert
+        v-if="saveError"
+        :title="saveError"
+        type="error"
+        :closable="false"
+        show-icon
+      />
       <el-form
         ref="formRef"
         :model="form"
         :rules="rules"
+        :disabled="saving"
         label-position="top"
         class="profile-form"
       >
@@ -118,6 +153,7 @@
         </el-button>
         <el-button
           type="primary"
+          :disabled="!canSave"
           :loading="saving"
           @click="submitProfile"
         >
@@ -129,12 +165,14 @@
 </template>
 
 <script setup>
-import { computed, nextTick, reactive, ref } from 'vue'
+import { computed, onScopeDispose, reactive, ref, shallowRef, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import { getProfileApi, updateProfileApi } from '@/services/api/auth.js'
+import { handleError } from '@/utils/errorHandler.js'
+import { validateForm } from '@/utils/formUtils.js'
 import { icons as iconMap } from '@/utils/icons.js'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { showSuccess } from '@/utils/messageUtils.js'
 
 const ROLE_LABELS = {
   admin: '管理员',
@@ -145,10 +183,25 @@ const ROLE_LABELS = {
 const visible = ref(false)
 const loading = ref(false)
 const saving = ref(false)
+const loadError = ref('')
+const saveError = ref('')
 const formRef = ref(null)
-const profile = reactive({})
-const form = reactive({ email: '', phone: '', remark: '' })
-const roleLabel = computed(() => ROLE_LABELS[profile.privilege] || '当前用户')
+const profile = shallowRef(null)
+const editableFields = ({ email, phone, remark } = {}) => ({
+  email: email?.trim() ?? '',
+  phone: phone?.trim() ?? '',
+  remark: remark?.trim() ?? ''
+})
+const form = reactive(editableFields())
+const roleLabel = computed(() => ROLE_LABELS[profile.value?.privilege] || '当前用户')
+const canSave = computed(() => {
+  if (!visible.value || loading.value || saving.value || !profile.value) return false
+  const current = editableFields(profile.value)
+  const draft = editableFields(form)
+  return Object.keys(current).some(field => current[field] !== draft[field])
+})
+let loadRequest
+let disposed = false
 
 const rules = {
   email: [
@@ -159,68 +212,85 @@ const rules = {
   remark: [{ max: 500, message: '备注不能超过 500 个字符', trigger: 'blur' }]
 }
 
-const fillProfile = (data) => {
-  if (!data || typeof data !== 'object' || Array.isArray(data) || !data.userId) {
+const requireProfile = (data) => {
+  if (typeof data?.userId !== 'string' || !data.userId) {
     throw new Error('个人信息接口返回异常')
   }
-  Object.assign(profile, data)
-  form.email = data.email || ''
-  form.phone = data.phone || ''
-  form.remark = data.remark || ''
+  return data
 }
 
-const openProfileDialog = async () => {
-  visible.value = true
+async function loadProfile() {
+  if (disposed || !visible.value || loading.value || saving.value) return
+  const request = new AbortController()
+  loadRequest = request
+  const { signal } = request
   loading.value = true
+  loadError.value = ''
   try {
-    const response = await getProfileApi()
-    fillProfile(response.data)
-    await nextTick()
-    formRef.value?.clearValidate()
+    const { data } = await getProfileApi({ signal })
+    if (signal.aborted) return
+    const loaded = requireProfile(data)
+    Object.assign(form, editableFields(loaded))
+    profile.value = loaded
   } catch (error) {
-    visible.value = false
-    showError(error?.response?.data?.msg || '个人信息加载失败')
+    if (!signal.aborted) loadError.value = handleError(error, { defaultMessage: '个人信息加载失败', showMessage: false })
   } finally {
-    loading.value = false
+    if (loadRequest === request) {
+      loadRequest = undefined
+      loading.value = false
+    }
   }
+}
+
+const openProfileDialog = () => {
+  if (visible.value || disposed) return
+  visible.value = true
+  return loadProfile()
 }
 
 const submitProfile = async () => {
-  try {
-    await formRef.value?.validate()
-  } catch {
-    showError('请检查表单输入')
-    return
-  }
-
+  if (!canSave.value || disposed) return
+  const userId = profile.value.userId
+  const payload = editableFields(form)
   saving.value = true
+  saveError.value = ''
+  Object.assign(form, payload)
   try {
-    const response = await updateProfileApi({
-      email: form.email,
-      phone: form.phone,
-      remark: form.remark
-    })
-    fillProfile(response.data)
+    if (!await validateForm(formRef, { errorMessage: '请检查表单输入' }) || disposed || !visible.value) return
+    const { data } = await updateProfileApi(payload)
+    if (disposed || !visible.value) return
+    if (requireProfile(data).userId !== userId) throw new Error('个人资料更新响应与当前账号不匹配')
     showSuccess('个人资料已更新')
     visible.value = false
   } catch (error) {
-    showError(error?.response?.data?.msg || '个人资料更新失败')
+    if (!disposed && visible.value) saveError.value = handleError(error, { defaultMessage: '个人资料更新失败', showMessage: false })
   } finally {
     saving.value = false
   }
 }
 
 const resetDialog = () => {
-  Object.keys(profile).forEach((key) => delete profile[key])
-  Object.assign(form, { email: '', phone: '', remark: '' })
-  formRef.value?.clearValidate()
+  loadRequest?.abort()
+  loadRequest = undefined
+  loading.value = false
+  profile.value = null
+  loadError.value = ''
+  saveError.value = ''
+  Object.assign(form, editableFields())
 }
+
+watch(visible, open => { if (!open) resetDialog() }, { flush: 'sync' })
+onScopeDispose(() => {
+  disposed = true
+  resetDialog()
+})
 
 defineExpose({ openProfileDialog })
 </script>
 
 <style scoped>
 .profile-shell { display: flex; flex-direction: column; gap: 20px; min-height: 360px; }
+.profile-feedback { display: flex; align-items: flex-start; justify-content: center; flex-direction: column; gap: 12px; min-height: 120px; color: var(--el-text-color-secondary); }
 .profile-head { display: flex; align-items: center; gap: 16px; }
 .profile-avatar { color: var(--el-color-primary); background: color-mix(in srgb, var(--el-color-primary) 14%, var(--app-control-background)); }
 .profile-head__copy { flex: 1; min-width: 0; }
