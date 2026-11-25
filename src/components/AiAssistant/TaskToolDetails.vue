@@ -46,16 +46,16 @@
         >{{ error }}</span>
       </div>
       <div
-        v-if="workspaceFile"
+        v-if="taskOutput"
         class="shell-fetch-row"
       >
         <button
           class="shell-fetch-btn"
-          :disabled="workspaceLoading"
-          @click="downloadWorkspaceFile"
+          :disabled="Boolean(outputDownload)"
+          @click="downloadOutput"
         >
           <Icon
-            v-if="workspaceLoading"
+            v-if="outputDownload"
             icon="mdi:loading"
             class="spin-icon"
           />
@@ -63,15 +63,15 @@
             v-else
             icon="mdi:file-download-outline"
           />
-          {{ workspaceLoading ? '下载中…' : `下载 ${workspaceFile.filename}` }}
+          {{ outputDownload ? '下载中…' : `下载 ${taskOutput.filename}` }}
         </button>
         <span class="workspace-file-meta">
-          {{ workspaceFile.path }}
+          {{ taskOutput.path }}
         </span>
         <span
-          v-if="workspaceError"
+          v-if="outputError"
           class="shell-fetch-error"
-        >{{ workspaceError }}</span>
+        >{{ outputError }}</span>
       </div>
       <div
         v-if="content"
@@ -101,13 +101,13 @@
 </template>
 
 <script setup>
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { getShellResultApi } from '@/services/api/shell-generator.js'
 import { downloadTaskOutputApi } from '@/services/api/task-output.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
-import { formatToolValue, getShellResultId, getWorkspaceFileRef } from './taskNodeModel.js'
+import { formatToolValue, getShellResultId, getTaskOutputRef } from './taskNodeModel.js'
 
 const props = defineProps({
   node: { type: Object, required: true }
@@ -116,10 +116,10 @@ const props = defineProps({
 const formattedArgs = computed(() => formatToolValue(props.node.args))
 const formattedResult = computed(() => formatToolValue(props.node.result, 2000))
 const shellResultId = computed(() => getShellResultId(props.node.result))
-const workspaceFile = computed(() => getWorkspaceFileRef(props.node.result))
+const taskOutput = computed(() => getTaskOutputRef(props.node.result))
 const loading = ref(false)
-const workspaceLoading = ref(false)
-const workspaceError = ref('')
+const outputDownload = shallowRef(null)
+const outputError = ref('')
 const content = ref('')
 const error = ref('')
 const copied = ref(false)
@@ -134,10 +134,10 @@ watch(shellResultId, () => {
   copied.value = false
 })
 
-watch(workspaceFile, () => {
-  workspaceLoading.value = false
-  workspaceError.value = ''
-})
+watch(() => taskOutput.value?.path, () => {
+  cancelOutputDownload()
+  outputError.value = ''
+}, { flush: 'sync' })
 
 const fetchShellResult = async () => {
   const resultId = shellResultId.value
@@ -177,24 +177,31 @@ const copyShellResult = async () => {
   }
 }
 
-const downloadWorkspaceFile = async () => {
-  const file = workspaceFile.value
-  if (!file || workspaceLoading.value) return
-  workspaceLoading.value = true
-  workspaceError.value = ''
+function cancelOutputDownload() {
+  outputDownload.value?.abort()
+  outputDownload.value = null
+}
+
+async function downloadOutput() {
+  const file = taskOutput.value
+  if (!file || outputDownload.value) return
+  const request = new AbortController()
+  const { signal } = request
+  outputDownload.value = request
+  outputError.value = ''
   try {
-    const response = await downloadTaskOutputApi({ path: file.path })
-    downloadBlob(response.data, file.filename)
+    const { data } = await downloadTaskOutputApi(file.path, { signal })
+    if (!signal.aborted) downloadBlob(data, file.filename)
   } catch (downloadError) {
-    workspaceError.value = downloadError?.message || '下载失败'
+    if (!signal.aborted) outputError.value = downloadError?.message || '下载失败'
   } finally {
-    workspaceLoading.value = false
+    if (outputDownload.value === request) outputDownload.value = null
   }
 }
 
-
-onUnmounted(() => {
+onBeforeUnmount(() => {
   requestGuard.invalidate()
+  cancelOutputDownload()
   if (copyResetTimer !== null) window.clearTimeout(copyResetTimer)
 })
 </script>

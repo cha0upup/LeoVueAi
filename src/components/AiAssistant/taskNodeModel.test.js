@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatToolValue,
   getShellResultId,
-  getWorkspaceFileRef,
+  getTaskOutputRef,
   getThinkingPeek,
   getToolStatusLabel,
   getToolTone
@@ -27,13 +27,13 @@ describe('taskNodeModel', () => {
     expect(getShellResultId({ resultId: 'old-shape' })).toBeNull()
   })
 
-  it('reads workspace file references from result preview strings', () => {
-    expect(getWorkspaceFileRef('{"userWorkspacePath":"/tasks/report.txt","sha256":"abc","size":12}')).toEqual({
-      path: '/tasks/report.txt',
-      filename: 'report.txt',
-      sha256: 'abc',
-      size: 12
+  it('shows download references only for task output files', () => {
+    expect(getTaskOutputRef('{"userWorkspacePath":" ai-tasks/job/files/reports/note.txt ","size":12}')).toEqual({
+      path: 'ai-tasks/job/files/reports/note.txt',
+      filename: 'note.txt'
     })
-    expect(getWorkspaceFileRef({ userWorkspacePath: '/tasks/old.txt' })).toBeNull()
+    expect(getTaskOutputRef('{"userWorkspacePath":"imports/old.txt"}')).toBeNull()
+    expect(getTaskOutputRef('{"userWorkspacePath":"ai-tasks/job/.internal/metadata.json"}')).toBeNull()
+    expect(getTaskOutputRef('{"userWorkspacePath":"ai-tasks/job/files/"}')).toBeNull()
   })
 })

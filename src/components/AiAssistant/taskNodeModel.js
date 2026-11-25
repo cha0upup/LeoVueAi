@@ -66,15 +66,12 @@ export const getShellResultId = result => {
   return typeof resultId === 'string' && resultId.trim() ? resultId.trim() : null
 }
 
-export const getWorkspaceFileRef = result => {
-  const value = parseToolResult(result)
-  const path = value?.userWorkspacePath
-  if (typeof path !== 'string' || !path.trim()) return null
-  const normalized = path.trim()
-  return {
-    path: normalized,
-    filename: normalized.split('/').filter(Boolean).at(-1) || 'workspace-file',
-    sha256: typeof value?.sha256 === 'string' ? value.sha256 : null,
-    size: Number.isFinite(Number(value?.size)) ? Number(value.size) : null
-  }
+export const getTaskOutputRef = result => {
+  const path = parseToolResult(result)?.userWorkspacePath
+  if (typeof path !== 'string') return null
+  const normalized = path.trim().replace(/\\/g, '/').replace(/^\//, '')
+  const parts = normalized.split('/')
+  if (parts.length < 4 || parts[0] !== 'ai-tasks' || parts[2] !== 'files' ||
+      parts.some(part => !part || part.startsWith('.'))) return null
+  return { path: normalized, filename: parts.at(-1) }
 }
