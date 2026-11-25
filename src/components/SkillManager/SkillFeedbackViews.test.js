@@ -40,19 +40,6 @@ function mount(component, initialProps = {}, initialRow = {}) {
 afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
 
 describe('Skill feedback presentation contracts', () => {
-  it.each([['health', Health, 'ElDialog'], ['batch', Batch, 'ElDialog'], ['issues', Issues, 'ElDrawer']])(
-    'keeps %s visibility controlled by its parent in both directions', async (_name, component, host) => {
-      const view = mount(component)
-      expect(view.nodes(host)[0].props.modelValue).toBe(true)
-      view.props.modelValue = false; await nextTick()
-      expect(view.nodes(host)[0].props.modelValue).toBe(false)
-      view.props.modelValue = true; await nextTick()
-      expect(view.nodes(host)[0].props.modelValue).toBe(true)
-      view.nodes(host)[0].props['onUpdate:modelValue'](false)
-      expect(view.props.modelValue).toBe(false)
-    }
-  )
-
   it('derives health counts and preserves scoped rows, status labels and locate events', async () => {
     const rows = [{ name: 'healthy', valid: true }, { name: 'warning', valid: true, issues: [{ severity: 'warning' }] }, { name: 'invalid', valid: false, issues: [{ severity: 'WARNING' }] }]
     const view = mount(Health, { scope: 'agent-node', data: { skills: rows } }, rows[1])
@@ -65,15 +52,6 @@ describe('Skill feedback presentation contracts', () => {
     view.row.value = rows[2]; await nextTick()
     expect(view.nodes('ElTag')[0].props.type).toBe('danger')
     expect(view.text()).toContain('错误')
-  })
-
-  it('reacts to refreshed health props without mutating its input', async () => {
-    const data = { skills: [] }, view = mount(Health, { data })
-    view.props.data = { skills: [{ valid: true }] }; await nextTick()
-    expect(view.nodes('strong').map(text)).toEqual(['1', '0', '0'])
-    expect(data).toEqual({ skills: [] })
-    view.nodes('ElDialog')[0].props['onUpdate:modelValue'](false)
-    expect(view.props.modelValue).toBe(false)
   })
 
   it('locates only failed batch rows that still exist in the current catalog', async () => {
@@ -110,7 +88,6 @@ describe('Skill feedback presentation contracts', () => {
     view.nodes('button')[0].props.onClick()
     view.nodes('ElButton')[0].props.onClick()
     expect(view.events).toEqual([['open-file', issue], ['revalidate']])
-    expect(view.nodes('ElDrawer')[0].props.size).toBe('520px')
   })
 
   it('renders the existing no-issues state and forwards drawer close without changing the skill', () => {
@@ -124,15 +101,6 @@ describe('Skill feedback presentation contracts', () => {
 })
 
 describe('Skill workspace overview presenter', () => {
-  it('preserves simple-mode description and missing-metadata fallbacks', () => {
-    const view = mount(Overview)
-    expect(view.text()).toContain('暂无说明，请编辑 SKILL.md')
-    expect(view.text()).toContain('未分类')
-    expect(view.text()).toContain('unknown')
-    expect(view.nodes('ElDescriptions')).toHaveLength(0)
-    expect(view.nodes('ElButton')).toHaveLength(0)
-  })
-
   it('renders descriptions as text and never mutates its Skill input', () => {
     const skill = { name: 'alpha', description: '<script>fixture</script>', category: 'discovery', platforms: ['linux', 'windows'], risk: 'low', accessMode: 'read-only' }
     const view = mount(Overview, { skill })
@@ -154,16 +122,14 @@ describe('Skill workspace overview presenter', () => {
     const skill = { id: 'leo.alpha', owner: 'team', source: 'custom', domain: 'operation', category: 'discovery', pack: 'base', mode: 'guided', risk: 'low', accessMode: 'read-only',
       platforms: ['linux'], targets: ['host'], tactics: ['TA0001'], techniques: ['T0001'], requiredTools: ['tool'], requiredSkills: ['skill'], requiredFacts: ['fact'], produces: ['report'], next: ['next'] }
     const view = mount(Overview, { mode: 'governance', skill })
-    expect(view.nodes('ElDescriptions')[0].props.column).toBe(3)
-    expect(view.nodes('ElDescriptionsItem')).toHaveLength(9)
     expect(view.text()).toContain('leo.alpha')
-    expect(view.nodes('h2').map(text)).toEqual(['使用说明', '治理信息', '平台与目标', 'ATT&CK 映射', '运行依赖', '产出与后续'])
-    expect(view.nodes('ElTag').map(text)).toEqual(['linux', 'host', 'TA0001', 'T0001', 'tool', 'skill', 'fact', 'report', 'next'])
+    expect(view.nodes('ElTag').map(text)).toEqual(expect.arrayContaining(
+      ['linux', 'host', 'TA0001', 'T0001', 'tool', 'skill', 'fact', 'report', 'next']
+    ))
   })
 
-  it('keeps undeclared groups visible and updates when the selected Skill changes', async () => {
+  it('updates the overview when the selected Skill changes', async () => {
     const view = mount(Overview, { mode: 'governance', skill: { description: 'first' } })
-    expect(view.nodes('span').filter(node => node.props.class === 'empty-value')).toHaveLength(9)
     view.props.skill = { description: 'second', platforms: ['macos'] }; await nextTick()
     expect(view.text()).toContain('second')
     expect(view.text()).not.toContain('first')

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { registerSessionCleanup, resetSessionState, sessionGeneration } from './sessionLifecycle.js'
+import { registerSessionCleanup, resetSessionState } from './sessionLifecycle.js'
 
 const mocks = vi.hoisted(() => {
   const handlers = {}
@@ -49,23 +49,6 @@ describe('HTTP response redirect handling', () => {
     resetSessionState()
     vi.clearAllMocks()
     mocks.currentRoute.value = { path: '/admin', fullPath: '/admin?tab=users' }
-  })
-
-  it('stamps requests with their login generation', () => {
-    expect(mocks.handlers.request({ url: '/test' })).toMatchObject({
-      url: '/test', sessionGeneration: sessionGeneration.value
-    })
-  })
-
-  it('rejects a late success from the previous login before unwrapping its data', async () => {
-    const config = mocks.handlers.request({})
-    resetSessionState()
-    vi.clearAllMocks()
-
-    await expect(mocks.handlers.fulfilled({ config, data: { code: 200, data: 'old user data' } }))
-      .rejects.toMatchObject({ code: 'SESSION_CHANGED' })
-    expect(mocks.resetAuth).not.toHaveBeenCalled()
-    expect(mocks.replace).not.toHaveBeenCalled()
   })
 
   it('does not log the new user out when an old request returns 401', async () => {

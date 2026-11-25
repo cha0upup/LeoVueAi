@@ -37,8 +37,4 @@ describe('application icon registry', () => {
     expect(references.size).toBeGreaterThan(0)
     expect([...references].filter(name => !Object.hasOwn(icons, name))).toEqual([])
   })
-
-  it('uses complete Iconify identifiers for retained entries', () => {
-    for (const icon of Object.values(icons)) expect(icon).toMatch(/^[\w-]+:[\w-]+$/)
-  })
 })

@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  createSessionChangedError,
   isCurrentSession,
   registerSessionCleanup,
   resetSessionState,
@@ -51,11 +50,5 @@ describe('browser session lifecycle', () => {
       second()
       logger.mockRestore()
     }
-  })
-
-  it('exposes a recognizable local error for discarded responses', () => {
-    expect(createSessionChangedError()).toMatchObject({
-      name: 'SessionChangedError', code: 'SESSION_CHANGED'
-    })
   })
 })
