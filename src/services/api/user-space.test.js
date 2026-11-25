@@ -34,7 +34,7 @@ describe('artifact library API contract', () => {
     expect(mocks.post).toHaveBeenCalledExactlyOnceWith('/platform/user/file/archive', artifact)
   })
 
-  it('preserves preview, download and delete requests', () => {
+  it('requests text-only previews and preserves download and delete requests', () => {
     const params = { path: 'imports/fixture.txt' }
     const { signal } = new AbortController()
 
@@ -43,7 +43,7 @@ describe('artifact library API contract', () => {
     userSpace.userFileDeleteApi(params)
 
     expect(mocks.get).toHaveBeenNthCalledWith(1, '/platform/user/file/preview', {
-      params: { ...params, includeBase64: false }, signal
+      params: { ...params, includeBase64: false, textOnly: true }, signal
     })
     expect(mocks.get).toHaveBeenNthCalledWith(2, '/platform/user/file/download', {
       params,

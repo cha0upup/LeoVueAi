@@ -3,6 +3,7 @@ import {
   detectUserSpaceLanguage,
   getUserSpaceEntryIconKey,
   getUserSpaceFileExtension,
+  isDownloadOnlyArtifact,
   normalizeWorkspaceOverview,
   resolveArtifactCategoryLabel,
   resolveArtifactSourceLabel
@@ -25,6 +26,15 @@ describe('userSpaceModel', () => {
     expect(resolveArtifactSourceLabel()).toBe('来源未记录')
     expect(getUserSpaceEntryIconKey({ name: 'report.MD' })).toBe('markdown')
     expect(getUserSpaceEntryIconKey({ name: 'output.bin' })).toBe('file')
+  })
+
+  it('skips text preview for known non-text formats but keeps SVG and unknown files eligible', () => {
+    for (const name of ['notes.PDF', 'picture.png', 'data.xlsx', 'recording.mp4', 'backup.tar.gz']) {
+      expect(isDownloadOnlyArtifact({ name })).toBe(true)
+    }
+    for (const name of ['logo.svg', 'readme', 'unknown.bin', 'report.md', 'rows.csv']) {
+      expect(isDownloadOnlyArtifact({ name })).toBe(false)
+    }
   })
 
   it('normalizes incomplete overview payloads', () => {

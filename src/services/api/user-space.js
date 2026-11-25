@@ -27,7 +27,7 @@ export function userFileDownloadApi(params) {
 }
 
 export function userFilePreviewApi(params, { signal } = {}) {
-  return http.get('/platform/user/file/preview', { params: { ...params, includeBase64: false }, signal })
+  return http.get('/platform/user/file/preview', { params: { ...params, includeBase64: false, textOnly: true }, signal })
 }
 
 export function userFileDeleteApi(params) {

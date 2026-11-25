@@ -31,6 +31,19 @@
         重新预览
       </el-button>
     </div>
+    <div
+      v-else-if="data?.previewable === false"
+      class="preview-feedback"
+    >
+      <strong>此成果暂无文本预览</strong>
+      <span>可下载原文件后，使用对应应用打开。</span>
+      <el-button
+        type="primary"
+        @click="emit('download')"
+      >
+        下载原文件
+      </el-button>
+    </div>
     <template v-else-if="data">
       <div class="preview-meta">
         <el-tag
@@ -100,7 +113,7 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' }
 })
-const emit = defineEmits(['update:modelValue', 'retry'])
+const emit = defineEmits(['update:modelValue', 'retry', 'download'])
 
 const SourcePreview = defineAsyncComponent({
   loader: () => import('./UserSpaceSourcePreview.vue'),
@@ -113,7 +126,8 @@ const previewLanguage = computed(() => detectUserSpaceLanguage(props.path))
 const previewMode = ref('rendered')
 const previewModes = [{ label: '阅读预览', value: 'rendered' }, { label: '查看源码', value: 'source' }]
 const isReading = computed(() => previewLanguage.value === 'markdown' && previewMode.value === 'rendered')
-const renderedMarkdown = computed(() => isReading.value && props.data ? renderArtifactMarkdown(props.data.content) : '')
+const renderedMarkdown = computed(() => isReading.value && typeof props.data?.content === 'string'
+  ? renderArtifactMarkdown(props.data.content) : '')
 
 watch(() => props.path, () => { previewMode.value = 'rendered' })
 </script>

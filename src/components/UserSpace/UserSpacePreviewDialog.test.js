@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import * as Vue from 'vue'
 import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
@@ -12,6 +12,26 @@ const Preview = compileClientComponent(new URL('./UserSpacePreviewDialog.vue', i
   '@/utils/format.js': { formatFileSize },
   './userSpaceModel.js': { detectUserSpaceLanguage },
   './artifactMarkdown.js': { renderArtifactMarkdown: () => '<h1>Fixture</h1>' }
+})
+
+it('shows a download action instead of a Markdown or source viewer for unsupported content', () => {
+  const renderer = createTestRenderer()
+  const onDownload = vi.fn()
+  const app = renderer.createApp({ render: () => Vue.h(Preview, {
+    modelValue: true, path: 'fixture.md', data: { previewable: false }, onDownload
+  }) })
+  for (const name of ['ElDialog', 'ElButton']) app.component(name, createSlotStub(name))
+  app.mount(renderer.root)
+  try {
+    expect(findNode(renderer.root, 'strong').text).toBe('此成果暂无文本预览')
+    expect(findNode(renderer.root, 'article')).toBeNull()
+    expect(findNode(renderer.root, 'SourcePreview')).toBeNull()
+    expect(findNode(renderer.root, 'ElSegmented')).toBeNull()
+    findNode(renderer.root, 'ElButton').props.onClick()
+    expect(onDownload).toHaveBeenCalledOnce()
+  } finally {
+    app.unmount()
+  }
 })
 
 it('mounts the source viewer only for source previews and unmounts it again after switching or closing', async () => {

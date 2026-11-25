@@ -51,6 +51,7 @@ const EXTENSION_KIND_GROUPS = [
   ['codeFile', new Set(['js', 'ts', 'json', 'vue', 'java', 'py', 'go', 'rs', 'sql'])],
   ['document', new Set(['txt', 'log'])]
 ]
+const DOWNLOAD_ONLY_KINDS = new Set(['picture', 'video', 'compress', 'filePdf', 'fileWord', 'fileExcel', 'filePowerPoint'])
 
 export function getUserSpaceFileExtension(path) {
   const filename = String(path || '').split(/[\\/]/).pop() || ''
@@ -71,6 +72,11 @@ export function getUserSpaceEntryIconKey(entry) {
   if (entry?.isDirectory) return 'folder'
   const extension = getUserSpaceFileExtension(entry?.name)
   return EXTENSION_KIND_GROUPS.find(([, extensions]) => extensions.has(extension))?.[0] || 'file'
+}
+
+export function isDownloadOnlyArtifact(entry) {
+  // SVG is an image for display but its XML remains useful as text.
+  return getUserSpaceFileExtension(entry?.name) !== 'svg' && DOWNLOAD_ONLY_KINDS.has(getUserSpaceEntryIconKey(entry))
 }
 
 export function normalizeWorkspaceOverview(data) {

@@ -256,6 +256,7 @@
       :loading="previewLoading"
       :error="preview?.error"
       @retry="previewFile(preview?.file)"
+      @download="downloadFile(preview?.file)"
     />
   </section>
 </template>
@@ -274,7 +275,8 @@ import { userFileListApi, userFileUploadApi, userFileDownloadApi, userFilePrevie
 import EmptyState from '@/components/common/EmptyState.vue'
 import UserSpaceDetail from './UserSpaceDetail.vue'
 import UserSpacePreviewDialog from './UserSpacePreviewDialog.vue'
-import { getUserSpaceEntryIconKey, getUserSpaceFileExtension, normalizeWorkspaceOverview, resolveArtifactCategoryLabel, resolveArtifactSourceLabel } from './userSpaceModel.js'
+import { getUserSpaceEntryIconKey, getUserSpaceFileExtension, isDownloadOnlyArtifact,
+  normalizeWorkspaceOverview, resolveArtifactCategoryLabel, resolveArtifactSourceLabel } from './userSpaceModel.js'
 
 const PAGE_SIZE = 50
 const sourceLabels = ARTIFACT_SOURCE_LABELS
@@ -483,16 +485,21 @@ async function uploadFile(event) {
 async function previewFile(file) {
   if (!file?.path || disposed || (previewLoading.value && preview.value.file.path === file.path)) return
   previewRequest?.abort()
+  detailVisible.value = false
+  if (isDownloadOnlyArtifact(file)) {
+    previewRequest = undefined
+    preview.value = { file, data: { previewable: false }, error: '' }
+    return
+  }
   const request = new AbortController()
   previewRequest = request
   const { signal } = request
-  detailVisible.value = false
   preview.value = { file, data: null, error: '' }
   try {
     const markdown = ['md', 'markdown'].includes(getUserSpaceFileExtension(file.name))
     const { data } = await userFilePreviewApi({ path: file.path, size: markdown ? 1024 * 1024 : undefined }, { signal })
     if (signal.aborted) return
-    if (typeof data?.content !== 'string') throw new Error('成果预览响应格式异常')
+    if (data?.previewable !== false && typeof data?.content !== 'string') throw new Error('成果预览响应格式异常')
     preview.value = { file, data, error: '' }
   } catch (error) {
     if (signal.aborted) return
@@ -503,6 +510,7 @@ async function previewFile(file) {
 }
 
 async function downloadFile(file) {
+  if (!file?.path) return
   try {
     const response = await userFileDownloadApi({ path: file.path, filename: file.name })
     downloadBlob(response.data, file.name)
