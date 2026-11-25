@@ -71,6 +71,7 @@ function mount() {
     input: () => props('input'),
     upload: (...files) => props('input').onChange({ target: { files } }),
     uploadProgress: () => findNodes(renderer.root, node => node.props.class === 'upload-progress')[0]?.text,
+    stopUpload: () => findNodes(renderer.root, node => node.type === 'ElButton' && node.props.title === '当前文件处理完后停止')[0]?.props,
     uploadReport: () => props('ElAlert'),
     uploadIssues: () => findNodes(renderer.root, node => node.props.role === 'listitem').map(node => node.text)
   }
@@ -199,7 +200,6 @@ it('imports selected files in order, confirms each collision, and refreshes only
     new File([], 'empty.txt'), new File(['fixture'], 'replace.txt')]
   api.userFileUploadApi.mockReturnValueOnce(first.promise)
     .mockRejectedValueOnce(conflict)
-    .mockRejectedValueOnce(new Error('上传文件不能为空'))
     .mockRejectedValueOnce(conflict)
     .mockResolvedValueOnce({})
   confirmAction.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
@@ -222,7 +222,6 @@ it('imports selected files in order, confirms each collision, and refreshes only
   expect(api.userFileUploadApi.mock.calls.map(([file, options]) => [file.name, options])).toEqual([
     ['first.txt', { path: 'imports' }],
     ['kept.txt', { path: 'imports' }],
-    ['empty.txt', { path: 'imports' }],
     ['replace.txt', { path: 'imports' }],
     ['replace.txt', { path: 'imports', overwrite: true }]
   ])
@@ -242,16 +241,38 @@ it('imports selected files in order, confirms each collision, and refreshes only
 })
 
 it('keeps the current catalog and shows the reason if nothing was imported', async () => {
-  api.userFileUploadApi.mockRejectedValueOnce(new Error('上传文件不能为空'))
   const workspace = mount()
   await flush()
   await workspace.upload(new File([], 'empty.txt'))
   await nextTick()
 
+  expect(api.userFileUploadApi).not.toHaveBeenCalled()
   expect(api.userFileListApi).toHaveBeenCalledOnce()
   expect(workspace.rows()).toEqual([original])
   expect(workspace.uploadReport()).toMatchObject({ type: 'error', title: '导入完成：成功 0 · 跳过 0 · 失败 1' })
   expect(workspace.uploadIssues()).toEqual(['empty.txt：上传文件不能为空'])
+})
+
+it('finishes the current import after stopping the queue and reports remaining files separately', async () => {
+  const first = deferred()
+  api.userFileUploadApi.mockReturnValueOnce(first.promise)
+  const workspace = mount()
+  await flush()
+  const files = ['first.txt', 'second.txt', 'third.txt'].map(name => new File(['fixture'], name))
+  const finished = workspace.upload(...files)
+  await nextTick()
+  workspace.stopUpload().onClick()
+  await nextTick()
+  expect(workspace.stopUpload().disabled).toBe(true)
+  expect(workspace.uploadProgress()).toBe('正在完成当前文件…')
+
+  first.resolve({})
+  await finished
+  await flush()
+  expect(api.userFileUploadApi).toHaveBeenCalledExactlyOnceWith(files[0], { path: 'imports' })
+  expect(api.userFileListApi).toHaveBeenCalledTimes(2)
+  expect(workspace.uploadReport().title).toBe('导入已停止：成功 1 · 跳过 0 · 失败 0 · 未处理 2')
+  expect(workspace.uploadProgress()).toBeUndefined()
 })
 
 it('does not overwrite or send remaining files after the login session changes during confirmation', async () => {

@@ -23,12 +23,13 @@
     <el-alert
       v-if="uploadReport"
       class="import-report"
-      :title="`导入完成：成功 ${uploadReport.imported} · 跳过 ${uploadReport.skipped} · 失败 ${uploadReport.failed}`"
+      :title="uploadReportTitle"
       :type="uploadReport.failed && !uploadReport.imported ? 'error' : 'warning'"
       show-icon
       @close="uploadReport = null"
     >
       <span
+        v-if="uploadReport.issues.length"
         class="import-issues"
         role="list"
       >
@@ -93,11 +94,25 @@
         >
           清空筛选
         </el-button>
-        <span
+        <div
           v-if="uploadProgress"
-          class="upload-progress"
-          role="status"
-        >正在导入 {{ uploadProgress.current }}/{{ uploadProgress.total }}</span>
+          class="import-activity"
+        >
+          <span
+            class="upload-progress"
+            role="status"
+          >{{ uploadProgress.stopping ? '正在完成当前文件…' : `正在导入 ${uploadProgress.current}/${uploadProgress.total}` }}</span>
+          <el-button
+            v-if="uploadProgress.current < uploadProgress.total"
+            link
+            type="primary"
+            title="当前文件处理完后停止"
+            :disabled="uploadProgress.stopping"
+            @click="stopQueuedImports"
+          >
+            停止后续导入
+          </el-button>
+        </div>
         <span
           class="result-count"
           aria-live="polite"
@@ -322,6 +337,12 @@ const loading = ref(false)
 const listError = ref('')
 const uploadProgress = shallowRef(null)
 const uploadReport = shallowRef(null)
+const uploadReportTitle = computed(() => {
+  const report = uploadReport.value
+  if (!report) return ''
+  const counts = `成功 ${report.imported} · 跳过 ${report.skipped} · 失败 ${report.failed}`
+  return report.unprocessed ? `导入已停止：${counts} · 未处理 ${report.unprocessed}` : `导入完成：${counts}`
+})
 const uploadInputRef = ref(null)
 const overview = shallowRef(null)
 const overviewOutdated = ref(false)
@@ -493,7 +514,15 @@ function triggerUpload() {
   uploadInputRef.value.click()
 }
 
+function stopQueuedImports() {
+  const progress = uploadProgress.value
+  if (progress && progress.current < progress.total) {
+    uploadProgress.value = { ...progress, stopping: true }
+  }
+}
+
 async function uploadImport(file, isActive) {
+  if (file.size === 0) throw new Error('上传文件不能为空')
   try {
     await userFileUploadApi(file, { path: IMPORT_CATEGORY })
   } catch (error) {
@@ -514,11 +543,15 @@ async function uploadFiles(event) {
 
   const generation = sessionGeneration.value
   const isActive = () => !disposed && isCurrentSession(generation)
-  const report = { imported: 0, skipped: 0, failed: 0, issues: [] }
+  const report = { imported: 0, skipped: 0, failed: 0, unprocessed: 0, issues: [] }
   uploadReport.value = null
   try {
     for (const [index, file] of selectedFiles.entries()) {
       if (!isActive()) return
+      if (uploadProgress.value?.stopping) {
+        report.unprocessed = selectedFiles.length - index
+        break
+      }
       uploadProgress.value = { current: index + 1, total: selectedFiles.length }
       try {
         if (await uploadImport(file, isActive)) {
@@ -533,7 +566,7 @@ async function uploadFiles(event) {
       }
     }
     if (!isActive()) return
-    if (report.issues.length) uploadReport.value = report
+    if (report.issues.length || report.unprocessed) uploadReport.value = report
     else showSuccess(`已导入 ${report.imported} 份成果到「导入与其他」`)
 
     if (!report.imported) return
@@ -643,6 +676,11 @@ onScopeDispose(() => {
 }
 .upload-progress {
   white-space: nowrap;
+}
+.import-activity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .import-report {
   flex-shrink: 0;
