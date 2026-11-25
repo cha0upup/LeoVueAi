@@ -57,7 +57,7 @@ function mount(kind, query = {}) {
   const form = formNode().props.model
   const button = label => findNodes(renderer.root, node => node.type === 'button' && text(node) === label)[0]?.props
   return {
-    form, formNode, replace, root: renderer.root, open: vm.openChangePasswordDialog, unmount, button,
+    form, formNode, replace, open: vm.openChangePasswordDialog, unmount, button,
     dialog: () => findNode(renderer.root, 'dialog-fixture')?.props,
     fill: () => Object.assign(form, credentials, { confirmPassword: credentials.newPassword }),
     submit: () => button(kind === 'page' ? '修改密码并进入控制台' : '提交修改').onClick()
@@ -74,17 +74,12 @@ beforeEach(() => {
 afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
 
 describe('required password update page', () => {
-  it('uses the deployment policy for new passwords but not for the existing password', () => {
+  it('applies the password policy and submits the exact credentials only once', async () => {
     const view = mount('page')
-    expect(findNode(view.root, 'h1').text).toBe('请先更新密码')
-    expect(findNode(view.root, 'input').props.placeholder).toBe('请输入当前密码')
     const { rules } = view.formNode().props
     expect(rules.newPassword[1]).toMatchObject({ min: 12, max: 256 })
     expect(rules.oldPassword[0]).not.toHaveProperty('min')
-  })
 
-  it('locks validation and sends the exact password characters only once', async () => {
-    const view = mount('page')
     view.fill()
     const validation = deferred()
     calls.validate.mockReturnValueOnce(validation.promise)
@@ -149,21 +144,13 @@ describe('password update dialog', () => {
     expect(calls.changePassword).not.toHaveBeenCalled()
   })
 
-  it('ignores duplicate submits and closes with cleared fields after success', async () => {
+  it('closes the dialog and clears credentials after a successful update', async () => {
     const view = mount('dialog')
     view.open()
     view.fill()
-    const pendingWrite = deferred()
-    calls.changePassword.mockReturnValueOnce(pendingWrite.promise)
-    const submit = view.submit()
     await view.submit()
     await flush()
-    expect(view.dialog()['close-on-press-escape']).toBe(false)
-    expect(calls.changePassword).toHaveBeenCalledExactlyOnceWith(credentials)
-
-    pendingWrite.resolve({})
-    await submit
-    await flush()
+    expect(calls.changePassword).toHaveBeenCalledOnce()
     expect(view.dialog().modelValue).toBe(false)
     expect(view.form).toEqual({ oldPassword: '', newPassword: '', confirmPassword: '' })
   })

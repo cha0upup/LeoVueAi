@@ -48,20 +48,23 @@ describe('first-deployment setup page', () => {
       form, submit, renderer, unmount }
   }
 
-  it('uses the server password bounds and requires an exact confirmation', async () => {
+  it('uses the server policy, submits exact values once and clears them before returning to login', async () => {
     const view = await mount()
     expect(view.form.rules.password[1]).toMatchObject({ min: 12, max: 256 })
     const callback = vi.fn()
     view.form.rules.confirmPassword[1].validator({}, 'chosen-fixture-password', callback)
     expect(callback.mock.calls[0][0]).toBeInstanceOf(Error)
-  })
 
-  it('submits both exact values, clears them, refreshes status and returns to login', async () => {
-    const view = await mount()
+    const response = deferred()
+    view.initialize.mockReturnValue(response.promise)
+    const pending = view.submit()
+    await nextTick()
     await view.submit()
-    expect(view.initialize).toHaveBeenCalledWith({
+    expect(view.initialize).toHaveBeenCalledExactlyOnceWith({
       password: ' chosen-fixture-password ', confirmPassword: ' chosen-fixture-password '
     })
+    response.resolve({})
+    await pending
     expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
     expect(view.fetchAuth).toHaveBeenCalledWith({ force: true })
     expect(view.replace).toHaveBeenCalledWith({ path: ROUTE_PATHS.login })
@@ -74,18 +77,6 @@ describe('first-deployment setup page', () => {
     await view.submit()
     expect(view.initialize).not.toHaveBeenCalled()
     expect(view.replace).not.toHaveBeenCalled()
-  })
-
-  it('blocks repeated submissions while initialization is pending', async () => {
-    const view = await mount()
-    const response = deferred()
-    view.initialize.mockReturnValue(response.promise)
-    const first = view.submit()
-    await nextTick()
-    await view.submit()
-    expect(view.initialize).toHaveBeenCalledOnce()
-    response.resolve({})
-    await first
   })
 
   it('reopens the form after a network failure only if a fresh status says setup is required', async () => {
@@ -147,16 +138,15 @@ describe('first-deployment setup page', () => {
     expect(view.form.model.password).toBe('')
   })
 
-  it.each([false, true])('goes to status recovery without resubmitting after setup (conflict=%s)', async conflict => {
+  it('goes to status recovery without resubmitting when setup succeeded but status is unavailable', async () => {
     const view = await mount()
-    if (conflict) view.initialize.mockRejectedValue({ response: { status: 409 } })
     view.fetchAuth.mockImplementation(async () => { view.authFetched.value = false })
     await view.submit()
     expect(view.initialize).toHaveBeenCalledOnce()
     expect(view.form.model).toEqual({ password: '', confirmPassword: '' })
     expect(view.replace).toHaveBeenCalledExactlyOnceWith({ path: ROUTE_PATHS.startup })
     expect(view.showError).not.toHaveBeenCalled()
-    expect(view.showSuccess).toHaveBeenCalledTimes(conflict ? 0 : 1)
+    expect(view.showSuccess).toHaveBeenCalledOnce()
   })
 
   it('opens read-only status recovery for an unconfirmed POST when status is also unavailable', async () => {

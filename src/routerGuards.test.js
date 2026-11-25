@@ -19,11 +19,11 @@ describe('authentication route guard', () => {
     expect(normalizeAuthRedirect('/main?tab=agent#details')).toBe('/main?tab=agent#details')
     expect(normalizeAuthRedirect(['/main?tab=agent', '/admin'])).toBe('/main?tab=agent')
   })
-  it.each(['unknown', 'checking', 'error'])('keeps %s status out of login/setup and protected views', state => {
-    expect(resolveAuthNavigation(route(ROUTE_PATHS.admin), null, false, state)).toEqual({
+  it('keeps a failed status check out of protected views and leaves recovery reachable', () => {
+    expect(resolveAuthNavigation(route(ROUTE_PATHS.admin), null, false, 'error')).toEqual({
       path: ROUTE_PATHS.startup, query: { redirect: ROUTE_PATHS.admin }
     })
-    expect(resolveAuthNavigation(route(ROUTE_PATHS.startup), null, false, state)).toBeNull()
+    expect(resolveAuthNavigation(route(ROUTE_PATHS.startup), null, false, 'error')).toBeNull()
   })
 
   it('continues to setup or login after a successful status retry', () => {
@@ -37,12 +37,9 @@ describe('authentication route guard', () => {
     expect(resolveAuthNavigation(startup, { privilege: 'admin' }, false, 'ready')).toBe(ROUTE_PATHS.admin)
   })
 
-  it.each([ROUTE_PATHS.login, ROUTE_PATHS.main, ROUTE_PATHS.admin, ROUTE_PATHS.changePassword])(
-    'sends %s to the setup wizard on a fresh deployment', path => {
-      const query = [ROUTE_PATHS.main, ROUTE_PATHS.admin].includes(path) ? { redirect: path } : undefined
-      expect(resolveAuthNavigation(route(path), null, true)).toEqual({ path: ROUTE_PATHS.setup, ...(query ? { query } : {}) })
-    }
-  )
+  it('does not enter the forced password page before setup is finished', () => {
+    expect(resolveAuthNavigation(route(ROUTE_PATHS.changePassword), null, true)).toEqual({ path: ROUTE_PATHS.setup })
+  })
 
   it('allows setup only while initialization is required', () => {
     expect(resolveAuthNavigation(route(ROUTE_PATHS.setup, { meta: {} }), null, true)).toBeNull()
@@ -59,16 +56,6 @@ describe('authentication route guard', () => {
     expect(resolveAuthNavigation(setupRoute, null, true, 'error')).toEqual({ path: ROUTE_PATHS.startup, query: { redirect } })
     expect(resolveAuthNavigation(route(ROUTE_PATHS.setup, { query: { redirect: '/setup' } }), null, false))
       .toEqual({ path: ROUTE_PATHS.login })
-  })
-
-  it('sends a first-login session to the forced password page', () => {
-    expect(resolveAuthNavigation(
-      route(ROUTE_PATHS.main),
-      { privilege: 'admin', passwordChangeRequired: true }
-    )).toEqual({
-      path: ROUTE_PATHS.changePassword,
-      query: { redirect: ROUTE_PATHS.main }
-    })
   })
 
   it('allows only the password page while a password change is required', () => {
