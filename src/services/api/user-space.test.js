@@ -11,31 +11,26 @@ beforeEach(() => {
 })
 
 describe('artifact library API contract', () => {
-  it('exports the seven APIs consumed by the artifact library', () => {
+  it('exports the APIs consumed by the artifact library', () => {
     expect(Object.keys(userSpace).sort()).toEqual([
       'archiveUserArtifactApi',
       'userFileDeleteApi',
       'userFileDownloadApi',
       'userFileListApi',
       'userFilePreviewApi',
-      'userFileUploadApi',
-      'userWorkspaceOverviewApi'
+      'userFileUploadApi'
     ])
   })
 
-  it('preserves listing, overview and archive requests', () => {
-    const filter = { category: 'imports', page: 2 }
+  it('requests the list and workspace overview together', () => {
+    const filter = { path: 'imports', recursive: true, page: 2, includeOverview: true }
     const artifact = { filename: 'report.md', content: 'fixture report' }
     const { signal } = new AbortController()
 
     userSpace.userFileListApi(filter, { signal })
-    userSpace.userWorkspaceOverviewApi({ signal })
     userSpace.archiveUserArtifactApi(artifact)
 
-    expect(mocks.get).toHaveBeenNthCalledWith(1, '/platform/user/file/list', { params: filter, signal })
-    expect(mocks.get).toHaveBeenNthCalledWith(2, '/platform/user/file/overview', {
-      params: { includeRecent: false }, signal
-    })
+    expect(mocks.get).toHaveBeenCalledExactlyOnceWith('/platform/user/file/list', { params: filter, signal })
     expect(mocks.post).toHaveBeenCalledExactlyOnceWith('/platform/user/file/archive', artifact)
   })
 

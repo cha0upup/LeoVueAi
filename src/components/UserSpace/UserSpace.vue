@@ -5,7 +5,10 @@
       :icon="iconMap.folderOpened"
     >
       <template #actions>
-        <span class="storage-summary">{{ overview.totalFiles }} 份成果 · {{ formatFileSize(overview.totalBytes) }}</span>
+        <span
+          class="storage-summary"
+          aria-live="polite"
+        >{{ summaryLabel }}</span>
         <el-button
           type="primary"
           :loading="uploading"
@@ -267,7 +270,7 @@ import { downloadBlob } from '@/utils/downloadBlob.js'
 import { confirmAction, confirmDelete } from '@/utils/confirmUtils.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
-import { userFileListApi, userWorkspaceOverviewApi, userFileUploadApi, userFileDownloadApi, userFilePreviewApi, userFileDeleteApi } from '@/services/api/user-space.js'
+import { userFileListApi, userFileUploadApi, userFileDownloadApi, userFilePreviewApi, userFileDeleteApi } from '@/services/api/user-space.js'
 import EmptyState from '@/components/common/EmptyState.vue'
 import UserSpaceDetail from './UserSpaceDetail.vue'
 import UserSpacePreviewDialog from './UserSpacePreviewDialog.vue'
@@ -287,11 +290,12 @@ const loading = ref(false)
 const listError = ref('')
 const uploading = ref(false)
 const uploadInputRef = ref(null)
-const overview = ref(normalizeWorkspaceOverview())
+const overview = shallowRef(null)
+const overviewOutdated = ref(false)
+let overviewNeeded = true
 const preview = shallowRef(null)
 let listRequest
 let previewRequest
-let overviewRequest
 let searchTimer
 let disposed = false
 const previewVisible = computed({
@@ -304,11 +308,16 @@ const previewVisible = computed({
   }
 })
 const previewLoading = computed(() => preview.value !== null && !preview.value.data && !preview.value.error)
+const summaryLabel = computed(() => {
+  const data = overview.value
+  if (!data) return overviewOutdated.value ? '成果统计暂不可用' : '正在读取成果统计…'
+  return `${data.totalFiles} 份成果 · ${formatFileSize(data.totalBytes)}${overviewOutdated.value ? ' · 统计待刷新' : ''}`
+})
 const categories = computed(() => [
-  { path: '', label: '全部成果', files: overview.value.totalFiles },
+  { path: '', label: '全部成果', files: overview.value?.totalFiles ?? '—' },
   ...ARTIFACT_CATEGORIES.map(category => ({
     ...category,
-    files: Number(overview.value.categories.find(item => item.path === category.path)?.files || 0)
+    files: overview.value ? Number(overview.value.categories.find(item => item.path === category.path)?.files || 0) : '—'
   }))
 ])
 const keyword = computed(() => search.value.trim())
@@ -346,8 +355,11 @@ async function fetchList() {
   const { signal } = request
   const params = { recursive: true, path: currentPath.value || undefined,
     search: keyword.value, source: source.value, pageSize: PAGE_SIZE }
-  const loadPage = async (requestedPage) => {
-    const { data } = await userFileListApi({ ...params, page: requestedPage }, { signal })
+  const includeOverview = overviewNeeded
+  const loadPage = async (requestedPage, withOverview = false) => {
+    const pageParams = { ...params, page: requestedPage }
+    if (withOverview) pageParams.includeOverview = true
+    const { data } = await userFileListApi(pageParams, { signal })
     if (!Number.isSafeInteger(data?.count) || data.count < 0 || data.page !== requestedPage || !Array.isArray(data.fileList)) {
       throw new Error('成果库列表响应格式异常')
     }
@@ -357,8 +369,13 @@ async function fetchList() {
   listError.value = ''
   try {
     const requestedPage = page.value
-    let data = await loadPage(requestedPage)
+    let data = await loadPage(requestedPage, includeOverview)
     if (signal.aborted) return
+    if (includeOverview) {
+      overviewNeeded = false
+      overviewOutdated.value = !Array.isArray(data.overview?.categories)
+      if (!overviewOutdated.value) overview.value = normalizeWorkspaceOverview(data.overview)
+    }
     if (requestedPage > 1 && (requestedPage - 1) * PAGE_SIZE >= data.count) {
       if (data.count > 0) data = await loadPage(1)
       if (signal.aborted) return
@@ -373,6 +390,7 @@ async function fetchList() {
   } catch (error) {
     if (signal.aborted) return
     files.value = []
+    if (includeOverview && overviewNeeded) overviewOutdated.value = true
     listError.value = handleError(error, { showMessage: false, defaultMessage: '读取成果失败，请重试' })
   } finally {
     if (listRequest === request) {
@@ -382,21 +400,9 @@ async function fetchList() {
   }
 }
 
-async function fetchOverview() {
-  if (disposed) return
-  overviewRequest?.abort()
-  const request = new AbortController()
-  overviewRequest = request
-  const { signal } = request
-  try {
-    const { data } = await userWorkspaceOverviewApi({ signal })
-    if (!signal.aborted && Array.isArray(data?.categories)) overview.value = normalizeWorkspaceOverview(data)
-  } catch { /* 保留已有计数，列表仍可独立使用。 */ }
-  finally { if (overviewRequest === request) overviewRequest = undefined }
-}
-
-async function refreshWorkspace() {
-  await Promise.all([fetchList(), fetchOverview()])
+function refreshWorkspace() {
+  overviewNeeded = true
+  return fetchList()
 }
 
 function closeFilePanels() {
@@ -462,10 +468,10 @@ async function uploadFile(event) {
     showSuccess('已导入到「导入与其他」')
     if (disposed) return
     if (currentPath.value !== path || source.value || keyword.value) {
+      overviewNeeded = true
       currentPath.value = path
       source.value = ''
       search.value = ''
-      await fetchOverview()
     } else {
       page.value = 1
       await refreshWorkspace()
@@ -519,7 +525,6 @@ onScopeDispose(() => {
   disposed = true
   clearTimeout(searchTimer)
   listRequest?.abort()
-  overviewRequest?.abort()
   previewRequest?.abort()
 })
 </script>

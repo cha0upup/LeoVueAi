@@ -8,10 +8,6 @@ export function archiveUserArtifactApi(data) {
   return http.post('/platform/user/file/archive', data)
 }
 
-export function userWorkspaceOverviewApi({ signal } = {}) {
-  return http.get('/platform/user/file/overview', { params: { includeRecent: false }, signal })
-}
-
 export function userFileUploadApi(file, options = {}) {
   const formData = new FormData()
   formData.append('file', file)
