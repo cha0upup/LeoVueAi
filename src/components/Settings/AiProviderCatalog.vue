@@ -72,17 +72,13 @@
                     :label="provider.enabled !== 0 ? '已启用' : '已禁用'"
                     compact
                   />
-                  <span
-                    v-if="provider.enabled !== 0 && provider.apiKeyConfigured"
-                    class="connection-dot"
-                  >连接正常</span>
                   <el-tag
                     v-if="provider.apiKeyConfigured"
                     type="primary"
                     size="small"
                     effect="plain"
                   >
-                    API Key 已验证
+                    API Key 已配置
                   </el-tag>
                 </div>
                 <div class="provider-meta-line">
@@ -376,12 +372,6 @@ const isProviderTesting = (provider) => {
   background: var(--el-border-color);
 }
 
-.connection-dot {
-  color: var(--el-color-success);
-  font-size: 12px;
-}
-
-.connection-dot::before,
 .status-dot::before {
   content: '';
   display: inline-block;

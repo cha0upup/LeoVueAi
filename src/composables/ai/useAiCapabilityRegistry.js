@@ -36,6 +36,7 @@ export function useAiCapabilityRegistry({ onChanged = async () => {} } = {}) {
   const capabilityFormRef = ref(null)
   const capabilitySaveLoading = ref(false)
   const capabilityForm = reactive(createCapabilityForm())
+  let capabilityRead = 0
 
   const filteredCapabilities = computed(() => {
     const query = capabilitySearchKeyword.value.trim().toLowerCase()
@@ -50,16 +51,17 @@ export function useAiCapabilityRegistry({ onChanged = async () => {} } = {}) {
   })
 
   const loadCapabilities = async () => {
+    const read = ++capabilityRead
     capabilityLoading.value = true
     try {
       const data = (await listAiModelCapabilitiesApi()).data
-      capabilities.value = Array.isArray(data) ? data : []
+      if (read === capabilityRead) capabilities.value = Array.isArray(data) ? data : []
       return capabilities.value
     } catch (error) {
-      showError(error?.message || '加载能力库失败')
+      if (read === capabilityRead) showError(error?.message || '加载能力库失败')
       return []
     } finally {
-      capabilityLoading.value = false
+      if (read === capabilityRead) capabilityLoading.value = false
     }
   }
 

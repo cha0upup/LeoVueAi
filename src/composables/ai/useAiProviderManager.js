@@ -48,6 +48,7 @@ export function useAiProviderManager({
   const providerFormRef = ref(null)
   const providerSaveLoading = ref(false)
   const providerForm = reactive(createProviderForm())
+  let savedProvidersRead = 0
 
   const providerHeadersPlaceholder = computed(() =>
     providerEditing.value?.headersConfigured
@@ -65,11 +66,12 @@ export function useAiProviderManager({
   }
 
   const loadSavedProviders = async () => {
+    const read = ++savedProvidersRead
     try {
       const data = (await listAiProvidersApi()).data
-      savedProviders.value = Array.isArray(data) ? data : []
+      if (read === savedProvidersRead) savedProviders.value = Array.isArray(data) ? data : []
     } catch (error) {
-      showError(error?.message || '加载供应商失败')
+      if (read === savedProvidersRead) showError(error?.message || '加载供应商失败')
     }
   }
 

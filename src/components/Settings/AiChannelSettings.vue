@@ -24,7 +24,7 @@
         :rows="rows"
         :model-health-by-id="modelHealthById"
         :selected-model-id="selectedModelId"
-        :loading="listLoading"
+        :loading="catalogLoading"
         :testing-model-id="testingId"
         :syncing-provider-id="syncingProviderId"
         @open-capabilities="openCapabilityManager"
@@ -117,7 +117,7 @@
 <script setup>
 import { icons as iconMap } from '@/utils/icons.js'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onScopeDispose, reactive, ref, watch } from 'vue'
 
 import {
   listAiModelConfigsApi,
@@ -127,6 +127,7 @@ import {
   probeAiModelCapabilitiesApi,
   listAiModelHealthApi
 } from '@/services/api/admin.js'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import AiCapabilityRegistryDialogs from './AiCapabilityRegistryDialogs.vue'
 import AiCapabilityProbeDialog from './AiCapabilityProbeDialog.vue'
@@ -150,6 +151,10 @@ import {
 // ── List state ─────────────────────────────────────────────────────────
 const rows = ref([])
 const listLoading = ref(false)
+const refreshing = ref(false)
+const catalogLoading = computed(() => refreshing.value || listLoading.value)
+const reads = createLatestRequestGuard(['models', 'health'])
+let disposed = false
 const searchKeyword = ref('')
 const activatingId = ref(null)
 const testingId = ref(null)
@@ -289,39 +294,44 @@ function focusCatalog() {
 }
 
 async function loadList() {
+  if (disposed) return
+  const read = reads.next('models')
   listLoading.value = true
   try {
-    const res = await listAiModelConfigsApi()
-    const data = res.data
+    const { data } = await listAiModelConfigsApi()
+    if (!reads.isCurrent('models', read)) return
     rows.value = Array.isArray(data) ? data : []
     if (!selectedModelId.value || !rows.value.some((item) => item.id === selectedModelId.value)) {
       selectedModelId.value = rows.value.find((item) => item.isActive === 1)?.id || rows.value[0]?.id || null
     }
   } catch (e) {
-    showError(e?.message || '加载失败')
+    if (reads.isCurrent('models', read)) showError(e?.message || '加载失败')
   } finally {
-    listLoading.value = false
+    if (reads.isCurrent('models', read)) listLoading.value = false
   }
 }
 
 async function loadModelHealth() {
+  if (disposed) return
+  const read = reads.next('health')
   try {
-    const res = await listAiModelHealthApi()
-    const list = res.data
+    const { data: list } = await listAiModelHealthApi()
+    if (!reads.isCurrent('health', read)) return
     modelHealthById.value = Array.isArray(list)
       ? Object.fromEntries(list.filter((item) => item?.configId != null).map((item) => [item.configId, item]))
       : {}
   } catch {
-    modelHealthById.value = {}
+    if (reads.isCurrent('health', read)) modelHealthById.value = {}
   }
 }
 
 async function refreshAll() {
-  listLoading.value = true
+  if (disposed || refreshing.value) return
+  refreshing.value = true
   try {
-    await Promise.all([loadSavedProviders(), loadList(), loadCapabilities(), loadModelHealth()])
+    await Promise.allSettled([loadSavedProviders(), loadList(), loadCapabilities(), loadModelHealth()])
   } finally {
-    listLoading.value = false
+    refreshing.value = false
   }
 }
 
@@ -456,6 +466,11 @@ async function probeCapabilities(row) {
 onMounted(() => {
   loadProviders()
   refreshAll()
+})
+
+onScopeDispose(() => {
+  disposed = true
+  reads.invalidate()
 })
 </script>
 

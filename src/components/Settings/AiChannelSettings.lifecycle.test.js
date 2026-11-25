@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, nextTick, reactive } from 'vue'
 import { compileClientComponent, createSlotStub, findNode, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
+import { deferred } from '@/test-support/deferred.js'
 import { useAiCapabilityRegistry } from '@/composables/ai/useAiCapabilityRegistry.js'
 import { useAiProviderManager } from '@/composables/ai/useAiProviderManager.js'
 import { useAiModelRequestPreview } from '@/composables/ai/useAiModelRequestPreview.js'
 import * as settingsModel from './aiChannelSettingsModel.js'
 import { icons } from '@/utils/icons.js'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 
 const api = vi.hoisted(() => Object.fromEntries([
   'listAiModelConfigsApi', 'createAiModelConfigApi', 'updateAiModelConfigApi', 'activateAiModelConfigApi',
@@ -27,6 +29,7 @@ const Settings = compileClientComponent(new URL('./AiChannelSettings.vue', impor
   '@/utils/icons.js': { icons },
   '@/components/common/PageHeader.vue': { default: createSlotStub('PageHeader', ['default', 'actions']) },
   '@/services/api/admin.js': api,
+  '@/utils/latestRequestGuard.js': { createLatestRequestGuard },
   '@/utils/messageUtils.js': messages,
   '@/composables/ai/useAiCapabilityRegistry.js': { useAiCapabilityRegistry },
   '@/composables/ai/useAiProviderManager.js': { useAiProviderManager },
@@ -96,6 +99,48 @@ describe('AI channel settings initialization', () => {
     })
     expect(view.node('AiModelConfigDialog').props['form-state']).not.toHaveProperty('protocol')
     expect(messages.showError).not.toHaveBeenCalled()
+  })
+
+  it('keeps refreshing while related reads are pending and ignores repeated refresh clicks', async () => {
+    const health = deferred()
+    api.listAiModelHealthApi.mockReturnValueOnce(health.promise)
+    const view = await mount()
+    const catalog = () => view.node('AiProviderCatalog').props
+
+    expect(catalog().loading).toBe(true)
+    await catalog().onRefresh()
+    expect(api.listAiModelConfigsApi).toHaveBeenCalledOnce()
+    expect(api.listAiProvidersApi).toHaveBeenCalledOnce()
+    expect(api.listAiModelHealthApi).toHaveBeenCalledOnce()
+
+    health.resolve({ data: [{ configId: 8, circuitOpen: true }] })
+    await flush()
+    expect(catalog().loading).toBe(false)
+    expect(catalog()['model-health-by-id'][8]).toMatchObject({ circuitOpen: true })
+  })
+
+  it('keeps the updated catalog when a refresh started before deletion returns last', async () => {
+    const view = await mount()
+    const catalog = () => view.node('AiProviderCatalog').props
+    const olderProviders = deferred()
+    const olderModels = deferred()
+    api.listAiProvidersApi.mockReturnValueOnce(olderProviders.promise)
+      .mockResolvedValueOnce({ data: [{ id: 2 }] })
+    api.listAiModelConfigsApi.mockReturnValueOnce(olderModels.promise)
+      .mockResolvedValueOnce({ data: [{ id: 20, providerId: 2 }] })
+    api.deleteAiProviderApi.mockResolvedValueOnce({})
+
+    const refresh = catalog().onRefresh()
+    await catalog().onRemoveProvider({ id: 1 })
+    olderProviders.resolve({ data: [{ id: 1 }] })
+    olderModels.resolve({ data: [{ id: 10, providerId: 1 }] })
+    await refresh
+    await nextTick()
+
+    expect(catalog()['saved-providers']).toEqual([{ id: 2 }])
+    expect(catalog().rows).toEqual([{ id: 20, providerId: 2 }])
+    expect(catalog()['selected-model-id']).toBe(20)
+    expect(catalog().loading).toBe(false)
   })
 
   it('applies reactive constraints after opening a model and switching its capability identity', async () => {
