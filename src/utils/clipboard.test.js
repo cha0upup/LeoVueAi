@@ -13,13 +13,13 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
 
 describe('copyTextWithFeedback', () => {
-  it.each(['text', 'reader'])('preserves %s content and reports success only after the write completes', async source => {
+  it('reads the original content once and reports success only after the clipboard write completes', async () => {
     const pending = deferred()
     writeText.mockReturnValue(pending.promise)
     const text = '  中文\n多行  '
     const read = vi.fn(() => text)
-    const copy = copyTextWithFeedback(source === 'reader' ? read : text, '已复制目录路径')
-    expect(read).toHaveBeenCalledTimes(source === 'reader' ? 1 : 0)
+    const copy = copyTextWithFeedback(read, '已复制目录路径')
+    expect(read).toHaveBeenCalledOnce()
     expect(writeText).toHaveBeenCalledExactlyOnceWith(text)
     expect(showSuccess).not.toHaveBeenCalled()
     pending.resolve()

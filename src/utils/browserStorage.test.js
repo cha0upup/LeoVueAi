@@ -1,13 +1,13 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { createSafeStorage } from './browserStorage.js'
 
 function createMemoryStorage() {
   const values = new Map()
   return {
-    getItem: vi.fn((key) => values.get(key) ?? null),
-    setItem: vi.fn((key, value) => values.set(key, value)),
-    removeItem: vi.fn((key) => values.delete(key))
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key)
   }
 }
 
@@ -23,45 +23,35 @@ describe('createSafeStorage', () => {
     expect(safeStorage.getItem('count')).toBeNull()
   })
 
-  it('validates JSON values and falls back for corrupt data', () => {
+  it('preserves saved JSON after a failed write and ignores corrupt or unexpected data', () => {
     const storage = createMemoryStorage()
     const safeStorage = createSafeStorage(() => storage)
+    const saved = { tabs: ['home'] }
+    const fallback = { tabs: [] }
+    const hasTabs = (value) => Array.isArray(value?.tabs)
 
-    expect(safeStorage.setJSON('state', { tabs: ['home'] })).toBe(true)
-    expect(safeStorage.getJSON('state', {}, (value) => Array.isArray(value.tabs))).toEqual({
-      tabs: ['home']
-    })
+    expect(safeStorage.setJSON('state', saved)).toBe(true)
+    const circular = {}
+    circular.self = circular
+    expect(safeStorage.setJSON('state', circular)).toBe(false)
+    expect(safeStorage.getJSON('state', fallback, hasTabs)).toEqual(saved)
 
-    storage.setItem('state', '{broken')
-    expect(safeStorage.getJSON('state', { tabs: [] })).toEqual({ tabs: [] })
-
-    storage.setItem('state', '[]')
-    expect(safeStorage.getJSON('state', { tabs: [] }, (value) => !Array.isArray(value))).toEqual({
-      tabs: []
-    })
+    for (const invalid of ['{broken', '[]']) {
+      storage.setItem('state', invalid)
+      expect(safeStorage.getJSON('state', fallback, hasTabs)).toEqual(fallback)
+    }
   })
 
   it('contains provider and quota errors instead of leaking them into the app', () => {
     const unavailable = createSafeStorage(() => {
-      throw Object.assign(new Error('denied'), { name: 'SecurityError' })
+      throw new Error('Storage access denied')
     })
     expect(unavailable.getItem('key', 'fallback')).toBe('fallback')
     expect(unavailable.setItem('key', 'value')).toBe(false)
 
-    const storage = createMemoryStorage()
-    storage.setItem.mockImplementation(() => {
-      throw Object.assign(new Error('full'), { name: 'QuotaExceededError' })
-    })
-    const quotaLimited = createSafeStorage(() => storage)
+    const quotaLimited = createSafeStorage(() => ({
+      setItem() { throw new Error('Storage quota exceeded') }
+    }))
     expect(quotaLimited.setJSON('state', { large: true })).toBe(false)
-  })
-
-  it('handles circular JSON values', () => {
-    const storage = createMemoryStorage()
-    const safeStorage = createSafeStorage(() => storage)
-    const circular = {}
-    circular.self = circular
-
-    expect(safeStorage.setJSON('state', circular)).toBe(false)
   })
 })
