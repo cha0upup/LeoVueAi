@@ -40,37 +40,29 @@ describe('apiUtils', () => {
     expect(loading.value).toBe(false)
   })
 
-  it('waits for asynchronous success callbacks before completing', async () => {
+  it('treats an empty response as success and waits for asynchronous completion', async () => {
     const loading = ref(false)
     const callback = deferred()
     const onSuccess = vi.fn(() => callback.promise)
     let completed = false
 
-    const request = executeRequest(async () => 'saved', { onSuccess, loadingRef: loading }).then(result => {
+    const request = executeRequest(async () => undefined, {
+      onSuccess, loadingRef: loading, successMessage: '保存成功'
+    }).then(result => {
       completed = true
       return result
     })
     await Promise.resolve()
 
-    expect(onSuccess).toHaveBeenCalledWith('saved')
+    expect(onSuccess).toHaveBeenCalledExactlyOnceWith(undefined)
     expect(completed).toBe(false)
     expect(loading.value).toBe(true)
 
     callback.resolve()
-    await expect(request).resolves.toBe('saved')
+    await expect(request).resolves.toBeUndefined()
     expect(completed).toBe(true)
     expect(loading.value).toBe(false)
-  })
-
-  it('treats an empty successful result as success', async () => {
-    const onSuccess = vi.fn()
-    await expect(executeRequest(async () => undefined, {
-      successMessage: '保存成功',
-      onSuccess
-    })).resolves.toBeUndefined()
-
-    expect(onSuccess).toHaveBeenCalledWith(undefined)
-    expect(mocks.showSuccess).toHaveBeenCalledWith('保存成功')
+    expect(mocks.showSuccess).toHaveBeenCalledExactlyOnceWith('保存成功')
     expect(mocks.handleError).not.toHaveBeenCalled()
   })
 
