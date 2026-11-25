@@ -302,9 +302,10 @@ it('opens preview immediately, aborts on close and retries a failed file without
   expect(workspace.preview()).toMatchObject({ path: replacement.path, error: '', data: { content: 'current text' } })
 })
 
-it('opens the download view without a request for known binary formats and cancels the earlier preview', async () => {
+it('opens the download view for known binary formats or when the server rules out text preview', async () => {
   const earlier = deferred()
   api.userFilePreviewApi.mockReturnValueOnce(earlier.promise)
+    .mockResolvedValueOnce({ data: { path: replacement.path, size: 4, previewable: false } })
   api.userFileDownloadApi.mockResolvedValue({ data: new Blob(['fixture']) })
   const binary = { name: 'fixture.zip', path: 'imports/fixture.zip' }
   const workspace = mount()
@@ -321,14 +322,10 @@ it('opens the download view without a request for known binary formats and cance
   expect(workspace.preview()).toMatchObject({ path: binary.path, loading: false, data: { previewable: false } })
   await workspace.preview().onDownload()
   expect(api.userFileDownloadApi).toHaveBeenCalledExactlyOnceWith({ path: binary.path, filename: binary.name })
-})
 
-it('accepts the server download-only response when a file name suggests text', async () => {
-  api.userFilePreviewApi.mockResolvedValue({ data: { path: replacement.path, size: 4, previewable: false } })
-  const workspace = mount()
-  await flush()
   await workspace.openPreview(replacement)
   await nextTick()
 
+  expect(api.userFilePreviewApi).toHaveBeenCalledTimes(2)
   expect(workspace.preview()).toMatchObject({ path: replacement.path, loading: false, error: '', data: { previewable: false } })
 })

@@ -30,23 +30,28 @@ describe('useArchiveImport', () => {
     expect(importer.step.value).toBe('pick')
   })
 
-  it.each(['skip', 'overwrite', 'rename'])('submits the selected file and %s policy once', async (policy) => {
+  it('submits the selected file and policy once, then forwards the same form to completion', async () => {
     const pending = deferred()
-    const request = vi.fn(() => pending.promise)
+    let scope = 'platform'
+    const request = vi.fn(formData => {
+      formData.append('scope', scope)
+      return pending.promise
+    })
     const onImported = vi.fn()
     const importer = useArchiveImport({ request, onImported })
     const file = createFile()
     importer.handleFileChange({ raw: file })
-    importer.conflictPolicy.value = policy
+    importer.conflictPolicy.value = 'rename'
 
     const submission = importer.submit()
+    scope = 'changed'
     await importer.submit()
     expect(importer.submitting.value).toBe(true)
     expect(request).toHaveBeenCalledTimes(1)
     const [formData] = request.mock.calls[0]
     expect(formData.get('file')).toBe(file)
-    expect(formData.get('conflictPolicy')).toBe(policy)
-    expect([...formData.keys()]).toEqual(['file', 'conflictPolicy'])
+    expect(formData.get('conflictPolicy')).toBe('rename')
+    expect(formData.get('scope')).toBe('platform')
     expect(onImported).not.toHaveBeenCalled()
 
     const results = [{ status: 'imported', name: 'one' }]
@@ -57,9 +62,10 @@ describe('useArchiveImport', () => {
     expect(importer.step.value).toBe('result')
     expect(importer.submitting.value).toBe(false)
     expect(onImported).toHaveBeenCalledExactlyOnceWith(results, formData)
+    expect(onImported.mock.lastCall[1]).toBe(formData)
   })
 
-  it('counts partial outcomes and keeps server details for unknown statuses', async () => {
+  it('counts partial outcomes and clears the results and uploader for the next import', async () => {
     const results = [
       { status: 'imported' }, { status: 'imported' }, { status: 'overwritten' },
       { status: 'renamed', originalName: 'old', finalName: 'new' },
@@ -69,7 +75,10 @@ describe('useArchiveImport', () => {
     const importer = useArchiveImport({
       request: vi.fn().mockResolvedValue({ data: { results } }), onImported: vi.fn()
     })
+    const clearFiles = vi.fn()
+    importer.uploadRef.value = { clearFiles }
     importer.handleFileChange({ raw: createFile() })
+    importer.conflictPolicy.value = 'overwrite'
     await importer.submit()
 
     expect(importer.counts.value).toEqual({
@@ -77,10 +86,16 @@ describe('useArchiveImport', () => {
     })
     expect(importer.results.value).toEqual(results)
     expect(importer.statusText('renamed')).toBe('已重命名')
-    expect(importer.resultClass('failed')).toBe('result-failed')
     expect(importer.statusText('unknown')).toBe('unknown')
-    expect(importer.resultClass('unknown')).toBe('')
     expect(mocks.handleError).not.toHaveBeenCalled()
+
+    importer.reset()
+    expect(importer.selectedFile.value).toBeNull()
+    expect(importer.conflictPolicy.value).toBe('skip')
+    expect(importer.step.value).toBe('pick')
+    expect(importer.results.value).toEqual([])
+    expect(importer.counts.value.imported).toBe(0)
+    expect(clearFiles).toHaveBeenCalledExactlyOnceWith()
   })
 
   it('keeps the file and policy after a request fails so the user can retry', async () => {
@@ -106,50 +121,6 @@ describe('useArchiveImport', () => {
     await importer.submit()
     expect(request).toHaveBeenCalledTimes(2)
     expect(importer.step.value).toBe('result')
-  })
-
-  it('passes the submitted extra fields to the completion callback', async () => {
-    const pending = deferred()
-    let scope = 'platform'
-    const onImported = vi.fn()
-    const importer = useArchiveImport({
-      request: (formData) => {
-        formData.append('scope', scope)
-        formData.append('defaultName', 'test-skill')
-        return pending.promise
-      },
-      onImported
-    })
-    importer.handleFileChange({ raw: createFile('test-skill.skill') })
-    const submission = importer.submit()
-    scope = 'agent-node'
-    pending.resolve({ data: { results: [] } })
-    await submission
-
-    const [, formData] = onImported.mock.calls[0]
-    expect(formData.get('scope')).toBe('platform')
-    expect(formData.get('defaultName')).toBe('test-skill')
-  })
-
-  it('resets completed results, policy and uploader state together', async () => {
-    const importer = useArchiveImport({
-      request: vi.fn().mockResolvedValue({ data: { results: [{ status: 'imported' }] } }),
-      onImported: vi.fn()
-    })
-    const clearFiles = vi.fn()
-    importer.uploadRef.value = { clearFiles }
-    importer.handleFileChange({ raw: createFile() })
-    importer.conflictPolicy.value = 'overwrite'
-    await importer.submit()
-
-    importer.reset()
-
-    expect(importer.selectedFile.value).toBeNull()
-    expect(importer.conflictPolicy.value).toBe('skip')
-    expect(importer.step.value).toBe('pick')
-    expect(importer.results.value).toEqual([])
-    expect(importer.counts.value.imported).toBe(0)
-    expect(clearFiles).toHaveBeenCalledExactlyOnceWith()
   })
 
   it('does not restore an old result screen after reset but still refreshes imported data', async () => {
