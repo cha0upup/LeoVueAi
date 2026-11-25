@@ -133,9 +133,10 @@ it('uses the ids shown in the confirmation if selection changes while it is open
   expect(api.deleteAuditLogsApi).toHaveBeenCalledWith({ logIds: ['a'] })
 })
 
-it('shows what is loading and retries the same audit record in the dialog without reloading the list', async () => {
+it('retries the same audit record after failed or mismatched responses without reloading the list', async () => {
   const first = deferred()
   api.getAuditLogDetailApi.mockReturnValueOnce(first.promise)
+    .mockResolvedValueOnce({ data: { logId: 'b', responseMessage: '错误记录的正文' } })
     .mockResolvedValueOnce({ data: { logId: 'a', responseMessage: '详情已恢复' } })
   const view = await mount()
 
@@ -152,7 +153,12 @@ it('shows what is loading and retries the same audit record in the dialog withou
   expect(view.detailsAlert()).toBe('网络暂时中断')
   await view.button('重新读取详情').onClick()
   await flush()
-  expect(api.getAuditLogDetailApi.mock.calls.map(([id]) => id)).toEqual(['a', 'a'])
+  expect(view.detailsAlert()).toBe('日志详情响应不完整，请重试')
+  expect(view.text()).not.toContain('错误记录的正文')
+
+  await view.button('重新读取详情').onClick()
+  await flush()
+  expect(api.getAuditLogDetailApi.mock.calls.map(([id]) => id)).toEqual(['a', 'a', 'a'])
   expect(api.getAuditLogSummaryPageApi).toHaveBeenCalledOnce()
   expect(view.detailsAlert()).toBeUndefined()
   expect(view.text()).toContain('详情已恢复')
@@ -174,15 +180,4 @@ it('aborts detail reads on close and ignores a late result after another record 
   await flush()
   expect(view.text()).not.toContain('旧详情')
   expect(view.text()).toContain('当前详情')
-})
-
-it('does not display a detail response from a different audit record', async () => {
-  api.getAuditLogDetailApi.mockResolvedValueOnce({ data: { logId: 'b', responseMessage: '错误记录的正文' } })
-  const view = await mount()
-  await view.openDetails()
-  await flush()
-
-  expect(view.detailsAlert()).toBe('日志详情响应不完整，请重试')
-  expect(view.text()).not.toContain('错误记录的正文')
-  expect(view.text()).toContain('重新读取详情')
 })
