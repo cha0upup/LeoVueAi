@@ -30,8 +30,13 @@
             <el-icon><Icon :icon="iconMap.view" /></el-icon>
             预览
           </el-button>
-          <el-button @click="emit('download', entry)">
-            <el-icon><Icon :icon="iconMap.download" /></el-icon>
+          <el-button
+            :loading="downloadLoading"
+            @click="emit('download', entry)"
+          >
+            <template #icon>
+              <Icon :icon="iconMap.download" />
+            </template>
             下载
           </el-button>
           <el-dropdown
@@ -133,7 +138,8 @@ import { getUserSpaceEntryIconKey, getUserSpaceFileExtension, resolveArtifactCat
 
 const props = defineProps({
   entry: { type: Object, default: null },
-  loading: { type: Boolean, default: false }
+  loading: { type: Boolean, default: false },
+  downloadLoading: Boolean
 })
 const emit = defineEmits(['preview', 'download', 'delete'])
 const title = computed(() => props.entry?.metadata?.title || props.entry?.name || '')

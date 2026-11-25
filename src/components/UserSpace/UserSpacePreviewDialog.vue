@@ -39,6 +39,7 @@
       <span>可下载原文件后，使用对应应用打开。</span>
       <el-button
         type="primary"
+        :loading="downloadLoading"
         @click="emit('download')"
       >
         下载原文件
@@ -71,6 +72,15 @@
         >
           {{ data.truncated ? '内容已截断' : '完整内容' }}
         </el-tag>
+        <el-button
+          v-if="data.truncated"
+          link
+          type="primary"
+          :loading="downloadLoading"
+          @click="emit('download')"
+        >
+          下载完整文件
+        </el-button>
       </div>
       <el-segmented
         v-if="previewLanguage === 'markdown'"
@@ -111,6 +121,7 @@ const props = defineProps({
   path: { type: String, default: '' },
   data: { type: Object, default: null },
   loading: { type: Boolean, default: false },
+  downloadLoading: Boolean,
   error: { type: String, default: '' }
 })
 const emit = defineEmits(['update:modelValue', 'retry', 'download'])
@@ -150,6 +161,7 @@ watch(() => props.path, () => { previewMode.value = 'rendered' })
 .preview-meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   margin-bottom: 12px;
 }

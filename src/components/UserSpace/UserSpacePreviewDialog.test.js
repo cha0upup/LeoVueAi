@@ -36,7 +36,8 @@ it('shows a download action instead of a Markdown or source viewer for unsupport
 
 it('mounts the source viewer only for source previews and unmounts it again after switching or closing', async () => {
   const renderer = createTestRenderer()
-  const preview = Vue.reactive({ modelValue: true, path: 'report.md', data: { content: '# Fixture' } })
+  const onDownload = vi.fn()
+  const preview = Vue.reactive({ modelValue: true, path: 'report.md', data: { content: '# Fixture' }, onDownload })
   const app = renderer.createApp({ render: () => Vue.h(Preview, { ...preview }) })
   for (const name of ['ElDialog', 'ElTag', 'ElSegmented', 'ElAlert', 'ElButton']) {
     app.component(name, createSlotStub(name))
@@ -49,6 +50,7 @@ it('mounts the source viewer only for source previews and unmounts it again afte
 
     expect(article()).not.toBeNull()
     expect(source()).toBeNull()
+    expect(findNode(renderer.root, 'ElButton')).toBeNull()
 
     selectMode('source')
     await Vue.nextTick()
@@ -61,9 +63,13 @@ it('mounts the source viewer only for source previews and unmounts it again afte
     expect(source()).toBeNull()
 
     preview.path = 'notes.txt'
-    preview.data = { content: 'Example text' }
+    preview.data = { content: 'Example text', truncated: true }
     await Vue.nextTick()
     expect(source().props).toMatchObject({ content: 'Example text', language: 'plaintext' })
+    const download = findNode(renderer.root, 'ElButton')
+    expect(findNode(download, 'text').text.trim()).toBe('下载完整文件')
+    download.props.onClick()
+    expect(onDownload).toHaveBeenCalledOnce()
 
     preview.modelValue = false
     await Vue.nextTick()

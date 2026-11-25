@@ -193,6 +193,7 @@
                 <el-button
                   link
                   type="primary"
+                  :loading="downloads.has(row.path)"
                   @click="downloadFile(row)"
                 >
                   下载
@@ -269,6 +270,7 @@
       <UserSpaceDetail
         v-if="detailEntry"
         :entry="detailEntry"
+        :download-loading="downloads.has(detailEntry.path)"
         @preview="previewFile"
         @download="downloadFile"
         @delete="deleteFile"
@@ -279,6 +281,7 @@
       :path="preview?.file.path"
       :data="preview?.data"
       :loading="previewLoading"
+      :download-loading="downloads.has(preview?.file.path)"
       :error="preview?.error"
       @retry="previewFile(preview?.file)"
       @download="downloadFile(preview?.file)"
@@ -288,7 +291,7 @@
 
 <script setup>
 import PageHeader from '@/components/common/PageHeader.vue'
-import { computed, onMounted, onScopeDispose, ref, shallowRef, watch } from 'vue'
+import { computed, onDeactivated, onMounted, onScopeDispose, ref, shallowReactive, shallowRef, watch } from 'vue'
 import { ARTIFACT_CATEGORIES, ARTIFACT_SOURCE_LABELS } from '@/constants/artifacts.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate, formatFileSize } from '@/utils/format.js'
@@ -324,6 +327,7 @@ const overview = shallowRef(null)
 const overviewOutdated = ref(false)
 let overviewNeeded = true
 const preview = shallowRef(null)
+const downloads = shallowReactive(new Map())
 let listRequest
 let previewRequest
 let searchTimer
@@ -456,6 +460,7 @@ watch([currentPath, source, keyword], ([path, sourceId, query], [previousPath, p
   files.value = []
   total.value = 0
   page.value = 1
+  if (path !== previousPath && overviewOutdated.value) overviewNeeded = true
   if (path === previousPath && sourceId === previousSource && query) {
     searchTimer = setTimeout(fetchList, 250)
   } else {
@@ -565,11 +570,24 @@ async function previewFile(file) {
 }
 
 async function downloadFile(file) {
-  if (!file?.path) return
+  if (!file?.path || disposed || downloads.has(file.path)) return
+  const { path, name: filename } = file
+  const request = new AbortController()
+  const { signal } = request
+  downloads.set(path, request)
   try {
-    const response = await userFileDownloadApi({ path: file.path, filename: file.name })
-    downloadBlob(response.data, file.name)
-  } catch (error) { showError(`下载失败：${error?.message || '未知错误'}`) }
+    const { data } = await userFileDownloadApi({ path, filename }, { signal })
+    if (!signal.aborted) downloadBlob(data, filename)
+  } catch (error) {
+    if (!signal.aborted) showError(`下载失败：${error?.message || '未知错误'}`)
+  } finally {
+    if (downloads.get(path) === request) downloads.delete(path)
+  }
+}
+
+function cancelDownloads() {
+  for (const request of downloads.values()) request.abort()
+  downloads.clear()
 }
 
 async function deleteFile(file) {
@@ -583,12 +601,15 @@ async function deleteFile(file) {
   } catch (error) { showError(`删除失败：${error?.message || '未知错误'}`) }
 }
 
+watch(sessionGeneration, cancelDownloads, { flush: 'sync' })
+onDeactivated(cancelDownloads)
 onMounted(refreshWorkspace)
 onScopeDispose(() => {
   disposed = true
   clearTimeout(searchTimer)
   listRequest?.abort()
   previewRequest?.abort()
+  cancelDownloads()
 })
 </script>
 

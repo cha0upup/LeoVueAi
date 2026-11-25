@@ -16,6 +16,7 @@ const api = {
 }
 const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showError: vi.fn() }))
 const confirmAction = vi.fn()
+const downloadBlob = vi.fn()
 vi.mock('@/utils/messageUtils.js', () => messages)
 
 const stub = (name, slots) => ({ default: createSlotStub(name, slots) })
@@ -27,7 +28,7 @@ const view = compileClientComponent(new URL('./UserSpace.vue', import.meta.url),
   '@/constants/artifacts.js': { ARTIFACT_CATEGORIES, ARTIFACT_SOURCE_LABELS },
   '@/utils/icons.js': { icons },
   '@/utils/format.js': { formatDate, formatFileSize },
-  '@/utils/downloadBlob.js': { downloadBlob: vi.fn() },
+  '@/utils/downloadBlob.js': { downloadBlob },
   '@/utils/confirmUtils.js': { confirmAction, confirmDelete: vi.fn() },
   '@/utils/messageUtils.js': messages,
   '@/utils/errorHandler.js': { handleError },
@@ -144,10 +145,13 @@ it('requests global counts on entry and refresh, but not when filtering or pagin
   expect(workspace.summary()).toContain('52 份成果')
 })
 
-it('keeps a filtered page usable and marks prior counts as stale if a combined response omits totals', async () => {
+it('keeps stale counts visible until the next category switch can refresh them', async () => {
+  vi.useFakeTimers()
   api.userFileListApi.mockResolvedValueOnce(result(1, [original], 1, summary(2)))
     .mockResolvedValueOnce(result(1, [original]))
     .mockResolvedValueOnce(result(1, [replacement]))
+    .mockResolvedValueOnce(result(1, [replacement]))
+    .mockResolvedValueOnce(result(1, [replacement], 1, summary(3)))
   const workspace = mount()
   await flush()
   workspace.selectCategory('imports')
@@ -158,6 +162,16 @@ it('keeps a filtered page usable and marks prior counts as stale if a combined r
   expect(workspace.rows()).toEqual([replacement])
   expect(workspace.summary()).toContain('2 份成果')
   expect(workspace.summary()).toContain('统计待刷新')
+
+  workspace.search('latest')
+  await nextTick()
+  await vi.advanceTimersByTimeAsync(250)
+  expect(api.userFileListApi.mock.lastCall[0]).not.toHaveProperty('includeOverview')
+
+  workspace.selectCategory('')
+  await flush()
+  expect(api.userFileListApi.mock.lastCall[0]).toMatchObject({ includeOverview: true })
+  expect(workspace.summary()).toBe('3 份成果 · 30 B')
 })
 
 it('keeps newly refreshed counts when loading the first page after a shrink fails', async () => {
@@ -304,9 +318,11 @@ it('opens preview immediately, aborts on close and retries a failed file without
 
 it('opens the download view for known binary formats or when the server rules out text preview', async () => {
   const earlier = deferred()
+  const transfer = deferred()
+  const blob = new Blob(['fixture'])
   api.userFilePreviewApi.mockReturnValueOnce(earlier.promise)
     .mockResolvedValueOnce({ data: { path: replacement.path, size: 4, previewable: false } })
-  api.userFileDownloadApi.mockResolvedValue({ data: new Blob(['fixture']) })
+  api.userFileDownloadApi.mockReturnValueOnce(transfer.promise)
   const binary = { name: 'fixture.zip', path: 'imports/fixture.zip' }
   const workspace = mount()
   await flush()
@@ -320,12 +336,47 @@ it('opens the download view for known binary formats or when the server rules ou
   expect(api.userFilePreviewApi).toHaveBeenCalledOnce()
   expect(api.userFilePreviewApi.mock.calls[0][1].signal.aborted).toBe(true)
   expect(workspace.preview()).toMatchObject({ path: binary.path, loading: false, data: { previewable: false } })
+  const finished = workspace.preview().onDownload()
   await workspace.preview().onDownload()
-  expect(api.userFileDownloadApi).toHaveBeenCalledExactlyOnceWith({ path: binary.path, filename: binary.name })
+  await nextTick()
+  expect(api.userFileDownloadApi).toHaveBeenCalledExactlyOnceWith(
+    { path: binary.path, filename: binary.name }, { signal: expect.any(globalThis.AbortSignal) }
+  )
+  expect(workspace.preview()['download-loading']).toBe(true)
+  transfer.resolve({ data: blob })
+  await finished
+  await nextTick()
+  expect(downloadBlob).toHaveBeenCalledExactlyOnceWith(blob, binary.name)
+  expect(workspace.preview()['download-loading']).toBe(false)
 
   await workspace.openPreview(replacement)
   await nextTick()
 
   expect(api.userFilePreviewApi).toHaveBeenCalledTimes(2)
   expect(workspace.preview()).toMatchObject({ path: replacement.path, loading: false, error: '', data: { previewable: false } })
+})
+
+it('cancels old downloads on session reset without affecting a new download of the same path', async () => {
+  const oldTransfer = deferred()
+  const newTransfer = deferred()
+  api.userFileDownloadApi.mockReturnValueOnce(oldTransfer.promise).mockReturnValueOnce(newTransfer.promise)
+  const file = { name: 'fixture.zip', path: 'imports/fixture.zip' }
+  const workspace = mount()
+  await workspace.openPreview(file)
+  const previous = workspace.preview().onDownload()
+  const { signal } = api.userFileDownloadApi.mock.lastCall[1]
+
+  resetSessionState()
+  expect(signal.aborted).toBe(true)
+  const current = workspace.preview().onDownload()
+  oldTransfer.resolve({ data: new Blob(['old']) })
+  await previous
+  await nextTick()
+  expect(downloadBlob).not.toHaveBeenCalled()
+  expect(workspace.preview()['download-loading']).toBe(true)
+
+  const blob = new Blob(['current'])
+  newTransfer.resolve({ data: blob })
+  await current
+  expect(downloadBlob).toHaveBeenCalledExactlyOnceWith(blob, file.name)
 })

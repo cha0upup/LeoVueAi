@@ -19,9 +19,10 @@ export function userFileUploadApi(file, options = {}) {
   })
 }
 
-export function userFileDownloadApi(params) {
+export function userFileDownloadApi(params, { signal } = {}) {
   return http.get('/platform/user/file/download', {
     params,
+    signal,
     responseType: 'blob'
   })
 }
