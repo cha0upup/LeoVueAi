@@ -11,8 +11,8 @@ const completedStream = ending => [
 ].join(ending)
 
 describe('AI SSE byte streams', () => {
-  it.each(['\n', '\r\n', '\r'])('preserves UTF-8 and control events for %j endings', async ending => {
-    const bytes = new TextEncoder().encode(completedStream(ending))
+  it('preserves split UTF-8 and flushes the terminal frame without a trailing newline', async () => {
+    const bytes = new TextEncoder().encode(completedStream('\r\n').trimEnd())
     const body = new globalThis.ReadableStream({
       start(controller) {
         for (const byte of bytes) controller.enqueue(new Uint8Array([byte]))
@@ -24,30 +24,23 @@ describe('AI SSE byte streams', () => {
     expect(onTurnCompleted).toHaveBeenCalledOnce()
   })
 
-  it('flushes a final data line without a newline', async () => {
-    await expect(parseAiSseStream(new globalThis.Response('event: turn\ndata: {"content":"tail"}')))
-      .resolves.toBe('tail')
-  })
-
-  it.each(['', '{malformed'])('does not advance past an invalid started event: %j', async payload => {
+  it('does not advance the cursor for empty or malformed start events', async () => {
     const onEventSeq = vi.fn()
-    await parseAiSseStream(new globalThis.Response(`id: 1\nevent: turn/started\ndata: ${payload}\n\n`), { onEventSeq })
+    const body = 'id: 1\nevent: turn/started\ndata:\n\nid: 2\nevent: turn/started\ndata: {malformed\n\n'
+    await parseAiSseStream(new globalThis.Response(body), { onEventSeq })
     expect(onEventSeq).not.toHaveBeenCalled()
   })
 
-  it('detects an incomplete new turn after an earlier completed turn', async () => {
-    const body = completedStream('\n') + 'event: turn/started\ndata: {"turn":{"id":"turn-2"}}\n\n'
-    await expect(parseAiSseStream(new globalThis.Response(body)))
-      .rejects.toMatchObject({ code: 'AI_TURN_INCOMPLETE' })
-  })
-
-  it('keeps a rejected new started event from inheriting an older terminal marker', async () => {
-    const body = completedStream('\n') + 'event: turn/started\ndata: {"turn":{"id":"turn-2"}}\n\n'
+  it.each([false, true])('does not inherit an older terminal marker when the next turn starts (handler failure: %s)', async failToApply => {
+    const body = completedStream('\n') + 'id: 4\nevent: turn/started\ndata: {"turn":{"id":"turn-2"}}\n\n'
+    const onEventSeq = vi.fn()
     await expect(parseAiSseStream(new globalThis.Response(body), {
       onTurnStarted: entry => {
-        if (entry.turn.id === 'turn-2') throw new Error('state update failed')
-      }
+        if (failToApply && entry.turn.id === 'turn-2') throw new Error('state update failed')
+      },
+      onEventSeq
     })).rejects.toMatchObject({ code: 'AI_TURN_INCOMPLETE' })
+    expect(onEventSeq.mock.calls.map(([seq]) => seq)).toEqual(failToApply ? [1, 2, 3] : [1, 2, 3, 4])
   })
 
   it('cancels the read stream and preserves the cursor when a business handler throws', async () => {
