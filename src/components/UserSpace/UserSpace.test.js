@@ -274,17 +274,21 @@ it('does not overwrite or send remaining files after the login session changes d
   expect(workspace.uploadProgress()).toBeUndefined()
 })
 
-it('returns to the first page once when a previously valid page no longer exists', async () => {
-  api.userFileListApi.mockResolvedValueOnce(result(1, [original], 51, summary(51)))
-    .mockResolvedValueOnce(result(2, [], 1))
+it.each([
+  { countAfterRetry: 51, expectedPages: [1, 3, 2] },
+  { countAfterRetry: 1, expectedPages: [1, 3, 2, 1] }
+])('recovers an out-of-range page via $expectedPages', async ({ countAfterRetry, expectedPages }) => {
+  api.userFileListApi.mockResolvedValueOnce(result(1, [original], 101, summary(101)))
+    .mockResolvedValueOnce(result(3, [], 51))
+    .mockResolvedValueOnce(result(2, countAfterRetry === 51 ? [replacement] : [], countAfterRetry))
     .mockResolvedValueOnce(result(1, [replacement]))
   const workspace = mount()
   await flush()
 
-  workspace.pagination().onCurrentChange(2)
-  await flush()
-  expect(api.userFileListApi.mock.calls.map(([params]) => params.page)).toEqual([1, 2, 1])
-  expect(workspace.pagination()['current-page']).toBe(1)
+  await workspace.pagination().onCurrentChange(3)
+  await nextTick()
+  expect(api.userFileListApi.mock.calls.map(([params]) => params.page)).toEqual(expectedPages)
+  expect(workspace.pagination()['current-page']).toBe(expectedPages.at(-1))
   expect(workspace.rows()).toEqual([replacement])
 })
 

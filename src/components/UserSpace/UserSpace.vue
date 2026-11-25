@@ -410,10 +410,17 @@ async function fetchList() {
       overviewOutdated.value = !Array.isArray(data.overview?.categories)
       if (!overviewOutdated.value) overview.value = normalizeWorkspaceOverview(data.overview)
     }
-    if (requestedPage > 1 && (requestedPage - 1) * PAGE_SIZE >= data.count) {
-      if (data.count > 0) data = await loadPage(1)
+    let recoveryPage = Math.max(1, Math.ceil(data.count / PAGE_SIZE))
+    if (requestedPage > recoveryPage) {
+      if (data.count > 0) data = await loadPage(recoveryPage)
       if (signal.aborted) return
-      page.value = 1
+      // If files disappear again during recovery, page 1 is always valid.
+      if (recoveryPage > 1 && (recoveryPage - 1) * PAGE_SIZE >= data.count) {
+        recoveryPage = 1
+        if (data.count > 0) data = await loadPage(1)
+        if (signal.aborted) return
+      }
+      page.value = recoveryPage
     }
     total.value = data.count
     files.value = data.fileList
@@ -448,7 +455,7 @@ function changePage(value) {
   if (page.value === value) return
   page.value = value
   closeFilePanels()
-  fetchList()
+  return fetchList()
 }
 
 watch([currentPath, source, keyword], ([path, sourceId, query], [previousPath, previousSource]) => {
