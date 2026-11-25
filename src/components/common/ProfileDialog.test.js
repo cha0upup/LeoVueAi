@@ -59,9 +59,9 @@ beforeEach(() => {
 
 afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
 
-it('does not expose blank fields while loading and ignores the response to a closed dialog', async () => {
+it('hides the form while loading or failed and ignores the response to a closed dialog', async () => {
   const first = deferred()
-  api.getProfileApi.mockReturnValueOnce(first.promise)
+  api.getProfileApi.mockReturnValueOnce(first.promise).mockRejectedValueOnce(new Error('资料暂时不可用'))
   const view = mount()
   const pending = view.open()
   await view.open()
@@ -78,14 +78,6 @@ it('does not expose blank fields while loading and ignores the response to a clo
   first.resolve({ data: { ...initial, email: 'outdated@example.test' } })
   await pending
   await flush()
-  expect(view.form().model.email).toBe('alice@example.test')
-})
-
-it('keeps a failed read open and lets the user retry without exposing an empty form', async () => {
-  api.getProfileApi.mockRejectedValueOnce(new Error('资料暂时不可用'))
-  const view = mount()
-  await view.open()
-  await flush()
   expect(view.dialog().modelValue).toBe(true)
   expect(view.error()).toBe('资料暂时不可用')
   expect(view.form()).toBeUndefined()
@@ -96,7 +88,7 @@ it('keeps a failed read open and lets the user retry without exposing an empty f
   expect(view.form().model.email).toBe(initial.email)
 })
 
-it('skips no-op saves and locks validation and submission around a single normalized write', async () => {
+it('skips unchanged values and retains a failed draft for retry without duplicate saves', async () => {
   const view = mount()
   await view.open()
   await flush()
@@ -108,6 +100,7 @@ it('skips no-op saves and locks validation and submission around a single normal
 
   view.form().model.remark = '  draft  '
   await flush()
+  api.updateProfileApi.mockRejectedValueOnce({ response: { data: { code: 409, msg: '账号信息已变化' } } })
   const validation = deferred()
   validate.mockReturnValueOnce(validation.promise)
   const write = view.button('保存资料').onClick()
@@ -119,20 +112,16 @@ it('skips no-op saves and locks validation and submission around a single normal
   validation.resolve(true)
   await write
   await flush()
-  expect(api.updateProfileApi).toHaveBeenCalledExactlyOnceWith({ email: initial.email, phone: '', remark: 'draft' })
-  expect(view.dialog().modelValue).toBe(false)
-})
-
-it('keeps the edited draft visible when a save fails', async () => {
-  const view = mount()
-  await view.open()
-  await flush()
-  view.form().model.remark = 'draft'
-  api.updateProfileApi.mockRejectedValueOnce({ response: { data: { code: 409, msg: '账号信息已变化' } } })
-  await view.button('保存资料').onClick()
-  await flush()
+  const payload = { email: initial.email, phone: '', remark: 'draft' }
+  expect(api.updateProfileApi).toHaveBeenCalledExactlyOnceWith(payload)
   expect(view.error()).toBe('账号信息已变化')
   expect(view.dialog().modelValue).toBe(true)
   expect(view.form().model.remark).toBe('draft')
   expect(messages.showSuccess).not.toHaveBeenCalled()
+
+  await view.button('保存资料').onClick()
+  await flush()
+  expect(api.updateProfileApi.mock.calls).toEqual([[payload], [payload]])
+  expect(messages.showSuccess).toHaveBeenCalledExactlyOnceWith('个人资料已更新')
+  expect(view.dialog().modelValue).toBe(false)
 })
