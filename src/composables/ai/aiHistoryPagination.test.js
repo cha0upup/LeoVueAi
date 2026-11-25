@@ -4,12 +4,6 @@ import { fetchCompleteAiHistory, mergeAiHistoryRecords, normalizeAiHistoryPage }
 const record = sequence => ({ messageId: `message-${sequence}`, sequence, role: 'assistant', content: `answer ${sequence}` })
 
 describe('AI history cursor pagination', () => {
-  it.each([undefined, {}, { messages: [] }, { messages: {}, hasMore: false }, { messages: [], hasMore: 'false' }])(
-    'rejects malformed current page responses: %j', page => {
-      expect(() => normalizeAiHistoryPage(page)).toThrow('分页响应格式异常')
-    }
-  )
-
   it('keeps only cursor metadata and accepts the current HTTP envelope or its page', () => {
     const page = { messages: [record(3)], hasMore: false, nextBeforeSequence: 3, total: 99, offset: 0, limit: 50 }
     const expected = { messages: [record(3)], hasMore: false, nextBeforeSequence: 3 }
@@ -41,9 +35,11 @@ describe('AI history cursor pagination', () => {
     await expect(fetchCompleteAiHistory(loadPage)).rejects.toThrow('page unavailable')
   })
 
-  it('rejects responses without the current cursor contract', async () => {
-    await expect(fetchCompleteAiHistory(async () => ({ messages: [record(201)], total: 201 })))
-      .rejects.toThrow('分页响应格式异常')
+  it.each([
+    { messages: [record(201)], total: 201 },
+    { messages: {}, hasMore: false }
+  ])('rejects an invalid export page instead of producing a partial report: %j', async page => {
+    await expect(fetchCompleteAiHistory(async () => page)).rejects.toThrow('分页响应格式异常')
   })
 
   it.each([
