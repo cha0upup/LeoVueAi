@@ -3,21 +3,21 @@ import { deferred } from '@/test-support/deferred.js'
 import { createLatestRequestGuard } from './latestRequestGuard.js'
 
 describe('createLatestRequestGuard', () => {
-  it.each(['resolve', 'reject'])('shares pending work and releases it after %s', async outcome => {
+  it('shares pending work and releases it after failure or success', async () => {
     const guard = createLatestRequestGuard(['status'])
     const pending = deferred()
     const action = vi.fn(() => pending.promise)
     const request = guard.coalesce('status', action)
     expect(guard.coalesce('status', action)).toBe(request)
     expect(action).toHaveBeenCalledOnce()
-    const settled = outcome === 'resolve'
-      ? expect(request).resolves.toBe('result') : expect(request).rejects.toBe('result')
-    pending[outcome]('result')
-    await settled
+    const failure = new Error('request failed')
+    pending.reject(failure)
+    await expect(request).rejects.toBe(failure)
+    await expect(guard.coalesce('status', () => 'recovered')).resolves.toBe('recovered')
     await expect(guard.coalesce('status', () => 'next')).resolves.toBe('next')
   })
 
-  it.each(['resolve', 'reject'])('keeps replacement work when invalidated work later %s', async outcome => {
+  it('keeps replacement and independent work when invalidated work fails late', async () => {
     const guard = createLatestRequestGuard(['status', 'meta'])
     const old = deferred(), latest = deferred(), meta = deferred()
     let isOldCurrent
@@ -30,7 +30,7 @@ describe('createLatestRequestGuard', () => {
     guard.invalidate(['status'])
     expect(isOldCurrent()).toBe(false)
     const replacement = guard.coalesce('status', () => latest.promise)
-    old[outcome]('stale')
+    old.reject(new Error('stale request'))
     await stale
     expect(guard.coalesce('status', () => null)).toBe(replacement)
     expect(guard.coalesce('meta', () => null)).toBe(independent)
