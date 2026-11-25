@@ -1,4 +1,6 @@
 const BUILT_IN_ADMIN = 'admin'
+// Team option values are strings, so numeric zero only means unassigned.
+export const UNASSIGNED_TEAM = 0
 
 const normalizeText = (value) => String(value ?? '').trim()
 const normalizeIdentity = (value) => normalizeText(value).toLowerCase()
@@ -37,9 +39,11 @@ export function isBuiltInAdmin(user) {
     .some((value) => normalizeIdentity(value) === BUILT_IN_ADMIN)
 }
 
-export function filterUsers(users, { keyword = '', role = '', team = '' } = {}) {
+export function filterUsers(users, { keyword = '', role = '', team = '', status = '' } = {}) {
   const list = Array.isArray(users) ? users : []
   const query = normalizeIdentity(keyword)
+  const teamId = normalizeText(team)
+  const filterStatus = status === 0 || status === 1
 
   return list.filter((user) => {
     if (query && ![user.userName, user.userId, user.privilege].some(
@@ -49,7 +53,10 @@ export function filterUsers(users, { keyword = '', role = '', team = '' } = {}) 
     }
 
     if (role && normalizeText(user.privilege) !== normalizeText(role)) return false
-    return !team || normalizeText(user.teamId) === normalizeText(team)
+    if (filterStatus && normalizeUserStatus(user.status) !== status) return false
+    const userTeam = normalizeText(user.teamId)
+    if (team === UNASSIGNED_TEAM) return !userTeam
+    return !teamId || userTeam === teamId
   })
 }
 
@@ -60,7 +67,7 @@ export function userStats(users) {
     if (user.privilege === 'admin') totals.admin++
     else if (user.privilege === 'leader') totals.leader++
     else if (user.privilege === 'normal') totals.normal++
-    if (user.teamId) totals.assignedToTeam++
+    if (normalizeText(user.teamId)) totals.assignedToTeam++
   }
   return totals
 }

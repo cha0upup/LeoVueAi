@@ -17,7 +17,7 @@
     </PageHeader>
     <AdminToolbar>
       <el-input
-        v-model="searchKeyword"
+        v-model="filters.keyword"
         placeholder="搜索用户名、用户ID或角色"
         clearable
         class="toolbar-search"
@@ -28,8 +28,9 @@
       </el-input>
 
       <el-select
-        v-model="filterRole"
+        v-model="filters.role"
         placeholder="角色"
+        aria-label="角色筛选"
         clearable
         class="toolbar-filter"
       >
@@ -42,7 +43,7 @@
       </el-select>
 
       <el-select
-        v-model="filterTeam"
+        v-model="filters.team"
         placeholder="团队"
         aria-label="团队筛选"
         clearable
@@ -54,12 +55,45 @@
           value=""
         />
         <el-option
+          label="未分配团队"
+          :value="UNASSIGNED_TEAM"
+        />
+        <el-option
           v-for="team in teams"
           :key="team.teamId"
           :label="team.teamName"
-          :value="team.teamId"
+          :value="String(team.teamId)"
         />
       </el-select>
+
+      <el-select
+        v-model="filters.status"
+        placeholder="状态"
+        aria-label="状态筛选"
+        clearable
+        class="toolbar-filter"
+      >
+        <el-option
+          label="全部状态"
+          value=""
+        />
+        <el-option
+          label="已启用"
+          :value="1"
+        />
+        <el-option
+          label="已禁用"
+          :value="0"
+        />
+      </el-select>
+
+      <el-button
+        v-if="hasFilters"
+        text
+        @click="clearFilters"
+      >
+        清空筛选
+      </el-button>
 
       <template #actions>
         <el-button
@@ -330,6 +364,7 @@ import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import UserEditorDialog from './UserEditorDialog.vue'
 import UserPasswordResetDialog from './UserPasswordResetDialog.vue'
 import {
+  UNASSIGNED_TEAM,
   canEditUser as canEditUserForActor,
   canManageUser as canManageUserForActor,
   createPasswordResetForm,
@@ -384,9 +419,8 @@ const resetPasswordVisible = resetPasswordDialog.visible
 const userData = ref([])
 const teams = ref([])
 const teamNames = computed(() => new Map(teams.value.map(({ teamId, teamName }) => [teamId, teamName])))
-const searchKeyword = ref('')
-const filterRole = ref('')
-const filterTeam = ref('')
+const defaultFilters = { keyword: '', role: '', team: '', status: '' }
+const filters = reactive({ ...defaultFilters })
 const currentPage = ref(1)
 const userTable = ref(null)
 
@@ -430,17 +464,20 @@ const resetRules = computed(() => ({
 }))
 
 // 计算属性
-const filteredUsers = computed(() => filterUsers(userData.value, {
-  keyword: searchKeyword.value,
-  role: filterRole.value,
-  team: filterTeam.value
-}))
+const filteredUsers = computed(() => filterUsers(userData.value, filters))
+const hasFilters = computed(() => Boolean(filters.keyword?.trim() || filters.role || filters.team
+  || filters.team === UNASSIGNED_TEAM || filters.status === 0 || filters.status === 1))
+
+function clearFilters() {
+  Object.assign(filters, defaultFilters)
+}
+
 const lastPage = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / PAGE_SIZE)))
 const pageUsers = computed(() => {
   const offset = (currentPage.value - 1) * PAGE_SIZE
   return filteredUsers.value.slice(offset, offset + PAGE_SIZE)
 })
-watch([searchKeyword, filterRole, filterTeam], () => { currentPage.value = 1 })
+watch(filters, () => { currentPage.value = 1 })
 watch(lastPage, (page) => { if (currentPage.value > page) currentPage.value = page })
 watch(pageUsers, () => userTable.value?.setScrollTop?.(0), { flush: 'post' })
 

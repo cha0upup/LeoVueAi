@@ -72,6 +72,8 @@ async function mount() {
     rows: () => nodes(node => node.type === 'ElTable')[0].props.data,
     pagination: () => nodes(node => node.type === 'ElPagination')[0].props,
     search: value => nodes(node => node.type === 'ElInput')[0].props['onUpdate:modelValue'](value),
+    select: (label, value) => nodes(node => node.type === 'ElSelect' && node.props['aria-label'] === label)[0]
+      .props['onUpdate:modelValue'](value),
     teamLabel: () => text(nodes(node => node.type === 'ElTag' && node.props.title === row.teamId)[0])
   }
 }
@@ -181,9 +183,13 @@ it('shows user rows while teams are pending or unavailable, then resolves their 
   expect(view.button('新增用户').disabled).toBe(false)
 })
 
-it('paginates rendered users but exports the complete filter snapshot shown in the confirmation', async () => {
+it('combines directory filters for pagination and exports the complete confirmed snapshot', async () => {
   const users = Array.from({ length: 30 }, (_, index) => ({
-    ...row, userId: `user-${index}`, userName: index < 26 ? `Example ${index}` : `Other ${index}`
+    ...row,
+    userId: `user-${index}`,
+    userName: index < 28 ? `Example ${index}` : `Other ${index}`,
+    teamId: index === 27 ? 'team' : null,
+    status: index === 26 || index === 29 ? 1 : 0
   }))
   api.getAllUsersApi.mockResolvedValue({ data: users })
   const view = await mount()
@@ -192,6 +198,11 @@ it('paginates rendered users but exports the complete filter snapshot shown in t
   await flush()
   expect(view.rows()).toEqual(users.slice(25))
 
+  view.select('状态筛选', 1)
+  await flush()
+  expect(view.rows()).toEqual([users[26], users[29]])
+  view.select('状态筛选', 0)
+  view.select('团队筛选', userManagerModel.UNASSIGNED_TEAM)
   view.search('Example')
   await flush()
   expect(view.pagination()['current-page']).toBe(1)
@@ -208,5 +219,9 @@ it('paginates rendered users but exports the complete filter snapshot shown in t
   confirmation.resolve(true)
   await pending
   expect(exportTsv).toHaveBeenCalledExactlyOnceWith(users.slice(0, 26), expect.any(String), expect.any(Array))
+  view.button('清空筛选').onClick()
+  await flush()
+  expect(view.pagination()['current-page']).toBe(1)
+  expect(view.rows()).toEqual(users.slice(0, 25))
   expect(api.getAllUsersApi).toHaveBeenCalledOnce()
 })
