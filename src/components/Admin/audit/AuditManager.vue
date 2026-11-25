@@ -361,7 +361,7 @@
               type="primary"
               text
               size="small"
-              @click="viewDetails(row)"
+              @click="loadDetails(row.logId)"
             >
               <el-icon><Icon :icon="iconMap.document" /></el-icon>
               详情
@@ -400,9 +400,11 @@
 
     <AuditLogDetailsDialog
       v-model="detailsVisible"
+      :log-id="detailLogId"
       :log="selectedLog"
       :loading="detailLoading"
       :error-message="detailError"
+      @retry="loadDetails(detailLogId)"
     />
 
     <AuditCleanupDialog
@@ -415,7 +417,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onScopeDispose, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onScopeDispose, reactive, ref, shallowRef, watch } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
@@ -554,41 +556,52 @@ const loadOperationTypes = async () => {
 
 const refreshAll = () => Promise.all([fetchAuditMode(), loadOperationTypes(), loadPage()])
 
-const detailsVisible = ref(false)
-const selectedLog = ref(null)
+const detailLogId = ref('')
+const selectedLog = shallowRef(null)
 const detailLoading = ref(false)
 const detailError = ref('')
 let detailRequest
 let disposed = false
 
-const viewDetails = async ({ logId }) => {
-  if (!logId) return
+const detailsVisible = computed({
+  get: () => Boolean(detailLogId.value),
+  set(visible) {
+    if (visible) return
+    detailRequest?.abort()
+    detailRequest = undefined
+    detailLogId.value = ''
+    selectedLog.value = null
+    detailError.value = ''
+    detailLoading.value = false
+  }
+})
+
+async function loadDetails(logId) {
+  if (!logId || disposed || (detailLoading.value && detailLogId.value === logId)) return
   detailRequest?.abort()
   const request = new AbortController()
+  const { signal } = request
   detailRequest = request
+  detailLogId.value = logId
   selectedLog.value = null
   detailError.value = ''
   detailLoading.value = true
-  detailsVisible.value = true
   try {
-    const { data } = await getAuditLogDetailApi(logId, { signal: request.signal })
-    if (!data) throw new Error('日志详情为空')
-    if (!request.signal.aborted) selectedLog.value = data
+    const { data } = await getAuditLogDetailApi(logId, { signal })
+    if (signal.aborted) return
+    if (data?.logId !== logId) throw new Error('日志详情响应不完整，请重试')
+    selectedLog.value = data
   } catch (error) {
-    if (!request.signal.aborted) {
+    if (!signal.aborted) {
       detailError.value = handleError(error, { defaultMessage: '获取日志详情失败', showMessage: false })
     }
   } finally {
-    if (!request.signal.aborted) detailLoading.value = false
+    if (detailRequest === request) {
+      detailRequest = undefined
+      detailLoading.value = false
+    }
   }
 }
-
-watch(detailsVisible, (visible) => {
-  if (visible) return
-  detailRequest?.abort()
-  selectedLog.value = null
-  detailLoading.value = false
-})
 
 onScopeDispose(() => {
   disposed = true

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
 import { compileClientComponent, createSlotStub, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
@@ -19,6 +19,10 @@ vi.mock('@/services/api/admin.js', () => api)
 vi.mock('@/utils/messageUtils.js', () => messages)
 const confirmDelete = vi.fn()
 const stub = (name, slots) => ({ default: createSlotStub(name, slots) })
+const Details = compileClientComponent(new URL('./AuditLogDetailsDialog.vue', import.meta.url), {
+  '@/utils/format.js': { formatDate },
+  './auditManagerModel.js': model
+})
 const View = compileClientComponent(new URL('./AuditManager.vue', import.meta.url), {
   '@/components/common/PageHeader.vue': stub('PageHeader'),
   '@/components/Admin/shared/AdminToolbar.vue': stub('AdminToolbar', ['default', 'actions']),
@@ -26,7 +30,7 @@ const View = compileClientComponent(new URL('./AuditManager.vue', import.meta.ur
   '@/components/Admin/shared/AdminWorkspacePanel.vue': stub('AdminWorkspacePanel', ['tags', 'actions', 'default']),
   '@/components/common/StatusIndicator.vue': stub('StatusIndicator'),
   './AuditCleanupDialog.vue': stub('AuditCleanupDialog'),
-  './AuditLogDetailsDialog.vue': stub('AuditLogDetailsDialog'),
+  './AuditLogDetailsDialog.vue': { default: Details },
   './auditManagerModel.js': model,
   './useAuditLogPage.js': { useAuditLogPage },
   '@/utils/icons.js': { icons },
@@ -46,16 +50,26 @@ async function mount() {
   const app = renderer.createApp(View)
   app.directive('loading', {})
   for (const name of ['Icon', 'ElIcon', 'ElButton', 'ElInput', 'ElSelect', 'ElOption', 'ElDatePicker',
-    'ElTag', 'ElRadioGroup', 'ElRadioButton', 'ElTable', 'ElPagination', 'ElAlert', 'ElAvatar']) {
+    'ElTag', 'ElRadioGroup', 'ElRadioButton', 'ElTable', 'ElPagination', 'ElAlert', 'ElAvatar',
+    'ElDialog', 'ElDescriptions', 'ElDescriptionsItem']) {
     app.component(name, createSlotStub(name))
   }
-  app.component('ElTableColumn', createSlotStub('ElTableColumn', []))
+  app.component('ElTableColumn', defineComponent({
+    inheritAttrs: false,
+    setup(_props, { attrs, slots }) {
+      return () => h('ElTableColumn', attrs, attrs.label === '操作'
+        ? ['a', 'b'].map(logId => slots.default({ row: { logId } })) : [])
+    }
+  }))
   app.mount(renderer.root)
   apps.push(app)
   await flush()
   const nodes = type => findNodes(renderer.root, node => node.type === type)
   return {
     button: label => nodes('ElButton').find(node => text(node) === label).props,
+    openDetails: (row = 0) => nodes('ElButton').filter(node => text(node) === '详情')[row].props.onClick(),
+    closeDetails: () => nodes('ElDialog')[0].props['onUpdate:modelValue'](false),
+    detailsAlert: () => nodes('ElAlert')[0]?.props.title,
     editKeyword: value => nodes('ElInput')[0].props['onUpdate:modelValue'](value),
     selectRows: selection => nodes('ElTable')[0].props.onSelectionChange(selection),
     text: () => text(renderer.root)
@@ -112,4 +126,58 @@ it('uses the ids shown in the confirmation if selection changes while it is open
   confirmation.resolve(true)
   await pending
   expect(api.deleteAuditLogsApi).toHaveBeenCalledWith({ logIds: ['a'] })
+})
+
+it('shows what is loading and retries the same audit record in the dialog without reloading the list', async () => {
+  const first = deferred()
+  api.getAuditLogDetailApi.mockReturnValueOnce(first.promise)
+    .mockResolvedValueOnce({ data: { logId: 'a', responseMessage: '详情已恢复' } })
+  const view = await mount()
+
+  const pending = view.openDetails()
+  await flush()
+  expect(view.text()).toContain('日志ID：a')
+  expect(view.text()).toContain('正在读取日志详情…')
+  view.openDetails()
+  expect(api.getAuditLogDetailApi).toHaveBeenCalledOnce()
+
+  first.reject(new Error('网络暂时中断'))
+  await pending
+  await flush()
+  expect(view.detailsAlert()).toBe('网络暂时中断')
+  await view.button('重新读取详情').onClick()
+  await flush()
+  expect(api.getAuditLogDetailApi.mock.calls.map(([id]) => id)).toEqual(['a', 'a'])
+  expect(api.getAuditLogSummaryPageApi).toHaveBeenCalledOnce()
+  expect(view.detailsAlert()).toBeUndefined()
+  expect(view.text()).toContain('详情已恢复')
+})
+
+it('aborts detail reads on close and ignores a late result after another record opens', async () => {
+  const first = deferred()
+  api.getAuditLogDetailApi.mockReturnValueOnce(first.promise)
+    .mockResolvedValueOnce({ data: { logId: 'b', responseMessage: '当前详情' } })
+  const view = await mount()
+
+  const pending = view.openDetails()
+  await flush()
+  view.closeDetails()
+  expect(api.getAuditLogDetailApi.mock.calls[0][1].signal.aborted).toBe(true)
+  await view.openDetails(1)
+  first.resolve({ data: { logId: 'a', responseMessage: '旧详情' } })
+  await pending
+  await flush()
+  expect(view.text()).not.toContain('旧详情')
+  expect(view.text()).toContain('当前详情')
+})
+
+it('does not display a detail response from a different audit record', async () => {
+  api.getAuditLogDetailApi.mockResolvedValueOnce({ data: { logId: 'b', responseMessage: '错误记录的正文' } })
+  const view = await mount()
+  await view.openDetails()
+  await flush()
+
+  expect(view.detailsAlert()).toBe('日志详情响应不完整，请重试')
+  expect(view.text()).not.toContain('错误记录的正文')
+  expect(view.text()).toContain('重新读取详情')
 })

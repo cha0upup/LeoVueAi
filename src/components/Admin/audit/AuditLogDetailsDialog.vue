@@ -3,20 +3,40 @@
     v-model="visible"
     title="日志详情"
     width="800px"
+    destroy-on-close
     class="log-details-dialog"
   >
-    <div
-      v-loading="loading"
-      class="log-details"
-      :aria-busy="loading"
-    >
-      <el-alert
-        v-if="errorMessage"
-        :title="errorMessage"
-        type="error"
-        :closable="false"
-        show-icon
-      />
+    <div class="log-details">
+      <p
+        v-if="logId && !log"
+        class="log-id-text detail-target"
+      >
+        日志ID：{{ logId }}
+      </p>
+      <div
+        v-if="loading"
+        role="status"
+      >
+        正在读取日志详情…
+      </div>
+      <div
+        v-else-if="errorMessage"
+        class="detail-feedback"
+      >
+        <el-alert
+          :title="errorMessage"
+          type="error"
+          :closable="false"
+          show-icon
+        />
+        <el-button
+          type="primary"
+          plain
+          @click="emit('retry')"
+        >
+          重新读取详情
+        </el-button>
+      </div>
       <el-descriptions
         v-else-if="log"
         :column="2"
@@ -120,10 +140,12 @@ import {
 const visible = defineModel({ type: Boolean, default: false })
 
 defineProps({
+  logId: { type: String, default: '' },
   log: { type: Object, default: null },
   loading: { type: Boolean, default: false },
   errorMessage: { type: String, default: '' }
 })
+const emit = defineEmits(['retry'])
 </script>
 
 <style>
@@ -152,6 +174,18 @@ defineProps({
   min-height: 88px;
   max-height: 70vh;
   overflow-y: auto;
+}
+
+.log-details-dialog .detail-target {
+  margin: 0 0 var(--space-3);
+  overflow-wrap: anywhere;
+}
+
+.log-details-dialog .detail-feedback {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
 }
 
 .log-details-dialog .log-id-text,
