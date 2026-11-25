@@ -39,7 +39,7 @@
             v-model="form[field.prop]"
             type="password"
             :placeholder="field.placeholder"
-            :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
+            :maxlength="passwordMaxLength"
             autocomplete="new-password"
             show-password
           />
@@ -143,6 +143,7 @@ const props = defineProps({
   editing: { type: Boolean, default: false },
   formState: { type: Object, required: true },
   rules: { type: Object, required: true },
+  passwordMaxLength: { type: Number, default: AUTH_FIELD_LIMITS.passwordMaxLength },
   teams: { type: Array, default: () => [] },
   isAdmin: { type: Boolean, default: false },
   isLeader: { type: Boolean, default: false },

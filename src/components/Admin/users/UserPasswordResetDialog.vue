@@ -34,7 +34,7 @@
             v-model="form[field.prop]"
             type="password"
             :placeholder="field.placeholder"
-            :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
+            :maxlength="passwordMaxLength"
             autocomplete="new-password"
             show-password
           />
@@ -77,6 +77,7 @@ const passwordFields = [
 const props = defineProps({
   formState: { type: Object, required: true },
   rules: { type: Object, required: true },
+  passwordMaxLength: { type: Number, default: AUTH_FIELD_LIMITS.passwordMaxLength },
   resetting: { type: Boolean, default: false }
 })
 

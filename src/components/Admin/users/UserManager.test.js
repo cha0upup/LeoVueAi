@@ -16,7 +16,8 @@ const api = Object.fromEntries(['addUserApi', 'deleteUserApi', 'getAllUsersApi',
   'updateUserApi', 'resetUserPasswordApi'].map(name => [name, vi.fn()]))
 const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showWarning: vi.fn(), showError: vi.fn() }))
 vi.mock('@/utils/messageUtils.js', () => messages)
-const actor = { currentUser: ref({ userId: 'manager' }), isAdmin: ref(true), isLeader: ref(false), fetchAuth: async () => {} }
+const actor = { currentUser: ref({ userId: 'manager' }), isAdmin: ref(true), isLeader: ref(false),
+  passwordMinLength: ref(12), passwordMaxLength: ref(256), fetchAuth: async () => {} }
 const stub = (name, slots) => ({ default: createSlotStub(name, slots) })
 const View = compileClientComponent(new URL('./UserManager.vue', import.meta.url), {
   '@/components/common/PageHeader.vue': stub('PageHeader', ['actions']),
@@ -81,6 +82,7 @@ afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
 it('locks creation during validation and reports a refresh failure separately from success', async () => {
   const view = await mount()
   const editor = () => view.dialog('UserEditorDialog')
+  expect(editor().rules.password[1]).toMatchObject({ min: 12, max: 256 })
   view.button('新增用户').onClick()
   await flush()
   Object.assign(editor()['form-state'], { userName: ' Bob ', password: 'fixture-value', confirmPassword: 'fixture-value' })
@@ -109,6 +111,7 @@ it('locks creation during validation and reports a refresh failure separately fr
 it('clears a cancelled password reset and ignores duplicate valid submissions', async () => {
   const view = await mount()
   const dialog = () => view.dialog('UserPasswordResetDialog')
+  expect(dialog().rules.newPassword[1]).toMatchObject({ min: 12, max: 256 })
   view.button('重置密码').onClick()
   await flush()
   Object.assign(dialog()['form-state'], { newPassword: 'discarded', confirmPassword: 'discarded' })

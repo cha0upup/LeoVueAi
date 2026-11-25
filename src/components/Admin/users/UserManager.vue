@@ -261,6 +261,7 @@
       :editing="isEdit"
       :form-state="userForm"
       :rules="userRules"
+      :password-max-length="passwordMaxLength"
       :teams="teams"
       :is-admin="isAdmin"
       :is-leader="isLeader"
@@ -273,6 +274,7 @@
       v-model="resetPasswordVisible"
       :form-state="resetForm"
       :rules="resetRules"
+      :password-max-length="passwordMaxLength"
       :resetting="resetting"
       @submit="submitResetPassword"
       @form-ready="resetFormRef = $event"
@@ -333,7 +335,7 @@ const statsCardConfigs = [
   { key: 'assignedToTeam', label: '已归属团队' }
 ]
 
-const { currentUser, isAdmin, isLeader, fetchAuth } = useAuth()
+const { currentUser, isAdmin, isLeader, fetchAuth, passwordMinLength, passwordMaxLength } = useAuth()
 
 // 响应式数据
 const loading = ref(false)
@@ -373,7 +375,8 @@ const userForm = reactive(createUserForm())
 const resetForm = reactive(createPasswordResetForm())
 
 // 表单验证规则
-const userRules = {
+const passwordBounds = computed(() => ({ min: passwordMinLength.value, max: passwordMaxLength.value }))
+const userRules = computed(() => ({
   userName: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
     {
@@ -382,7 +385,7 @@ const userRules = {
       trigger: 'blur'
     }
   ],
-  password: createPasswordRules('请输入密码'),
+  password: createPasswordRules('请输入密码', passwordBounds.value),
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
     {
@@ -391,10 +394,10 @@ const userRules = {
     }
   ],
   privilege: [{ required: true, message: '请选择角色', trigger: 'change' }]
-}
+}))
 
-const resetRules = {
-  newPassword: createPasswordRules(),
+const resetRules = computed(() => ({
+  newPassword: createPasswordRules('请输入新密码', passwordBounds.value),
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
     {
@@ -402,7 +405,7 @@ const resetRules = {
       trigger: 'blur'
     }
   ]
-}
+}))
 
 // 计算属性
 const filteredUsers = computed(() => filterUsers(userData.value, {

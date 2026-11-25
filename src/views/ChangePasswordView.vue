@@ -10,25 +10,33 @@
         </span>
         <div>
           <span class="page-kicker">账号安全设置</span>
-          <h1>请先更新密码</h1>
-          <p>账户创建或密码被管理员重置后，请设置自己的密码，再进入 Leo 控制台。</p>
+          <h1>{{ confirmed ? '确认登录状态' : '请先更新密码' }}</h1>
+          <p v-if="!confirmed">
+            账户创建或密码被管理员重置后，请设置自己的密码，再进入 Leo 控制台。
+          </p>
         </div>
       </header>
 
-      <div class="security-note">
+      <div
+        v-if="!confirmed"
+        class="security-note"
+      >
         <el-icon><Icon :icon="iconMap.shield" /></el-icon>
         <span>
-          新密码长度为 {{ AUTH_FIELD_LIMITS.passwordMinLength }}–{{ AUTH_FIELD_LIMITS.passwordMaxLength }}
+          新密码长度为 {{ passwordMinLength }}–{{ passwordMaxLength }}
           个字符，并需满足服务端安全策略。
         </span>
       </div>
 
       <el-form
+        v-if="!confirmed"
         ref="formRef"
         :model="form"
         :rules="rules"
+        :disabled="submitting || loggingOut"
         label-position="top"
         class="password-form"
+        @submit.prevent="submitForm"
         @keyup.enter="submitForm"
       >
         <el-form-item
@@ -39,7 +47,8 @@
             v-model="form.oldPassword"
             type="password"
             placeholder="请输入当前密码"
-            :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
+            :maxlength="passwordMaxLength"
+            autocomplete="current-password"
             size="large"
             show-password
             autofocus
@@ -58,7 +67,8 @@
             v-model="form.newPassword"
             type="password"
             placeholder="请输入新密码"
-            :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
+            :maxlength="passwordMaxLength"
+            autocomplete="new-password"
             size="large"
             show-password
           >
@@ -76,7 +86,8 @@
             v-model="form.confirmPassword"
             type="password"
             placeholder="请再次输入新密码"
-            :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
+            :maxlength="passwordMaxLength"
+            autocomplete="new-password"
             size="large"
             show-password
           >
@@ -96,13 +107,31 @@
           {{ submitting ? '正在修改...' : '修改密码并进入控制台' }}
         </el-button>
       </el-form>
+      <section
+        v-else
+        class="password-form"
+        :aria-busy="checkingStatus"
+      >
+        <p role="status">
+          {{ checkingStatus ? '正在检查登录状态…' : '密码已更新。如未进入控制台，请重新检查登录状态。' }}
+        </p>
+        <el-button
+          type="primary"
+          class="submit-button"
+          :loading="checkingStatus"
+          :disabled="loggingOut"
+          @click="continueAfterChange"
+        >
+          重新检查登录状态
+        </el-button>
+      </section>
 
       <footer class="page-footer">
-        <span>当前会话仅允许修改密码或退出登录。</span>
+        <span v-if="!confirmed">当前会话仅允许修改密码或退出登录。</span>
         <el-button
           link
           type="primary"
-          :disabled="submitting || loggingOut"
+          :disabled="submitting || checkingStatus || loggingOut"
           @click="handleLogout"
         >
           {{ loggingOut ? '正在退出...' : '退出并切换账户' }}
@@ -113,72 +142,61 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { onScopeDispose, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { AUTH_FIELD_LIMITS, ROUTE_PATHS } from '@/constants/app.js'
+import { ROUTE_PATHS } from '@/constants/app.js'
 import { useAuth } from '@/composables/useAuth.js'
-import { normalizeAuthRedirect } from '@/routerGuards.js'
-import { changePasswordApi, logoutApi } from '@/services/api/auth.js'
-import { createPasswordRules, createPasswordMatchValidator, validateForm } from '@/utils/formUtils.js'
+import { usePasswordChangeForm } from '@/composables/usePasswordChangeForm.js'
+import { authPageTarget } from '@/routerGuards.js'
+import { logoutApi } from '@/services/api/auth.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 import { icons as iconMap } from '@/utils/icons.js'
-import { showError, showSuccess } from '@/utils/messageUtils.js'
+import { showError } from '@/utils/messageUtils.js'
 
 const route = useRoute()
 const router = useRouter()
-const { fetchAuth, resetAuth } = useAuth()
+const { resetAuth } = useAuth()
 
-const formRef = ref(null)
-const submitting = ref(false)
+const confirmed = ref(false)
+const checkingStatus = ref(false)
 const loggingOut = ref(false)
-const form = reactive({
-  oldPassword: '',
-  newPassword: '',
-  confirmPassword: ''
+let disposed = false
+onScopeDispose(() => { disposed = true })
+
+const { form, formRef, rules, submitting, passwordMinLength, passwordMaxLength, submitForm } = usePasswordChangeForm({
+  canSubmit: () => !confirmed.value && !loggingOut.value,
+  onSaved: () => {
+    confirmed.value = true
+    return continueAfterChange()
+  }
 })
 
-const rules = {
-  oldPassword: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
-  newPassword: createPasswordRules(),
-  confirmPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
-    { validator: createPasswordMatchValidator(() => form.newPassword), trigger: 'blur' }
-  ]
-}
-
-const getErrorMessage = (error, fallback) =>
-  error?.response?.data?.msg || error?.message || fallback
-
-const submitForm = async () => {
-  if (submitting.value) return
-  const isValid = await validateForm(formRef, { errorMessage: '请检查密码输入' })
-  if (!isValid) return
-
-  submitting.value = true
+async function continueAfterChange() {
+  if (disposed || !confirmed.value || checkingStatus.value || loggingOut.value) return
+  checkingStatus.value = true
   try {
-    await changePasswordApi({
-      oldPassword: form.oldPassword,
-      newPassword: form.newPassword
-    })
-    await fetchAuth({ force: true })
-    showSuccess('密码修改成功')
-    await router.replace(normalizeAuthRedirect(route.query.redirect) || ROUTE_PATHS.main)
-  } catch (error) {
-    showError(getErrorMessage(error, '密码修改失败，请稍后重试'))
+    await router.replace(authPageTarget(ROUTE_PATHS.startup, route.query.redirect))
+  } catch {
+    if (!disposed) showError('登录状态暂未确认，请重新检查')
   } finally {
-    submitting.value = false
+    checkingStatus.value = false
   }
 }
 
 const handleLogout = async () => {
-  if (loggingOut.value) return
+  if (disposed || loggingOut.value || submitting.value || checkingStatus.value) return
+  const generation = sessionGeneration.value
   loggingOut.value = true
   try {
     await logoutApi()
+    if (disposed || !isCurrentSession(generation)) return
     resetAuth()
     await router.replace(ROUTE_PATHS.login)
   } catch (error) {
-    showError(getErrorMessage(error, '退出登录失败，请稍后重试'))
+    if (!disposed && isCurrentSession(generation)) {
+      showError(error?.response?.data?.msg || error?.message || '退出登录失败，请稍后重试')
+    }
   } finally {
     loggingOut.value = false
   }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
-import { createPasswordMatchValidator } from '@/utils/formUtils.js'
+import { createPasswordMatchValidator, createPasswordRules } from '@/utils/formUtils.js'
 import { deferred } from '@/test-support/deferred.js'
 import { ROUTE_PATHS } from '@/constants/app.js'
 import { authPageTarget } from '@/routerGuards.js'
@@ -27,7 +27,7 @@ describe('first-deployment setup page', () => {
       }) },
       '@/services/api/auth.js': { initializeSystemApi: initialize },
       '@/routerGuards.js': { authPageTarget },
-      '@/utils/formUtils.js': { createPasswordMatchValidator, validateForm: validate },
+      '@/utils/formUtils.js': { createPasswordMatchValidator, createPasswordRules, validateForm: validate },
       '@/utils/messageUtils.js': { showError, showSuccess }
     })
     const renderer = createTestRenderer()

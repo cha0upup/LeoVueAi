@@ -86,10 +86,12 @@ router.beforeEach(async (to, from) => {
   }
 
   const showingError = to.path === ROUTE_PATHS.startup && authCheckState.value === 'error'
+  const checkingAfterPasswordChange = to.path === ROUTE_PATHS.startup && from.path === ROUTE_PATHS.changePassword
   // A guard redirect or a successful retry from /startup already carries a fresh status result.
   const continuingCheck = Boolean(to.redirectedFrom) || from.path === ROUTE_PATHS.startup
   const directSetupCheck = !continuingCheck && (initializationRequired.value || to.path === ROUTE_PATHS.setup)
-  if (!showingError && (authCheckState.value === 'checking' || !authFetched.value || directSetupCheck)) {
+  if (checkingAfterPasswordChange ||
+      !showingError && (authCheckState.value === 'checking' || !authFetched.value || directSetupCheck)) {
     await fetchAuth({ force: true })
   }
 

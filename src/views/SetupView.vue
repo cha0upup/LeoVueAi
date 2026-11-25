@@ -107,7 +107,7 @@ import { ROUTE_PATHS } from '@/constants/app.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { initializeSystemApi } from '@/services/api/auth.js'
 import { authPageTarget } from '@/routerGuards.js'
-import { createPasswordMatchValidator, validateForm } from '@/utils/formUtils.js'
+import { createPasswordMatchValidator, createPasswordRules, validateForm } from '@/utils/formUtils.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 
 const router = useRouter()
@@ -119,15 +119,7 @@ const confirmation = ref('')
 const form = reactive({ password: '', confirmPassword: '' })
 let disposed = false
 const rules = computed(() => ({
-  password: [
-    { required: true, message: '请输入管理员密码', trigger: 'blur' },
-    {
-      min: passwordMinLength.value,
-      max: passwordMaxLength.value,
-      message: `密码长度在 ${passwordMinLength.value} 到 ${passwordMaxLength.value} 个字符`,
-      trigger: 'blur'
-    }
-  ],
+  password: createPasswordRules('请输入管理员密码', { min: passwordMinLength.value, max: passwordMaxLength.value }),
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
     { validator: createPasswordMatchValidator(() => form.password), trigger: 'blur' }

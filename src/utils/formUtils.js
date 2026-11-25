@@ -5,13 +5,16 @@ import { showError } from './messageUtils.js'
  * 提供表单相关的通用方法
  */
 
-export function createPasswordRules(requiredMessage = '请输入新密码') {
+export function createPasswordRules(requiredMessage = '请输入新密码', {
+  min = AUTH_FIELD_LIMITS.passwordMinLength,
+  max = AUTH_FIELD_LIMITS.passwordMaxLength
+} = {}) {
   return [
     { required: true, message: requiredMessage, trigger: 'blur' },
     {
-      min: AUTH_FIELD_LIMITS.passwordMinLength,
-      max: AUTH_FIELD_LIMITS.passwordMaxLength,
-      message: `密码长度在 ${AUTH_FIELD_LIMITS.passwordMinLength} 到 ${AUTH_FIELD_LIMITS.passwordMaxLength} 个字符`,
+      min,
+      max,
+      message: `密码长度在 ${min} 到 ${max} 个字符`,
       trigger: 'blur'
     }
   ]

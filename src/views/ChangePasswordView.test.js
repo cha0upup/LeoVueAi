@@ -1,79 +1,199 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick, ref } from 'vue'
+import { compileClientComponent, createSlotStub, findNode, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
-import { AUTH_FIELD_LIMITS, ROUTE_PATHS } from '@/constants/app.js'
-import { createPasswordRules, createPasswordMatchValidator } from '@/utils/formUtils.js'
+import { deferred } from '@/test-support/deferred.js'
+import { ROUTE_PATHS } from '@/constants/app.js'
 import { icons } from '@/utils/icons.js'
-import { normalizeAuthRedirect } from '@/routerGuards.js'
+import { useDialog } from '@/utils/dialogUtils.js'
+import { authPageTarget } from '@/routerGuards.js'
+import { usePasswordChangeForm } from '@/composables/usePasswordChangeForm.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
+
+const calls = vi.hoisted(() => ({
+  changePassword: vi.fn(), logout: vi.fn(), validate: vi.fn(), showError: vi.fn(), showSuccess: vi.fn(), resetAuth: vi.fn()
+}))
+const auth = { passwordMinLength: ref(12), passwordMaxLength: ref(256), resetAuth: calls.resetAuth }
+vi.mock('@/composables/useAuth.js', () => ({ useAuth: () => auth }))
+vi.mock('@/services/api/auth.js', () => ({ changePasswordApi: calls.changePassword, logoutApi: calls.logout }))
+vi.mock('@/utils/formUtils.js', async original => ({ ...await original(), validateForm: calls.validate }))
+vi.mock('@/utils/messageUtils.js', () => calls)
+
+const apps = []
+const text = node => [node.text, ...node.children.map(text)].join('').trim()
+const flush = async () => { for (let i = 0; i < 5; i++) await nextTick() }
+const credentials = { oldPassword: ' current-fixture-password ', newPassword: ' new-fixture-password ' }
+
+function mount(kind, query = {}) {
+  const replace = vi.fn().mockResolvedValue(undefined)
+  const modules = {
+    '@/utils/icons.js': { icons },
+    '@/composables/usePasswordChangeForm.js': { usePasswordChangeForm }
+  }
+  if (kind === 'page') Object.assign(modules, {
+    'vue-router': { useRoute: () => ({ query }), useRouter: () => ({ replace }) },
+    '@/routerGuards.js': { authPageTarget },
+    '@/constants/app.js': { ROUTE_PATHS },
+    '@/composables/useAuth.js': { useAuth: () => auth },
+    '@/services/api/auth.js': { logoutApi: calls.logout },
+    '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration },
+    '@/utils/messageUtils.js': { showError: calls.showError }
+  })
+  else modules['@/utils/dialogUtils.js'] = { useDialog }
+  const file = kind === 'page' ? './ChangePasswordView.vue' : '../components/common/ChangePasswordDialog.vue'
+  const View = compileClientComponent(new URL(file, import.meta.url), modules)
+  const renderer = createTestRenderer()
+  const app = renderer.createApp(View)
+  app.component('ElDialog', createSlotStub('dialog-fixture', ['default', 'footer']))
+  app.component('ElForm', createSlotStub('form-fixture'))
+  app.component('ElFormItem', createSlotStub('item'))
+  app.component('ElInput', createSlotStub('input', []))
+  app.component('ElButton', createSlotStub('button'))
+  for (const name of ['ElIcon', 'Icon']) app.component(name, { render: () => null })
+  const vm = app.mount(renderer.root)
+  apps.push(app)
+  const unmount = () => { app.unmount(); apps.splice(apps.indexOf(app), 1) }
+  const formNode = () => findNode(renderer.root, 'form-fixture')
+  const form = formNode().props.model
+  const button = label => findNodes(renderer.root, node => node.type === 'button' && text(node) === label)[0]?.props
+  return {
+    form, formNode, replace, root: renderer.root, open: vm.openChangePasswordDialog, unmount, button,
+    dialog: () => findNode(renderer.root, 'dialog-fixture')?.props,
+    fill: () => Object.assign(form, credentials, { confirmPassword: credentials.newPassword }),
+    submit: () => button(kind === 'page' ? '修改密码并进入控制台' : '提交修改').onClick()
+  }
+}
+
+beforeEach(() => {
+  vi.resetAllMocks()
+  auth.passwordMinLength.value = 12
+  calls.validate.mockResolvedValue(true)
+  calls.changePassword.mockResolvedValue({})
+  calls.logout.mockResolvedValue({})
+})
+afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
 
 describe('required password update page', () => {
-  const apps = []
-  afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
-
-  const mount = (query = {}) => {
-    const changePassword = vi.fn().mockResolvedValue({})
-    const fetchAuth = vi.fn().mockResolvedValue({ passwordChangeRequired: false })
-    const replace = vi.fn().mockResolvedValue(undefined)
-    const validate = vi.fn().mockResolvedValue(true)
-    const View = compileClientComponent(new URL('./ChangePasswordView.vue', import.meta.url), {
-      'vue-router': { useRoute: () => ({ query }), useRouter: () => ({ replace }) },
-      '@/routerGuards.js': { normalizeAuthRedirect },
-      '@/constants/app.js': { AUTH_FIELD_LIMITS, ROUTE_PATHS },
-      '@/composables/useAuth.js': { useAuth: () => ({ fetchAuth, resetAuth: vi.fn() }) },
-      '@/services/api/auth.js': { changePasswordApi: changePassword, logoutApi: vi.fn() },
-      '@/utils/formUtils.js': { createPasswordRules, createPasswordMatchValidator, validateForm: validate },
-      '@/utils/icons.js': { icons },
-      '@/utils/messageUtils.js': { showError: vi.fn(), showSuccess: vi.fn() }
-    })
-    const renderer = createTestRenderer()
-    const app = renderer.createApp(View)
-    app.component('ElForm', createSlotStub('form-fixture'))
-    app.component('ElFormItem', createSlotStub('item'))
-    app.component('ElInput', createSlotStub('input', []))
-    app.component('ElButton', createSlotStub('button'))
-    for (const name of ['ElIcon', 'Icon']) app.component(name, { render: () => null })
-    app.mount(renderer.root)
-    apps.push(app)
-    const form = findNode(renderer.root, 'form-fixture').props.model
-    return { form, changePassword, fetchAuth, replace, validate, root: renderer.root,
-      submit: () => findNode(renderer.root, 'button').props.onClick() }
-  }
-
-  it('describes an account password update rather than deployment bootstrap', () => {
-    const view = mount()
+  it('uses the deployment policy for new passwords but not for the existing password', () => {
+    const view = mount('page')
     expect(findNode(view.root, 'h1').text).toBe('请先更新密码')
     expect(findNode(view.root, 'input').props.placeholder).toBe('请输入当前密码')
+    const { rules } = view.formNode().props
+    expect(rules.newPassword[1]).toMatchObject({ min: 12, max: 256 })
+    expect(rules.oldPassword[0]).not.toHaveProperty('min')
   })
 
-  it('keeps the current-user password update and authentication refresh workflow', async () => {
-    const view = mount()
-    view.form.oldPassword = ' current-fixture-password '
-    view.form.newPassword = ' new-fixture-password '
-    view.form.confirmPassword = view.form.newPassword
-    await view.submit()
-    expect(view.changePassword).toHaveBeenCalledWith({
-      oldPassword: ' current-fixture-password ', newPassword: ' new-fixture-password '
-    })
-    expect(view.fetchAuth).toHaveBeenCalledWith({ force: true })
-    expect(view.replace).toHaveBeenCalledWith(ROUTE_PATHS.main)
+  it('locks validation and sends the exact password characters only once', async () => {
+    const view = mount('page')
+    view.fill()
+    const validation = deferred()
+    calls.validate.mockReturnValueOnce(validation.promise)
+    const submit = view.button('修改密码并进入控制台').onClick
+    const pending = submit()
+    await submit()
+    await flush()
+    expect(view.formNode().props.disabled).toBe(true)
+    expect(view.button('退出并切换账户').disabled).toBe(true)
+    await view.button('退出并切换账户').onClick()
+    expect(calls.logout).not.toHaveBeenCalled()
+    expect(calls.validate).toHaveBeenCalledOnce()
+    expect(calls.changePassword).not.toHaveBeenCalled()
+
+    validation.resolve(true)
+    await pending
+    expect(calls.changePassword).toHaveBeenCalledExactlyOnceWith(credentials)
+    expect(view.form).toEqual({ oldPassword: '', newPassword: '', confirmPassword: '' })
+    expect(view.replace).toHaveBeenCalledExactlyOnceWith({ path: ROUTE_PATHS.startup })
   })
 
-  it('does not submit when the current password form is invalid', async () => {
-    const view = mount()
-    view.validate.mockResolvedValue(false)
+  it('retries only session verification after the password write has succeeded', async () => {
+    const redirect = '/admin?tab=statistics#latest'
+    const view = mount('page', { redirect })
+    view.fill()
+    view.replace.mockRejectedValueOnce(new Error('fixture navigation issue'))
     await view.submit()
-    expect(view.changePassword).not.toHaveBeenCalled()
+    await flush()
+    expect(view.formNode()).toBeNull()
+    expect(calls.showSuccess).toHaveBeenCalledOnce()
+
+    await view.button('重新检查登录状态').onClick()
+    expect(calls.changePassword).toHaveBeenCalledOnce()
+    expect(view.replace.mock.calls).toEqual([
+      [{ path: ROUTE_PATHS.startup, query: { redirect } }],
+      [{ path: ROUTE_PATHS.startup, query: { redirect } }]
+    ])
+  })
+
+  it('does not submit an invalid form or carry a disallowed redirect into recovery', async () => {
+    const view = mount('page', { redirect: '/startup' })
+    calls.validate.mockResolvedValueOnce(false)
+    await view.submit()
+    expect(calls.changePassword).not.toHaveBeenCalled()
     expect(view.replace).not.toHaveBeenCalled()
+    await view.submit()
+    expect(view.replace).toHaveBeenCalledExactlyOnceWith({ path: ROUTE_PATHS.startup })
+  })
+})
+
+describe('password update dialog', () => {
+  it('clears cancelled credentials and applies the current password policy', async () => {
+    const view = mount('dialog')
+    view.open()
+    view.fill()
+    await flush()
+    auth.passwordMinLength.value = 14
+    await flush()
+    expect(view.formNode().props.rules.newPassword[1]).toMatchObject({ min: 14, max: 256 })
+    view.button('取消').onClick()
+    expect(view.form).toEqual({ oldPassword: '', newPassword: '', confirmPassword: '' })
+    expect(calls.changePassword).not.toHaveBeenCalled()
   })
 
-  it.each([
-    ['/main?tab=agent', '/main?tab=agent'],
-    [['/main?tab=agent'], '/main?tab=agent'],
-    ['/startup', ROUTE_PATHS.main],
-    [{ redirect: '/main' }, ROUTE_PATHS.main]
-  ])('normalizes the post-password redirect %j', async (redirect, expected) => {
-    const view = mount({ redirect })
+  it('ignores duplicate submits and closes with cleared fields after success', async () => {
+    const view = mount('dialog')
+    view.open()
+    view.fill()
+    const pendingWrite = deferred()
+    calls.changePassword.mockReturnValueOnce(pendingWrite.promise)
+    const submit = view.submit()
     await view.submit()
-    expect(view.replace).toHaveBeenCalledExactlyOnceWith(expected)
+    await flush()
+    expect(view.dialog()['close-on-press-escape']).toBe(false)
+    expect(calls.changePassword).toHaveBeenCalledExactlyOnceWith(credentials)
+
+    pendingWrite.resolve({})
+    await submit
+    await flush()
+    expect(view.dialog().modelValue).toBe(false)
+    expect(view.form).toEqual({ oldPassword: '', newPassword: '', confirmPassword: '' })
+  })
+
+  it('reports a rejected password without claiming success or closing the dialog', async () => {
+    const view = mount('dialog')
+    calls.changePassword.mockRejectedValueOnce({ response: { data: { msg: '旧密码不正确' } } })
+    view.open()
+    view.fill()
+    await view.submit()
+    await flush()
+
+    expect(calls.showError).toHaveBeenCalledWith('旧密码不正确')
+    expect(calls.showSuccess).not.toHaveBeenCalled()
+    expect(view.dialog().modelValue).toBe(true)
+    expect(view.form.oldPassword).toBe(credentials.oldPassword)
+  })
+
+  it('clears credentials and skips writing when validation completes after unmount', async () => {
+    const view = mount('dialog')
+    view.open()
+    view.fill()
+    const validation = deferred()
+    calls.validate.mockReturnValueOnce(validation.promise)
+    const submit = view.submit()
+    view.unmount()
+    validation.resolve(true)
+    await submit
+
+    expect(view.form).toEqual({ oldPassword: '', newPassword: '', confirmPassword: '' })
+    expect(calls.changePassword).not.toHaveBeenCalled()
   })
 })

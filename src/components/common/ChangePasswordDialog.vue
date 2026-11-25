@@ -1,9 +1,12 @@
 <template>
   <el-dialog
     v-model="changePasswordVisible"
+    title="修改密码"
     width="560px"
     class="change-password-dialog"
-    @close="handleClose"
+    :close-on-click-modal="!submitting"
+    :close-on-press-escape="!submitting"
+    :show-close="!submitting"
   >
     <div class="dialog-shell">
       <div class="dialog-head">
@@ -20,8 +23,7 @@
       <div class="security-note">
         <el-icon><Icon :icon="iconMap.shield" /></el-icon>
         <span>
-          密码至少 {{ AUTH_FIELD_LIMITS.passwordMinLength }} 个字符，具体要求以系统安全策略为准，最长
-          {{ AUTH_FIELD_LIMITS.passwordMaxLength }} 个字符。
+          新密码长度为 {{ passwordMinLength }}–{{ passwordMaxLength }} 个字符，以系统安全策略为准。
         </span>
       </div>
 
@@ -29,8 +31,11 @@
         ref="formRef"
         :model="form"
         :rules="rules"
+        :disabled="submitting"
         label-position="top"
         class="password-form"
+        @submit.prevent="submitForm"
+        @keyup.enter="submitForm"
       >
         <div class="form-grid">
           <div
@@ -47,7 +52,8 @@
                 v-model="form[field.prop]"
                 type="password"
                 :placeholder="field.placeholder"
-                :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
+                :maxlength="passwordMaxLength"
+                :autocomplete="field.prop === 'oldPassword' ? 'current-password' : 'new-password'"
                 show-password
                 class="password-input"
               >
@@ -64,13 +70,15 @@
       <div class="dialog-footer">
         <el-button
           class="footer-button"
-          @click="handleClose"
+          :disabled="submitting"
+          @click="dialog.close"
         >
           取消
         </el-button>
         <el-button
           class="footer-button primary-button"
           type="primary"
+          :loading="submitting"
           @click="submitForm"
         >
           提交修改
@@ -81,16 +89,17 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
+import { watch } from 'vue'
+import { usePasswordChangeForm } from '@/composables/usePasswordChangeForm.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
-import { createPasswordRules, createPasswordMatchValidator, validateForm, resetForm as resetFormUtil } from '@/utils/formUtils.js'
-import { executeRequest } from '@/utils/apiUtils.js'
-import { changePasswordApi } from '@/services/api/auth.js'
 
 const dialog = useDialog()
 const changePasswordVisible = dialog.visible
+const { form, formRef, rules, submitting, passwordMinLength, passwordMaxLength, clear, submitForm } = usePasswordChangeForm({
+  canSubmit: () => changePasswordVisible.value,
+  onSaved: dialog.close
+})
 
 const passwordFields = [
   { prop: 'oldPassword', label: '旧密码', hint: '验证当前身份', placeholder: '请输入旧密码', icon: 'key' },
@@ -98,54 +107,10 @@ const passwordFields = [
   { prop: 'confirmPassword', label: '确认密码', hint: '再次确认新密码', placeholder: '请再次输入新密码', icon: 'check' }
 ]
 
-const form = reactive({
-  oldPassword: '',
-  newPassword: '',
-  confirmPassword: ''
-})
-
-const rules = {
-  oldPassword: [{ required: true, message: '请输入旧密码', trigger: 'blur' }],
-  newPassword: createPasswordRules(),
-  confirmPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
-    { validator: createPasswordMatchValidator(() => form.newPassword), trigger: 'blur' }
-  ]
-}
-
-const formRef = ref(null)
-
-const handleClose = () => {
-  resetFormUtil(formRef, form, {
-    oldPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  })
-  dialog.close()
-}
-
-const submitForm = async () => {
-  const isValid = await validateForm(formRef, {
-    errorMessage: '请检查表单输入'
-  })
-  if (!isValid) return
-
-  await executeRequest(
-    () =>
-      changePasswordApi({
-        oldPassword: form.oldPassword,
-        newPassword: form.newPassword
-      }),
-    {
-      successMessage: '密码修改成功',
-      errorMessage: '请求失败，请稍后重试',
-      onSuccess: handleClose
-    }
-  )
-}
+watch(changePasswordVisible, (open) => { if (!open) clear() }, { flush: 'sync' })
 
 defineExpose({
-  openChangePasswordDialog: dialog.open
+  openChangePasswordDialog: () => { if (!submitting.value) dialog.open() }
 })
 </script>
 

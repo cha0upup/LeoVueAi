@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { ROUTE_PATHS } from '@/constants/app.js'
-import { authPageTarget } from '@/routerGuards.js'
+import { authPageTarget, resolveAuthNavigation } from '@/routerGuards.js'
 import { deferred } from '@/test-support/deferred.js'
 
 const getStatus = vi.hoisted(() => vi.fn())
@@ -14,6 +14,7 @@ vi.mock('@/views/SetupView.vue', () => ({ default: {} }))
 vi.mock('@/views/StartupCheckView.vue', () => ({ default: {} }))
 vi.mock('@/views/LoginView.vue', () => ({ default: {} }))
 vi.mock('@/views/AdminView.vue', () => ({ default: {} }))
+vi.mock('@/views/ChangePasswordView.vue', () => ({ default: {} }))
 
 const requiresSetup = { data: { isLoggedIn: false, initializationRequired: true } }
 const installed = { data: { isLoggedIn: false, initializationRequired: false } }
@@ -82,4 +83,26 @@ it('waits for an in-flight status refresh instead of briefly opening recovery', 
   await Promise.all([refresh, navigation])
   expect(getStatus).toHaveBeenCalledTimes(2)
   expect(router.currentRoute.value.path).toBe(ROUTE_PATHS.admin)
+})
+
+it('rechecks a forced-password session and keeps a failed read in status recovery', async () => {
+  const loggedIn = { ...installed.data, isLoggedIn: true, privilege: 'admin' }
+  const redirect = '/admin?tab=statistics#latest'
+  getStatus.mockResolvedValueOnce({ data: { ...loggedIn, passwordChangeRequired: true } })
+    .mockRejectedValueOnce(new Error('status network fixture'))
+    .mockResolvedValue({ data: { ...loggedIn, passwordChangeRequired: false } })
+  const { default: router } = await import('./router.js')
+  const { useAuth } = await import('@/composables/useAuth.js')
+
+  await router.push(redirect)
+  expect(router.currentRoute.value).toMatchObject({ path: ROUTE_PATHS.changePassword, query: { redirect } })
+  await router.replace(authPageTarget(ROUTE_PATHS.startup, redirect))
+  expect(router.currentRoute.value).toMatchObject({ path: ROUTE_PATHS.startup, query: { redirect } })
+  expect(getStatus).toHaveBeenCalledTimes(2)
+
+  const auth = useAuth()
+  const user = await auth.fetchAuth({ force: true })
+  await router.replace(resolveAuthNavigation(router.currentRoute.value, user, false, auth.authCheckState.value))
+  expect(router.currentRoute.value.fullPath).toBe(redirect)
+  expect(getStatus).toHaveBeenCalledTimes(3)
 })
