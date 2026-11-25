@@ -40,15 +40,6 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button
-          v-if="outputResult"
-          :disabled="isResultStale || isGenerating"
-          :loading="isSavingArtifact"
-          @click="emit('save-artifact')"
-        >
-          <el-icon><Icon :icon="iconMap.save" /></el-icon>
-          保存成果
-        </el-button>
         <el-tooltip
           content="请先完成所有必填项配置"
           :disabled="isFormValid"
@@ -165,7 +156,6 @@ const props = defineProps({
   isGenerating:      { type: Boolean, default: false },
   isFormValid:       { type: Boolean, default: false },
   isResultStale:     { type: Boolean, default: false },
-  isSavingArtifact:  { type: Boolean, default: false },
   classArtifacts:    { type: Array,   default: () => [] },
   resultMeta:        { type: Array,   default: () => [] },
   configSummary:     { type: Array,   default: () => [] }
@@ -174,7 +164,6 @@ const props = defineProps({
 const emit = defineEmits([
   'copy',
   'generate',
-  'save-artifact',
   'copy-summary',
   'download-class-artifact',
   'container-ready'

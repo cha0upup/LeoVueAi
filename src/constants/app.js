@@ -66,8 +66,7 @@ export const HOME_MENU_GROUPS = [
     kicker: 'Build',
     title: '构建与交付',
     items: [
-      { key: 'script-generator', title: '脚本构建', icon: icons.codeGenerator },
-      { key: 'user-space', title: '成果库', icon: icons.folderOpened }
+      { key: 'script-generator', title: '脚本构建', icon: icons.codeGenerator }
     ]
   },
   {

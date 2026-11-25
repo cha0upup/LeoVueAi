@@ -65,13 +65,6 @@
           />
           {{ workspaceLoading ? '下载中…' : `下载 ${workspaceFile.filename}` }}
         </button>
-        <button
-          class="shell-fetch-btn"
-          :disabled="archiving || archived"
-          @click="archiveWorkspaceFile"
-        >
-          {{ archived ? '已归档到成果库' : archiving ? '归档中…' : '归档到成果库' }}
-        </button>
         <span class="workspace-file-meta">
           {{ workspaceFile.path }}
         </span>
@@ -111,7 +104,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { getShellResultApi } from '@/services/api/shell-generator.js'
-import { archiveUserArtifactApi, userFileDownloadApi } from '@/services/api/user-space.js'
+import { downloadTaskOutputApi } from '@/services/api/task-output.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
 import { formatToolValue, getShellResultId, getWorkspaceFileRef } from './taskNodeModel.js'
@@ -127,8 +120,6 @@ const workspaceFile = computed(() => getWorkspaceFileRef(props.node.result))
 const loading = ref(false)
 const workspaceLoading = ref(false)
 const workspaceError = ref('')
-const archiving = ref(false)
-const archived = ref(false)
 const content = ref('')
 const error = ref('')
 const copied = ref(false)
@@ -146,7 +137,6 @@ watch(shellResultId, () => {
 watch(workspaceFile, () => {
   workspaceLoading.value = false
   workspaceError.value = ''
-  archived.value = false
 })
 
 const fetchShellResult = async () => {
@@ -193,7 +183,7 @@ const downloadWorkspaceFile = async () => {
   workspaceLoading.value = true
   workspaceError.value = ''
   try {
-    const response = await userFileDownloadApi({ path: file.path })
+    const response = await downloadTaskOutputApi({ path: file.path })
     downloadBlob(response.data, file.filename)
   } catch (downloadError) {
     workspaceError.value = downloadError?.message || '下载失败'
@@ -202,23 +192,6 @@ const downloadWorkspaceFile = async () => {
   }
 }
 
-const archiveWorkspaceFile = async () => {
-  const file = workspaceFile.value
-  if (!file || archiving.value || archived.value) return
-  archiving.value = true
-  workspaceError.value = ''
-  try {
-    await archiveUserArtifactApi({
-      category: 'task-results', filename: file.filename, sourcePath: file.path,
-      metadata: { title: file.filename, sourceModule: 'task-output' }
-    })
-    if (workspaceFile.value?.path === file.path) archived.value = true
-  } catch (error) {
-    if (workspaceFile.value?.path === file.path) workspaceError.value = error?.message || '归档失败'
-  } finally {
-    archiving.value = false
-  }
-}
 
 onUnmounted(() => {
   requestGuard.invalidate()

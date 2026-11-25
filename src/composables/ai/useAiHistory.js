@@ -1,7 +1,6 @@
 import { computed, nextTick, ref } from 'vue'
 import {
   AI_HISTORY_PAGE_SIZE,
-  fetchCompleteAiHistory,
   mergeAiHistoryRecords,
   normalizeAiHistoryPage,
   requireOlderCursor
@@ -62,12 +61,7 @@ export function useAiHistory({
     }
   }
 
-  const loadCompleteHistory = (threadId = getConversationKey()) => {
-    const current = context(threadId)
-    return fetchCompleteAiHistory(params => loadPage({ ...current, ...params }))
-  }
-
   const forgetHistory = threadId => { delete pages.value[context(threadId).key] }
 
-  return { recordPage, hasOlderMessages, loadingOlder, loadOlderMessages, loadCompleteHistory, forgetHistory }
+  return { recordPage, hasOlderMessages, loadingOlder, loadOlderMessages, forgetHistory }
 }

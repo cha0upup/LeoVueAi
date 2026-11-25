@@ -33,10 +33,8 @@
           :config-summary="configSummary"
           :class-artifacts="generatedClassArtifacts"
           :is-result-stale="isResultStale"
-          :is-saving-artifact="isSavingArtifact"
           @copy="copyToClipboard"
           @generate="generateArtifact"
-          @save-artifact="saveArtifact"
           @copy-summary="copyConfigSummary"
           @download-class-artifact="downloadGeneratedClass"
           @container-ready="handleEditorContainerReady"
@@ -64,11 +62,6 @@ import {
   generateRuntimeScriptApi,
   getObfuscationStepsApi
 } from '@/services/api/shell-generator.js'
-import {
-  ARTIFACT_CATEGORY,
-  archiveTextArtifact,
-  sanitizeArtifactName
-} from '@/utils/artifactArchive.js'
 import ScriptGeneratorConfigPanel from './ScriptGeneratorConfigPanel.vue'
 import ScriptGeneratorPreviewPanel from './ScriptGeneratorPreviewPanel.vue'
 import { isScriptGeneratorFormValid } from './scriptGeneratorValidation.js'
@@ -145,7 +138,6 @@ const monacoEditor = ref(null)
 const monacoContainer = ref(null)
 /** 上次成功生成时的 form 快照，用于检测配置是否已变更 */
 const lastGeneratedForm = ref(null)
-const isSavingArtifact = ref(false)
 
 /** 生成结果是否已过期（生成后有字段被修改） */
 const isResultStale = computed(() => {
@@ -737,54 +729,6 @@ const copyConfigSummary = async () => {
   }
 
   await writeTextToClipboard(configSummaryText.value, '配置摘要已复制')
-}
-
-const resolveArtifactExtension = () => {
-  if (isPhpRuntime.value) return webMetadata.value?.fileExtension || 'php'
-  if (form.generateType === 'memoryshell') {
-    return isJspGroupPacker(form.packerType) ? 'jsp' : 'txt'
-  }
-  const extension = sanitizeArtifactName(webMetadata.value?.type || form.shellType, 'txt')
-  return ['jsp', 'jspx', 'php', 'aspx', 'ashx'].includes(extension) ? extension : 'txt'
-}
-
-const buildArtifactName = () => {
-  if (isPhpRuntime.value) return `http-php-${form.phpOutputMode || 'compact'}-webshell`
-  if (form.generateType === 'memoryshell') {
-    const server = sanitizeArtifactName(form.serverType, 'server')
-    const shell = sanitizeArtifactName(form.shellType, 'shell')
-    return `memory-${server}-${shell}`
-  }
-  const protocol = sanitizeArtifactName(form.protocol, 'http')
-  const shell = sanitizeArtifactName(form.shellType, 'webshell')
-  return `${protocol}-${shell}`
-}
-
-const saveArtifact = async () => {
-  if (!outputResult.value) {
-    showWarning('请先生成脚本')
-    return
-  }
-  if (isResultStale.value) {
-    showWarning('配置已变更，请重新生成后再保存成果')
-    return
-  }
-
-  isSavingArtifact.value = true
-  try {
-    const artifact = await archiveTextArtifact({
-      category: ARTIFACT_CATEGORY.SCRIPT_BUILDS,
-      name: buildArtifactName(),
-      extension: resolveArtifactExtension(),
-      content: outputResult.value,
-      metadata: { sourceModule: 'script-generator', title: buildArtifactName() }
-    })
-    showSuccess(`成果已保存至 ${artifact.path}`)
-  } catch (error) {
-    showError(`保存成果失败: ${error?.message || '未知错误'}`)
-  } finally {
-    isSavingArtifact.value = false
-  }
 }
 
 const handleKeydown = (e) => {

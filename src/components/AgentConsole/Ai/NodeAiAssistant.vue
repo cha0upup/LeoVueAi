@@ -15,23 +15,6 @@
       </div>
       <div class="assistant-actions">
         <el-tooltip
-          content="归档完整对话报告"
-          placement="bottom"
-          :show-after="400"
-        >
-          <button
-            type="button"
-            class="header-action"
-            aria-label="归档完整对话报告"
-            :disabled="!canArchiveReport || archivingReport"
-            @click="archiveCurrentReport"
-          >
-            <el-icon :class="{ 'u-spin': archivingReport }">
-              <Icon :icon="icons.save" />
-            </el-icon>
-          </button>
-        </el-tooltip>
-        <el-tooltip
           content="新建对话"
           placement="bottom"
           :show-after="400"
@@ -170,7 +153,6 @@ import { getReconSummaryApi, generateReconSummaryDigestApi } from '@/services/ap
 
 import { useAiChat } from '@/composables/ai/useAiChat.js'
 import { useAiHistory } from '@/composables/ai/useAiHistory.js'
-import { useAiReportArchive } from '@/composables/ai/useAiReportArchive.js'
 import { useAiThreads } from '@/composables/ai/useAiThreads.js'
 import { useAiChannelSelector } from '@/composables/ai/useAiChannelSelector.js'
 import { useAppEvent, emitAppEvent } from '@/composables/useAppEvent.js'
@@ -243,7 +225,6 @@ const requestGuard = createLatestRequestGuard(['history', 'recon', 'config', 'in
 const { selectedConfigId, configs, fetchConfigs, reasoningEffort } = useAiChannelSelector()
 const attachments = ref([])
 const composerRef = ref(null)
-const selectedConfigModel = computed(() => configs.value.find(c => c.id === selectedConfigId.value)?.model || '')
 const requestedModelSwitchId = ref(null)
 const revertingConfigSelection = ref(false)
 const syncingConfigSelection = ref(false)
@@ -345,7 +326,7 @@ const {
   errorLabel: 'AI 对话请求失败'
 })
 
-const { recordPage, hasOlderMessages, loadingOlder, loadOlderMessages, loadCompleteHistory, forgetHistory } = useAiHistory({
+const { recordPage, hasOlderMessages, loadingOlder, loadOlderMessages, forgetHistory } = useAiHistory({
   getConversationKey: () => activeThreadId.value,
   getScopeKey: () => props.sessionId,
   loadPage: ({ threadId, scopeKey, beforeSequence, offset, limit }) =>
@@ -382,20 +363,6 @@ const composerSending = computed(() =>
     ? false
     : activeThreadBusy.value
 )
-
-const { archivingReport, canArchiveReport, archiveCurrentReport } = useAiReportArchive({
-  sourceModule: 'node-ai',
-  messages,
-  isBusy: () => composerSending.value || historyLoading.value || loadingOlder.value,
-  getContext: () => ({
-    title: activeThread.value?.title,
-    threadId: activeThreadId.value,
-    sessionId: props.sessionId,
-    hostName: props.basicInfo?.OSInfo?.HostName || props.sessionId,
-    model: selectedConfigModel.value
-  }),
-  loadMessages: loadCompleteHistory
-})
 
 // ── Send history (Composer ↑ recall) ─────────────────────────────────────────
 const sentHistory = ref([])

@@ -14,23 +14,6 @@
         </div>
       </div>
       <div class="assistant-actions">
-        <el-tooltip
-          content="归档完整对话报告"
-          placement="bottom"
-          :show-after="400"
-        >
-          <button
-            type="button"
-            class="header-action is-icon"
-            aria-label="归档完整对话报告"
-            :disabled="!canArchiveReport || archivingReport"
-            @click="archiveCurrentReport"
-          >
-            <el-icon :class="{ 'u-spin': archivingReport }">
-              <Icon :icon="icons.save" />
-            </el-icon>
-          </button>
-        </el-tooltip>
         <button
           type="button"
           class="header-action is-primary"
@@ -183,7 +166,6 @@ import {
 } from '@/services/api/platform-ai.js'
 import { useAiChat } from '@/composables/ai/useAiChat.js'
 import { useAiHistory } from '@/composables/ai/useAiHistory.js'
-import { useAiReportArchive } from '@/composables/ai/useAiReportArchive.js'
 import { useAiChannelSelector } from '@/composables/ai/useAiChannelSelector.js'
 import { ACTIVE_AI_STATUSES, normalizeAiStatus, getThreadStatus, isDefaultThreadTitle, shouldRecoverAiConversation } from '@/utils/aiRuntime.js'
 import PlatformAiWelcome from './PlatformAiWelcome.vue'
@@ -212,7 +194,6 @@ let mounted = false
 const { selectedConfigId, configs, fetchConfigs, reasoningEffort } = useAiChannelSelector()
 const attachments = ref([])
 const composerRef = ref(null)
-const selectedConfigModel = computed(() => configs.value.find(c => c.id === selectedConfigId.value)?.model || '')
 const requestedModelSwitchId = ref(null)
 const revertingConfigSelection = ref(false)
 const passiveConfigId = ref(null)
@@ -311,7 +292,7 @@ const {
   errorLabel: '平台 AI 请求失败'
 })
 
-const { recordPage, hasOlderMessages, loadingOlder, loadOlderMessages, loadCompleteHistory, forgetHistory } = useAiHistory({
+const { recordPage, hasOlderMessages, loadingOlder, loadOlderMessages, forgetHistory } = useAiHistory({
   getConversationKey: () => activeThreadId.value,
   loadPage: ({ threadId, beforeSequence, offset, limit }) =>
     platformAiMessagesApi({ threadId, beforeSequence, offset, limit }),
@@ -339,18 +320,6 @@ const composerSending = computed(() => {
 const waitingForUserInput = computed(() => Boolean(
   conversationStatus.value?.[activeThreadId.value]?.pendingUserInput
 ))
-
-const { archivingReport, canArchiveReport, archiveCurrentReport } = useAiReportArchive({
-  sourceModule: 'platform-ai',
-  messages,
-  isBusy: () => composerSending.value || historyLoading.value || loadingOlder.value,
-  getContext: () => ({
-    title: activeThread.value?.title,
-    threadId: activeThreadId.value,
-    model: selectedConfigModel.value
-  }),
-  loadMessages: loadCompleteHistory
-})
 
 // ── Thread API ────────────────────────────────────────────────────────────────
 

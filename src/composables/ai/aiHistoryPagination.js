@@ -31,18 +31,3 @@ export function requireOlderCursor(page, previousCursor = null) {
   }
   return cursor
 }
-
-/** 以首屏的最新消息为边界读取完整历史；后续新增消息不会挤动旧页。 */
-export async function fetchCompleteAiHistory(loadPage) {
-  let beforeSequence = null
-  const records = []
-  while (true) {
-    const page = normalizeAiHistoryPage(await loadPage({
-      limit: 200,
-      ...(beforeSequence != null ? { beforeSequence } : { offset: 0 })
-    }))
-    records.push(...page.messages)
-    if (!page.hasMore) return mergeAiHistoryRecords(records)
-    beforeSequence = requireOlderCursor(page, beforeSequence)
-  }
-}

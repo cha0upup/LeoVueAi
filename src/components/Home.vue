@@ -109,7 +109,6 @@ const DisguiseManager = defineAsyncComponent(
 const AgentManager = defineAsyncComponent(
   () => import('@/components/AgentManager/AgentManager.vue')
 )
-const UserSpace = defineAsyncComponent(() => import('@/components/UserSpace/UserSpace.vue'))
 const SkillManager = defineAsyncComponent(
   () => import('@/components/SkillManager/SkillManager.vue')
 )
@@ -123,7 +122,6 @@ const initializedModules = reactive({ [DEFAULT_HOME_MENU_KEY]: true })
 
 const componentMap = {
   agent: AgentManager,
-  'user-space': UserSpace,
   'script-generator': ScriptGenerator,
   disguise: DisguiseManager,
   plugin: PluginManager,
