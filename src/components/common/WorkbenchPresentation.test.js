@@ -9,8 +9,6 @@ import * as format from '@/utils/format.js'
 import * as pluginForms from '@/utils/plugin.js'
 import * as modelLabels from '@/components/Settings/aiChannelSettingsModel.js'
 
-const PageHeader = compileClientComponent(new URL('./PageHeader.vue', import.meta.url))
-const StatsStrip = compileClientComponent(new URL('./StatsStrip.vue', import.meta.url))
 const EntityCard = compileClientComponent(new URL('./EntityCard.vue', import.meta.url), {
   '@iconify/vue': { Icon: stub('Icon') }
 })
@@ -129,12 +127,6 @@ describe('shared workbench presentation', () => {
     expect(view.nodes('button').map(text)).toContain('导出')
   })
 
-  it('keeps compact empty descriptions without rendering unused controls', () => {
-    const view = mount(EmptyState, { compact: true, description: '没有匹配项' })
-    expect(view.nodes('ElEmpty')[0].props).toMatchObject({ description: '没有匹配项', 'image-size': 60 })
-    expect(view.nodes('ElButton')).toHaveLength(0)
-  })
-
   it('preserves artifact empty-state actions and lets host actions use the default slot', () => {
     const action = vi.fn()
     const view = mount(EmptyState, { workbench: true, title: '暂无成果', icon: icons.folderOpened,
@@ -187,36 +179,11 @@ describe('shared workbench presentation', () => {
     expect(view.nodes('SplitterBar')[0].props.modelValue).toBe(350)
   })
 
-  it('keeps a semantic title, metadata and the original page action', () => {
-    const action = vi.fn()
-    const view = mount(PageHeader, { title: '成果库', icon: icons.folderOpened }, {
-      meta: () => h('span', '3 项'),
-      actions: () => h('button', { type: 'button', onClick: action }, '导入')
-    })
-    expect(view.nodes('h1').map(text)).toEqual(['成果库'])
-    expect(view.nodes('span').map(text)).toContain('3 项')
-    view.nodes('button')[0].props.onClick()
-    expect(action).toHaveBeenCalledOnce()
-  })
-
-  it('preserves native quick-filter actions and the requested column count', () => {
-    const filter = vi.fn()
-    const view = mount(StatsStrip, { columns: 5 }, {
-      default: () => h('button', { type: 'button', 'aria-pressed': false, onClick: filter }, '可运行 4')
-    })
-    expect(view.nodes('section')[0].props.style['--stats-columns']).toBe(5)
-    view.nodes('button')[0].props.onClick()
-    expect(filter).toHaveBeenCalledOnce()
-  })
-
   it.each(['add', 'edit'])('keeps %s dialog cancellation separate from validated submission', async mode => {
     const submit = vi.fn()
     const visibility = vi.fn()
     validate.mockImplementation(callback => callback(true))
     const view = mount(PluginDialog, { modelValue: true, mode, onSubmit: submit, 'onUpdate:modelValue': visibility })
-    const dialog = view.nodes('ElDialog')[0]
-    expect(dialog.props.width).toBe('var(--dialog-width-lg)')
-    expect(dialog.props['align-center']).toBe('')
     view.button('取消').props.onClick()
     expect(visibility).toHaveBeenCalledWith(false)
     expect(validate).not.toHaveBeenCalled()

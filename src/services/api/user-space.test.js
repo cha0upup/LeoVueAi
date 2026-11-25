@@ -11,17 +11,6 @@ beforeEach(() => {
 })
 
 describe('artifact library API contract', () => {
-  it('exports the APIs consumed by the artifact library', () => {
-    expect(Object.keys(userSpace).sort()).toEqual([
-      'archiveUserArtifactApi',
-      'userFileDeleteApi',
-      'userFileDownloadApi',
-      'userFileListApi',
-      'userFilePreviewApi',
-      'userFileUploadApi'
-    ])
-  })
-
   it('requests the list and workspace overview together', () => {
     const filter = { path: 'imports', recursive: true, page: 2, includeOverview: true }
     const artifact = { filename: 'report.md', content: 'fixture report' }

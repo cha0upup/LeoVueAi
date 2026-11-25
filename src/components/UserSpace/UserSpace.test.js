@@ -178,23 +178,6 @@ it('keeps newly refreshed counts when loading the first page after a shrink fail
   expect(workspace.summary()).toBe('1 份成果 · 10 B')
 })
 
-it('updates counts and opens the import category with one list request after an upload', async () => {
-  api.userFileUploadApi.mockResolvedValue({ data: {} })
-  api.userFileListApi.mockResolvedValueOnce(result(1, [original], 1, summary(1)))
-    .mockResolvedValueOnce(result(1, [replacement], 1, summary(2)))
-  const workspace = mount()
-  await flush()
-
-  await workspace.upload(new File(['fixture'], 'latest.txt'))
-  await flush()
-  expect(api.userFileListApi).toHaveBeenCalledTimes(2)
-  expect(api.userFileListApi).toHaveBeenLastCalledWith(
-    expect.objectContaining({ path: 'imports', page: 1, includeOverview: true }), expect.any(Object)
-  )
-  expect(workspace.rows()).toEqual([replacement])
-  expect(workspace.summary()).toContain('2 份成果')
-})
-
 it('imports selected files in order, confirms each collision, and refreshes only once after partial success', async () => {
   const first = deferred()
   const conflict = Object.assign(new Error('同名文件'), { code: 409 })
@@ -234,6 +217,8 @@ it('imports selected files in order, confirms each collision, and refreshes only
   expect(api.userFileListApi).toHaveBeenLastCalledWith(
     expect.objectContaining({ path: 'imports', page: 1, includeOverview: true }), expect.any(Object)
   )
+  expect(workspace.rows()).toEqual([replacement])
+  expect(workspace.summary()).toContain('2 份成果')
   expect(workspace.uploadProgress()).toBeUndefined()
   expect(workspace.uploadReport().title).toBe('导入完成：成功 2 · 跳过 1 · 失败 1')
   expect(workspace.uploadIssues()).toEqual(['kept.txt：已跳过同名文件', 'empty.txt：上传文件不能为空'])
