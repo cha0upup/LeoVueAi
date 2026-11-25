@@ -91,6 +91,11 @@ afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
 it('keeps drafts out of refresh and filter deletion, then submits only the confirmed filter snapshot', async () => {
   const view = await mount()
   expect(api.getAuditLogSummaryPageApi).toHaveBeenCalledOnce()
+  view.editKeyword('   ')
+  await nextTick()
+  expect(view.text()).not.toContain('筛选已编辑')
+  expect(view.button('删除筛选').disabled).toBe(true)
+
   view.editKeyword(' first ')
   await nextTick()
   expect(view.button('删除筛选').disabled).toBe(true)

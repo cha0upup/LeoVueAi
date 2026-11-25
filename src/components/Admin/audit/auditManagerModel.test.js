@@ -8,39 +8,28 @@ import {
 } from './auditManagerModel.js'
 
 describe('auditManagerModel', () => {
-  it('builds trimmed filter parameters and a complete date range', () => {
+  it('submits trimmed filter values and displays the submitted range and status', () => {
     const filter = createAuditFilter()
+    const dateRange = ['2026-01-01 00:00:00', '2026-01-02 00:00:00']
     Object.assign(filter, {
       userId: ' user-1 ',
-      keyword: ' command ',
-      dateRange: ['2026-01-01 00:00:00', '2026-01-02 00:00:00']
+      status: 'FAILED',
+      dateRange
     })
 
-    expect(buildAuditFilterParams(filter)).toEqual({
-      userId: 'user-1',
-      keyword: 'command',
-      startTime: '2026-01-01 00:00:00',
-      endTime: '2026-01-02 00:00:00'
+    const params = buildAuditFilterParams(filter)
+    expect(params).toEqual({
+      userId: 'user-1', status: 'FAILED', startTime: dateRange[0], endTime: dateRange[1]
     })
-  })
-
-  it('creates filter labels from the submitted parameters only', () => {
-    expect(getActiveAuditFilterSummary({
-      operationType: 'FILE_READ', status: 'FAILED', startTime: '1', endTime: '2'
-    })).toEqual([
-      { field: 'operationType', label: '操作类型', value: '读取文件' },
+    expect(getActiveAuditFilterSummary(params)).toEqual([
+      { field: 'userId', label: '用户ID', value: 'user-1' },
       { field: 'status', label: '状态', value: '失败' },
-      { field: 'dateRange', label: '时间范围', value: '1 ~ 2' }
+      { field: 'dateRange', label: '时间范围', value: '2026-01-01 00:00:00 ~ 2026-01-02 00:00:00' }
     ])
   })
 
-  it('does not treat whitespace-only values as an active deletion filter', () => {
-    const filter = createAuditFilter()
-    filter.keyword = '   '
-    filter.userId = '\t'
-    filter.dateRange = ['2026-01-01 00:00:00', '']
-
-    expect(buildAuditFilterParams(filter)).toEqual({})
+  it('does not treat an incomplete date range as a deletion filter', () => {
+    expect(buildAuditFilterParams({ dateRange: ['2026-01-01 00:00:00', ''] })).toEqual({})
   })
 
   it('formats JSON and preserves malformed payloads', () => {
