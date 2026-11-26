@@ -302,16 +302,18 @@
         </el-table-column>
       </el-table>
       <nav
-        v-if="lastPage > 1"
+        v-if="filteredUsers.length > PAGE_SIZES[0]"
         class="user-pagination"
         aria-label="用户列表分页"
       >
         <el-pagination
           v-model:current-page="currentPage"
-          :page-size="PAGE_SIZE"
+          :page-size="pageSize"
+          :page-sizes="PAGE_SIZES"
           :total="filteredUsers.length"
           :pager-count="5"
-          layout="prev, pager, next"
+          layout="sizes, prev, pager, next"
+          @update:page-size="changePageSize"
         />
       </nav>
     </AdminWorkspacePanel>
@@ -391,7 +393,7 @@ import {
   userStats
 } from './userManagerModel.js'
 
-const PAGE_SIZE = 25
+const PAGE_SIZES = [25, 50, 100]
 const statsCardConfigs = [
   { key: 'total', label: '用户总数' },
   { key: 'admin', label: '管理员' },
@@ -434,6 +436,7 @@ const teamNames = computed(() => buildDirectoryTeamNames(teams.value, userData.v
 const defaultFilters = { keyword: '', role: '', team: '', status: '' }
 const filters = reactive({ ...defaultFilters })
 const currentPage = ref(1)
+const pageSize = ref(PAGE_SIZES[0])
 const userTable = ref(null)
 
 // 表单
@@ -484,11 +487,17 @@ function clearFilters() {
   Object.assign(filters, defaultFilters)
 }
 
-const lastPage = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / PAGE_SIZE)))
-const pageUsers = computed(() => {
-  const offset = (currentPage.value - 1) * PAGE_SIZE
-  return filteredUsers.value.slice(offset, offset + PAGE_SIZE)
-})
+const lastPage = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / pageSize.value)))
+const pageOffset = computed(() => (currentPage.value - 1) * pageSize.value)
+const pageUsers = computed(() => filteredUsers.value.slice(pageOffset.value, pageOffset.value + pageSize.value))
+
+function changePageSize(size) {
+  if (!PAGE_SIZES.includes(size) || size === pageSize.value) return
+  const firstRow = pageOffset.value
+  pageSize.value = size
+  currentPage.value = Math.min(Math.floor(firstRow / size) + 1, lastPage.value)
+}
+
 watch(filters, () => { currentPage.value = 1 })
 watch(lastPage, (page) => { if (currentPage.value > page) currentPage.value = page })
 watch(pageUsers, () => userTable.value?.setScrollTop?.(0), { flush: 'post' })
@@ -827,6 +836,11 @@ onScopeDispose(() => {
   .toolbar-search,
   .toolbar-filter {
     width: 100%;
+  }
+
+  .user-pagination {
+    justify-content: flex-start;
+    overflow-x: auto;
   }
 
   :deep(.admin-toolbar__actions),

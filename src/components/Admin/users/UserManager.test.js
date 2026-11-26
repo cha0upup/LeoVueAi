@@ -251,7 +251,7 @@ it('shows user rows while teams are pending or unavailable, then resolves their 
 })
 
 it('combines directory filters for pagination and exports the complete confirmed snapshot', async () => {
-  const users = Array.from({ length: 30 }, (_, index) => ({
+  const users = Array.from({ length: 80 }, (_, index) => ({
     ...row,
     userId: `user-${index}`,
     userName: index < 28 ? `Example ${index}` : `Other ${index}`,
@@ -261,9 +261,20 @@ it('combines directory filters for pagination and exports the complete confirmed
   api.getAllUsersApi.mockResolvedValue({ data: users })
   const view = await mount()
   expect(view.rows()).toHaveLength(25)
-  view.pagination()['onUpdate:currentPage'](2)
+  view.pagination()['onUpdate:currentPage'](3)
   await flush()
-  expect(view.rows()).toEqual(users.slice(25))
+  expect(view.rows()).toEqual(users.slice(50, 75))
+
+  view.pagination()['onUpdate:pageSize'](50)
+  await flush()
+  expect(view.pagination()['current-page']).toBe(2)
+  expect(view.rows()).toEqual(users.slice(50))
+  view.pagination()['onUpdate:pageSize'](100)
+  await flush()
+  expect(view.rows()).toEqual(users)
+  view.pagination()['onUpdate:pageSize'](25)
+  await flush()
+  expect(view.rows()).toEqual(users.slice(0, 25))
 
   view.select('状态筛选', 1)
   await flush()
