@@ -357,7 +357,7 @@ describe('Agent dialog shared form integration', () => {
     expect(mocks.transferProject).not.toHaveBeenCalled()
   })
 
-  it('locks project validation and restores status without submitting or discarding the draft', async () => {
+  it('keeps the project draft separate from lifecycle changes and locks validation', async () => {
     const dialog = mountDialog(ProjectEditorDialog)
     dialog.vm.open({ projectId: 'p1', projectName: 'Original', status: 'archived' })
     await nextTick()
@@ -387,6 +387,14 @@ describe('Agent dialog shared form integration', () => {
     expect(dialog.nodes('ElInput')[0].props.modelValue).toBe('Updated draft')
     expect(dialog.node('ElDialog').props.modelValue).toBe(true)
     expect(dialog.saved).toHaveBeenCalledExactlyOnceWith(restored)
+
+    const edited = { ...restored, projectName: 'Updated draft', status: 'archived' }
+    mocks.updateProject.mockResolvedValueOnce({ data: edited })
+    await save()
+    expect(mocks.updateProject).toHaveBeenCalledExactlyOnceWith({
+      projectId: 'p1', projectName: 'Updated draft', projectCode: '', description: '', permission: 'private'
+    })
+    expect(dialog.saved).toHaveBeenLastCalledWith(edited)
   })
 
   it('keeps a delete confirmation bound to the project it was opened for', async () => {

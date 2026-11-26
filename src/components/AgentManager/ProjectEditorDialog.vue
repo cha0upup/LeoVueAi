@@ -356,8 +356,9 @@ const save = () => {
   const updating = editing.value
   return runAction(async (isCurrent) => {
     if (!formRef.value || !await formRef.value.validate().catch(() => false) || !isCurrent()) return
-    const payload = { ...form }
-    return updating ? updateProjectApi(payload) : addProjectApi(payload)
+    const { projectId, projectName, projectCode, description, permission } = form
+    const details = { projectName, projectCode, description, permission }
+    return updating ? updateProjectApi({ projectId, ...details }) : addProjectApi(details)
   }, {
     successMessage: updating ? '项目已更新' : '项目已创建',
     errorMessage: updating ? '更新项目失败' : '创建项目失败'
