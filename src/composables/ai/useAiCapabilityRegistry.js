@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, reactive, ref } from 'vue'
 
 import {
   createAiModelCapabilityApi,
@@ -6,10 +6,11 @@ import {
   listAiModelCapabilitiesApi,
   updateAiModelCapabilityApi
 } from '@/services/api/admin.js'
+import { handleError } from '@/utils/errorHandler.js'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import {
   buildCapabilityBody,
-  capabilityIdentityLabel,
   capabilityToForm,
   createCapabilityForm,
   normalizeCapabilityKey,
@@ -30,13 +31,21 @@ export function useAiCapabilityRegistry({ onChanged = async () => {} } = {}) {
   const capabilities = ref([])
   const capabilityDialogVisible = ref(false)
   const capabilityLoading = ref(false)
+  const capabilityLoadError = ref('')
   const capabilitySearchKeyword = ref('')
   const capabilityFormVisible = ref(false)
   const capabilityEditing = ref(null)
   const capabilityFormRef = ref(null)
   const capabilitySaveLoading = ref(false)
   const capabilityForm = reactive(createCapabilityForm())
-  let capabilityRead = 0
+  const reads = createLatestRequestGuard(['capabilities'])
+  let hasLoadedCapabilities = false
+  let disposed = false
+
+  if (getCurrentScope()) onScopeDispose(() => {
+    disposed = true
+    reads.invalidate()
+  })
 
   const filteredCapabilities = computed(() => {
     const query = capabilitySearchKeyword.value.trim().toLowerCase()
@@ -50,25 +59,37 @@ export function useAiCapabilityRegistry({ onChanged = async () => {} } = {}) {
     )
   })
 
-  const loadCapabilities = async () => {
-    const read = ++capabilityRead
-    capabilityLoading.value = true
-    try {
-      const data = (await listAiModelCapabilitiesApi()).data
-      if (read === capabilityRead) capabilities.value = Array.isArray(data) ? data : []
-      return capabilities.value
-    } catch (error) {
-      if (read === capabilityRead) showError(error?.message || '加载能力库失败')
-      return []
-    } finally {
-      if (read === capabilityRead) capabilityLoading.value = false
-    }
+  function readCapabilities() {
+    if (disposed) return
+    return reads.coalesce('capabilities', async (isCurrent) => {
+      capabilityLoading.value = true
+      try {
+        const { data } = await listAiModelCapabilitiesApi()
+        if (!isCurrent()) return
+        if (!Array.isArray(data)) throw new Error('能力库响应格式异常')
+        capabilities.value = data
+        hasLoadedCapabilities = true
+        capabilityLoadError.value = ''
+      } catch (error) {
+        if (isCurrent()) {
+          capabilityLoadError.value = handleError(error, {
+            defaultMessage: '加载能力库失败',
+            showMessage: !capabilityDialogVisible.value
+          })
+        }
+      } finally {
+        if (isCurrent()) capabilityLoading.value = false
+      }
+    })
+  }
+
+  function loadCapabilities() {
+    reads.invalidate()
+    return readCapabilities()
   }
 
   const ensureCapabilitiesLoaded = async () => {
-    if (capabilities.value.length === 0) {
-      await loadCapabilities()
-    }
+    if (!hasLoadedCapabilities) await readCapabilities()
     return capabilities.value
   }
 
@@ -140,9 +161,9 @@ export function useAiCapabilityRegistry({ onChanged = async () => {} } = {}) {
   }
 
   return {
-    capabilities,
     capabilityDialogVisible,
     capabilityLoading,
+    capabilityLoadError,
     capabilitySearchKeyword,
     capabilityFormVisible,
     capabilityEditing,
@@ -158,7 +179,6 @@ export function useAiCapabilityRegistry({ onChanged = async () => {} } = {}) {
     openCapabilityEdit,
     submitCapability,
     removeCapability,
-    findCapabilityByModelName,
-    capabilityIdentityLabel
+    findCapabilityByModelName
   }
 }

@@ -99,6 +99,7 @@
       v-model:search-keyword="capabilitySearchKeyword"
       :items="filteredCapabilities"
       :loading="capabilityLoading"
+      :load-error="capabilityLoadError"
       :editing="capabilityEditing"
       :form-state="capabilityForm"
       :rules="capabilityRules"
@@ -185,6 +186,7 @@ const rules = {
 const {
   capabilityDialogVisible,
   capabilityLoading,
+  capabilityLoadError,
   capabilitySearchKeyword,
   capabilityFormVisible,
   capabilityEditing,

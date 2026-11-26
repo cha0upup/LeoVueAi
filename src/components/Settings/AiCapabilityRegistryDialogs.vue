@@ -37,12 +37,20 @@
           刷新
         </el-button>
       </div>
+      <el-alert
+        v-if="loadError"
+        title="能力库读取失败，请刷新重试"
+        :description="loadError"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
       <el-table
         v-loading="loading"
         :data="items"
         class="capability-table"
         max-height="320"
-        empty-text="暂无能力记录"
+        :empty-text="emptyText"
       >
         <el-table-column
           label="模型"
@@ -237,7 +245,7 @@
 
 <script setup>
 import { Icon } from '@iconify/vue'
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 
 import { icons } from '@/utils/icons.js'
 import { capabilitySourceLabel, shortTokens } from './aiChannelSettingsModel.js'
@@ -249,6 +257,7 @@ const searchKeyword = defineModel('searchKeyword', { type: String, default: '' }
 const props = defineProps({
   items: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
+  loadError: { type: String, default: '' },
   editing: { type: Object, default: null },
   formState: { type: Object, required: true },
   rules: { type: Object, required: true },
@@ -256,6 +265,11 @@ const props = defineProps({
 })
 
 const form = reactive(props.formState)
+const emptyText = computed(() => {
+  if (props.loading) return '正在加载…'
+  if (props.loadError) return '请刷新后重试'
+  return searchKeyword.value.trim() ? '没有匹配的能力记录' : '暂无能力记录'
+})
 
 const emit = defineEmits([
   'load',
