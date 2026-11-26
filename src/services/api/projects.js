@@ -1,7 +1,7 @@
 import http from '../http.js'
 
-export function getProjectsApi() {
-  return http.get('/platform/projects')
+export function getProjectsApi({ signal } = {}) {
+  return http.get('/platform/projects', { signal })
 }
 
 export function addProjectApi(project) {

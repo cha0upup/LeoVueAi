@@ -115,9 +115,9 @@ describe('AgentManager batch workflow', () => {
     vi.stubGlobal('window', { setInterval: vi.fn().mockReturnValue(1), clearInterval: vi.fn() })
     fixture.project = {
       projects: ref([{ projectId: 'destination', status: 'active', contentEditable: true }]),
-      projectsLoading: ref(false), selectedProjectId: ref('all'), activeProject: ref(null),
+      projectsLoading: ref(false), projectsError: ref(''), selectedProjectId: ref('all'), activeProject: ref(null),
       activeProjectId: ref(''), isUnassignedProject: ref(false), isAllProjects: ref(true),
-      loadProjects: vi.fn().mockResolvedValue(),
+      loadProjects: vi.fn().mockResolvedValue(true),
       selectProject: vi.fn(id => { fixture.project.selectedProjectId.value = id; fixture.project.activeProjectId.value = id })
     }
     mocks.agents.mockResolvedValue({ data: rows })

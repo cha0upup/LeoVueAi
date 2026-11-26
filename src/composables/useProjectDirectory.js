@@ -1,7 +1,8 @@
-import { computed, ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref } from 'vue'
 
 import { getProjectsApi } from '@/services/api/projects.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
+import { handleError } from '@/utils/errorHandler.js'
 
 export const UNASSIGNED_PROJECT_ID = '__unassigned__'
 export const ALL_PROJECTS_ID = '__all__'
@@ -18,6 +19,8 @@ const normalizeProjectSummary = (item) => ({
 export function useProjectDirectory() {
   const projects = ref([])
   const projectsLoading = ref(false)
+  const projectsError = ref('')
+  let pendingRequest
   const selectedProjectId = ref(
     safeLocalStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY) || ALL_PROJECTS_ID
   )
@@ -31,32 +34,53 @@ export function useProjectDirectory() {
     isUnassignedProject.value || isAllProjects.value ? '' : selectedProjectId.value
   )
 
-  const loadProjects = async () => {
+  const selectProject = (projectId) => {
+    selectedProjectId.value = projectId || ALL_PROJECTS_ID
+    safeLocalStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, selectedProjectId.value)
+  }
+
+  // A failed current read can still use the existing workspace; a superseded read must do nothing.
+  const loadProjects = async ({ focusProjectId } = {}) => {
+    pendingRequest?.abort()
+    const request = new AbortController()
+    pendingRequest = request
+    const { signal } = request
+    const selectionAtStart = selectedProjectId.value
     projectsLoading.value = true
+    projectsError.value = ''
     try {
-      const response = await getProjectsApi()
-      projects.value = (response.data || []).map(normalizeProjectSummary)
-      if (
+      const { data } = await getProjectsApi({ signal })
+      if (signal.aborted) return false
+      if (!Array.isArray(data)) throw new Error('项目目录响应格式异常')
+      projects.value = data.map(normalizeProjectSummary)
+      if (focusProjectId && selectionAtStart === selectedProjectId.value
+        && projects.value.some((project) => project.projectId === focusProjectId)) {
+        selectProject(focusProjectId)
+      } else if (
         selectedProjectId.value !== UNASSIGNED_PROJECT_ID &&
         selectedProjectId.value !== ALL_PROJECTS_ID &&
         !projects.value.some((project) => project.projectId === selectedProjectId.value)
       ) {
         selectedProjectId.value = ALL_PROJECTS_ID
       }
-      return projects.value
+    } catch (error) {
+      if (signal.aborted || error?.code === 'SESSION_CHANGED' || error?.response?.status === 401) return false
+      projectsError.value = handleError(error, { defaultMessage: '请稍后重试', showMessage: false })
     } finally {
-      projectsLoading.value = false
+      if (pendingRequest === request) {
+        pendingRequest = undefined
+        projectsLoading.value = false
+      }
     }
+    return true
   }
 
-  const selectProject = (projectId) => {
-    selectedProjectId.value = projectId || ALL_PROJECTS_ID
-    safeLocalStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, selectedProjectId.value)
-  }
+  if (getCurrentScope()) onScopeDispose(() => pendingRequest?.abort())
 
   return {
     projects,
     projectsLoading,
+    projectsError,
     selectedProjectId,
     activeProject,
     activeProjectId,

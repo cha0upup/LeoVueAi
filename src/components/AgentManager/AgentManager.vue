@@ -55,6 +55,22 @@
       />
 
       <div
+        v-if="projectsError"
+        class="project-context-notice"
+        role="status"
+      >
+        <el-icon><Icon :icon="iconMap.warning" /></el-icon>
+        <span>项目目录加载失败：{{ projectsError }}</span>
+        <button
+          type="button"
+          :disabled="loading || sessionsLoading || batchBusy || projectsLoading"
+          @click="refresh()"
+        >
+          重试
+        </button>
+      </div>
+
+      <div
         v-if="activeProject?.status === 'archived'"
         class="project-context-notice"
       >
@@ -106,7 +122,7 @@
             class="u-icon-btn"
             type="button"
             aria-label="刷新主机列表"
-            :disabled="loading || sessionsLoading || batchBusy"
+            :disabled="loading || sessionsLoading || batchBusy || projectsLoading"
             @click="refresh"
           >
             <el-icon :class="{ 'u-spin': loading || sessionsLoading }">
@@ -353,6 +369,7 @@ const CONN_RESULTS_KEY = 'agent_conn_results'
 const {
   projects,
   projectsLoading,
+  projectsError,
   selectedProjectId,
   activeProject,
   activeProjectId,
@@ -1022,13 +1039,7 @@ const handleProjectChange = (projectId) => {
   refresh({ reloadProjects: false })
 }
 
-const handleProjectSaved = async (project) => {
-  await loadProjects()
-  if (project?.projectId) {
-    selectProject(project.projectId)
-  }
-  await refresh({ reloadProjects: false })
-}
+const handleProjectSaved = (project) => refresh({ focusProjectId: project?.projectId })
 
 const openProjectAssignment = () => {
   if (selectionDisabled.value || !selectedCount.value || !assignableProjects.value.length) return
@@ -1037,8 +1048,7 @@ const openProjectAssignment = () => {
 
 const refreshAfterProjectMembershipChange = async () => {
   clearAgentSelection()
-  await loadProjects()
-  await refresh({ reloadProjects: false })
+  await refresh()
 }
 
 const detachFromCurrentProject = () => runBatchAction('detach', async () => {
@@ -1097,15 +1107,15 @@ const batchDeleteAgents = () => runBatchAction('delete', async () => {
   })
 })
 
-const refresh = async ({ reloadProjects = true } = {}) => {
+const refresh = async ({ reloadProjects = true, focusProjectId } = {}) => {
+  if (reloadProjects && !await loadProjects({ focusProjectId })) return
   membershipContextToken += 1
   loadedAgentsById.clear()
   tableKey.value += 1
   agentTable.value?.clearSelection()
   clearAgentSelection()
   visibleAgents.value = []
-  if (reloadProjects) await loadProjects()
-  await Promise.all([getAgents(), getLiveSessions()])
+  await Promise.allSettled([getAgents(), getLiveSessions()])
 }
 
 onMounted(() => {

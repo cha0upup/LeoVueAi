@@ -259,15 +259,18 @@ const hasResults = computed(
     projectGroups.value.some((group) => group.projects.length > 0)
 )
 const currentTitle = computed(() => {
-  if (props.activeProject) return props.activeProject.projectName
-  return props.modelValue === ALL_PROJECTS_ID ? '全部资产' : '待整理主机'
+  if (props.activeProject) return props.activeProject.projectName || '未命名项目'
+  if (props.modelValue === ALL_PROJECTS_ID) return '全部资产'
+  if (props.modelValue === UNASSIGNED_PROJECT_ID) return '待整理主机'
+  return '项目工作区'
 })
 const currentSubtitle = computed(() =>
   props.activeProject?.projectCode || props.activeProject?.description || ''
 )
 const currentIcon = computed(() => {
-  if (props.activeProject) return iconMap.folderOpened
-  return props.modelValue === ALL_PROJECTS_ID ? iconMap.server : iconMap.inbox
+  if (props.modelValue === ALL_PROJECTS_ID) return iconMap.server
+  if (props.modelValue === UNASSIGNED_PROJECT_ID) return iconMap.inbox
+  return iconMap.folderOpened
 })
 
 const choose = (projectId) => {
