@@ -5,7 +5,9 @@
     align-center
     draggable
     class="project-editor-dialog workbench-dialog"
-    @closed="reset"
+    :show-close="!saving"
+    :close-on-click-modal="!saving"
+    :close-on-press-escape="!saving"
   >
     <template #header="{ titleId }">
       <div class="project-dialog-title">
@@ -36,6 +38,7 @@
       ref="formRef"
       :model="form"
       :rules="rules"
+      :disabled="saving"
       label-position="top"
     >
       <div class="project-form-grid">
@@ -68,6 +71,7 @@
             type="button"
             class="permission-card"
             :class="{ selected: form.permission === option.value }"
+            :disabled="saving"
             @click="form.permission = option.value"
           >
             <span class="permission-card__icon"><el-icon><Icon :icon="option.icon" /></el-icon></span>
@@ -115,7 +119,7 @@
             placeholder="选择接任账号"
             no-data-text="暂无可接任的已启用账号"
             :loading="ownerTransfer.loading"
-            :disabled="ownerTransfer.loading || ownerTransfer.busy || Boolean(ownerTransfer.error) || saving"
+            :disabled="ownerTransfer.loading || Boolean(ownerTransfer.error) || saving"
           >
             <el-option
               v-for="account in ownerTransfer.accounts"
@@ -128,6 +132,7 @@
             v-if="ownerTransfer.error"
             type="primary"
             plain
+            :disabled="saving"
             @click="loadOwnerOptions"
           >
             重新加载
@@ -135,14 +140,14 @@
           <el-button
             v-else
             type="primary"
-            :disabled="!ownerTransfer.newOwnerUserId || ownerTransfer.busy || saving"
+            :disabled="!ownerTransfer.newOwnerUserId || saving"
             @click="confirmOwnerTransfer"
           >
             提交交接
           </el-button>
           <el-button
             text
-            :disabled="ownerTransfer.busy"
+            :disabled="saving"
             @click="closeOwnerTransfer"
           >
             取消交接
@@ -157,7 +162,7 @@
           v-if="editing"
           type="button"
           class="project-lifecycle-action delete"
-          :disabled="saving || ownerTransfer?.busy"
+          :disabled="saving"
           @click="remove"
         >
           <el-icon><Icon icon="mdi:trash-can-outline" /></el-icon>删除项目
@@ -166,7 +171,7 @@
           v-if="editing && form.status !== 'archived'"
           type="button"
           class="project-lifecycle-action archive"
-          :disabled="saving || ownerTransfer?.busy"
+          :disabled="saving"
           @click="archive"
         >
           <el-icon><Icon icon="mdi:archive-arrow-down-outline" /></el-icon>归档
@@ -175,19 +180,22 @@
           v-if="editing && form.status === 'archived'"
           type="button"
           class="project-lifecycle-action restore"
-          :disabled="saving || ownerTransfer?.busy"
+          :disabled="saving"
           @click="restore"
         >
           <el-icon><Icon icon="mdi:archive-arrow-up-outline" /></el-icon>恢复项目
         </button>
         <span class="project-dialog-actions__spacer" />
-        <el-button @click="visible = false">
+        <el-button
+          :disabled="saving"
+          @click="visible = false"
+        >
           取消
         </el-button>
         <el-button
           type="primary"
           :loading="saving"
-          :disabled="ownerTransfer?.busy"
+          :disabled="saving"
           @click="save"
         >
           保存
@@ -198,7 +206,7 @@
 </template>
 
 <script setup>
-import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
+import { computed, onScopeDispose, reactive, ref, shallowRef, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import {
@@ -209,10 +217,11 @@ import {
   updateProjectApi
 } from '@/services/api/projects.js'
 import { getEnabledUserOptionsApi } from '@/services/api/admin.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 import { useAuth } from '@/composables/useAuth.js'
-import { executeRequest } from '@/utils/apiUtils.js'
 import { confirmAction } from '@/utils/confirmUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
+import { showSuccess } from '@/utils/messageUtils.js'
 import { icons as iconMap } from '@/utils/icons.js'
 
 const emit = defineEmits(['saved'])
@@ -223,10 +232,12 @@ const permissionOptions = [
 ]
 const visible = ref(false)
 const editing = ref(false)
-const saving = ref(false)
+const activeAction = shallowRef(null)
+const saving = computed(() => activeAction.value !== null)
 const formRef = ref(null)
 const ownerTransfer = ref(null)
 let ownerOptionsRequest
+let disposed = false
 const createForm = () => ({
   projectId: '',
   projectName: '',
@@ -248,47 +259,61 @@ function closeOwnerTransfer() {
 }
 
 watch([visible, isAdmin], ([isOpen, admin]) => {
+  if (!isOpen) activeAction.value = null
   if (!isOpen || !admin) closeOwnerTransfer()
 }, { flush: 'sync' })
-onScopeDispose(closeOwnerTransfer)
-
-const reset = () => {
+onScopeDispose(() => {
+  disposed = true
+  activeAction.value = null
   closeOwnerTransfer()
-  Object.assign(form, createForm())
-  editing.value = false
-  formRef.value?.clearValidate?.()
-}
+})
 
 const open = (project = null) => {
-  reset()
-  if (project) {
-    editing.value = true
-    Object.assign(form, project)
-  }
+  activeAction.value = null
+  closeOwnerTransfer()
+  Object.assign(form, createForm(), project)
+  editing.value = Boolean(project)
+  formRef.value?.clearValidate?.()
   visible.value = true
 }
 
-const handleSaved = (response) => {
-  visible.value = false
-  if (response) emit('saved', response.data)
-  else emit('saved')
+const runAction = async (request, { successMessage, errorMessage, selectProject = true }) => {
+  if (!visible.value || saving.value) return
+  const action = {}
+  const generation = sessionGeneration.value
+  activeAction.value = action
+  const isCurrent = () => activeAction.value === action && isCurrentSession(generation)
+  try {
+    const response = await request(isCurrent)
+    if (!response || disposed || !isCurrentSession(generation)) return
+    if (!isCurrent()) {
+      // The write committed, but a different editor is now open. Refresh without switching projects.
+      emit('saved')
+      return
+    }
+    showSuccess(successMessage)
+    visible.value = false
+    if (selectProject) emit('saved', response.data)
+    else emit('saved')
+  } catch (error) {
+    if (isCurrent()) handleError(error, { defaultMessage: errorMessage })
+  } finally {
+    if (activeAction.value === action) activeAction.value = null
+  }
 }
-
-const submit = (request, successMessage, onSuccess = handleSaved) =>
-  executeRequest(request, { loadingRef: saving, successMessage, errorMessage: null, onSuccess })
 
 const isCurrentTransfer = (transfer) =>
   visible.value && canTransferOwner.value && ownerTransfer.value === transfer
 
 const openOwnerTransfer = () => {
   if (!visible.value || !canTransferOwner.value || ownerTransfer.value || saving.value) return
-  ownerTransfer.value = { accounts: [], newOwnerUserId: '', loading: false, busy: false, error: '' }
+  ownerTransfer.value = { accounts: [], newOwnerUserId: '', loading: false, error: '' }
   return loadOwnerOptions()
 }
 
 async function loadOwnerOptions() {
   const transfer = ownerTransfer.value
-  if (!transfer || !isCurrentTransfer(transfer) || transfer.loading || transfer.busy || saving.value) return
+  if (!transfer || !isCurrentTransfer(transfer) || transfer.loading || saving.value) return
   const request = new AbortController()
   ownerOptionsRequest = request
   transfer.loading = true
@@ -308,64 +333,63 @@ async function loadOwnerOptions() {
   }
 }
 
-const confirmOwnerTransfer = async () => {
+const confirmOwnerTransfer = () => {
   const transfer = ownerTransfer.value
-  if (!transfer || !isCurrentTransfer(transfer) || transfer.busy || saving.value) return
+  if (!transfer || !isCurrentTransfer(transfer)) return
   const recipient = transfer.accounts.find(account => account.userId === transfer.newOwnerUserId)
   if (!recipient) return
-  const projectId = form.projectId
-  transfer.busy = true
-  try {
+  const { projectId, projectName } = form
+  return runAction(async (isCurrent) => {
     const confirmed = await confirmAction({
       title: '交接项目负责人',
-      message: `将项目“${form.projectName}”交接给“${recipient.userName || recipient.userId}”？共享团队和归档状态保持原样，其他未保存的修改将丢弃。`,
+      message: `将项目“${projectName}”交接给“${recipient.userName || recipient.userId}”？共享团队和归档状态保持原样，其他未保存的修改将丢弃。`,
       confirmButtonText: '确认交接'
     })
-    if (!confirmed || !isCurrentTransfer(transfer)) return
-    await submit(() => transferProjectApi(projectId, recipient.userId), '项目负责人已交接', (response) => {
-      if (isCurrentTransfer(transfer)) handleSaved(response)
-      else emit('saved')
+    if (confirmed && isCurrent() && isCurrentTransfer(transfer)) return transferProjectApi(projectId, recipient.userId)
+  }, { successMessage: '项目负责人已交接', errorMessage: '项目交接失败，请重试' })
+}
+
+const save = () => {
+  const updating = editing.value
+  return runAction(async (isCurrent) => {
+    if (!formRef.value || !await formRef.value.validate().catch(() => false) || !isCurrent()) return
+    const payload = { ...form }
+    return updating ? updateProjectApi(payload) : addProjectApi(payload)
+  }, {
+    successMessage: updating ? '项目已更新' : '项目已创建',
+    errorMessage: updating ? '更新项目失败' : '创建项目失败'
+  })
+}
+
+const archive = () => {
+  const { projectId, projectName } = form
+  return runAction(async (isCurrent) => {
+    const confirmed = await confirmAction({
+      title: '归档项目',
+      message: `归档“${projectName}”后将保留项目数据，但项目会停止接收新主机和新会话。`,
+      confirmButtonText: '确认归档'
     })
-  } catch (error) {
-    if (isCurrentTransfer(transfer)) handleError(error, { defaultMessage: '项目交接失败，请重试' })
-  } finally {
-    transfer.busy = false
-  }
+    if (confirmed && isCurrent()) return archiveProjectApi(projectId)
+  }, { successMessage: '项目已归档', errorMessage: '归档项目失败' })
 }
 
-const save = async () => {
-  await formRef.value?.validate?.()
-  await submit(
-    () => editing.value ? updateProjectApi(form) : addProjectApi(form),
-    editing.value ? '项目已更新' : '项目已创建'
-  )
+const remove = () => {
+  const { projectId, projectName } = form
+  return runAction(async (isCurrent) => {
+    const confirmed = await confirmAction({
+      title: '删除项目',
+      message: `删除项目“${projectName}”后，主机资产和会话仍会保留，但项目归属将被解除。此操作不可恢复。`,
+      confirmButtonText: '确认删除',
+      type: 'error'
+    })
+    if (confirmed && isCurrent()) return deleteProjectApi(projectId)
+  }, { successMessage: '项目已删除', errorMessage: '删除项目失败', selectProject: false })
 }
 
-const archive = async () => {
-  const confirmed = await confirmAction({
-    title: '归档项目',
-    message: '归档后保留项目数据，但项目会停止接收新主机和新会话。',
-    confirmButtonText: '确认归档'
-  })
-  if (confirmed) await submit(() => archiveProjectApi(form.projectId), '项目已归档')
-}
-
-const remove = async () => {
-  const confirmed = await confirmAction({
-    title: '删除项目',
-    message: `删除项目“${form.projectName}”后，主机资产和会话仍会保留，但项目归属将被解除。此操作不可恢复。`,
-    confirmButtonText: '确认删除',
-    type: 'error'
-  })
-  if (confirmed) await submit(() => deleteProjectApi(form.projectId), '项目已删除', () => handleSaved())
-}
-
-const restore = async () => {
-  await submit(() => {
-    form.status = 'active'
-    return updateProjectApi(form)
-  }, '项目已恢复')
-}
+const restore = () => runAction(() => updateProjectApi({ ...form, status: 'active' }), {
+  successMessage: '项目已恢复',
+  errorMessage: '恢复项目失败'
+})
 
 defineExpose({ open })
 </script>

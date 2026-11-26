@@ -9,6 +9,7 @@ import { useDialog } from '@/utils/dialogUtils.js'
 import { createDefaultAgent } from '@/utils/constants.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 import { useAgentForm } from '@/composables/agent/useAgentForm.js'
 import { useAgentImportBatch } from '@/composables/agent/useAgentImportBatch.js'
 import { MAX_AGENT_TRANSFER_BYTES, buildAgentTransferBundle, parseAgentTransferPayload } from '@/utils/agentTransfer.js'
@@ -17,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   add: vi.fn(), update: vi.fn(), validate: vi.fn(),
   resetFields: vi.fn(), clearValidate: vi.fn(), scrollToTop: vi.fn(),
   export: vi.fn(), encode: vi.fn(), decode: vi.fn(), copy: vi.fn(), download: vi.fn(),
-  listAccounts: vi.fn(), transferProject: vi.fn(), updateProject: vi.fn(), confirm: vi.fn(),
+  listAccounts: vi.fn(), transferProject: vi.fn(), updateProject: vi.fn(), deleteProject: vi.fn(), confirm: vi.fn(),
   attachProjectHosts: vi.fn(),
   showError: vi.fn(), showSuccess: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn()
 }))
@@ -50,6 +51,12 @@ const ParentHostSummary = defineComponent({
     return () => h('ParentHostSummary', attrs)
   }
 })
+const ProjectForm = defineComponent({
+  setup(_props, { attrs, slots, expose }) {
+    expose({ validate: mocks.validate, clearValidate: mocks.clearValidate })
+    return () => h('ElForm', attrs, slots.default?.())
+  }
+})
 const projectAdmin = ref(false)
 const modules = {
   '@iconify/vue': { Icon: { render: () => null } },
@@ -59,13 +66,14 @@ const modules = {
   '@/utils/constants.js': { createDefaultAgent },
   '@/utils/apiUtils.js': { executeRequest },
   '@/utils/errorHandler.js': { handleError },
+  '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration },
   '@/utils/confirmUtils.js': { confirmAction: mocks.confirm },
   '@/composables/useAuth.js': { useAuth: () => ({ isAdmin: projectAdmin }) },
   '@/composables/agent/useAgentForm.js': { useAgentForm },
   '@/services/api/agent-manage.js': { addAgentApi: mocks.add, updateAgentApi: mocks.update, exportAgentsApi: mocks.export },
   '@/services/api/admin.js': { getEnabledUserOptionsApi: mocks.listAccounts },
   '@/services/api/projects.js': {
-    addProjectApi: vi.fn(), archiveProjectApi: vi.fn(), deleteProjectApi: vi.fn(),
+    addProjectApi: vi.fn(), archiveProjectApi: vi.fn(), deleteProjectApi: mocks.deleteProject,
     transferProjectApi: mocks.transferProject, updateProjectApi: mocks.updateProject,
     attachProjectAgentsApi: mocks.attachProjectHosts
   },
@@ -103,7 +111,8 @@ describe('Agent dialog shared form integration', () => {
         return () => h('ElDialog', attrs, [slots.header?.({ titleId: 'fixture-title' }), slots.default?.(), slots.footer?.()])
       }
     }))
-    for (const name of ['ElButton', 'ElIcon', 'Icon', 'ElForm', 'ElFormItem',
+    app.component('ElForm', component === ProjectEditorDialog ? ProjectForm : createSlotStub('ElForm'))
+    for (const name of ['ElButton', 'ElIcon', 'Icon', 'ElFormItem',
       'ElInput', 'ElRow', 'ElCol', 'ElTooltip', 'ElTag', 'ElCheckbox', 'ElRadioGroup', 'ElRadioButton',
       'ElSelect', 'ElOption', 'ElAlert']) {
       app.component(name, createSlotStub(name, ['header', 'default', 'footer']))
@@ -134,6 +143,8 @@ describe('Agent dialog shared form integration', () => {
     ] })
     mocks.confirm.mockReset().mockResolvedValue(true)
     mocks.transferProject.mockReset().mockResolvedValue({ data: { projectId: 'p1', ownerUserId: 'next' } })
+    mocks.updateProject.mockReset()
+    mocks.deleteProject.mockReset().mockResolvedValue({ data: {} })
     mocks.attachProjectHosts.mockReset().mockResolvedValue({ data: { changedCount: 2 } })
   })
   afterEach(() => {
@@ -342,6 +353,58 @@ describe('Agent dialog shared form integration', () => {
     confirmation.resolve(true)
     await oldTransfer
     expect(mocks.transferProject).not.toHaveBeenCalled()
+  })
+
+  it('locks project validation and preserves the archived draft when restoring fails', async () => {
+    const dialog = mountDialog(ProjectEditorDialog)
+    dialog.vm.open({ projectId: 'p1', projectName: 'Original', status: 'archived' })
+    await nextTick()
+    dialog.nodes('ElInput')[0].props['onUpdate:modelValue']('Updated draft')
+    const validation = deferred()
+    mocks.validate.mockReturnValueOnce(validation.promise)
+    const save = dialog.button('保存').props.onClick
+    const pending = save()
+    await save()
+    expect(mocks.validate).toHaveBeenCalledOnce()
+    validation.resolve(false)
+    await pending
+    expect(mocks.updateProject).not.toHaveBeenCalled()
+
+    mocks.updateProject.mockRejectedValueOnce(new Error('项目暂时无法恢复'))
+    await dialog.nodes('button').find(node => node.props.class?.includes('restore')).props.onClick()
+
+    expect(mocks.updateProject).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      projectId: 'p1', projectName: 'Updated draft', status: 'active'
+    }))
+    expect(dialog.node('ElForm').props.model.status).toBe('archived')
+    expect(dialog.nodes('ElInput')[0].props.modelValue).toBe('Updated draft')
+    expect(dialog.node('ElDialog').props.modelValue).toBe(true)
+    expect(mocks.showError).toHaveBeenCalledWith('项目暂时无法恢复')
+    expect(dialog.saved).not.toHaveBeenCalled()
+  })
+
+  it('keeps a delete confirmation bound to the project it was opened for', async () => {
+    const dialog = mountDialog(ProjectEditorDialog)
+    const deleteButton = () => dialog.nodes('button').find(node => node.props.class?.includes('delete'))
+    const first = deferred()
+    const second = deferred()
+    mocks.confirm.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    dialog.vm.open({ projectId: 'p1', projectName: 'First' })
+    await nextTick()
+    const previous = deleteButton().props.onClick()
+    dialog.vm.open({ projectId: 'p2', projectName: 'Second' })
+    await nextTick()
+    const current = deleteButton().props.onClick()
+    first.resolve(true)
+    await previous
+    await nextTick()
+    expect(deleteButton().props.disabled).toBe(true)
+    expect(mocks.deleteProject).not.toHaveBeenCalled()
+
+    second.resolve(true)
+    await current
+    expect(mocks.deleteProject).toHaveBeenCalledExactlyOnceWith('p2')
+    expect(dialog.saved).toHaveBeenCalledExactlyOnceWith()
   })
 
   it('assigns selected hosts to the chosen project using only their IDs', async () => {
