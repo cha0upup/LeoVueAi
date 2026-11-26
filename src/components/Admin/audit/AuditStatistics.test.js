@@ -122,7 +122,7 @@ it('ignores out-of-order trend responses and keeps zero days at zero height', as
   expect(view.nodes(node => node.props.class === 'trend-bar')).toHaveLength(0)
 })
 
-it('defaults the operation distribution to all history and changes only its own range', async () => {
+it('can follow the trend range without changing the default or independent distribution ranges', async () => {
   const view = await mount()
   expect(api.getAuditOperationStatisticsApi.mock.lastCall[0]).toBeUndefined()
   const picker = view.nodes(node => node.type === 'ElSelect' && node.props['aria-label'] === '操作分布时间范围')[0].props
@@ -131,9 +131,22 @@ it('defaults the operation distribution to all history and changes only its own 
   expect(api.getAuditOperationStatisticsApi.mock.lastCall[0]).toEqual({ days: 30 })
   expect(api.getAuditTrendStatisticsApi).toHaveBeenCalledOnce()
 
+  picker['onUpdate:modelValue']('trend')
+  await picker.onChange()
+  expect(api.getAuditOperationStatisticsApi.mock.lastCall[0]).toEqual({ days: 7 })
+  const trend = view.nodes(node => node.type === 'ElSelect' && node.props['aria-label'] === '操作趋势时间范围')[0].props
+  trend['onUpdate:modelValue']('90')
+  await trend.onChange()
+  expect(api.getAuditTrendStatisticsApi.mock.lastCall[0]).toEqual({ days: 90 })
+  expect(api.getAuditOperationStatisticsApi.mock.lastCall[0]).toEqual({ days: 90 })
+
   picker['onUpdate:modelValue']('all')
   await picker.onChange()
   expect(api.getAuditOperationStatisticsApi.mock.lastCall[0]).toBeUndefined()
+  const requests = api.getAuditOperationStatisticsApi.mock.calls.length
+  trend['onUpdate:modelValue']('30')
+  await trend.onChange()
+  expect(api.getAuditOperationStatisticsApi).toHaveBeenCalledTimes(requests)
 })
 
 it('shows current errors separately from empty data and cancels pending reads on exit', async () => {

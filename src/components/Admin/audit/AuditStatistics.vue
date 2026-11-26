@@ -88,6 +88,10 @@
                 value="all"
               />
               <el-option
+                label="与趋势同期"
+                value="trend"
+              />
+              <el-option
                 v-for="days in dayRanges"
                 :key="days"
                 :label="`最近${days}天`"
@@ -162,7 +166,7 @@
               v-model="trendTimeRange"
               size="small"
               aria-label="操作趋势时间范围"
-              @change="refreshTrendStats"
+              @change="changeTrendRange"
             >
               <el-option
                 v-for="days in dayRanges"
@@ -338,14 +342,17 @@ async function readStatsRows(request) {
 
 const dayRanges = ['7', '30', '90']
 const operationTimeRange = ref('all')
+const trendTimeRange = ref('7')
 const { result: operationRows, loading: operationStatsLoading, error: operationError,
   run: runOperationStats } = useStatsRequest(
   (days, signal) => readStatsRows(getAuditOperationStatisticsApi(days === null ? undefined : { days }, { signal })),
   '获取操作分布失败'
 )
-const refreshOperationStats = () => runOperationStats(
-  operationTimeRange.value === 'all' ? null : Number(operationTimeRange.value)
-)
+const refreshOperationStats = () => {
+  const range = operationTimeRange.value
+  if (range === 'all') return runOperationStats(null)
+  return runOperationStats(Number(range === 'trend' ? trendTimeRange.value : range))
+}
 
 const operationStats = computed(() => {
   const rows = (operationRows.value ?? []).map((row) => ({ ...row, count: Number(row.count) }))
@@ -354,7 +361,6 @@ const operationStats = computed(() => {
 })
 const getOperationColor = (operation) => `var(--el-color-${getOperationTagType(operation) || 'info'})`
 
-const trendTimeRange = ref('7')
 const { result: trendRows, loading: trendStatsLoading, error: trendError, run: runTrend } = useStatsRequest(
   (days, signal) => readStatsRows(getAuditTrendStatisticsApi({ days }, { signal })), '获取操作趋势失败'
 )
@@ -366,6 +372,10 @@ const averageDailyCount = computed(() =>
 const maxDailyCount = computed(() => trendStats.value.reduce((max, { count }) => Math.max(max, count), 0))
 const getTrendBarHeight = (count) => maxDailyCount.value > 0 ? Math.round(count * 100 / maxDailyCount.value) : 0
 const refreshTrendStats = () => runTrend(Number(trendTimeRange.value))
+const changeTrendRange = () => {
+  if (operationTimeRange.value !== 'trend') return refreshTrendStats()
+  return Promise.all([refreshTrendStats(), refreshOperationStats()])
+}
 
 onMounted(() => {
   refreshOperationStats()
