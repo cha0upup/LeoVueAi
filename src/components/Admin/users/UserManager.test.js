@@ -66,6 +66,7 @@ async function mount() {
   apps.push(app)
   await flush()
   const nodes = (predicate) => findNodes(renderer.root, predicate)
+  const selectField = label => nodes(node => node.type === 'ElSelect' && node.props['aria-label'] === label)[0]
   return {
     dialog: type => nodes(node => node.type === type)[0].props,
     button: label => nodes(node => node.type === 'ElButton' && text(node) === label)[0].props,
@@ -76,8 +77,8 @@ async function mount() {
     rows: () => nodes(node => node.type === 'ElTable')[0].props.data,
     pagination: () => nodes(node => node.type === 'ElPagination')[0].props,
     search: value => nodes(node => node.type === 'ElInput')[0].props['onUpdate:modelValue'](value),
-    select: (label, value) => nodes(node => node.type === 'ElSelect' && node.props['aria-label'] === label)[0]
-      .props['onUpdate:modelValue'](value),
+    select: (label, value) => selectField(label).props['onUpdate:modelValue'](value),
+    optionLabel: (label, value) => findNodes(selectField(label), node => node.type === 'ElOption' && node.props.value === value)[0]?.props.label,
     teamLabel: () => text(nodes(node => node.type === 'ElTag' && node.props.title === row.teamId)[0])
   }
 }
@@ -222,10 +223,18 @@ it('shows user rows while teams are pending or unavailable, then resolves their 
 
   expect(view.rows()).toEqual([row])
   expect(view.teamLabel()).toBe('team')
+  expect(view.optionLabel('团队筛选', row.teamId)).toBe('team')
+  view.select('团队筛选', row.teamId)
+  view.search(' TEAM ')
+  await flush()
+  expect(view.rows()).toEqual([row])
   expect(view.button('新增用户').disabled).toBe(true)
   pending.reject(new Error('暂时不可用'))
   await flush()
   expect(view.alert()).toBe('团队目录加载失败：暂时不可用')
+  expect(view.rows()).toEqual([row])
+  view.search('普通用户')
+  await flush()
   expect(view.rows()).toEqual([row])
   expect(view.button('重置密码').disabled).toBe(false)
   expect(view.button('编辑').disabled).toBe(true)
@@ -234,6 +243,10 @@ it('shows user rows while teams are pending or unavailable, then resolves their 
   await flush()
   expect(view.alert()).toBeUndefined()
   expect(view.teamLabel()).toBe('Example')
+  expect(view.optionLabel('团队筛选', row.teamId)).toBe('Example')
+  view.search('Example')
+  await flush()
+  expect(view.rows()).toEqual([row])
   expect(view.button('新增用户').disabled).toBe(false)
 })
 

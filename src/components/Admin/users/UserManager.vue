@@ -18,7 +18,8 @@
     <AdminToolbar>
       <el-input
         v-model="filters.keyword"
-        placeholder="搜索用户名、用户ID或角色"
+        placeholder="搜索用户名、用户 ID、角色或团队"
+        aria-label="搜索用户名、用户 ID、角色或团队"
         clearable
         class="toolbar-search"
       >
@@ -59,10 +60,10 @@
           :value="UNASSIGNED_TEAM"
         />
         <el-option
-          v-for="team in teams"
-          :key="team.teamId"
-          :label="team.teamName"
-          :value="String(team.teamId)"
+          v-for="[teamId, name] in teamNames"
+          :key="teamId"
+          :label="name"
+          :value="teamId"
         />
       </el-select>
 
@@ -220,13 +221,13 @@
         >
           <template #default="{ row }">
             <el-tag
-              v-if="row.teamId"
+              v-if="row.teamId != null && row.teamId !== ''"
               type="info"
               size="small"
               effect="plain"
               :title="row.teamId"
             >
-              {{ teamNames.get(row.teamId) || row.teamId }}
+              {{ teamNames.get(String(row.teamId).trim()) || row.teamId }}
             </el-tag>
             <span
               v-else
@@ -373,6 +374,7 @@ import UserEditorDialog from './UserEditorDialog.vue'
 import UserPasswordResetDialog from './UserPasswordResetDialog.vue'
 import {
   UNASSIGNED_TEAM,
+  buildDirectoryTeamNames,
   canEditUser as canEditUserForActor,
   canManageUser as canManageUserForActor,
   createPasswordResetForm,
@@ -428,7 +430,7 @@ const resetTarget = resetPasswordDialog.currentItem
 
 // 数据
 const teams = ref([])
-const teamNames = computed(() => new Map(teams.value.map(({ teamId, teamName }) => [teamId, teamName])))
+const teamNames = computed(() => buildDirectoryTeamNames(teams.value, userData.value))
 const defaultFilters = { keyword: '', role: '', team: '', status: '' }
 const filters = reactive({ ...defaultFilters })
 const currentPage = ref(1)
@@ -474,7 +476,7 @@ const resetRules = computed(() => ({
 }))
 
 // 计算属性
-const filteredUsers = computed(() => filterUsers(userData.value, filters))
+const filteredUsers = computed(() => filterUsers(userData.value, filters, teamNames.value))
 const hasFilters = computed(() => Boolean(filters.keyword?.trim() || filters.role || filters.team
   || filters.team === UNASSIGNED_TEAM || filters.status === 0 || filters.status === 1))
 

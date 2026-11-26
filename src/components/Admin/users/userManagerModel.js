@@ -38,24 +38,39 @@ export function isBuiltInAdmin(user) {
     .some((value) => normalizeIdentity(value) === BUILT_IN_ADMIN)
 }
 
-export function filterUsers(users, { keyword = '', role = '', team = '', status = '' } = {}) {
+export function buildDirectoryTeamNames(teams, users) {
+  const names = new Map()
+  for (const { teamId, teamName } of teams) {
+    const id = normalizeText(teamId)
+    if (id) names.set(id, normalizeText(teamName) || id)
+  }
+  for (const { teamId } of users ?? []) {
+    const id = normalizeText(teamId)
+    if (id && !names.has(id)) names.set(id, id)
+  }
+  return names
+}
+
+export function filterUsers(users, { keyword = '', role = '', team = '', status = '' } = {}, teamNames) {
   const list = Array.isArray(users) ? users : []
   const query = normalizeIdentity(keyword)
   const teamId = normalizeText(team)
   const filterStatus = status === 0 || status === 1
 
   return list.filter((user) => {
-    if (query && ![user.userName, user.userId, user.privilege].some(
-      (value) => normalizeIdentity(value).includes(query)
-    )) {
-      return false
-    }
-
     if (role && normalizeText(user.privilege) !== normalizeText(role)) return false
     if (filterStatus && normalizeUserStatus(user.status) !== status) return false
     const userTeam = normalizeText(user.teamId)
-    if (team === UNASSIGNED_TEAM) return !userTeam
-    return !teamId || userTeam === teamId
+    if (team === UNASSIGNED_TEAM) {
+      if (userTeam) return false
+    } else if (teamId && userTeam !== teamId) {
+      return false
+    }
+    if (!query) return true
+
+    const teamName = userTeam ? teamNames?.get(userTeam) : '未分配团队'
+    return [user.userName, user.userId, user.privilege, getRoleDisplayName(user.privilege), userTeam, teamName]
+      .some((value) => normalizeIdentity(value).includes(query))
   })
 }
 
