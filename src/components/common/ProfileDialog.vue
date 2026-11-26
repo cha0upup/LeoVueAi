@@ -91,6 +91,31 @@
           读取最新资料
         </el-button>
       </div>
+      <div v-if="concurrentEdits.length">
+        <el-alert
+          title="以下字段也有更新"
+          description="表单保留了你的草稿。可以采用最新值，或核对后保存草稿。"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+        <ul class="profile-concurrent-edits">
+          <li
+            v-for="{ field, value } in concurrentEdits"
+            :key="field"
+          >
+            <span>{{ FIELD_LABELS[field] }}的最新值：{{ value || '未填写' }}</span>
+            <el-button
+              text
+              size="small"
+              :disabled="saving || loading"
+              @click="useLatestValue(field, value)"
+            >
+              采用最新{{ FIELD_LABELS[field] }}
+            </el-button>
+          </li>
+        </ul>
+      </div>
       <el-form
         ref="formRef"
         :model="form"
@@ -189,6 +214,7 @@ const ROLE_LABELS = {
   leader: '队长',
   normal: '普通用户'
 }
+const FIELD_LABELS = { email: '邮箱', phone: '手机号', remark: '备注' }
 
 const visible = ref(false)
 const loading = ref(false)
@@ -196,6 +222,7 @@ const saving = ref(false)
 const loadError = ref('')
 const saveError = ref('')
 const profileConflict = ref(false)
+const concurrentEdits = ref([])
 const formRef = ref(null)
 const profile = shallowRef(null)
 const editableFields = ({ email, phone, remark } = {}) => ({
@@ -237,14 +264,7 @@ async function loadProfile() {
   loadRequest = request
   const { signal } = request
   const previous = profile.value
-  const draftChanges = {}
-  if (previous) {
-    const original = editableFields(previous)
-    const draft = editableFields(form)
-    for (const field of Object.keys(original)) {
-      if (original[field] !== draft[field]) draftChanges[field] = draft[field]
-    }
-  }
+  const draft = editableFields(form)
   loading.value = true
   loadError.value = ''
   try {
@@ -252,8 +272,21 @@ async function loadProfile() {
     if (signal.aborted) return
     const loaded = requireProfile(data)
     if (previous && loaded.userId !== previous.userId) throw new Error('资料与当前账号不匹配，请重新打开')
-    Object.assign(form, editableFields(loaded), draftChanges)
+    const merged = editableFields(loaded)
+    const conflicts = []
+    if (previous) {
+      const original = editableFields(previous)
+      for (const field of Object.keys(original)) {
+        if (draft[field] === original[field]) continue
+        if (merged[field] !== original[field] && merged[field] !== draft[field]) {
+          conflicts.push({ field, value: merged[field] })
+        }
+        merged[field] = draft[field]
+      }
+    }
+    Object.assign(form, merged)
     profile.value = loaded
+    concurrentEdits.value = conflicts
     saveError.value = ''
     profileConflict.value = false
   } catch (error) {
@@ -270,6 +303,12 @@ const openProfileDialog = () => {
   if (visible.value || disposed) return
   visible.value = true
   return loadProfile()
+}
+
+const useLatestValue = (field, value) => {
+  if (saving.value || loading.value) return
+  form[field] = value
+  concurrentEdits.value = concurrentEdits.value.filter((entry) => entry.field !== field)
 }
 
 const submitProfile = async () => {
@@ -305,6 +344,7 @@ const resetDialog = () => {
   loadError.value = ''
   saveError.value = ''
   profileConflict.value = false
+  concurrentEdits.value = []
   Object.assign(form, editableFields())
 }
 
@@ -320,6 +360,8 @@ defineExpose({ openProfileDialog })
 <style scoped>
 .profile-shell { display: flex; flex-direction: column; gap: 20px; min-height: 360px; }
 .profile-feedback { display: flex; align-items: flex-start; justify-content: center; flex-direction: column; gap: 12px; min-height: 120px; color: var(--el-text-color-secondary); }
+.profile-concurrent-edits { padding-inline-start: 18px; overflow-wrap: anywhere; }
+.profile-concurrent-edits span { white-space: pre-wrap; }
 .profile-head { display: flex; align-items: center; gap: 16px; }
 .profile-avatar { color: var(--el-color-primary); background: color-mix(in srgb, var(--el-color-primary) 14%, var(--app-control-background)); }
 .profile-head__copy { flex: 1; min-width: 0; }

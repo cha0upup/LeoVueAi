@@ -48,6 +48,7 @@ function mount() {
     dialog: () => findNode(renderer.root, 'ElDialog').props,
     form: () => findNode(renderer.root, 'ProfileForm')?.props,
     error: () => findNode(renderer.root, 'ElAlert')?.props.title,
+    conflictText: () => text(findNode(renderer.root, 'ul')),
     button: (label) => findNodes(renderer.root, node => node.type === 'ElButton' && text(node) === label)[0].props
   }
 }
@@ -154,4 +155,28 @@ it('requires a fresh version after a conflict and keeps only the edited fields i
   expect(api.updateProfileApi).toHaveBeenLastCalledWith({
     email: latest.email, phone: '', remark: 'My draft', accountRevision: 1
   })
+})
+
+it('shows the latest value when both edits touched the same field and can adopt it without saving', async () => {
+  const view = mount()
+  await view.open()
+  await flush()
+  view.form().model.email = 'draft@example.test'
+  api.updateProfileApi.mockRejectedValueOnce({ response: { status: 409 } })
+  api.getProfileApi.mockResolvedValueOnce({
+    data: { ...initial, email: 'latest@example.test', accountRevision: 1 }
+  })
+  await flush()
+
+  await view.button('保存资料').onClick()
+  await view.button('读取最新资料').onClick()
+  expect(view.form().model.email).toBe('draft@example.test')
+  expect(view.conflictText()).toContain('邮箱的最新值：latest@example.test')
+
+  view.button('采用最新邮箱').onClick()
+  await flush()
+  expect(view.form().model.email).toBe('latest@example.test')
+  expect(view.error()).toBeUndefined()
+  expect(view.button('保存资料').disabled).toBe(true)
+  expect(api.updateProfileApi).toHaveBeenCalledOnce()
 })
