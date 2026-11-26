@@ -11,7 +11,9 @@ const api = { getProfileApi: vi.fn(), updateProfileApi: vi.fn() }
 const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showError: vi.fn() }))
 vi.mock('@/utils/messageUtils.js', () => messages)
 const validate = vi.fn()
-const initial = { userId: 'member', userName: 'Alice', email: 'alice@example.test', phone: '', remark: null, status: 1 }
+const initial = {
+  userId: 'member', userName: 'Alice', email: 'alice@example.test', phone: '', remark: null, status: 1, accountRevision: 0
+}
 const View = compileClientComponent(new URL('./ProfileDialog.vue', import.meta.url), {
   '@iconify/vue': { Icon: { render: () => null } },
   '@/services/api/auth.js': api,
@@ -100,7 +102,7 @@ it('skips unchanged values and retains a failed draft for retry without duplicat
 
   view.form().model.remark = '  draft  '
   await flush()
-  api.updateProfileApi.mockRejectedValueOnce({ response: { data: { code: 409, msg: '账号信息已变化' } } })
+  api.updateProfileApi.mockRejectedValueOnce(new Error('暂时保存失败'))
   const validation = deferred()
   validate.mockReturnValueOnce(validation.promise)
   const write = view.button('保存资料').onClick()
@@ -112,9 +114,9 @@ it('skips unchanged values and retains a failed draft for retry without duplicat
   validation.resolve(true)
   await write
   await flush()
-  const payload = { email: initial.email, phone: '', remark: 'draft' }
+  const payload = { email: initial.email, phone: '', remark: 'draft', accountRevision: 0 }
   expect(api.updateProfileApi).toHaveBeenCalledExactlyOnceWith(payload)
-  expect(view.error()).toBe('账号信息已变化')
+  expect(view.error()).toBe('暂时保存失败')
   expect(view.dialog().modelValue).toBe(true)
   expect(view.form().model.remark).toBe('draft')
   expect(messages.showSuccess).not.toHaveBeenCalled()
@@ -124,4 +126,32 @@ it('skips unchanged values and retains a failed draft for retry without duplicat
   expect(api.updateProfileApi.mock.calls).toEqual([[payload], [payload]])
   expect(messages.showSuccess).toHaveBeenCalledExactlyOnceWith('个人资料已更新')
   expect(view.dialog().modelValue).toBe(false)
+})
+
+it('requires a fresh version after a conflict and keeps only the edited fields in the draft', async () => {
+  const view = mount()
+  await view.open()
+  await flush()
+  view.form().model.remark = 'My draft'
+  api.updateProfileApi.mockRejectedValueOnce({
+    response: { status: 409, data: { code: 409, msg: '账号信息已变化' } }
+  })
+  const latest = { ...initial, email: 'latest@example.test', accountRevision: 1 }
+  api.getProfileApi.mockResolvedValueOnce({ data: latest })
+  await flush()
+
+  await view.button('保存资料').onClick()
+  expect(view.button('保存资料').disabled).toBe(true)
+  expect(view.form().model.remark).toBe('My draft')
+  expect(view.error()).toBe('账号信息已变化')
+
+  await view.button('读取最新资料').onClick()
+  expect(view.form().model).toMatchObject({ email: latest.email, remark: 'My draft' })
+  expect(view.error()).toBeUndefined()
+  expect(api.updateProfileApi).toHaveBeenCalledOnce()
+
+  await view.button('保存资料').onClick()
+  expect(api.updateProfileApi).toHaveBeenLastCalledWith({
+    email: latest.email, phone: '', remark: 'My draft', accountRevision: 1
+  })
 })

@@ -9,14 +9,14 @@
     :show-close="!saving"
   >
     <div
-      v-if="loading"
+      v-if="loading && !profile"
       class="profile-feedback"
       role="status"
     >
       正在读取个人资料…
     </div>
     <div
-      v-else-if="loadError"
+      v-else-if="loadError && !profile"
       class="profile-feedback"
     >
       <el-alert
@@ -75,17 +75,27 @@
       </div>
 
       <el-alert
-        v-if="saveError"
-        :title="saveError"
+        v-if="loadError || saveError"
+        :title="loadError || saveError"
         type="error"
         :closable="false"
         show-icon
       />
+      <div v-if="profileConflict">
+        <p>读取最新资料后会保留你改过的字段，请核对后再保存。</p>
+        <el-button
+          plain
+          :loading="loading"
+          @click="loadProfile"
+        >
+          读取最新资料
+        </el-button>
+      </div>
       <el-form
         ref="formRef"
         :model="form"
         :rules="rules"
-        :disabled="saving"
+        :disabled="saving || loading"
         label-position="top"
         class="profile-form"
       >
@@ -185,6 +195,7 @@ const loading = ref(false)
 const saving = ref(false)
 const loadError = ref('')
 const saveError = ref('')
+const profileConflict = ref(false)
 const formRef = ref(null)
 const profile = shallowRef(null)
 const editableFields = ({ email, phone, remark } = {}) => ({
@@ -195,7 +206,7 @@ const editableFields = ({ email, phone, remark } = {}) => ({
 const form = reactive(editableFields())
 const roleLabel = computed(() => ROLE_LABELS[profile.value?.privilege] || '当前用户')
 const canSave = computed(() => {
-  if (!visible.value || loading.value || saving.value || !profile.value) return false
+  if (!visible.value || loading.value || saving.value || profileConflict.value || !profile.value) return false
   const current = editableFields(profile.value)
   const draft = editableFields(form)
   return Object.keys(current).some(field => current[field] !== draft[field])
@@ -213,7 +224,8 @@ const rules = {
 }
 
 const requireProfile = (data) => {
-  if (typeof data?.userId !== 'string' || !data.userId) {
+  if (typeof data?.userId !== 'string' || !data.userId
+    || !Number.isSafeInteger(data.accountRevision) || data.accountRevision < 0) {
     throw new Error('个人信息接口返回异常')
   }
   return data
@@ -224,14 +236,26 @@ async function loadProfile() {
   const request = new AbortController()
   loadRequest = request
   const { signal } = request
+  const previous = profile.value
+  const draftChanges = {}
+  if (previous) {
+    const original = editableFields(previous)
+    const draft = editableFields(form)
+    for (const field of Object.keys(original)) {
+      if (original[field] !== draft[field]) draftChanges[field] = draft[field]
+    }
+  }
   loading.value = true
   loadError.value = ''
   try {
     const { data } = await getProfileApi({ signal })
     if (signal.aborted) return
     const loaded = requireProfile(data)
-    Object.assign(form, editableFields(loaded))
+    if (previous && loaded.userId !== previous.userId) throw new Error('资料与当前账号不匹配，请重新打开')
+    Object.assign(form, editableFields(loaded), draftChanges)
     profile.value = loaded
+    saveError.value = ''
+    profileConflict.value = false
   } catch (error) {
     if (!signal.aborted) loadError.value = handleError(error, { defaultMessage: '个人信息加载失败', showMessage: false })
   } finally {
@@ -250,20 +274,24 @@ const openProfileDialog = () => {
 
 const submitProfile = async () => {
   if (!canSave.value || disposed) return
-  const userId = profile.value.userId
+  const current = profile.value
+  const { userId, accountRevision } = current
   const payload = editableFields(form)
   saving.value = true
   saveError.value = ''
   Object.assign(form, payload)
   try {
-    if (!await validateForm(formRef, { errorMessage: '请检查表单输入' }) || disposed || !visible.value) return
-    const { data } = await updateProfileApi(payload)
-    if (disposed || !visible.value) return
+    if (!await validateForm(formRef, { errorMessage: '请检查表单输入' }) || disposed || profile.value !== current) return
+    const { data } = await updateProfileApi({ ...payload, accountRevision })
+    if (disposed || profile.value !== current) return
     if (requireProfile(data).userId !== userId) throw new Error('个人资料更新响应与当前账号不匹配')
     showSuccess('个人资料已更新')
     visible.value = false
   } catch (error) {
-    if (!disposed && visible.value) saveError.value = handleError(error, { defaultMessage: '个人资料更新失败', showMessage: false })
+    if (!disposed && profile.value === current) {
+      profileConflict.value = error?.response?.status === 409
+      saveError.value = handleError(error, { defaultMessage: '个人资料更新失败', showMessage: false })
+    }
   } finally {
     saving.value = false
   }
@@ -276,6 +304,7 @@ const resetDialog = () => {
   profile.value = null
   loadError.value = ''
   saveError.value = ''
+  profileConflict.value = false
   Object.assign(form, editableFields())
 }
 
