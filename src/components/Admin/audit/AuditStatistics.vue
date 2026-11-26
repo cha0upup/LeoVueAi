@@ -122,10 +122,11 @@
           />
           <div
             v-if="operationStats.length > 0"
+            id="audit-operation-distribution"
             class="operation-stats"
           >
             <div
-              v-for="stat in operationStats"
+              v-for="stat in visibleOperationStats"
               :key="stat.operation"
               class="operation-item"
             >
@@ -145,6 +146,16 @@
                 :stroke-width="8"
               />
             </div>
+            <el-button
+              v-if="remainingOperationTypes > 0"
+              class="operation-expand"
+              text
+              :aria-expanded="showAllOperations"
+              aria-controls="audit-operation-distribution"
+              @click="showAllOperations = !showAllOperations"
+            >
+              {{ showAllOperations ? `收起至前 ${visibleOperationLimit} 类` : `展开其余 ${remainingOperationTypes} 类` }}
+            </el-button>
           </div>
           <el-empty
             v-else-if="!operationStatsLoading && !operationError"
@@ -246,7 +257,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onScopeDispose, reactive, ref, shallowRef } from 'vue'
+import { computed, onMounted, onScopeDispose, reactive, ref, shallowRef, watch } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import AdminWorkspacePanel from '@/components/Admin/shared/AdminWorkspacePanel.vue'
 import { icons as iconMap } from '@/utils/icons.js'
@@ -341,24 +352,32 @@ async function readStatsRows(request) {
 }
 
 const dayRanges = ['7', '30', '90']
+const visibleOperationLimit = 8
 const operationTimeRange = ref('all')
 const trendTimeRange = ref('7')
+const showAllOperations = ref(false)
 const { result: operationRows, loading: operationStatsLoading, error: operationError,
   run: runOperationStats } = useStatsRequest(
   (days, signal) => readStatsRows(getAuditOperationStatisticsApi(days === null ? undefined : { days }, { signal })),
   '获取操作分布失败'
 )
-const refreshOperationStats = () => {
+const operationDays = computed(() => {
   const range = operationTimeRange.value
-  if (range === 'all') return runOperationStats(null)
-  return runOperationStats(Number(range === 'trend' ? trendTimeRange.value : range))
-}
+  if (range === 'all') return null
+  return Number(range === 'trend' ? trendTimeRange.value : range)
+})
+const refreshOperationStats = () => runOperationStats(operationDays.value)
+watch(operationDays, () => { showAllOperations.value = false })
 
 const operationStats = computed(() => {
   const rows = (operationRows.value ?? []).map((row) => ({ ...row, count: Number(row.count) }))
   const total = rows.reduce((sum, row) => sum + row.count, 0)
   return rows.map((row) => ({ ...row, percentage: total > 0 ? Math.round(row.count * 100 / total) : 0 }))
 })
+const visibleOperationStats = computed(() =>
+  showAllOperations.value ? operationStats.value : operationStats.value.slice(0, visibleOperationLimit)
+)
+const remainingOperationTypes = computed(() => Math.max(0, operationStats.value.length - visibleOperationLimit))
 const getOperationColor = (operation) => `var(--el-color-${getOperationTagType(operation) || 'info'})`
 
 const { result: trendRows, loading: trendStatsLoading, error: trendError, run: runTrend } = useStatsRequest(
@@ -512,6 +531,10 @@ onMounted(() => {
 
 .operation-count {
   color: var(--el-text-color-primary);
+}
+
+.operation-expand {
+  align-self: flex-start;
 }
 
 .trend-stats {

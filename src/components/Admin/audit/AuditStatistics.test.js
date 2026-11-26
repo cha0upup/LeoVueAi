@@ -149,6 +149,28 @@ it('can follow the trend range without changing the default or independent distr
   expect(api.getAuditOperationStatisticsApi).toHaveBeenCalledTimes(requests)
 })
 
+it('collapses long operation lists without changing the total used for percentages', async () => {
+  api.getAuditOperationStatisticsApi.mockResolvedValue({ data: Array.from({ length: 9 }, (_, index) => ({
+    operation: `TYPE_${index}`, operationName: `Type ${index + 1}`, count: index === 0 ? 8 : 1
+  })) })
+  const view = await mount()
+  const progress = () => view.nodes(node => node.type === 'ElProgress')
+  expect(progress()).toHaveLength(8)
+  expect(progress()[0].props.percentage).toBe(50)
+
+  view.button('展开其余 1 类').onClick()
+  await flush()
+  expect(progress()).toHaveLength(9)
+  expect(view.button('收起至前 8 类')['aria-expanded']).toBe(true)
+  expect(api.getAuditOperationStatisticsApi).toHaveBeenCalledOnce()
+
+  const picker = view.nodes(node => node.type === 'ElSelect' && node.props['aria-label'] === '操作分布时间范围')[0].props
+  picker['onUpdate:modelValue']('7')
+  await picker.onChange()
+  expect(progress()).toHaveLength(8)
+  expect(view.button('展开其余 1 类')['aria-expanded']).toBe(false)
+})
+
 it('shows current errors separately from empty data and cancels pending reads on exit', async () => {
   const pending = deferred()
   api.getAuditOperationStatisticsApi.mockReturnValueOnce(pending.promise)
