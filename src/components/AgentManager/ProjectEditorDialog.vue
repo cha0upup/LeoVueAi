@@ -31,6 +31,7 @@
         <small>
           {{ form.status === 'archived' ? '保留已有主机和会话记录，当前工作区按只读方式展示' : '可继续整理主机并创建项目会话' }}
         </small>
+        <small>归档和恢复只变更状态，其他修改请单独保存。</small>
       </div>
     </div>
 
@@ -213,6 +214,7 @@ import {
   addProjectApi,
   archiveProjectApi,
   deleteProjectApi,
+  restoreProjectApi,
   transferProjectApi,
   updateProjectApi
 } from '@/services/api/projects.js'
@@ -277,7 +279,7 @@ const open = (project = null) => {
   visible.value = true
 }
 
-const runAction = async (request, { successMessage, errorMessage, selectProject = true }) => {
+const runAction = async (request, { successMessage, errorMessage, selectProject = true, statusOnly = false }) => {
   if (!visible.value || saving.value) return
   const action = {}
   const generation = sessionGeneration.value
@@ -291,8 +293,9 @@ const runAction = async (request, { successMessage, errorMessage, selectProject 
       emit('saved')
       return
     }
+    if (statusOnly) form.status = response.data.status
+    else visible.value = false
     showSuccess(successMessage)
-    visible.value = false
     if (selectProject) emit('saved', response.data)
     else emit('saved')
   } catch (error) {
@@ -370,7 +373,7 @@ const archive = () => {
       confirmButtonText: '确认归档'
     })
     if (confirmed && isCurrent()) return archiveProjectApi(projectId)
-  }, { successMessage: '项目已归档', errorMessage: '归档项目失败' })
+  }, { successMessage: '项目已归档', errorMessage: '归档项目失败', statusOnly: true })
 }
 
 const remove = () => {
@@ -386,9 +389,10 @@ const remove = () => {
   }, { successMessage: '项目已删除', errorMessage: '删除项目失败', selectProject: false })
 }
 
-const restore = () => runAction(() => updateProjectApi({ ...form, status: 'active' }), {
+const restore = () => runAction(() => restoreProjectApi(form.projectId), {
   successMessage: '项目已恢复',
-  errorMessage: '恢复项目失败'
+  errorMessage: '恢复项目失败',
+  statusOnly: true
 })
 
 defineExpose({ open })

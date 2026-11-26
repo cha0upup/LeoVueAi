@@ -20,6 +20,10 @@ export function archiveProjectApi(projectId) {
   return http.post('/platform/projects/archive', { projectId })
 }
 
+export function restoreProjectApi(projectId) {
+  return http.post('/platform/projects/restore', { projectId })
+}
+
 export function deleteProjectApi(projectId) {
   return http.post('/platform/projects/delete', { projectId })
 }

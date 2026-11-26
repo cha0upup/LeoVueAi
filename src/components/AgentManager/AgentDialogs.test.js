@@ -18,7 +18,8 @@ const mocks = vi.hoisted(() => ({
   add: vi.fn(), update: vi.fn(), validate: vi.fn(),
   resetFields: vi.fn(), clearValidate: vi.fn(), scrollToTop: vi.fn(),
   export: vi.fn(), encode: vi.fn(), decode: vi.fn(), copy: vi.fn(), download: vi.fn(),
-  listAccounts: vi.fn(), transferProject: vi.fn(), updateProject: vi.fn(), deleteProject: vi.fn(), confirm: vi.fn(),
+  listAccounts: vi.fn(), transferProject: vi.fn(), updateProject: vi.fn(), deleteProject: vi.fn(),
+  restoreProject: vi.fn(), confirm: vi.fn(),
   attachProjectHosts: vi.fn(),
   showError: vi.fn(), showSuccess: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn()
 }))
@@ -74,7 +75,7 @@ const modules = {
   '@/services/api/admin.js': { getEnabledUserOptionsApi: mocks.listAccounts },
   '@/services/api/projects.js': {
     addProjectApi: vi.fn(), archiveProjectApi: vi.fn(), deleteProjectApi: mocks.deleteProject,
-    transferProjectApi: mocks.transferProject, updateProjectApi: mocks.updateProject,
+    transferProjectApi: mocks.transferProject, updateProjectApi: mocks.updateProject, restoreProjectApi: mocks.restoreProject,
     attachProjectAgentsApi: mocks.attachProjectHosts
   },
   '@element-plus/icons-vue': { Link: { render: () => null }, Monitor: { render: () => null } },
@@ -144,6 +145,7 @@ describe('Agent dialog shared form integration', () => {
     mocks.confirm.mockReset().mockResolvedValue(true)
     mocks.transferProject.mockReset().mockResolvedValue({ data: { projectId: 'p1', ownerUserId: 'next' } })
     mocks.updateProject.mockReset()
+    mocks.restoreProject.mockReset()
     mocks.deleteProject.mockReset().mockResolvedValue({ data: {} })
     mocks.attachProjectHosts.mockReset().mockResolvedValue({ data: { changedCount: 2 } })
   })
@@ -355,7 +357,7 @@ describe('Agent dialog shared form integration', () => {
     expect(mocks.transferProject).not.toHaveBeenCalled()
   })
 
-  it('locks project validation and preserves the archived draft when restoring fails', async () => {
+  it('locks project validation and restores status without submitting or discarding the draft', async () => {
     const dialog = mountDialog(ProjectEditorDialog)
     dialog.vm.open({ projectId: 'p1', projectName: 'Original', status: 'archived' })
     await nextTick()
@@ -370,17 +372,21 @@ describe('Agent dialog shared form integration', () => {
     await pending
     expect(mocks.updateProject).not.toHaveBeenCalled()
 
-    mocks.updateProject.mockRejectedValueOnce(new Error('项目暂时无法恢复'))
-    await dialog.nodes('button').find(node => node.props.class?.includes('restore')).props.onClick()
-
-    expect(mocks.updateProject).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-      projectId: 'p1', projectName: 'Updated draft', status: 'active'
-    }))
+    const restore = () => dialog.nodes('button').find(node => node.props.class?.includes('restore')).props.onClick()
+    const restored = { projectId: 'p1', projectName: 'Original', status: 'active' }
+    mocks.restoreProject.mockRejectedValueOnce(new Error('项目暂时无法恢复')).mockResolvedValueOnce({ data: restored })
+    await restore()
     expect(dialog.node('ElForm').props.model.status).toBe('archived')
-    expect(dialog.nodes('ElInput')[0].props.modelValue).toBe('Updated draft')
-    expect(dialog.node('ElDialog').props.modelValue).toBe(true)
     expect(mocks.showError).toHaveBeenCalledWith('项目暂时无法恢复')
     expect(dialog.saved).not.toHaveBeenCalled()
+
+    await restore()
+    expect(mocks.restoreProject.mock.calls).toEqual([['p1'], ['p1']])
+    expect(mocks.updateProject).not.toHaveBeenCalled()
+    expect(dialog.node('ElForm').props.model.status).toBe('active')
+    expect(dialog.nodes('ElInput')[0].props.modelValue).toBe('Updated draft')
+    expect(dialog.node('ElDialog').props.modelValue).toBe(true)
+    expect(dialog.saved).toHaveBeenCalledExactlyOnceWith(restored)
   })
 
   it('keeps a delete confirmation bound to the project it was opened for', async () => {
