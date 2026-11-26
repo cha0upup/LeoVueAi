@@ -19,7 +19,6 @@ export function createUserForm() {
 
 export function createPasswordResetForm() {
   return {
-    userId: '',
     newPassword: '',
     confirmPassword: ''
   }

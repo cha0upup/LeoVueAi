@@ -324,6 +324,7 @@
 
     <UserPasswordResetDialog
       v-model="resetPasswordVisible"
+      :target-user="resetTarget"
       :form-state="resetForm"
       :rules="resetRules"
       :password-max-length="passwordMaxLength"
@@ -343,7 +344,7 @@ import { formatDate as formatDateTime } from '@/utils/format.js'
 import { executeRequest, withLoading } from '@/utils/apiUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { confirmDelete, confirmAction } from '@/utils/confirmUtils.js'
-import { useEditDialog, useDialog } from '@/utils/dialogUtils.js'
+import { useEditDialog } from '@/utils/dialogUtils.js'
 import { createPasswordRules, createPasswordMatchValidator, validateForm } from '@/utils/formUtils.js'
 import {
   addUserApi,
@@ -412,8 +413,9 @@ let disposed = false
 const userDialog = useEditDialog()
 const userDialogVisible = userDialog.visible
 const isEdit = computed(() => !!userDialog.currentItem.value)
-const resetPasswordDialog = useDialog()
+const resetPasswordDialog = useEditDialog()
 const resetPasswordVisible = resetPasswordDialog.visible
+const resetTarget = resetPasswordDialog.currentItem
 
 // 数据
 const userData = ref([])
@@ -575,6 +577,7 @@ watch(userDialogVisible, (visible) => {
 
 watch(resetPasswordVisible, (visible) => {
   if (visible) return
+  resetPasswordDialog.close()
   Object.assign(resetForm, createPasswordResetForm())
   resetFormRef.value?.clearValidate?.()
 }, { flush: 'sync' })
@@ -614,16 +617,22 @@ const deleteUser = (user) => {
   }
 
   const { userId, userName } = user
+  const generation = sessionGeneration.value
+  const isActive = () => !disposed && isCurrentSession(generation)
   return withLoading(deleting, async () => {
     const confirmed = await confirmDelete({
       title: '删除确认',
       message: `确定要删除用户「${userName || '未知用户'}」吗？此操作不可撤销。`
     })
-    if (!confirmed || disposed) return
+    if (!confirmed || !isActive()) return
     await executeRequest(() => deleteUserApi({ id: userId }), {
       successMessage: '用户已删除',
       errorMessage: '删除用户失败',
-      onSuccess: () => { if (!disposed) return loadUsers() }
+      onSuccess: () => { if (isActive()) return loadUsers() },
+      onError: (error) => {
+        const status = error?.response?.status
+        if (isActive() && (status === 404 || status === 409)) return loadUsers()
+      }
     }).catch(() => false)
   })
 }
@@ -634,15 +643,17 @@ const resetPassword = (user) => {
     showWarning(getManageDisabledReason(user))
     return
   }
-  Object.assign(resetForm, createPasswordResetForm(), { userId: user.userId })
-  resetPasswordDialog.open()
+  resetPasswordDialog.open({ userId: user.userId, userName: user.userName })
 }
 
 const submitResetPassword = () => {
-  if (!resetPasswordVisible.value || actionsDisabled.value) return
+  const target = resetTarget.value
+  if (!resetPasswordVisible.value || !target?.userId || actionsDisabled.value) return
+  const generation = sessionGeneration.value
   return withLoading(resetting, async () => {
-    if (!await validateForm(resetFormRef) || disposed || !resetPasswordVisible.value) return
-    const { userId, newPassword } = resetForm
+    if (!await validateForm(resetFormRef) || disposed || !isCurrentSession(generation) || resetTarget.value !== target) return
+    const { userId } = target
+    const { newPassword } = resetForm
     await executeRequest(() => resetUserPasswordApi({ userId, newPassword }), {
       successMessage: '密码已重置',
       errorMessage: '重置密码失败',

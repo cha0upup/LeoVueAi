@@ -10,8 +10,10 @@
   >
     <div class="reset-content">
       <el-alert
-        title="密码重置"
-        description="确定要重置该用户的密码吗？重置后用户需要使用新密码登录。"
+        v-if="targetUser"
+        :title="`目标账号：${targetUser.userName || targetUser.userId}`"
+        :description="`用户 ID：${targetUser.userId}。该账号下次登录时需使用新密码，并按提示修改密码。`"
+        class="reset-account"
         type="warning"
         :closable="false"
         show-icon
@@ -75,6 +77,7 @@ const passwordFields = [
 ]
 
 const props = defineProps({
+  targetUser: { type: Object, default: null },
   formState: { type: Object, required: true },
   rules: { type: Object, required: true },
   passwordMaxLength: { type: Number, default: AUTH_FIELD_LIMITS.passwordMaxLength },
@@ -113,6 +116,10 @@ const setFormRef = (instance) => emit('form-ready', instance)
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.reset-password-dialog .reset-account {
+  overflow-wrap: anywhere;
 }
 
 .reset-password-dialog .reset-form {

@@ -18,6 +18,7 @@ const api = Object.fromEntries(['addUserApi', 'deleteUserApi', 'getAllUsersApi',
 const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showWarning: vi.fn(), showError: vi.fn() }))
 vi.mock('@/utils/messageUtils.js', () => messages)
 const confirmAction = vi.fn()
+const confirmDelete = vi.fn()
 const exportTsv = vi.fn()
 const actor = { currentUser: ref({ userId: 'manager' }), isAdmin: ref(true), isLeader: ref(false),
   passwordMinLength: ref(12), passwordMaxLength: ref(256), fetchAuth: async () => {} }
@@ -39,7 +40,7 @@ const View = compileClientComponent(new URL('./UserManager.vue', import.meta.url
   '@/utils/messageUtils.js': messages,
   '@/utils/formUtils.js': formUtils,
   '@/utils/dialogUtils.js': dialogUtils,
-  '@/utils/confirmUtils.js': { confirmDelete: vi.fn(), confirmAction },
+  '@/utils/confirmUtils.js': { confirmDelete, confirmAction },
   '@/utils/exportUtils.js': { exportTsv },
   '@/services/api/admin.js': api,
   '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration },
@@ -121,17 +122,18 @@ it('locks creation during validation and reports a refresh failure separately fr
   expect(editor()['form-state'].password).toBe('')
 })
 
-it('clears a cancelled password reset and ignores duplicate valid submissions', async () => {
+it('shows the reset target, clears it on cancel, and submits only once for that account', async () => {
   const view = await mount()
   const dialog = () => view.dialog('UserPasswordResetDialog')
   expect(dialog().rules.newPassword[1]).toMatchObject({ min: 12, max: 256 })
   view.button('重置密码').onClick()
   await flush()
+  expect(dialog()['target-user']).toEqual({ userId: 'member', userName: 'Alice' })
   Object.assign(dialog()['form-state'], { newPassword: 'discarded', confirmPassword: 'discarded' })
   dialog()['onUpdate:modelValue'](false)
   expect(dialog()['form-state'].newPassword).toBe('')
-  expect(dialog()['form-state'].userId).toBe('')
   await flush()
+  expect(dialog()['target-user']).toBeNull()
   view.button('重置密码').onClick()
   await flush()
   const validate = vi.fn().mockResolvedValue(true)
@@ -147,6 +149,29 @@ it('clears a cancelled password reset and ignores duplicate valid submissions', 
   saving.resolve({})
   await submit
   expect(dialog()['form-state'].newPassword).toBe('')
+})
+
+it('refreshes the filtered directory after a delete conflict without retrying the deletion', async () => {
+  const view = await mount()
+  view.select('状态筛选', 1)
+  await flush()
+  confirmDelete.mockResolvedValue(true)
+  api.deleteUserApi.mockRejectedValueOnce({
+    response: { status: 409, data: { code: 409, msg: '账号已变化' } }
+  })
+  const updated = { ...row, status: 0 }
+  api.getAllUsersApi.mockResolvedValueOnce({ data: [updated] })
+
+  await view.button('删除').onClick()
+  expect(api.deleteUserApi).toHaveBeenCalledExactlyOnceWith({ id: 'member' })
+  expect(api.getAllUsersApi).toHaveBeenCalledTimes(2)
+  expect(messages.showError).toHaveBeenCalledWith('账号已变化')
+  expect(messages.showSuccess).not.toHaveBeenCalled()
+  expect(view.rows()).toEqual([])
+
+  view.select('状态筛选', 0)
+  await flush()
+  expect(view.rows()).toEqual([updated])
 })
 
 it('does not let an old refresh replace newer rows', async () => {
