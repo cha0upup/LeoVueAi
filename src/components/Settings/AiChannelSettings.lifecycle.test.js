@@ -186,7 +186,7 @@ describe('AI channel settings initialization', () => {
     ] })
     api.listAiModelConfigsApi.mockResolvedValue({ data: [
       { id: 8, providerId: 2, model: 'chat-v1' },
-      { id: 9, providerId: 2, model: 'reasoner-v1' },
+      { id: 9, providerId: 2, providerName: 'Fixture Provider', model: 'reasoner-v1', name: ' Team Reasoner ' },
       { id: 10, providerId: 99, model: 'orphan-model' }
     ] })
     const view = await mount(SettingsPage)
@@ -194,18 +194,24 @@ describe('AI channel settings initialization', () => {
       view.node('ElInput').props['onUpdate:modelValue'](keyword)
       await flush()
     }
-    const modelNames = () => findNodes(view.root, node => node.props['aria-pressed'] !== undefined)
-      .map(node => text(findNode(node, 'strong')).trim())
+    const modelRows = () => findNodes(view.root, node => node.props['aria-pressed'] !== undefined)
+    const modelNames = () => modelRows().map(node => findNode(findNode(node, 'strong'), 'text').text.trim())
     const providerCards = () => findNodes(view.root, node => node.type === 'article')
 
-    await search(' REASONER ')
-    expect(modelNames()).toEqual(['reasoner-v1'])
+    await search(' TEAM REASONER ')
+    expect(modelNames()).toEqual(['Team Reasoner'])
     expect(providerCards()).toHaveLength(1)
     expect(text(providerCards()[0])).toContain('显示 1 个匹配模型')
+    expect(text(modelRows()[0])).toContain('ID：reasoner-v1')
     expect(view.node('ElPopconfirm').props.title).toContain('其下 2 个模型')
+    await modelRows()[0].props.onClick()
+    expect(findNode(view.node('aside'), 'h4').text).toBe('Team Reasoner')
+    expect(text(view.node('aside'))).toContain('模型 ID：reasoner-v1')
+    expect(text(view.node('aside'))).toContain('来自 Fixture Provider')
 
     await search('gateway.example.test')
-    expect(modelNames()).toEqual(['chat-v1', 'reasoner-v1'])
+    expect(modelNames()).toEqual(['chat-v1', 'Team Reasoner'])
+    expect(findNode(modelRows()[0], 'small')).toBeNull()
     await search('orphan-model')
     expect(text(view.root)).toContain('未找到匹配的供应商或模型')
     await search('')

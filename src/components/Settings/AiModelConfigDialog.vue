@@ -34,7 +34,7 @@
           </div>
           <div class="form-grid two">
             <el-form-item
-              label="模型名称"
+              label="展示名称"
               prop="name"
             >
               <el-input

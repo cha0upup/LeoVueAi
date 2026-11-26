@@ -14,11 +14,16 @@
     <template v-if="model">
       <div class="detail-header">
         <div class="provider-avatar detail">
-          {{ providerInitial({ name: model.model }) }}
+          {{ providerInitial({ name: displayName }) }}
         </div>
         <div class="detail-title">
-          <h4>{{ model.model }}</h4>
-          <p>来自 {{ model.providerName || model.name || '供应商' }}</p>
+          <h4>{{ displayName }}</h4>
+          <p v-if="model.model && displayName !== model.model">
+            模型 ID：{{ model.model }}
+          </p>
+          <p v-if="model.providerName">
+            来自 {{ model.providerName }}
+          </p>
           <el-tag
             v-if="model.enabled !== 0"
             type="success"
@@ -217,6 +222,7 @@ import {
   formatNumber,
   healthStatusLabel,
   healthTagType,
+  modelDisplayName,
   providerInitial,
   supportItems
 } from './aiChannelSettingsModel.js'
@@ -231,6 +237,7 @@ const props = defineProps({
 
 defineEmits(['edit', 'probe', 'activate', 'back'])
 
+const displayName = computed(() => modelDisplayName(props.model))
 const limitsMatchCapabilities = computed(() => props.model?.capabilityRecognized && [
   ['effectiveContextWindowTokens', 'capabilityContextWindowTokens'],
   ['effectiveMaxOutputTokens', 'capabilityMaxOutputTokens']
@@ -317,6 +324,7 @@ const healthStatus = computed(() => props.healthReadState === 'ready' ? health.v
   margin: 0 0 6px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .detail-actions {

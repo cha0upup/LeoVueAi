@@ -270,6 +270,10 @@ export function providerTestModelId(provider) {
   return (models.find((model) => model.enabled !== 0) || models[0])?.id ?? null
 }
 
+export function modelDisplayName(model) {
+  return model?.name?.trim() || model?.model || ''
+}
+
 export function providerInitial(provider) {
   const name = provider?.name || provider?.providerKey || 'AI'
   return String(name).trim().slice(0, 1).toUpperCase()

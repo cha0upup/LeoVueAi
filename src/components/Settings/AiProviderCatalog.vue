@@ -44,7 +44,8 @@
       <div class="provider-list-content">
         <el-input
           v-model="searchKeyword"
-          placeholder="搜索供应商 / Base URL / 模型名称"
+          placeholder="搜索供应商 / Base URL / 展示名或模型 ID"
+          aria-label="搜索供应商或模型"
           clearable
           class="ai-model-settings__search"
         >
@@ -164,8 +165,12 @@
                 @click="$emit('select-model', model)"
               >
                 <strong>
-                  {{ model.model }}
+                  {{ modelDisplayName(model) }}
                   <em v-if="model.isActive === 1">默认</em>
+                  <small
+                    v-if="model.model && modelDisplayName(model) !== model.model"
+                    class="model-id"
+                  >ID：{{ model.model }}</small>
                 </strong>
                 <span>
                   <el-tag
@@ -239,6 +244,7 @@ import { icons } from '@/utils/icons.js'
 import {
   buildProviderRows,
   healthStatusLabel,
+  modelDisplayName,
   providerInitial,
   providerTestModelId,
   searchProviderRows,
@@ -471,6 +477,14 @@ const isProviderTesting = (provider) => {
 .model-row-lite > * { min-width: 0; }
 .model-row-lite > strong { overflow-wrap: anywhere; }
 .model-row-lite :deep(.el-tag) { max-width: 100%; height: auto; min-height: 20px; white-space: normal; }
+
+.model-id {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  font-weight: normal;
+}
 
 .model-row-lite strong em {
   margin-left: 6px;
