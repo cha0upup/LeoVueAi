@@ -56,8 +56,8 @@ export function getAuditAgentStatisticsApi(params, { signal } = {}) {
   return http.get('/platform/admin/audit-logs/statistics/agent', { params, signal })
 }
 
-export function getAuditOperationStatisticsApi({ signal } = {}) {
-  return http.get('/platform/admin/audit-logs/statistics/operations', { signal })
+export function getAuditOperationStatisticsApi(params, { signal } = {}) {
+  return http.get('/platform/admin/audit-logs/statistics/operations', { params, signal })
 }
 
 export function getAuditTrendStatisticsApi(params, { signal } = {}) {

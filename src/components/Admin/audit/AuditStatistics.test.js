@@ -93,7 +93,7 @@ it('ignores out-of-order trend responses and keeps zero days at zero height', as
   const latest = deferred()
   api.getAuditTrendStatisticsApi.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise)
   const view = await mount()
-  const picker = view.nodes(node => node.type === 'ElSelect')[0].props
+  const picker = view.nodes(node => node.type === 'ElSelect' && node.props['aria-label'] === '操作趋势时间范围')[0].props
   picker['onUpdate:modelValue']('90')
   const changing = picker.onChange()
   expect(api.getAuditTrendStatisticsApi.mock.calls[0][1].signal.aborted).toBe(true)
@@ -122,13 +122,27 @@ it('ignores out-of-order trend responses and keeps zero days at zero height', as
   expect(view.nodes(node => node.props.class === 'trend-bar')).toHaveLength(0)
 })
 
+it('defaults the operation distribution to all history and changes only its own range', async () => {
+  const view = await mount()
+  expect(api.getAuditOperationStatisticsApi.mock.lastCall[0]).toBeUndefined()
+  const picker = view.nodes(node => node.type === 'ElSelect' && node.props['aria-label'] === '操作分布时间范围')[0].props
+  picker['onUpdate:modelValue']('30')
+  await picker.onChange()
+  expect(api.getAuditOperationStatisticsApi.mock.lastCall[0]).toEqual({ days: 30 })
+  expect(api.getAuditTrendStatisticsApi).toHaveBeenCalledOnce()
+
+  picker['onUpdate:modelValue']('all')
+  await picker.onChange()
+  expect(api.getAuditOperationStatisticsApi.mock.lastCall[0]).toBeUndefined()
+})
+
 it('shows current errors separately from empty data and cancels pending reads on exit', async () => {
   const pending = deferred()
   api.getAuditOperationStatisticsApi.mockReturnValueOnce(pending.promise)
   api.getAuditTrendStatisticsApi.mockRejectedValueOnce(new Error('趋势加载失败'))
   const view = await mount()
   expect(view.nodes(node => node.type === 'ElAlert').map(node => node.props.title)).toContain('趋势加载失败')
-  const signal = api.getAuditOperationStatisticsApi.mock.lastCall[0].signal
+  const signal = api.getAuditOperationStatisticsApi.mock.lastCall[1].signal
   view.unmount()
   expect(signal.aborted).toBe(true)
   pending.resolve({ data: [] })

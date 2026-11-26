@@ -76,13 +76,32 @@
           <el-icon><Icon :icon="iconMap.pieChart" /></el-icon>
         </template>
         <template #actions>
-          <el-button
-            text
-            :loading="operationStatsLoading"
-            @click="refreshOperationStats"
-          >
-            刷新
-          </el-button>
+          <div class="panel-actions">
+            <el-select
+              v-model="operationTimeRange"
+              size="small"
+              aria-label="操作分布时间范围"
+              @change="refreshOperationStats"
+            >
+              <el-option
+                label="全部历史"
+                value="all"
+              />
+              <el-option
+                v-for="days in dayRanges"
+                :key="days"
+                :label="`最近${days}天`"
+                :value="days"
+              />
+            </el-select>
+            <el-button
+              text
+              :loading="operationStatsLoading"
+              @click="refreshOperationStats"
+            >
+              刷新
+            </el-button>
+          </div>
         </template>
 
         <div
@@ -142,11 +161,11 @@
             <el-select
               v-model="trendTimeRange"
               size="small"
-              aria-label="统计时间范围"
+              aria-label="操作趋势时间范围"
               @change="refreshTrendStats"
             >
               <el-option
-                v-for="days in ['7', '30', '90']"
+                v-for="days in dayRanges"
                 :key="days"
                 :label="`最近${days}天`"
                 :value="days"
@@ -317,11 +336,16 @@ async function readStatsRows(request) {
   return response
 }
 
+const dayRanges = ['7', '30', '90']
+const operationTimeRange = ref('all')
 const { result: operationRows, loading: operationStatsLoading, error: operationError,
   run: runOperationStats } = useStatsRequest(
-  (_params, signal) => readStatsRows(getAuditOperationStatisticsApi({ signal })), '获取操作分布失败'
+  (days, signal) => readStatsRows(getAuditOperationStatisticsApi(days === null ? undefined : { days }, { signal })),
+  '获取操作分布失败'
 )
-const refreshOperationStats = () => runOperationStats()
+const refreshOperationStats = () => runOperationStats(
+  operationTimeRange.value === 'all' ? null : Number(operationTimeRange.value)
+)
 
 const operationStats = computed(() => {
   const rows = (operationRows.value ?? []).map((row) => ({ ...row, count: Number(row.count) }))
