@@ -167,8 +167,8 @@ export function deleteAiModelCapabilityApi(modelName) {
   return http.delete(`${AI_MODEL_ROUTE}/capabilities/${encodeURIComponent(modelName)}`)
 }
 
-export function fetchAiModelListApi(body) {
-  return http.post(`${AI_MODEL_ROUTE}/fetch-models`, body)
+export function fetchAiModelListApi(body, { signal } = {}) {
+  return http.post(`${AI_MODEL_ROUTE}/fetch-models`, body, { signal })
 }
 
 export function fetchAiProviderModelListApi(providerId) {

@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 
 const mocks = vi.hoisted(() => ({
   createModel: vi.fn(),
@@ -67,6 +68,40 @@ describe('useAiProviderManager', () => {
     )
   })
 
+  it('discards discoveries from a closed dialog or an edited connection', async () => {
+    const closed = deferred()
+    const edited = deferred()
+    const current = deferred()
+    mocks.fetchModels.mockReturnValueOnce(closed.promise)
+      .mockReturnValueOnce(edited.promise)
+      .mockReturnValueOnce(current.promise)
+    const manager = useAiProviderManager({ modelRows: ref([]) })
+
+    manager.openProviderCreate()
+    manager.providerForm.apiKey = 'first-fixture-key'
+    const closedRead = manager.fetchProviderFormModels()
+    manager.providerDialogVisible.value = false
+    manager.openProviderCreate()
+    manager.providerForm.apiKey = 'second-fixture-key'
+    const editedRead = manager.fetchProviderFormModels()
+    manager.providerForm.baseUrl = 'https://provider.example.test/v1'
+    const currentRead = manager.fetchProviderFormModels()
+    expect(mocks.fetchModels.mock.calls.map(([, options]) => options.signal.aborted)).toEqual([true, true, false])
+
+    closed.resolve({ data: ['old-model'] })
+    edited.reject(new Error('Old connection error'))
+    await Promise.all([closedRead, editedRead])
+    expect(manager.providerForm.models).toEqual([])
+    expect(manager.fetchingModels.value).toBe(true)
+    expect(mocks.showSuccess).not.toHaveBeenCalled()
+    expect(mocks.showError).not.toHaveBeenCalled()
+
+    current.resolve({ data: ['current-model'] })
+    await currentRead
+    expect(manager.providerForm.models).toEqual([{ model: 'current-model', name: 'current-model', checked: true }])
+    expect(manager.fetchingModels.value).toBe(false)
+  })
+
   it('imports only selected models with the preset connection and chosen default', async () => {
     const preset = {
       key: 'kimi', label: 'Kimi (Moonshot)', baseUrl: 'https://api.moonshot.cn/v1',
@@ -95,7 +130,7 @@ describe('useAiProviderManager', () => {
     expect(mocks.fetchModels).toHaveBeenCalledExactlyOnceWith({
       baseUrl: preset.baseUrl, apiKey: 'test-key', providerKey: 'kimi',
       protocol: 'chat_completions', completionsPath: '/chat/completions'
-    })
+    }, { signal: expect.any(globalThis.AbortSignal) })
     manager.providerForm.models.find(row => row.model === 'unselected-model').checked = false
     manager.providerDefaultModelIndex.value = 1
 

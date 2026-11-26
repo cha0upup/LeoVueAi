@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, reactive, ref, watch } from 'vue'
 
 import {
   createAiModelConfigApi,
@@ -51,6 +51,24 @@ export function useAiProviderManager({
   const providerSaveLoading = ref(false)
   const providerForm = reactive(createProviderForm())
   let savedProvidersRead = 0
+  let modelFetchController = null
+  const modelFetchParams = computed(() => ({
+    baseUrl: providerForm.baseUrl,
+    apiKey: providerForm.apiKey,
+    providerKey: providerForm.providerKey,
+    protocol: normalizeProtocol(providerForm.protocol),
+    completionsPath: providerForm.completionsPath || DEFAULT_COMPLETIONS_PATH
+  }))
+
+  function cancelModelFetch() {
+    if (!modelFetchController) return
+    modelFetchController.abort()
+    modelFetchController = null
+    fetchingModels.value = false
+  }
+
+  watch([providerDialogVisible, providerEditing, modelFetchParams], cancelModelFetch, { flush: 'sync' })
+  if (getCurrentScope()) onScopeDispose(cancelModelFetch)
 
   const providerHeadersPlaceholder = computed(() =>
     providerEditing.value?.headersConfigured
@@ -83,6 +101,7 @@ export function useAiProviderManager({
   }
 
   const selectProviderPreset = (provider) => {
+    cancelModelFetch()
     selectedProviderKey.value = provider.key
     providerForm.providerKey = provider.key || 'custom'
     providerForm.name = provider.label || ''
@@ -98,22 +117,19 @@ export function useAiProviderManager({
   }
 
   const fetchProviderFormModels = async () => {
-    if (!providerForm.baseUrl || !providerForm.apiKey) {
+    if (!providerDialogVisible.value || providerEditing.value || fetchingModels.value) return
+    const params = modelFetchParams.value
+    if (!params.baseUrl || !params.apiKey) {
       showError('请先填写 Base URL 和 API Key')
       return
     }
 
+    const controller = new AbortController()
+    modelFetchController = controller
     fetchingModels.value = true
     try {
-      const data = (
-        await fetchAiModelListApi({
-          baseUrl: providerForm.baseUrl,
-          apiKey: providerForm.apiKey,
-          providerKey: providerForm.providerKey,
-          protocol: normalizeProtocol(providerForm.protocol),
-          completionsPath: providerForm.completionsPath || DEFAULT_COMPLETIONS_PATH
-        })
-      ).data
+      const { data } = await fetchAiModelListApi(params, { signal: controller.signal })
+      if (modelFetchController !== controller) return
       if (!Array.isArray(data) || data.length === 0) {
         showError('未获取到模型列表，请检查供应商配置')
         return
@@ -122,9 +138,12 @@ export function useAiProviderManager({
       providerDefaultModelIndex.value = 0
       showSuccess(`获取到 ${data.length} 个模型`)
     } catch (error) {
-      showError(error?.message || '获取模型列表失败')
+      if (modelFetchController === controller) showError(error?.message || '获取模型列表失败')
     } finally {
-      fetchingModels.value = false
+      if (modelFetchController === controller) {
+        modelFetchController = null
+        fetchingModels.value = false
+      }
     }
   }
 
