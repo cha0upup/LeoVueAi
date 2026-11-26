@@ -44,7 +44,7 @@
       </el-select>
 
       <el-select
-        v-model="filters.team"
+        v-model="selectedTeam"
         placeholder="团队"
         aria-label="团队筛选"
         clearable
@@ -348,6 +348,7 @@
 <script setup>
 import PageHeader from '@/components/common/PageHeader.vue'
 import { ref, reactive, computed, onMounted, onScopeDispose, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
@@ -403,6 +404,8 @@ const statsCardConfigs = [
 ]
 
 const { currentUser, isAdmin, isLeader, fetchAuth, passwordMinLength, passwordMaxLength } = useAuth()
+const route = useRoute()
+const router = useRouter()
 
 // 响应式数据
 const loading = ref(false)
@@ -433,8 +436,25 @@ const resetTarget = resetPasswordDialog.currentItem
 // 数据
 const teams = ref([])
 const teamNames = computed(() => buildDirectoryTeamNames(teams.value, userData.value))
-const defaultFilters = { keyword: '', role: '', team: '', status: '' }
+const defaultFilters = { keyword: '', role: '', status: '' }
 const filters = reactive({ ...defaultFilters })
+const selectedTeam = computed({
+  get() {
+    const teamId = route.query.teamId
+    // ?teamId 表示未分配；没有该参数则显示全部团队。
+    if (teamId === null) return UNASSIGNED_TEAM
+    return typeof teamId === 'string' ? teamId : ''
+  },
+  set(value) {
+    const team = value ?? ''
+    if (team === selectedTeam.value) return
+    const query = { ...route.query }
+    if (team === UNASSIGNED_TEAM) query.teamId = null
+    else if (team) query.teamId = team
+    else delete query.teamId
+    router.replace({ query })
+  }
+})
 const currentPage = ref(1)
 const pageSize = ref(PAGE_SIZES[0])
 const userTable = ref(null)
@@ -479,12 +499,13 @@ const resetRules = computed(() => ({
 }))
 
 // 计算属性
-const filteredUsers = computed(() => filterUsers(userData.value, filters, teamNames.value))
-const hasFilters = computed(() => Boolean(filters.keyword?.trim() || filters.role || filters.team
-  || filters.team === UNASSIGNED_TEAM || filters.status === 0 || filters.status === 1))
+const filteredUsers = computed(() => filterUsers(userData.value, { ...filters, team: selectedTeam.value }, teamNames.value))
+const hasFilters = computed(() => Boolean(filters.keyword?.trim() || filters.role || selectedTeam.value !== ''
+  || filters.status === 0 || filters.status === 1))
 
 function clearFilters() {
   Object.assign(filters, defaultFilters)
+  selectedTeam.value = ''
 }
 
 const lastPage = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / pageSize.value)))
@@ -498,7 +519,7 @@ function changePageSize(size) {
   currentPage.value = Math.min(Math.floor(firstRow / size) + 1, lastPage.value)
 }
 
-watch(filters, () => { currentPage.value = 1 })
+watch([filters, selectedTeam], () => { currentPage.value = 1 })
 watch(lastPage, (page) => { if (currentPage.value > page) currentPage.value = page })
 watch(pageUsers, () => userTable.value?.setScrollTop?.(0), { flush: 'post' })
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { h, nextTick, ref } from 'vue'
+import { h, nextTick, reactive, ref } from 'vue'
 import { compileClientComponent, createSlotStub, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
@@ -22,8 +22,11 @@ const confirmDelete = vi.fn()
 const exportTsv = vi.fn()
 const actor = { currentUser: ref({ userId: 'manager' }), isAdmin: ref(true), isLeader: ref(false),
   passwordMinLength: ref(12), passwordMaxLength: ref(256), fetchAuth: async () => {} }
+const route = reactive({ query: {} })
+const router = { replace: vi.fn() }
 const stub = (name, slots) => ({ default: createSlotStub(name, slots) })
 const View = compileClientComponent(new URL('./UserManager.vue', import.meta.url), {
+  'vue-router': { useRoute: () => route, useRouter: () => router },
   '@/components/common/PageHeader.vue': stub('PageHeader', ['actions']),
   '@/components/Admin/shared/AdminToolbar.vue': stub('AdminToolbar', ['default', 'actions']),
   '@/components/common/StatsStrip.vue': stub('StatsStrip'),
@@ -87,10 +90,31 @@ const row = { userId: 'member', userName: 'Alice', privilege: 'normal', status: 
 
 beforeEach(() => {
   vi.resetAllMocks()
+  route.query = { tab: 'users' }
+  router.replace.mockImplementation(({ query }) => { route.query = query })
   api.getAllUsersApi.mockResolvedValue({ data: [row] })
   api.getAllTeamsApi.mockResolvedValue({ data: [{ teamId: 'team', teamName: 'Example' }] })
 })
 afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
+
+it('uses the team link as a removable directory filter without another user request', async () => {
+  route.query = { tab: 'users', teamId: 'team' }
+  const unassigned = { ...row, userId: 'unassigned-user', teamId: null }
+  api.getAllUsersApi.mockResolvedValue({ data: [row, unassigned] })
+  const view = await mount()
+  expect(view.rows()).toEqual([row])
+
+  view.select('团队筛选', userManagerModel.UNASSIGNED_TEAM)
+  await flush()
+  expect(router.replace).toHaveBeenLastCalledWith({ query: { tab: 'users', teamId: null } })
+  expect(view.rows()).toEqual([unassigned])
+
+  view.button('清空筛选').onClick()
+  await flush()
+  expect(router.replace).toHaveBeenLastCalledWith({ query: { tab: 'users' } })
+  expect(view.rows()).toEqual([row, unassigned])
+  expect(api.getAllUsersApi).toHaveBeenCalledOnce()
+})
 
 it('reports directory counts only after a valid response, including a genuinely empty directory', async () => {
   const initial = deferred()

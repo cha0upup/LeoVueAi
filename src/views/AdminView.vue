@@ -114,10 +114,11 @@ const activeTabMeta = computed(
   () => visibleTabs.value.find((tab) => tab.name === activeTab.value) ?? visibleTabs.value[0]
 )
 
-const getAdminTabLocation = (tabName) => ({
-  path: ROUTE_PATHS.admin,
-  query: { ...route.query, tab: tabName }
-})
+const getAdminTabLocation = (tabName) => {
+  const query = { ...route.query, tab: tabName }
+  if (tabName !== 'users') delete query.teamId
+  return { path: ROUTE_PATHS.admin, query }
+}
 
 const syncActiveTabFromRoute = ({ normalizeUrl = false } = {}) => {
   if (route.path !== ROUTE_PATHS.admin) return
@@ -142,7 +143,7 @@ const selectTab = (tabName) => {
 }
 
 watch(
-  [() => route.query.tab, activeTab],
+  [() => route.fullPath, activeTab],
   () => syncActiveTabFromRoute({ normalizeUrl: true })
 )
 

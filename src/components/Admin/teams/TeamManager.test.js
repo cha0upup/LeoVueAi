@@ -3,6 +3,7 @@ import { defineComponent, h, nextTick, ref } from 'vue'
 import { compileClientComponent, createSlotStub, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
+import { ROUTE_PATHS } from '@/constants/app.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { icons } from '@/utils/icons.js'
@@ -23,6 +24,7 @@ const View = compileClientComponent(new URL('./TeamManager.vue', import.meta.url
   '@/components/common/StatsStrip.vue': stub('StatsStrip'),
   '@/components/Admin/shared/AdminWorkspacePanel.vue': stub('AdminWorkspacePanel', ['tags', 'default']),
   '@/utils/icons.js': { icons },
+  '@/constants/app.js': { ROUTE_PATHS },
   '@/utils/format.js': { formatDate },
   '@/utils/apiUtils.js': { executeRequest },
   '@/utils/errorHandler.js': { handleError },
@@ -40,14 +42,14 @@ async function mount() {
   const renderer = createTestRenderer()
   const app = renderer.createApp(View)
   app.directive('loading', {})
-  for (const name of ['Icon', 'ElIcon', 'ElButton', 'ElInput', 'ElSelect', 'ElOption', 'ElTag',
+  for (const name of ['Icon', 'ElIcon', 'RouterLink', 'ElButton', 'ElInput', 'ElSelect', 'ElOption', 'ElTag',
     'ElTable', 'ElForm', 'ElFormItem', 'ElAlert']) {
     app.component(name, createSlotStub(name))
   }
   app.component('ElTableColumn', defineComponent({
     inheritAttrs: false,
     setup(_props, { attrs, slots }) {
-      return () => h('ElTableColumn', attrs, attrs.label === '操作' ? slots.default?.({ row: existingTeam }) : [])
+      return () => h('ElTableColumn', attrs, ['操作', '团队名称'].includes(attrs.label) ? slots.default?.({ row: existingTeam }) : [])
     }
   }))
   app.component('ElDialog', createSlotStub('ElDialog', ['default', 'footer']))
@@ -58,6 +60,7 @@ async function mount() {
   const field = (type, placeholder) => nodes(type).find(node => node.props.placeholder === placeholder).props
   return {
     button: label => nodes('ElButton').find(node => text(node) === label)?.props,
+    membersLink: () => nodes('RouterLink')[0]?.props.to,
     change: (type, placeholder, value) => field(type, placeholder)['onUpdate:modelValue'](value),
     field,
     options: () => nodes('ElOption').map(node => node.props.value),
@@ -76,6 +79,7 @@ afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
 
 it('searches by the loaded leader and only requests candidates when creating a team', async () => {
   const view = await mount()
+  expect(view.membersLink()).toEqual({ path: ROUTE_PATHS.admin, query: { tab: 'users', teamId: 'team' } })
   expect(api.getAllTeamsApi).toHaveBeenCalledOnce()
   expect(api.getAllUsersApi).not.toHaveBeenCalled()
   expect(api.getTeamLeaderOptionsApi).not.toHaveBeenCalled()

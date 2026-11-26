@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, onMounted, reactive, ref } from 'vue'
-import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
+import { compileClientComponent, createSlotStub, findNode, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { ROUTE_PATHS } from '@/constants/app.js'
 import { icons } from '@/utils/icons.js'
@@ -89,6 +89,10 @@ it('does not mount an old panel that finishes loading after a tab switch', async
   const node = await mount('users')
   expect(node('UserManager')).toBeNull()
 
+  route.query = { tab: 'users', teamId: 'team' }
+  const teamsTab = findNodes(node('nav'), item => item.props['data-tab'] === 'teams')[0]
+  teamsTab.props.onClick()
+  expect(router.push).toHaveBeenCalledWith({ path: ROUTE_PATHS.admin, query: { tab: 'teams' } })
   route.query = { tab: 'teams' }
   await flush()
   expect(node('TeamManager')).toBeTruthy()

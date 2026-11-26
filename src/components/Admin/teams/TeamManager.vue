@@ -95,7 +95,21 @@
           prop="teamName"
           label="团队名称"
           min-width="180"
-        />
+        >
+          <template #default="{ row }">
+            <RouterLink
+              v-if="row.teamId"
+              :to="{ path: ROUTE_PATHS.admin, query: { tab: 'users', teamId: row.teamId } }"
+              :aria-label="`查看团队「${row.teamName}」的成员`"
+              aria-current-value="false"
+              title="查看团队成员"
+              class="team-members-link"
+            >
+              {{ row.teamName }}
+            </RouterLink>
+            <span v-else>{{ row.teamName }}</span>
+          </template>
+        </el-table-column>
         <el-table-column
           prop="leaderId"
           label="队长"
@@ -241,6 +255,7 @@ import { executeRequest } from '@/utils/apiUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { showWarning } from '@/utils/messageUtils.js'
 import { icons as iconMap } from '@/utils/icons.js'
+import { ROUTE_PATHS } from '@/constants/app.js'
 import {
   addTeamApi,
   deleteTeamApi,
@@ -456,6 +471,17 @@ onScopeDispose(() => {
 
 .team-table :deep(.el-table__row td) {
   padding: 10px 0;
+}
+
+.team-members-link {
+  color: var(--el-color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.team-members-link:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 2px;
 }
 
 .empty-text {
