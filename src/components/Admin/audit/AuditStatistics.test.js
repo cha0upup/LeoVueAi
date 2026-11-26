@@ -69,6 +69,25 @@ it('trims subject searches and refreshes the submitted ID independently of the d
   expect(view.text()).toContain('member')
 })
 
+it('keeps prior results on a failed refresh but does not show them for a new subject', async () => {
+  const view = await mount()
+  const input = () => view.input('用户')
+  input()['onUpdate:modelValue']('member')
+  await input().onKeyup({ key: 'Enter' })
+  api.getAuditUserStatisticsApi.mockRejectedValueOnce(new Error('刷新失败'))
+
+  await view.button('刷新').onClick()
+  expect(view.text()).toContain('刷新失败；仍显示上次成功的结果')
+  expect(view.text()).toContain('用户IDmember')
+
+  input()['onUpdate:modelValue']('another')
+  api.getAuditUserStatisticsApi.mockRejectedValueOnce(new Error('查询失败'))
+  await input().onKeyup({ key: 'Enter' })
+  expect(view.text()).toContain('查询失败')
+  expect(view.text()).not.toContain('仍显示上次成功的结果')
+  expect(view.nodes(node => node.props.class === 'query-result')).toHaveLength(0)
+})
+
 it('ignores out-of-order trend responses and keeps zero days at zero height', async () => {
   const old = deferred()
   const latest = deferred()
@@ -89,6 +108,18 @@ it('ignores out-of-order trend responses and keeps zero days at zero height', as
   expect(view.text()).not.toContain('01-01')
   expect(view.nodes(node => node.props.class === 'trend-bar').map(node => node.props.style.height))
     .toEqual(['0%', '100%'])
+
+  api.getAuditTrendStatisticsApi.mockRejectedValueOnce(new Error('趋势刷新失败'))
+  const trendRefresh = view.nodes(node => node.type === 'ElButton' && text(node) === '刷新').at(-1)
+  await trendRefresh.props.onClick()
+  expect(view.nodes(node => node.type === 'ElAlert')[0].props.description).toBe('仍显示上次成功的结果')
+  expect(view.nodes(node => node.props.class === 'trend-bar')).toHaveLength(2)
+
+  api.getAuditTrendStatisticsApi.mockRejectedValueOnce(new Error('新范围加载失败'))
+  picker['onUpdate:modelValue']('30')
+  await picker.onChange()
+  expect(view.nodes(node => node.type === 'ElAlert')[0].props.description).toBeUndefined()
+  expect(view.nodes(node => node.props.class === 'trend-bar')).toHaveLength(0)
 })
 
 it('shows current errors separately from empty data and cancels pending reads on exit', async () => {

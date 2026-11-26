@@ -45,9 +45,10 @@
           class="query-message"
         >
           {{ card.validationError || card.error }}
+          <span v-if="!card.validationError && card.result">；仍显示上次成功的结果</span>
         </div>
         <div
-          v-else-if="card.result"
+          v-if="card.result"
           class="query-result"
         >
           <div class="result-item">
@@ -91,12 +92,13 @@
           <el-alert
             v-if="operationError"
             :title="operationError"
+            :description="operationStats.length ? '仍显示上次成功的结果' : undefined"
             type="error"
             :closable="false"
             show-icon
           />
           <div
-            v-else-if="operationStats.length > 0"
+            v-if="operationStats.length > 0"
             class="operation-stats"
           >
             <div
@@ -122,7 +124,7 @@
             </div>
           </div>
           <el-empty
-            v-else-if="!operationStatsLoading"
+            v-else-if="!operationStatsLoading && !operationError"
             description="暂无操作统计数据"
           />
         </div>
@@ -167,12 +169,13 @@
           <el-alert
             v-if="trendError"
             :title="trendError"
+            :description="trendStats.length ? '仍显示上次成功的结果' : undefined"
             type="error"
             :closable="false"
             show-icon
           />
           <div
-            v-else-if="trendStats.length > 0"
+            v-if="trendStats.length > 0"
             class="trend-stats"
           >
             <div class="trend-summary">
@@ -210,7 +213,7 @@
             </div>
           </div>
           <el-empty
-            v-else-if="!trendStatsLoading"
+            v-else-if="!trendStatsLoading && !trendError"
             description="暂无趋势数据"
           />
         </div>
@@ -240,6 +243,7 @@ function useStatsRequest(request, defaultMessage) {
   const loading = ref(false)
   const error = ref('')
   let pending
+  let resultParams
 
   onScopeDispose(() => pending?.abort())
 
@@ -249,13 +253,19 @@ function useStatsRequest(request, defaultMessage) {
     pending = current
     const { signal } = current
     loading.value = true
-    result.value = null
+    if (resultParams !== params) result.value = null
     error.value = ''
     try {
       const { data } = await request(params, signal)
-      if (!signal.aborted) result.value = data
+      if (!signal.aborted) {
+        result.value = data
+        resultParams = params
+      }
     } catch (failure) {
-      if (!signal.aborted) error.value = handleError(failure, { defaultMessage, showMessage: false })
+      if (signal.aborted) return
+      const status = failure?.response?.status
+      if (status === 401 || status === 403 || failure?.code === 'SESSION_CHANGED') result.value = null
+      error.value = handleError(failure, { defaultMessage, showMessage: false })
     } finally {
       if (pending === current) {
         pending = undefined
@@ -308,9 +318,10 @@ async function readStatsRows(request) {
 }
 
 const { result: operationRows, loading: operationStatsLoading, error: operationError,
-  run: refreshOperationStats } = useStatsRequest(
+  run: runOperationStats } = useStatsRequest(
   (_params, signal) => readStatsRows(getAuditOperationStatisticsApi({ signal })), '获取操作分布失败'
 )
+const refreshOperationStats = () => runOperationStats()
 
 const operationStats = computed(() => {
   const rows = (operationRows.value ?? []).map((row) => ({ ...row, count: Number(row.count) }))
@@ -436,6 +447,10 @@ onMounted(() => {
 .chart-panel__body {
   padding: 18px;
   min-height: 220px;
+}
+
+.chart-panel__body > .el-alert + div {
+  margin-top: var(--space-3);
 }
 
 .panel-actions .el-select {
