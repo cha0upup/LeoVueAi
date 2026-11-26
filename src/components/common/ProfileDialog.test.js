@@ -3,6 +3,7 @@ import { defineComponent, h, nextTick } from 'vue'
 import { compileClientComponent, createSlotStub, findNode, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
+import { isCurrentSession, resetSessionState, sessionGeneration } from '@/services/sessionLifecycle.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { validateForm } from '@/utils/formUtils.js'
 import { icons } from '@/utils/icons.js'
@@ -17,6 +18,7 @@ const initial = {
 const View = compileClientComponent(new URL('./ProfileDialog.vue', import.meta.url), {
   '@iconify/vue': { Icon: { render: () => null } },
   '@/services/api/auth.js': api,
+  '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration },
   '@/utils/errorHandler.js': { handleError },
   '@/utils/formUtils.js': { validateForm },
   '@/utils/icons.js': { icons },
@@ -179,4 +181,30 @@ it('shows the latest value when both edits touched the same field and can adopt 
   expect(view.error()).toBeUndefined()
   expect(view.button('保存资料').disabled).toBe(true)
   expect(api.updateProfileApi).toHaveBeenCalledOnce()
+})
+
+it('clears the old profile draft and lets the next session open before stale validation completes', async () => {
+  const view = mount()
+  await view.open()
+  await flush()
+  view.form().model.remark = 'Old draft'
+  const validation = deferred()
+  validate.mockReturnValueOnce(validation.promise)
+  await flush()
+  const oldSubmit = view.button('保存资料').onClick()
+
+  resetSessionState()
+  await flush()
+  expect(view.dialog().modelValue).toBe(false)
+  expect(view.form()).toBeUndefined()
+  api.getProfileApi.mockResolvedValueOnce({ data: {
+    ...initial, userId: 'next-user', email: 'next@example.test', remark: 'Current notes'
+  } })
+  await view.open()
+  expect(view.form().model).toMatchObject({ email: 'next@example.test', remark: 'Current notes' })
+
+  validation.resolve(true)
+  await oldSubmit
+  expect(api.updateProfileApi).not.toHaveBeenCalled()
+  expect(view.dialog().modelValue).toBe(true)
 })

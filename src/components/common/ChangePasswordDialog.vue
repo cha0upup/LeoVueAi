@@ -91,6 +91,7 @@
 <script setup>
 import { watch } from 'vue'
 import { usePasswordChangeForm } from '@/composables/usePasswordChangeForm.js'
+import { sessionGeneration } from '@/services/sessionLifecycle.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
 
@@ -108,6 +109,7 @@ const passwordFields = [
 ]
 
 watch(changePasswordVisible, (open) => { if (!open) clear() }, { flush: 'sync' })
+watch(sessionGeneration, dialog.close, { flush: 'sync' })
 
 defineExpose({
   openChangePasswordDialog: () => { if (!submitting.value) dialog.open() }

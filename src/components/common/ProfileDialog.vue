@@ -204,6 +204,7 @@ import { computed, onScopeDispose, reactive, ref, shallowRef, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import { getProfileApi, updateProfileApi } from '@/services/api/auth.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { validateForm } from '@/utils/formUtils.js'
 import { icons as iconMap } from '@/utils/icons.js'
@@ -314,25 +315,27 @@ const useLatestValue = (field, value) => {
 const submitProfile = async () => {
   if (!canSave.value || disposed) return
   const current = profile.value
+  const generation = sessionGeneration.value
+  const isActive = () => !disposed && isCurrentSession(generation) && profile.value === current
   const { userId, accountRevision } = current
   const payload = editableFields(form)
   saving.value = true
   saveError.value = ''
   Object.assign(form, payload)
   try {
-    if (!await validateForm(formRef, { errorMessage: '请检查表单输入' }) || disposed || profile.value !== current) return
+    if (!await validateForm(formRef, { errorMessage: '请检查表单输入' }) || !isActive()) return
     const { data } = await updateProfileApi({ ...payload, accountRevision })
-    if (disposed || profile.value !== current) return
+    if (!isActive()) return
     if (requireProfile(data).userId !== userId) throw new Error('个人资料更新响应与当前账号不匹配')
     showSuccess('个人资料已更新')
     visible.value = false
   } catch (error) {
-    if (!disposed && profile.value === current) {
+    if (isActive()) {
       profileConflict.value = error?.response?.status === 409
       saveError.value = handleError(error, { defaultMessage: '个人资料更新失败', showMessage: false })
     }
   } finally {
-    saving.value = false
+    if (isActive()) saving.value = false
   }
 }
 
@@ -340,6 +343,7 @@ const resetDialog = () => {
   loadRequest?.abort()
   loadRequest = undefined
   loading.value = false
+  saving.value = false
   profile.value = null
   loadError.value = ''
   saveError.value = ''
@@ -349,6 +353,7 @@ const resetDialog = () => {
 }
 
 watch(visible, open => { if (!open) resetDialog() }, { flush: 'sync' })
+watch(sessionGeneration, () => { visible.value = false }, { flush: 'sync' })
 onScopeDispose(() => {
   disposed = true
   resetDialog()

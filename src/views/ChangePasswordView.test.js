@@ -8,7 +8,7 @@ import { icons } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
 import { authPageTarget } from '@/routerGuards.js'
 import { usePasswordChangeForm } from '@/composables/usePasswordChangeForm.js'
-import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
+import { isCurrentSession, resetSessionState, sessionGeneration } from '@/services/sessionLifecycle.js'
 
 const calls = vi.hoisted(() => ({
   changePassword: vi.fn(), logout: vi.fn(), validate: vi.fn(), showError: vi.fn(), showSuccess: vi.fn(), resetAuth: vi.fn()
@@ -28,7 +28,8 @@ function mount(kind, query = {}) {
   const replace = vi.fn().mockResolvedValue(undefined)
   const modules = {
     '@/utils/icons.js': { icons },
-    '@/composables/usePasswordChangeForm.js': { usePasswordChangeForm }
+    '@/composables/usePasswordChangeForm.js': { usePasswordChangeForm },
+    '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration }
   }
   if (kind === 'page') Object.assign(modules, {
     'vue-router': { useRoute: () => ({ query }), useRouter: () => ({ replace }) },
@@ -36,7 +37,6 @@ function mount(kind, query = {}) {
     '@/constants/app.js': { ROUTE_PATHS },
     '@/composables/useAuth.js': { useAuth: () => auth },
     '@/services/api/auth.js': { logoutApi: calls.logout },
-    '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration },
     '@/utils/messageUtils.js': { showError: calls.showError }
   })
   else modules['@/utils/dialogUtils.js'] = { useDialog }
@@ -181,6 +181,28 @@ describe('password update dialog', () => {
     await submit
 
     expect(view.form).toEqual({ oldPassword: '', newPassword: '', confirmPassword: '' })
+    expect(calls.changePassword).not.toHaveBeenCalled()
+  })
+
+  it('closes and clears credentials when the session changes during validation', async () => {
+    const view = mount('dialog')
+    view.open()
+    view.fill()
+    const validation = deferred()
+    calls.validate.mockReturnValueOnce(validation.promise)
+    const pending = view.submit()
+
+    resetSessionState()
+    await flush()
+    expect(view.dialog().modelValue).toBe(false)
+    expect(view.form).toEqual({ oldPassword: '', newPassword: '', confirmPassword: '' })
+    view.open()
+    await flush()
+    expect(view.dialog().modelValue).toBe(true)
+    expect(view.formNode().props.disabled).toBe(false)
+
+    validation.resolve(true)
+    await pending
     expect(calls.changePassword).not.toHaveBeenCalled()
   })
 })

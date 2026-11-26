@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, reactive, ref } from 'vue'
+import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { useAuth } from '@/composables/useAuth.js'
 import { changePasswordApi } from '@/services/api/auth.js'
 import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
@@ -27,6 +27,11 @@ export function usePasswordChangeForm({ canSubmit, onSaved }) {
     formRef.value?.clearValidate?.()
   }
 
+  watch(sessionGeneration, () => {
+    clear()
+    submitting.value = false
+  }, { flush: 'sync' })
+
   onScopeDispose(() => {
     disposed = true
     clear()
@@ -50,7 +55,7 @@ export function usePasswordChangeForm({ canSubmit, onSaved }) {
       showSuccess('密码修改成功')
       await onSaved()
     } finally {
-      submitting.value = false
+      if (isCurrentSession(generation)) submitting.value = false
     }
   }
 
