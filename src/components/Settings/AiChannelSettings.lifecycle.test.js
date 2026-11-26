@@ -7,6 +7,7 @@ import { useAiCapabilityRegistry } from '@/composables/ai/useAiCapabilityRegistr
 import { useAiProviderManager } from '@/composables/ai/useAiProviderManager.js'
 import { useAiModelRequestPreview } from '@/composables/ai/useAiModelRequestPreview.js'
 import * as settingsModel from './aiChannelSettingsModel.js'
+import { handleError } from '@/utils/errorHandler.js'
 import { icons } from '@/utils/icons.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 
@@ -29,6 +30,7 @@ const settingsModules = {
   '@/utils/icons.js': { icons },
   '@/components/common/PageHeader.vue': { default: createSlotStub('PageHeader', ['default', 'actions']) },
   '@/services/api/admin.js': api,
+  '@/utils/errorHandler.js': { handleError },
   '@/utils/latestRequestGuard.js': { createLatestRequestGuard },
   '@/utils/messageUtils.js': messages,
   '@/composables/ai/useAiCapabilityRegistry.js': { useAiCapabilityRegistry },
@@ -38,9 +40,26 @@ const settingsModules = {
   ...Object.fromEntries(childNames.map(name => [`./${name}.vue`, { default: createSlotStub(name) }]))
 }
 const Settings = compileClientComponent(new URL('./AiChannelSettings.vue', import.meta.url), settingsModules)
+const Catalog = compileClientComponent(new URL('./AiProviderCatalog.vue', import.meta.url), {
+  '@iconify/vue': { Icon: createSlotStub('Icon') },
+  '@/components/common/StatsStrip.vue': { default: createSlotStub('StatsStrip') },
+  '@/components/Admin/shared/AdminWorkspacePanel.vue': { default: createSlotStub('AdminWorkspacePanel', ['default', 'actions']) },
+  '@/components/common/StatusIndicator.vue': { default: createSlotStub('StatusIndicator') },
+  '@/utils/icons.js': { icons },
+  './aiChannelSettingsModel.js': settingsModel
+})
+const Detail = compileClientComponent(new URL('./AiModelDetailPanel.vue', import.meta.url), {
+  './aiChannelSettingsModel.js': settingsModel
+})
+const SettingsPage = compileClientComponent(new URL('./AiChannelSettings.vue', import.meta.url), {
+  ...settingsModules,
+  './AiProviderCatalog.vue': { default: Catalog },
+  './AiModelDetailPanel.vue': { default: Detail }
+})
 const ModelDialog = compileClientComponent(new URL('./AiModelConfigDialog.vue', import.meta.url))
 
 const flush = async () => { for (let i = 0; i < 6; i++) await nextTick() }
+const text = node => findNodes(node).map(item => item.text).join(' ')
 const apps = []
 
 beforeEach(() => {
@@ -57,7 +76,7 @@ afterEach(() => {
 async function mount(component = Settings) {
   const renderer = createTestRenderer()
   const app = renderer.createApp(component)
-  for (const name of ['Icon', 'ElIcon', 'ElButton', 'ElEmpty', 'ElInput', 'ElPopconfirm', 'ElTag']) {
+  for (const name of ['Icon', 'ElIcon', 'ElAlert', 'ElButton', 'ElEmpty', 'ElInput', 'ElPopconfirm', 'ElTag']) {
     app.component(name, createSlotStub(name))
   }
   app.directive('loading', {})
@@ -67,6 +86,12 @@ async function mount(component = Settings) {
   app.mount(renderer.root)
   await flush()
   return { errors, node: name => findNode(renderer.root, name), root: renderer.root }
+}
+
+async function refresh(view) {
+  const button = findNodes(view.root, node => node.type === 'ElButton').find(item => text(item).includes('刷新'))
+  await button.props.onClick()
+  await flush()
 }
 
 describe('AI channel settings initialization', () => {
@@ -125,45 +150,54 @@ describe('AI channel settings initialization', () => {
     expect(catalog()['model-health-by-id'][8]).toMatchObject({ circuitOpen: true })
   })
 
+  it('preserves the last loaded catalog on failure and only shows an empty state for a successful read', async () => {
+    api.listAiProvidersApi
+      .mockRejectedValueOnce(new Error('暂时不可用'))
+      .mockResolvedValueOnce({ data: [{ id: 2, name: 'Fixture Provider' }] })
+      .mockResolvedValueOnce({ data: null })
+    api.listAiModelConfigsApi
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [{ id: 8, model: 'fixture-model', providerId: 2 }] })
+      .mockResolvedValueOnce({ data: {} })
+    const view = await mount(SettingsPage)
+    const metricValues = () => findNodes(view.root, node => node.props.class === 'metric-value').map(node => node.text)
+
+    expect(view.node('ElAlert').props.description).toBe('供应商：暂时不可用')
+    expect(text(view.root)).not.toContain('暂无供应商')
+    expect(metricValues().slice(0, 2)).toEqual(['—', '0'])
+    await refresh(view)
+    expect(view.node('ElAlert')).toBeNull()
+    await refresh(view)
+    expect(view.node('ElAlert').props.description).toBe('供应商：目录响应格式异常；模型：目录响应格式异常')
+    expect(text(view.node('article'))).toContain('Fixture Provider')
+    const selected = findNodes(view.root, node => node.props['aria-pressed'] === true)
+    expect(text(selected[0])).toContain('fixture-model')
+    expect(metricValues().slice(0, 2)).toEqual(['—', '—'])
+
+    await refresh(view)
+    expect(view.node('ElAlert')).toBeNull()
+    expect(text(view.root)).toContain('暂无供应商')
+    expect(view.errors).toEqual([])
+  })
+
   it('renders read failures, missing health records and observed breaker state distinctly', async () => {
-    const Catalog = compileClientComponent(new URL('./AiProviderCatalog.vue', import.meta.url), {
-      '@iconify/vue': { Icon: createSlotStub('Icon') },
-      '@/components/common/StatsStrip.vue': { default: createSlotStub('StatsStrip') },
-      '@/components/Admin/shared/AdminWorkspacePanel.vue': { default: createSlotStub('AdminWorkspacePanel', ['default', 'actions']) },
-      '@/components/common/StatusIndicator.vue': { default: createSlotStub('StatusIndicator') },
-      '@/utils/icons.js': { icons },
-      './aiChannelSettingsModel.js': settingsModel
-    })
-    const Detail = compileClientComponent(new URL('./AiModelDetailPanel.vue', import.meta.url), {
-      './aiChannelSettingsModel.js': settingsModel
-    })
-    const page = compileClientComponent(new URL('./AiChannelSettings.vue', import.meta.url), {
-      ...settingsModules,
-      './AiProviderCatalog.vue': { default: Catalog },
-      './AiModelDetailPanel.vue': { default: Detail }
-    })
     api.listAiModelConfigsApi.mockResolvedValue({ data: [{ id: 8, model: 'fixture', enabled: 1 }] })
     api.listAiModelHealthApi
       .mockRejectedValueOnce(new Error('health unavailable'))
       .mockResolvedValueOnce({ data: [{ configId: 8, status: 'unknown', circuitOpen: false }] })
       .mockResolvedValueOnce({ data: [{ configId: 8, status: 'half_open', circuitOpen: true, consecutiveFailures: 2 }] })
-    const view = await mount(page)
-    const text = node => findNodes(node).map(item => item.text).join(' ')
+    const view = await mount(SettingsPage)
     const breaker = () => findNodes(view.root, node => node.props.class === 'metric-card')
       .find(card => text(card).includes('熔断模型'))
     const count = () => findNode(breaker(), 'strong').text
-    const refresh = async () => {
-      await findNodes(view.root, node => node.type === 'ElButton').find(button => text(button).includes('刷新')).props.onClick()
-      await flush()
-    }
 
     expect(text(breaker())).toContain('健康状态读取失败')
     expect(text(view.node('aside'))).toContain('健康状态读取失败')
     expect(count()).toBe('—')
-    await refresh()
+    await refresh(view)
     expect(text(breaker())).toContain('暂无健康记录')
     expect(count()).toBe('—')
-    await refresh()
+    await refresh(view)
     expect(text(view.node('aside'))).toContain('半开观察')
     expect(count()).toBe('1')
     expect(text(view.root)).not.toMatch(/全部模型可调度|已切换备用链|将优先使用备用模型/)
@@ -295,7 +329,6 @@ describe('AI channel settings initialization', () => {
     app.config.errorHandler = error => errors.push(error)
     apps.push(app)
     app.mount(renderer.root)
-    const text = node => findNodes(node).map(child => child.text).join(' ')
     expect(findNode(renderer.root, 'ElDialog').props.title).toBe('编辑模型配置')
     expect(findNodes(renderer.root, node => node.type === 'ElSelect')).toHaveLength(1)
     expect(text(renderer.root)).toContain('选择供应商并填写模型 ID 后自动预览')

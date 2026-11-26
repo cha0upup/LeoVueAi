@@ -10,6 +10,7 @@ import {
   listAiProvidersApi,
   updateAiProviderApi
 } from '@/services/api/admin.js'
+import { handleError } from '@/utils/errorHandler.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import {
   AI_PROTOCOL,
@@ -38,6 +39,7 @@ export function useAiProviderManager({
 }) {
   const providers = ref([])
   const savedProviders = ref([])
+  const savedProvidersError = ref('')
   const selectedProviderKey = ref('')
   const fetchingModels = ref(false)
   const providerDefaultModelIndex = ref(0)
@@ -69,9 +71,14 @@ export function useAiProviderManager({
     const read = ++savedProvidersRead
     try {
       const data = (await listAiProvidersApi()).data
-      if (read === savedProvidersRead) savedProviders.value = Array.isArray(data) ? data : []
+      if (read !== savedProvidersRead) return
+      if (!Array.isArray(data)) throw new Error('目录响应格式异常')
+      savedProviders.value = data
+      savedProvidersError.value = ''
     } catch (error) {
-      if (read === savedProvidersRead) showError(error?.message || '加载供应商失败')
+      if (read === savedProvidersRead) {
+        savedProvidersError.value = handleError(error, { showMessage: false, defaultMessage: '加载失败' })
+      }
     }
   }
 
@@ -298,6 +305,7 @@ export function useAiProviderManager({
   return {
     providers,
     savedProviders,
+    savedProvidersError,
     selectedProviderKey,
     fetchingModels,
     providerDefaultModelIndex,

@@ -3,18 +3,18 @@
     <StatsStrip :columns="4">
       <div class="metric-card">
         <span class="metric-label">供应商</span>
-        <strong class="metric-value">{{ savedProviders.length }}</strong>
-        <small class="metric-hint">已启用 {{ enabledProviderCount }} 个</small>
+        <strong class="metric-value">{{ providerListError ? '—' : savedProviders.length }}</strong>
+        <small class="metric-hint">{{ providerListError ? '目录读取失败' : `已启用 ${enabledProviderCount} 个` }}</small>
       </div>
       <div class="metric-card">
         <span class="metric-label">已同步模型</span>
-        <strong class="metric-value">{{ rows.length }}</strong>
-        <small class="metric-hint">已启用 {{ enabledModelCount }} 个</small>
+        <strong class="metric-value">{{ modelListError ? '—' : rows.length }}</strong>
+        <small class="metric-hint">{{ modelListError ? '目录读取失败' : `已启用 ${enabledModelCount} 个` }}</small>
       </div>
       <div class="metric-card">
         <span class="metric-label">能力库模型</span>
-        <strong class="metric-value">{{ recognizedModelCount }}</strong>
-        <small class="metric-hint">识别率 {{ recognitionRate }}%</small>
+        <strong class="metric-value">{{ modelListError ? '—' : recognizedModelCount }}</strong>
+        <small class="metric-hint">{{ modelListError ? '模型目录读取失败' : `识别率 ${recognitionRate}%` }}</small>
       </div>
       <div class="metric-card">
         <span class="metric-label">熔断模型</span>
@@ -57,6 +57,14 @@
           v-loading="loading"
           class="provider-cards"
         >
+          <el-alert
+            v-if="directoryError"
+            title="目录读取异常，请刷新重试"
+            :description="directoryError"
+            type="warning"
+            :closable="false"
+            show-icon
+          />
           <article
             v-for="provider in filteredProviderRows"
             :key="provider.id"
@@ -86,7 +94,7 @@
                 </div>
                 <div class="provider-meta-line">
                   <span>Base URL：{{ provider.baseUrl || '未配置' }}</span>
-                  <span>同步模型：{{ provider.models.length }} 个</span>
+                  <span>同步模型：{{ modelListError ? '待刷新' : `${provider.models.length} 个` }}</span>
                   <span>同步时间：{{ provider.updatedAt || provider.createdAt || '暂无' }}</span>
                 </div>
               </div>
@@ -114,7 +122,7 @@
                   编辑
                 </el-button>
                 <el-popconfirm
-                  :title="`确定删除该供应商？其下 ${provider.models.length} 个模型将一并删除。`"
+                  :title="modelListError ? '确定删除该供应商？其下模型将一并删除。' : `确定删除该供应商？其下 ${provider.models.length} 个模型将一并删除。`"
                   confirm-button-text="删除"
                   cancel-button-text="取消"
                   @confirm="$emit('remove-provider', provider)"
@@ -204,7 +212,7 @@
           </article>
 
           <div
-            v-if="filteredProviderRows.length === 0"
+            v-if="!loading && !directoryError && filteredProviderRows.length === 0"
             class="provider-empty-hint"
           >
             {{ hasSearchKeyword ? '没有匹配的供应商' : '暂无供应商' }}
@@ -237,6 +245,8 @@ const searchKeyword = defineModel('searchKeyword', { type: String, default: '' }
 const props = defineProps({
   savedProviders: { type: Array, default: () => [] },
   rows: { type: Array, default: () => [] },
+  providerListError: { type: String, default: '' },
+  modelListError: { type: String, default: '' },
   modelHealthById: { type: Object, default: () => ({}) },
   healthReadState: { type: String, default: 'loading' },
   selectedModelId: { type: [Number, String], default: null },
@@ -255,10 +265,15 @@ defineEmits([
   'select-model'
 ])
 
+const directoryError = computed(() => [
+  props.providerListError && `供应商：${props.providerListError}`,
+  props.modelListError && `模型：${props.modelListError}`
+].filter(Boolean).join('；'))
 const enabledProviderCount = computed(() => props.savedProviders.filter((item) => item.enabled !== 0).length)
 const enabledModelCount = computed(() => props.rows.filter((item) => item.enabled !== 0).length)
 const recognizedModelCount = computed(() => props.rows.filter((item) => item.capabilityRecognized).length)
 const circuitSummary = computed(() => {
+  if (props.modelListError) return { count: '—', hint: '模型目录读取失败' }
   if (props.healthReadState !== 'ready') return { count: '—', hint: healthStatusLabel(props.healthReadState) }
   if (!props.rows.length) return { count: '—', hint: '暂无模型' }
   let recorded = 0
@@ -306,6 +321,7 @@ const isProviderTesting = (provider) => {
   flex-direction: column;
   gap: var(--space-3);
   margin-top: 16px;
+  min-height: 88px;
 }
 
 .provider-empty-hint {

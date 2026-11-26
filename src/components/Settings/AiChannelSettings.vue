@@ -22,6 +22,8 @@
         v-model:search-keyword="searchKeyword"
         :saved-providers="savedProviders"
         :rows="rows"
+        :provider-list-error="savedProvidersError"
+        :model-list-error="modelListError"
         :model-health-by-id="modelHealthById"
         :health-read-state="healthReadState"
         :selected-model-id="selectedModelId"
@@ -129,6 +131,7 @@ import {
   probeAiModelCapabilitiesApi,
   listAiModelHealthApi
 } from '@/services/api/admin.js'
+import { handleError } from '@/utils/errorHandler.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import AiCapabilityRegistryDialogs from './AiCapabilityRegistryDialogs.vue'
@@ -152,6 +155,7 @@ import {
 
 // ── List state ─────────────────────────────────────────────────────────
 const rows = ref([])
+const modelListError = ref('')
 const listLoading = ref(false)
 const refreshing = ref(false)
 const catalogLoading = computed(() => refreshing.value || listLoading.value)
@@ -202,6 +206,7 @@ const {
 const {
   providers,
   savedProviders,
+  savedProvidersError,
   selectedProviderKey,
   fetchingModels,
   providerDefaultModelIndex,
@@ -303,12 +308,16 @@ async function loadList() {
   try {
     const { data } = await listAiModelConfigsApi()
     if (!reads.isCurrent('models', read)) return
-    rows.value = Array.isArray(data) ? data : []
+    if (!Array.isArray(data)) throw new Error('目录响应格式异常')
+    rows.value = data
+    modelListError.value = ''
     if (!selectedModelId.value || !rows.value.some((item) => item.id === selectedModelId.value)) {
       selectedModelId.value = rows.value.find((item) => item.isActive === 1)?.id || rows.value[0]?.id || null
     }
-  } catch (e) {
-    if (reads.isCurrent('models', read)) showError(e?.message || '加载失败')
+  } catch (error) {
+    if (reads.isCurrent('models', read)) {
+      modelListError.value = handleError(error, { showMessage: false, defaultMessage: '加载失败' })
+    }
   } finally {
     if (reads.isCurrent('models', read)) listLoading.value = false
   }
