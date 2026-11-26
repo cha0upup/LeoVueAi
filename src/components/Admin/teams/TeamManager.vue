@@ -34,6 +34,7 @@
           type="primary"
           plain
           :loading="loading"
+          :disabled="mutationBusy"
           @click="refreshData"
         >
           <el-icon><Icon :icon="iconMap.refresh" /></el-icon>
@@ -42,7 +43,10 @@
       </template>
     </AdminToolbar>
 
-    <StatsStrip :columns="3">
+    <StatsStrip
+      v-if="hasLoadedTeams"
+      :columns="3"
+    >
       <article class="metric-card">
         <span class="metric-label">团队总数</span>
         <strong class="metric-value">{{ teamData.length }}</strong>
@@ -59,7 +63,10 @@
 
     <AdminWorkspacePanel title="团队列表">
       <template #tags>
-        <el-tag effect="light">
+        <el-tag
+          v-if="hasLoadedTeams"
+          effect="light"
+        >
           结果 {{ filteredTeams.length }}
         </el-tag>
       </template>
@@ -67,6 +74,7 @@
       <el-alert
         v-if="listError"
         :title="listError"
+        :description="hasLoadedTeams ? '仍显示已加载的团队，请刷新后再执行删除。' : '请点击刷新重新加载团队列表。'"
         type="error"
         :closable="false"
         show-icon
@@ -135,7 +143,7 @@
               type="danger"
               text
               size="small"
-              :disabled="mutationBusy || loading"
+              :disabled="!canDeleteTeam"
               @click="delTeam(row)"
             >
               <el-icon><Icon :icon="iconMap.delete" /></el-icon>
@@ -239,6 +247,7 @@ import {
   getAllTeamsApi,
   getTeamLeaderOptionsApi
 } from '@/services/api/admin.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 import { formatDate as formatDateTime } from '@/utils/format.js'
 import { useAuth } from '@/composables/useAuth.js'
 import AdminToolbar from '@/components/Admin/shared/AdminToolbar.vue'
@@ -256,6 +265,7 @@ const listError = ref('')
 const searchKeyword = ref('')
 const team = reactive({ teamName: '', leaderId: '' })
 const teamData = ref([])
+const hasLoadedTeams = ref(false)
 
 const leaderOptions = ref([])
 const candidatesLoading = ref(false)
@@ -263,6 +273,8 @@ const candidateError = ref('')
 const submitting = ref(false)
 const deleting = ref(false)
 const mutationBusy = computed(() => submitting.value || deleting.value)
+const canDeleteTeam = computed(() => isAdmin.value && hasLoadedTeams.value && !listError.value
+  && !loading.value && !mutationBusy.value && !addTeamDialog.value)
 const canSubmitTeam = computed(() => !mutationBusy.value && !candidatesLoading.value
   && !candidateError.value && !!team.teamName.trim()
   && leaderOptions.value.some(({ userId }) => userId === team.leaderId))
@@ -281,8 +293,8 @@ const filteredTeams = computed(() => {
   )
 })
 const emptyText = computed(() => {
+  if (!hasLoadedTeams.value) return listError.value ? '请刷新后重试' : '正在加载…'
   if (loading.value) return '正在加载…'
-  if (listError.value) return '请刷新后重试'
   return searchKeyword.value.trim() ? '没有匹配的团队' : '暂无团队'
 })
 
@@ -301,9 +313,9 @@ const refreshData = async () => {
     if (signal.aborted) return
     if (!Array.isArray(data)) throw new Error('团队目录响应格式异常')
     teamData.value = data
+    hasLoadedTeams.value = true
   } catch (error) {
     if (signal.aborted) return
-    teamData.value = []
     listError.value = handleError(error, { defaultMessage: '加载团队列表失败', showMessage: false })
   } finally {
     if (directoryRequest === request) {
@@ -375,20 +387,31 @@ const isBuiltInTeam = (item) =>
   item.teamId === BUILT_IN_TEAM_ID || item.teamName === BUILT_IN_TEAM_NAME
 
 const delTeam = async (row) => {
-  if (!isAdmin.value || mutationBusy.value || loading.value) return
+  if (!canDeleteTeam.value) return
   if (isBuiltInTeam(row)) {
     showWarning('内置系统管理员团队禁止删除')
     return
   }
   const { teamId, teamName } = row
+  const generation = sessionGeneration.value
+  const isActive = () => !disposed && isAdmin.value && isCurrentSession(generation)
+  const refreshAfterRemoval = () => {
+    if (!isActive()) return
+    teamData.value = teamData.value.filter((item) => item.teamId !== teamId)
+    return refreshData()
+  }
   deleting.value = true
   try {
     const confirmed = await confirmDelete({ message: `确定要删除团队「${teamName}」吗？此操作不可撤销。` })
-    if (!confirmed || disposed) return
+    if (!confirmed || !isActive()) return
     await executeRequest(() => deleteTeamApi({ id: teamId }), {
       successMessage: '已删除团队',
       errorMessage: '删除团队失败',
-      onSuccess: () => { if (!disposed) return refreshData() }
+      onSuccess: refreshAfterRemoval,
+      onError: (error) => {
+        const response = error?.response
+        if (response?.status === 404 && response.data?.code === 404) return refreshAfterRemoval()
+      }
     }).catch(() => false)
   } finally {
     deleting.value = false

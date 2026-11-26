@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { nextTick, ref } from 'vue'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { compileClientComponent, createSlotStub, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
@@ -7,12 +7,15 @@ import { executeRequest } from '@/utils/apiUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { icons } from '@/utils/icons.js'
 import { formatDate } from '@/utils/format.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 
 const api = Object.fromEntries(['getAllTeamsApi', 'getAllUsersApi', 'getTeamLeaderOptionsApi',
   'addTeamApi', 'deleteTeamApi'].map(name => [name, vi.fn()]))
 const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showWarning: vi.fn(), showError: vi.fn() }))
 vi.mock('@/utils/messageUtils.js', () => messages)
 const isAdmin = ref(true)
+const confirmDelete = vi.fn()
+const existingTeam = { teamId: 'team', teamName: 'Example', leaderId: 'lead-123', leaderName: 'Alice' }
 const stub = (name, slots) => ({ default: createSlotStub(name, slots) })
 const View = compileClientComponent(new URL('./TeamManager.vue', import.meta.url), {
   '@/components/common/PageHeader.vue': stub('PageHeader', ['actions']),
@@ -24,8 +27,9 @@ const View = compileClientComponent(new URL('./TeamManager.vue', import.meta.url
   '@/utils/apiUtils.js': { executeRequest },
   '@/utils/errorHandler.js': { handleError },
   '@/utils/messageUtils.js': messages,
-  '@/utils/confirmUtils.js': { confirmDelete: vi.fn() },
+  '@/utils/confirmUtils.js': { confirmDelete },
   '@/services/api/admin.js': api,
+  '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration },
   '@/composables/useAuth.js': { useAuth: () => ({ isAdmin, fetchAuth: async () => {} }) }
 })
 const apps = []
@@ -40,7 +44,12 @@ async function mount() {
     'ElTable', 'ElForm', 'ElFormItem', 'ElAlert']) {
     app.component(name, createSlotStub(name))
   }
-  app.component('ElTableColumn', createSlotStub('ElTableColumn', []))
+  app.component('ElTableColumn', defineComponent({
+    inheritAttrs: false,
+    setup(_props, { attrs, slots }) {
+      return () => h('ElTableColumn', attrs, attrs.label === '操作' ? slots.default?.({ row: existingTeam }) : [])
+    }
+  }))
   app.component('ElDialog', createSlotStub('ElDialog', ['default', 'footer']))
   app.mount(renderer.root)
   apps.push(app)
@@ -60,7 +69,7 @@ async function mount() {
 beforeEach(() => {
   vi.resetAllMocks()
   isAdmin.value = true
-  api.getAllTeamsApi.mockResolvedValue({ data: [{ teamId: 'team', teamName: 'Example', leaderId: 'lead-123', leaderName: 'Alice' }] })
+  api.getAllTeamsApi.mockResolvedValue({ data: [existingTeam] })
   api.getTeamLeaderOptionsApi.mockResolvedValue({ data: [{ userId: 'candidate', userName: 'Bob' }] })
 })
 afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
@@ -137,6 +146,29 @@ it('keeps the team draft and reloads candidates after the selected leader become
   await nextTick()
   await view.button('提交').onClick()
   expect(api.addTeamApi).toHaveBeenLastCalledWith({ teamName: 'New team', leaderId: 'replacement' })
+})
+
+it('retains teams on a refresh failure but keeps a confirmed missing team off the list', async () => {
+  const view = await mount()
+  api.getAllTeamsApi.mockRejectedValueOnce(new Error('目录暂不可用'))
+  await view.button('刷新').onClick()
+  expect(view.rows()).toEqual([existingTeam])
+  expect(view.alerts()).toEqual(['目录暂不可用'])
+  expect(view.button('删除').disabled).toBe(true)
+  await view.button('删除').onClick()
+  expect(confirmDelete).not.toHaveBeenCalled()
+
+  await view.button('刷新').onClick()
+  expect(view.button('删除').disabled).toBe(false)
+  confirmDelete.mockResolvedValueOnce(true)
+  api.deleteTeamApi.mockRejectedValueOnce({ response: { status: 404, data: { code: 404, msg: '团队不存在' } } })
+  api.getAllTeamsApi.mockRejectedValueOnce(new Error('刷新暂不可用'))
+
+  await view.button('删除').onClick()
+  expect(api.deleteTeamApi).toHaveBeenCalledExactlyOnceWith({ id: 'team' })
+  expect(api.getAllTeamsApi).toHaveBeenCalledTimes(4)
+  expect(view.rows()).toEqual([])
+  expect(view.alerts()).toEqual(['刷新暂不可用'])
 })
 
 it('does not load admin candidates for a team leader', async () => {
