@@ -46,10 +46,11 @@ async function mount() {
   apps.push(app)
   await flush()
   const nodes = type => findNodes(renderer.root, node => node.type === type)
+  const field = (type, placeholder) => nodes(type).find(node => node.props.placeholder === placeholder).props
   return {
     button: label => nodes('ElButton').find(node => text(node) === label)?.props,
-    change: (type, placeholder, value) =>
-      nodes(type).find(node => node.props.placeholder === placeholder).props['onUpdate:modelValue'](value),
+    change: (type, placeholder, value) => field(type, placeholder)['onUpdate:modelValue'](value),
+    field,
     options: () => nodes('ElOption').map(node => node.props.value),
     rows: () => nodes('ElTable')[0].props.data,
     alerts: () => nodes('ElAlert').map(node => node.props.title)
@@ -111,6 +112,31 @@ it('aborts a closed dialog and retries failed candidate requests without applyin
   await nextTick()
   expect(view.alerts()).toEqual([])
   expect(view.options()).toEqual(['candidate'])
+})
+
+it('keeps the team draft and reloads candidates after the selected leader becomes unavailable', async () => {
+  const view = await mount()
+  await view.button('新增团队').onClick()
+  view.change('ElInput', '请输入团队名称', 'New team')
+  view.change('ElSelect', '请选择队长', 'candidate')
+  api.addTeamApi.mockRejectedValueOnce({
+    response: { status: 409, data: { code: 409, msg: '所选队长已加入团队，请重新选择' } }
+  }).mockResolvedValueOnce({ data: null })
+  api.getTeamLeaderOptionsApi.mockResolvedValueOnce({ data: [{ userId: 'replacement', userName: 'Eve' }] })
+  await nextTick()
+
+  await view.button('提交').onClick()
+  expect(api.addTeamApi).toHaveBeenCalledExactlyOnceWith({ teamName: 'New team', leaderId: 'candidate' })
+  expect(api.getTeamLeaderOptionsApi).toHaveBeenCalledTimes(2)
+  expect(view.field('ElSelect', '请选择队长').modelValue).toBe('')
+  expect(view.options()).toEqual(['replacement'])
+  expect(view.button('提交').disabled).toBe(true)
+  expect(messages.showError).toHaveBeenCalledWith('所选队长已加入团队，请重新选择')
+
+  view.change('ElSelect', '请选择队长', 'replacement')
+  await nextTick()
+  await view.button('提交').onClick()
+  expect(api.addTeamApi).toHaveBeenLastCalledWith({ teamName: 'New team', leaderId: 'replacement' })
 })
 
 it('does not load admin candidates for a team leader', async () => {

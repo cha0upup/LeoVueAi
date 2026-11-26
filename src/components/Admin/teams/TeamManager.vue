@@ -182,12 +182,12 @@
             placeholder="请选择队长"
             :loading="candidatesLoading"
             :no-data-text="candidateError ? '加载失败' : '没有可选择的未入队用户'"
-            :disabled="Boolean(candidateError)"
+            :disabled="candidatesLoading || Boolean(candidateError)"
             clearable
             filterable
           >
             <el-option
-              v-for="item in users"
+              v-for="item in leaderOptions"
               :key="item.userId"
               :label="item.userName"
               :value="item.userId"
@@ -257,7 +257,7 @@ const searchKeyword = ref('')
 const team = reactive({ teamName: '', leaderId: '' })
 const teamData = ref([])
 
-const users = ref([])
+const leaderOptions = ref([])
 const candidatesLoading = ref(false)
 const candidateError = ref('')
 const submitting = ref(false)
@@ -265,7 +265,7 @@ const deleting = ref(false)
 const mutationBusy = computed(() => submitting.value || deleting.value)
 const canSubmitTeam = computed(() => !mutationBusy.value && !candidatesLoading.value
   && !candidateError.value && !!team.teamName.trim()
-  && users.value.some(({ userId }) => userId === team.leaderId))
+  && leaderOptions.value.some(({ userId }) => userId === team.leaderId))
 
 let directoryRequest
 let candidatesRequest
@@ -314,7 +314,7 @@ const refreshData = async () => {
 }
 
 const loadCandidates = async () => {
-  if (!addTeamDialog.value || candidatesLoading.value) return
+  if (disposed || !isAdmin.value || !addTeamDialog.value || candidatesLoading.value) return
   const request = new AbortController()
   candidatesRequest = request
   const { signal } = request
@@ -323,7 +323,7 @@ const loadCandidates = async () => {
   try {
     const { data } = await getTeamLeaderOptionsApi({ signal })
     if (!Array.isArray(data)) throw new Error('队长候选响应格式异常')
-    if (!signal.aborted) users.value = data
+    if (!signal.aborted) leaderOptions.value = data
   } catch (error) {
     if (!signal.aborted) {
       candidateError.value = handleError(error, { defaultMessage: '加载队长候选失败', showMessage: false })
@@ -339,7 +339,7 @@ const loadCandidates = async () => {
 const openAddTeamDialog = () => {
   if (!isAdmin.value || mutationBusy.value || addTeamDialog.value) return
   Object.assign(team, { teamName: '', leaderId: '' })
-  users.value = []
+  leaderOptions.value = []
   addTeamDialog.value = true
   return loadCandidates()
 }
@@ -361,6 +361,12 @@ const addTeam = () => {
     onSuccess: async () => {
       addTeamDialog.value = false
       if (!disposed) await refreshData()
+    },
+    onError: (error) => {
+      const status = error?.response?.status
+      if (disposed || !addTeamDialog.value || (status !== 404 && status !== 409)) return
+      team.leaderId = ''
+      return loadCandidates()
     }
   }).catch(() => false)
 }
