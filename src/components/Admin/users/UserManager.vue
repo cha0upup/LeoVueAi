@@ -117,7 +117,10 @@
       </template>
     </AdminToolbar>
 
-    <StatsStrip :columns="5">
+    <StatsStrip
+      v-if="hasLoadedUsers"
+      :columns="5"
+    >
       <article
         v-for="card in statsCardConfigs"
         :key="card.key"
@@ -130,7 +133,10 @@
 
     <AdminWorkspacePanel title="用户列表">
       <template #tags>
-        <el-tag effect="light">
+        <el-tag
+          v-if="hasLoadedUsers"
+          effect="light"
+        >
           筛选结果 {{ filteredUsers.length }}
         </el-tag>
       </template>
@@ -138,6 +144,7 @@
       <el-alert
         v-if="listError"
         :title="listError"
+        :description="hasLoadedUsers ? '仍显示上次成功加载的数据。请刷新后再操作。' : '请点击刷新重新加载用户列表。'"
         type="error"
         :closable="false"
         show-icon
@@ -401,8 +408,10 @@ const resetting = ref(false)
 const deleting = ref(false)
 const listError = ref('')
 const teamsError = ref('')
+const userData = ref(null)
+const hasLoadedUsers = computed(() => userData.value !== null)
 const mutationBusy = computed(() => submitting.value || resetting.value || deleting.value)
-const actionsDisabled = computed(() => loading.value || mutationBusy.value || Boolean(listError.value))
+const actionsDisabled = computed(() => !hasLoadedUsers.value || loading.value || mutationBusy.value || Boolean(listError.value))
 const editorDisabled = computed(() => actionsDisabled.value
   || isAdmin.value && (teamsLoading.value || Boolean(teamsError.value)))
 let usersRequest
@@ -418,7 +427,6 @@ const resetPasswordVisible = resetPasswordDialog.visible
 const resetTarget = resetPasswordDialog.currentItem
 
 // 数据
-const userData = ref([])
 const teams = ref([])
 const teamNames = computed(() => new Map(teams.value.map(({ teamId, teamName }) => [teamId, teamName])))
 const defaultFilters = { keyword: '', role: '', team: '', status: '' }
@@ -493,6 +501,7 @@ const actorContext = computed(() => ({
 const emptyText = computed(() => {
   if (loading.value) return '正在加载…'
   if (listError.value) return '请刷新后重试'
+  if (!hasLoadedUsers.value) return '正在加载…'
   return userData.value.length ? '没有匹配的用户' : '暂无用户'
 })
 

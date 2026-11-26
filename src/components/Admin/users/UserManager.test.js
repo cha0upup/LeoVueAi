@@ -70,6 +70,9 @@ async function mount() {
     dialog: type => nodes(node => node.type === type)[0].props,
     button: label => nodes(node => node.type === 'ElButton' && text(node) === label)[0].props,
     alert: () => nodes(node => node.type === 'ElAlert')[0]?.props.title,
+    stats: () => nodes(node => node.props.class === 'metric-value').map(text),
+    resultCount: () => nodes(node => node.type === 'ElTag').map(text).find(label => label.startsWith('筛选结果')),
+    emptyText: () => nodes(node => node.type === 'ElTable')[0].props['empty-text'],
     rows: () => nodes(node => node.type === 'ElTable')[0].props.data,
     pagination: () => nodes(node => node.type === 'ElPagination')[0].props,
     search: value => nodes(node => node.type === 'ElInput')[0].props['onUpdate:modelValue'](value),
@@ -87,6 +90,30 @@ beforeEach(() => {
   api.getAllTeamsApi.mockResolvedValue({ data: [{ teamId: 'team', teamName: 'Example' }] })
 })
 afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
+
+it('reports directory counts only after a valid response, including a genuinely empty directory', async () => {
+  const initial = deferred()
+  api.getAllUsersApi.mockReturnValueOnce(initial.promise).mockResolvedValueOnce({ data: [] })
+  const view = await mount()
+  expect(view.emptyText()).toBe('正在加载…')
+  expect(view.stats()).toEqual([])
+  expect(view.resultCount()).toBeUndefined()
+  expect(view.button('新增用户').disabled).toBe(true)
+
+  initial.resolve({ data: null })
+  await flush()
+  expect(view.alert()).toBe('用户目录响应格式异常')
+  expect(view.emptyText()).toBe('请刷新后重试')
+  expect(view.stats()).toEqual([])
+  expect(view.resultCount()).toBeUndefined()
+
+  await view.button('刷新').onClick()
+  await flush()
+  expect(view.alert()).toBeUndefined()
+  expect(view.emptyText()).toBe('暂无用户')
+  expect(view.stats()).toEqual(['0', '0', '0', '0', '0'])
+  expect(view.resultCount()).toBe('筛选结果 0')
+})
 
 it('locks creation during validation and reports a refresh failure separately from success', async () => {
   const view = await mount()
@@ -119,6 +146,8 @@ it('locks creation during validation and reports a refresh failure separately fr
   expect(messages.showSuccess).toHaveBeenCalledWith('用户已创建')
   expect(messages.showError).not.toHaveBeenCalled()
   expect(view.alert()).toBe('目录暂不可用')
+  expect(view.rows()).toEqual([row])
+  expect(view.resultCount()).toBe('筛选结果 1')
   expect(editor()['form-state'].password).toBe('')
 })
 
