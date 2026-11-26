@@ -2,11 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   AI_PROTOCOL,
-  buildProviderRows,
   buildCapabilityBody,
   capabilityIdentityLabel,
   defaultPathForProtocol,
-  filterProviderRows,
   normalizeProtocol,
   normalizeModelNameForCapability,
   modelRequestControls,
@@ -48,21 +46,6 @@ describe('aiChannelSettingsModel', () => {
     expect(defaultPathForProtocol(AI_PROTOCOL.responses)).toBe('/responses')
     expect(normalizeProtocol('unexpected')).toBe(AI_PROTOCOL.chatCompletions)
     expect(defaultPathForProtocol('unexpected')).toBe('/chat/completions')
-  })
-
-  it('searches grouped providers by model without exposing orphan rows', () => {
-    const rows = buildProviderRows(
-      [{ id: 1, name: 'Example' }, { id: 2, name: 'Other' }],
-      [
-        { id: 10, providerId: 1, model: 'reasoner-v1', isActive: 1 },
-        { id: 20, providerId: 999, model: 'orphan-model' }
-      ]
-    )
-
-    expect(filterProviderRows(rows, 'reasoner')).toEqual([expect.objectContaining({
-      id: 1, hasDefault: true, models: [expect.objectContaining({ model: 'reasoner-v1' })]
-    })])
-    expect(filterProviderRows(rows, 'orphan')).toEqual([])
   })
 
   it('selects the same model used by provider connection testing', () => {

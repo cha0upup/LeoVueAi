@@ -236,44 +236,33 @@ export function buildProviderRows(savedProviders, models) {
   const map = new Map()
 
   providers.forEach((provider) => {
-    map.set(provider.id, {
-      ...provider,
-      models: [],
-      hasDefault: false
-    })
+    map.set(provider.id, { ...provider, models: [] })
   })
 
   modelRows.forEach((model) => {
     const provider = map.get(model.providerId)
     if (!provider) return
     provider.models.push(model)
-    provider.hasDefault ||= model.isActive === 1
   })
 
   return [...map.values()]
 }
 
-export function filterProviderRows(providerRows, keyword) {
-  const query = String(keyword || '')
-    .trim()
-    .toLowerCase()
-  if (!query) return providerRows
-  return providerRows.filter(
-    (provider) =>
-      [provider.name, provider.providerKey, provider.baseUrl, provider.completionsPath].some(
-        (value) =>
-          String(value || '')
-            .toLowerCase()
-            .includes(query)
-      ) ||
-      provider.models.some((model) =>
-        [model.name, model.model].some((value) =>
-          String(value || '')
-            .toLowerCase()
-            .includes(query)
-        )
-      )
-  )
+export function searchProviderRows(providerRows, keyword) {
+  const query = keyword.trim().toLowerCase()
+  const matches = (value) => String(value ?? '').toLowerCase().includes(query)
+  const results = []
+
+  for (const provider of providerRows) {
+    if (!query || [provider.name, provider.providerKey, provider.baseUrl, provider.completionsPath].some(matches)) {
+      results.push({ provider, visibleModels: provider.models })
+      continue
+    }
+    const visibleModels = provider.models.filter((model) => matches(model.name) || matches(model.model))
+    if (visibleModels.length) results.push({ provider, visibleModels })
+  }
+
+  return results
 }
 
 export function providerTestModelId(provider) {

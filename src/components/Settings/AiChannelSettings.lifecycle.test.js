@@ -59,7 +59,7 @@ const SettingsPage = compileClientComponent(new URL('./AiChannelSettings.vue', i
 const ModelDialog = compileClientComponent(new URL('./AiModelConfigDialog.vue', import.meta.url))
 
 const flush = async () => { for (let i = 0; i < 6; i++) await nextTick() }
-const text = node => findNodes(node).map(item => item.text).join(' ')
+const text = node => findNodes(node, item => item.type !== 'comment').map(item => item.text).join(' ')
 const apps = []
 
 beforeEach(() => {
@@ -178,6 +178,38 @@ describe('AI channel settings initialization', () => {
     expect(view.node('ElAlert')).toBeNull()
     expect(text(view.root)).toContain('暂无供应商')
     expect(view.errors).toEqual([])
+  })
+
+  it('narrows model search results without changing provider totals or actions', async () => {
+    api.listAiProvidersApi.mockResolvedValue({ data: [
+      { id: 2, name: 'Fixture Provider', baseUrl: 'https://gateway.example.test' }, { id: 3, name: 'Other Provider' }
+    ] })
+    api.listAiModelConfigsApi.mockResolvedValue({ data: [
+      { id: 8, providerId: 2, model: 'chat-v1' },
+      { id: 9, providerId: 2, model: 'reasoner-v1' },
+      { id: 10, providerId: 99, model: 'orphan-model' }
+    ] })
+    const view = await mount(SettingsPage)
+    const search = async (keyword) => {
+      view.node('ElInput').props['onUpdate:modelValue'](keyword)
+      await flush()
+    }
+    const modelNames = () => findNodes(view.root, node => node.props['aria-pressed'] !== undefined)
+      .map(node => text(findNode(node, 'strong')).trim())
+    const providerCards = () => findNodes(view.root, node => node.type === 'article')
+
+    await search(' REASONER ')
+    expect(modelNames()).toEqual(['reasoner-v1'])
+    expect(providerCards()).toHaveLength(1)
+    expect(text(providerCards()[0])).toContain('显示 1 个匹配模型')
+    expect(view.node('ElPopconfirm').props.title).toContain('其下 2 个模型')
+
+    await search('gateway.example.test')
+    expect(modelNames()).toEqual(['chat-v1', 'reasoner-v1'])
+    await search('orphan-model')
+    expect(text(view.root)).toContain('未找到匹配的供应商或模型')
+    await search('')
+    expect(providerCards()).toHaveLength(2)
   })
 
   it('renders read failures, missing health records and observed breaker state distinctly', async () => {

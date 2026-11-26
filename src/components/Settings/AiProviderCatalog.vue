@@ -66,7 +66,7 @@
             show-icon
           />
           <article
-            v-for="provider in filteredProviderRows"
+            v-for="{ provider, visibleModels } in filteredProviderRows"
             :key="provider.id"
             class="provider-card-row"
             :class="{ 'is-disabled': provider.enabled === 0 }"
@@ -94,7 +94,12 @@
                 </div>
                 <div class="provider-meta-line">
                   <span>Base URL：{{ provider.baseUrl || '未配置' }}</span>
-                  <span>同步模型：{{ modelListError ? '待刷新' : `${provider.models.length} 个` }}</span>
+                  <span>
+                    同步模型：{{ modelListError ? '待刷新' : `${provider.models.length} 个` }}
+                    <template v-if="visibleModels.length < provider.models.length">
+                      （显示 {{ visibleModels.length }} 个匹配模型）
+                    </template>
+                  </span>
                   <span>同步时间：{{ provider.updatedAt || provider.createdAt || '暂无' }}</span>
                 </div>
               </div>
@@ -140,7 +145,7 @@
             </div>
 
             <div
-              v-if="provider.models.length"
+              v-if="visibleModels.length"
               class="model-table-lite"
             >
               <div class="model-table-lite__head">
@@ -151,7 +156,7 @@
                 <span>状态</span>
               </div>
               <button
-                v-for="model in provider.models"
+                v-for="model in visibleModels"
                 :key="model.id"
                 class="model-row-lite"
                 :class="{ 'is-selected': selectedModelId === model.id }"
@@ -215,7 +220,7 @@
             v-if="!loading && !directoryError && filteredProviderRows.length === 0"
             class="provider-empty-hint"
           >
-            {{ hasSearchKeyword ? '没有匹配的供应商' : '暂无供应商' }}
+            {{ hasSearchKeyword ? '未找到匹配的供应商或模型' : '暂无供应商' }}
           </div>
         </div>
       </div>
@@ -233,10 +238,10 @@ import StatusIndicator from '@/components/common/StatusIndicator.vue'
 import { icons } from '@/utils/icons.js'
 import {
   buildProviderRows,
-  filterProviderRows,
   healthStatusLabel,
   providerInitial,
   providerTestModelId,
+  searchProviderRows,
   shortTokens
 } from './aiChannelSettingsModel.js'
 
@@ -289,7 +294,7 @@ const circuitSummary = computed(() => {
 })
 const recognitionRate = computed(() => props.rows.length ? Math.round((recognizedModelCount.value / props.rows.length) * 1000) / 10 : 0)
 const providerRows = computed(() => buildProviderRows(props.savedProviders, props.rows))
-const filteredProviderRows = computed(() => filterProviderRows(providerRows.value, searchKeyword.value))
+const filteredProviderRows = computed(() => searchProviderRows(providerRows.value, searchKeyword.value))
 const hasSearchKeyword = computed(() => searchKeyword.value.trim().length > 0)
 
 const isProviderTesting = (provider) => {
