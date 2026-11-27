@@ -23,10 +23,17 @@ describe('current task factory state', () => {
 
   it('stores the export connection once and keeps explicit export choices', () => {
     const connection = { dialect: 'sqlite', file: '/tmp/fixture.db' }
-    const task = createDbExportTask({ taskId: 'export', sessionId: 'session', databaseName: 'fixture',
-      tableCount: 2, options: { connection, includeData: false, includeStructure: true, exportFormat: 'sql' } })
+    const task = createDbExportTask({
+      taskId: 'export', sessionId: 'session', databaseName: 'selected', connection,
+      snapshot: {
+        taskId: 'server-export', database: 'fixture', fileName: 'fixture.zip',
+        tableRefs: [{ name: 'orders' }, { name: 'customers' }],
+        includeData: false, includeStructure: null, format: 'zip'
+      }
+    })
     expect(task.connection).toBe(connection)
-    expect(task.options).toEqual({ includeData: false, includeStructure: true, exportFormat: 'sql' })
+    expect(task).toMatchObject({ databaseName: 'fixture', fileName: 'fixture.zip', tableCount: 2 })
+    expect(task.options).toEqual({ includeData: false, includeStructure: true, exportFormat: 'zip' })
     expect(task).not.toHaveProperty('result')
     expect(task).not.toHaveProperty('retryCount')
   })

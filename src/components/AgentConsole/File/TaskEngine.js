@@ -20,7 +20,6 @@ import {
 import { applyDownloadExecutor } from './executors/downloadExecutor.js'
 import { applyUploadExecutor } from './executors/uploadExecutor.js'
 import { applyScanExecutor } from './executors/scanExecutor.js'
-import { applyDbExportExecutor } from './executors/dbExportExecutor.js'
 import { registerSessionCleanup } from '@/services/sessionLifecycle.js'
 
 /** 按会话管理任务，协调执行器并分发生命周期事件。 */
@@ -109,10 +108,11 @@ class TaskEngine {
     }))
   }
 
-  // 创建数据库导出任务
-  createDbExportTask(sessionId, databaseName, tableCount, options = {}) {
+  // SQL 导出由服务端创建；本地任务注册时已包含可用的服务端状态。
+  registerDbExportTask({ sessionId, snapshot, databaseName, connection }) {
+    if (!snapshot?.taskId) return null
     const taskId = this.generateTaskId()
-    return this.registerTask(createDbExportTask({ taskId, sessionId, databaseName, tableCount, options }))
+    return this.registerTask(createDbExportTask({ taskId, sessionId, snapshot, databaseName, connection }))
   }
 
   // 创建扫描任务
@@ -378,7 +378,6 @@ class TaskEngine {
 applyDownloadExecutor(TaskEngine)
 applyUploadExecutor(TaskEngine)
 applyScanExecutor(TaskEngine)
-applyDbExportExecutor(TaskEngine)
 
 // 创建全局任务引擎实例，确保在热重载时保持单例
 

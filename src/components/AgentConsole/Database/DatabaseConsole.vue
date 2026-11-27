@@ -239,31 +239,12 @@ const getDefaultWorkspaceTab = () => {
   return hasCapability('rawSql') ? 'query' : 'database-info'
 }
 
-const registerSqlExportTask = (snapshot) => {
-  if (!snapshot?.taskId) return null
-
-  const tableRefs = Array.isArray(snapshot.tableRefs) ? snapshot.tableRefs : []
-  const localTaskId = taskEngine.createDbExportTask(
-    props.sessionId,
-    snapshot.database || currentDatabase.value || '',
-    snapshot.tableCount ?? tableRefs.length,
-    {
-      connection: { ...connection },
-      exportFormat: snapshot.format || 'zip',
-      includeData:
-        snapshot.includeData === null || snapshot.includeData === undefined
-          ? true
-          : snapshot.includeData,
-      includeStructure:
-        snapshot.includeStructure === null || snapshot.includeStructure === undefined
-          ? true
-          : snapshot.includeStructure
-    }
-  )
-
-  taskEngine.hydrateDbExportTask(localTaskId, snapshot)
-  return localTaskId
-}
+const registerSqlExportTask = (snapshot) => taskEngine.registerDbExportTask({
+  sessionId: props.sessionId,
+  snapshot,
+  databaseName: currentDatabase.value || '',
+  connection: { ...connection }
+})
 
 // 切换连接信息显示
 const toggleConnectionInfo = () => {

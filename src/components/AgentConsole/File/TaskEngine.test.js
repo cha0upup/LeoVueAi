@@ -39,13 +39,21 @@ describe('task engine login scope', () => {
     expect(taskEngine.activeTasks.size).toBe(0)
   })
 
-  it.each(['NEW', 'PENDING', 'RUNNING', 'PAUSED', 'COMPLETED', 'FAILED', 'CANCELLED'])(
-    'hydrates database export state from the shared engine mapping: %s', state => {
-      const id = taskEngine.createDbExportTask('session', 'fixture', 1)
-      taskEngine.hydrateDbExportTask(id, { taskId: 'server-export', status: state, progress: 25 })
-      const expected = { NEW: TaskStatus.PENDING, PENDING: TaskStatus.PENDING, RUNNING: TaskStatus.DB_EXPORTING,
-        PAUSED: TaskStatus.PAUSED, COMPLETED: TaskStatus.COMPLETED, FAILED: TaskStatus.FAILED, CANCELLED: TaskStatus.CANCELLED }
-      expect(taskEngine.getTaskById(id)).toMatchObject({ serverTaskId: 'server-export', status: expected[state], progress: 25 })
+  it.each([
+    ['NEW', TaskStatus.PENDING], ['PENDING', TaskStatus.PENDING], ['RUNNING', TaskStatus.DB_EXPORTING],
+    ['PAUSED', TaskStatus.PAUSED], ['COMPLETED', TaskStatus.COMPLETED], ['FAILED', TaskStatus.FAILED],
+    ['CANCELLED', TaskStatus.CANCELLED]
+  ])(
+    'registers a database export with its server state in a single notification: %s', (state, status) => {
+      const received = vi.fn()
+      taskEngine.on('taskCreated', task => received(taskEngine.getTaskById(task.id)?.status, task.serverTaskId))
+      taskEngine.on('taskProgress', () => received('unexpected progress notification'))
+      const id = taskEngine.registerDbExportTask({
+        sessionId: 'session',
+        snapshot: { taskId: 'server-export', status: state, progress: 25 }
+      })
+      expect(received).toHaveBeenCalledExactlyOnceWith(status, 'server-export')
+      expect(taskEngine.getTaskById(id)).toMatchObject({ serverTaskId: 'server-export', status, progress: 25 })
     }
   )
 

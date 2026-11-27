@@ -1,4 +1,4 @@
-import { TaskStatus, TaskType } from '@/constants/task.js'
+import { normalizeEngineTaskStatus, TaskStatus, TaskType } from '@/constants/task.js'
 
 export function createDownloadTask({
   taskId,
@@ -73,33 +73,34 @@ export function createUploadTask({
   }
 }
 
-export function createDbExportTask({ taskId, sessionId, databaseName, tableCount, options = {} }) {
+export function createDbExportTask({ taskId, sessionId, snapshot, databaseName = '', connection }) {
+  const database = snapshot.database || databaseName
   return {
     id: taskId,
     type: TaskType.DB_EXPORT,
     sessionId,
-    databaseName,
-    tableCount,
-    fileName: `${databaseName}_数据库导出_${new Date().toISOString().slice(0, 10)}.zip`,
-    fileSize: 0,
-    serverTaskId: null,
-    connection: options.connection || null,
-    downloadPath: null,
-    status: TaskStatus.PENDING,
-    progress: 0,
-    currentTable: '',
-    processedTables: 0,
-    rowCount: null,
-    createdTime: null,
-    startTime: null,
-    endTime: null,
+    databaseName: database,
+    tableCount: snapshot.tableCount ?? (Array.isArray(snapshot.tableRefs) ? snapshot.tableRefs.length : 0),
+    fileName: snapshot.fileName || `${database}_数据库导出_${new Date().toISOString().slice(0, 10)}.zip`,
+    fileSize: snapshot.fileSize ?? 0,
+    serverTaskId: snapshot.taskId,
+    connection: connection || null,
+    downloadPath: snapshot.downloadPath || null,
+    status: normalizeEngineTaskStatus(snapshot.status, TaskStatus.DB_EXPORTING),
+    progress: Number(snapshot.progress || 0),
+    currentTable: snapshot.currentTable || '',
+    processedTables: Number(snapshot.processedTables || 0),
+    rowCount: snapshot.rowCount ?? null,
+    createdTime: snapshot.createdTime || null,
+    startTime: snapshot.startTime || null,
+    endTime: snapshot.endTime || null,
     isPaused: false,
     isCancelled: false,
-    error: null,
+    error: snapshot.error || null,
     options: {
-      exportFormat: options.exportFormat || 'zip',
-      includeData: options.includeData !== false,
-      includeStructure: options.includeStructure !== false,
+      exportFormat: snapshot.format || 'zip',
+      includeData: snapshot.includeData ?? true,
+      includeStructure: snapshot.includeStructure ?? true,
     }
   }
 }
