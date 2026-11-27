@@ -257,6 +257,22 @@ it('refreshes the filtered directory after a delete conflict without retrying th
   expect(view.rows()).toEqual([updated])
 })
 
+it('ignores user deletion feedback from a previous session', async () => {
+  const view = await mount()
+  const pending = deferred()
+  confirmDelete.mockResolvedValueOnce(true)
+  api.deleteUserApi.mockReturnValueOnce(pending.promise)
+  const deletion = view.button('删除').onClick()
+  await flush()
+  expect(api.deleteUserApi).toHaveBeenCalledOnce()
+
+  resetSessionState()
+  pending.resolve({ data: null })
+  await deletion
+  expect(messages.showSuccess).not.toHaveBeenCalled()
+  expect(api.getAllUsersApi).toHaveBeenCalledOnce()
+})
+
 it('does not let an old refresh replace newer rows', async () => {
   const view = await mount()
   const stale = deferred()

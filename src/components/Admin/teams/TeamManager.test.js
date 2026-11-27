@@ -8,7 +8,7 @@ import { executeRequest } from '@/utils/apiUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { icons } from '@/utils/icons.js'
 import { formatDate } from '@/utils/format.js'
-import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
+import { isCurrentSession, resetSessionState, sessionGeneration } from '@/services/sessionLifecycle.js'
 
 const api = Object.fromEntries(['getAllTeamsApi', 'getAllUsersApi', 'getTeamLeaderOptionsApi',
   'addTeamApi', 'deleteTeamApi'].map(name => [name, vi.fn()]))
@@ -178,6 +178,23 @@ it('keeps the team draft and reloads candidates after the selected leader become
   expect(api.addTeamApi).toHaveBeenLastCalledWith({ teamName: 'New team', leaderId: 'replacement' })
 })
 
+it('ignores team creation feedback after leaving the page', async () => {
+  const view = await mount()
+  await view.button('新增团队').onClick()
+  view.change('ElInput', '请输入团队名称', 'New team')
+  view.change('ElSelect', '请选择队长', 'candidate')
+  const pending = deferred()
+  api.addTeamApi.mockReturnValueOnce(pending.promise)
+  const submit = view.button('提交').onClick()
+  expect(api.addTeamApi).toHaveBeenCalledOnce()
+
+  apps.pop().unmount()
+  pending.resolve({ data: null })
+  await submit
+  expect(messages.showSuccess).not.toHaveBeenCalled()
+  expect(api.getAllTeamsApi).toHaveBeenCalledOnce()
+})
+
 it('retains teams on a refresh failure but keeps a confirmed missing team off the list', async () => {
   const view = await mount()
   api.getAllTeamsApi.mockRejectedValueOnce(new Error('目录暂不可用'))
@@ -199,6 +216,22 @@ it('retains teams on a refresh failure but keeps a confirmed missing team off th
   expect(api.getAllTeamsApi).toHaveBeenCalledTimes(4)
   expect(view.rows()).toEqual([])
   expect(view.alerts()).toEqual(['刷新暂不可用'])
+})
+
+it('ignores team deletion feedback from a previous session', async () => {
+  const view = await mount()
+  const pending = deferred()
+  confirmDelete.mockResolvedValueOnce(true)
+  api.deleteTeamApi.mockReturnValueOnce(pending.promise)
+  const deletion = view.button('删除').onClick()
+  await flush()
+  expect(api.deleteTeamApi).toHaveBeenCalledOnce()
+
+  resetSessionState()
+  pending.reject({ response: { status: 404, data: { code: 404, msg: '团队不存在' } } })
+  await deletion
+  expect(messages.showError).not.toHaveBeenCalled()
+  expect(api.getAllTeamsApi).toHaveBeenCalledOnce()
 })
 
 it('does not load admin candidates for a team leader', async () => {

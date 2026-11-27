@@ -307,6 +307,8 @@ let directoryRequest
 let candidatesRequest
 let disposed = false
 
+const isActiveAdminSession = generation => !disposed && isAdmin.value && isCurrentSession(generation)
+
 const keyword = computed(() => searchKeyword.value.trim().toLowerCase())
 const hasFilters = computed(() => Boolean(keyword.value) || leaderFilter.value !== 'all')
 const teamMetrics = computed(() => {
@@ -405,18 +407,20 @@ watch(addTeamDialog, (visible) => {
 
 const addTeam = () => {
   if (!isAdmin.value || !addTeamDialog.value || !canSubmitTeam.value) return
+  const generation = sessionGeneration.value
   const payload = { teamName: team.teamName.trim(), leaderId: team.leaderId }
   return executeRequest(() => addTeamApi(payload), {
     loadingRef: submitting,
     successMessage: '已创建团队',
     errorMessage: '创建团队失败',
-    onSuccess: async () => {
+    isActive: () => isActiveAdminSession(generation) && addTeamDialog.value,
+    onSuccess: () => {
       addTeamDialog.value = false
-      if (!disposed) await refreshData()
+      return refreshData()
     },
     onError: (error) => {
       const status = error?.response?.status
-      if (disposed || !addTeamDialog.value || (status !== 404 && status !== 409)) return
+      if (status !== 404 && status !== 409) return
       team.leaderId = ''
       return loadCandidates()
     }
@@ -434,9 +438,8 @@ const delTeam = async (row) => {
   }
   const { teamId, teamName } = row
   const generation = sessionGeneration.value
-  const isActive = () => !disposed && isAdmin.value && isCurrentSession(generation)
+  const isActive = () => isActiveAdminSession(generation)
   const refreshAfterRemoval = () => {
-    if (!isActive()) return
     teamData.value = teamData.value.filter((item) => item.teamId !== teamId)
     return refreshData()
   }
@@ -447,6 +450,7 @@ const delTeam = async (row) => {
     await executeRequest(() => deleteTeamApi({ id: teamId }), {
       successMessage: '已删除团队',
       errorMessage: '删除团队失败',
+      isActive,
       onSuccess: refreshAfterRemoval,
       onError: (error) => {
         const response = error?.response
@@ -459,8 +463,9 @@ const delTeam = async (row) => {
 }
 
 onMounted(async () => {
+  const generation = sessionGeneration.value
   await fetchAuth()
-  if (!disposed) await refreshData()
+  if (!disposed && isCurrentSession(generation)) await refreshData()
 })
 onScopeDispose(() => {
   disposed = true

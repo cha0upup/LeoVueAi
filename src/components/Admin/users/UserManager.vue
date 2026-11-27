@@ -696,7 +696,7 @@ const deleteUser = (user) => {
 
   const { userId, userName } = user
   const generation = sessionGeneration.value
-  const isActive = () => !disposed && isCurrentSession(generation)
+  const isActive = () => !disposed && isCurrentSession(generation) && canManageUser(user)
   return withLoading(deleting, async () => {
     const confirmed = await confirmDelete({
       title: '删除确认',
@@ -706,10 +706,11 @@ const deleteUser = (user) => {
     await executeRequest(() => deleteUserApi({ id: userId }), {
       successMessage: '用户已删除',
       errorMessage: '删除用户失败',
-      onSuccess: () => { if (isActive()) return loadUsers() },
+      isActive,
+      onSuccess: loadUsers,
       onError: (error) => {
         const status = error?.response?.status
-        if (isActive() && (status === 404 || status === 409)) return loadUsers()
+        if (status === 404 || status === 409) return loadUsers()
       }
     }).catch(() => false)
   })
