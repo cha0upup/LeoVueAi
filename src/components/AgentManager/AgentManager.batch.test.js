@@ -72,6 +72,7 @@ const modules = {
   './agentRuntimeStatus.js': { resolveAgentRuntimeStatus: () => ({}) },
   '@/composables/agent/useAgentDirectory.js': { useAgentDirectory, buildAgentUpdatePayload, normalizeAgentList },
   '@/composables/agent/useAgentSelection.js': { useAgentSelection },
+  '@/composables/useAuth.js': { useAuth: () => ({ currentUser: ref({ userId: 'manager' }) }) },
   '@/composables/useProjectDirectory.js': { useProjectDirectory: () => fixture.project },
   '@/utils/agentTransfer.js': {
     buildAgentTransferBundle: agents => ({ agents }), encodeAgentTransferPayload: mocks.encode

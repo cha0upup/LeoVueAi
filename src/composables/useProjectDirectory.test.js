@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { deferred } from '@/test-support/deferred.js'
 
 const mocks = vi.hoisted(() => ({ getProjects: vi.fn() }))
@@ -9,6 +9,7 @@ vi.mock('@/services/api/projects.js', () => ({
 
 import {
   ALL_PROJECTS_ID,
+  UNASSIGNED_PROJECT_ID,
   useProjectDirectory
 } from './useProjectDirectory.js'
 
@@ -16,7 +17,13 @@ describe('useProjectDirectory', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.getProjects.mockResolvedValue({ data: [] })
+    const storage = new Map()
+    vi.stubGlobal('window', { localStorage: {
+      getItem: key => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, value)
+    } })
   })
+  afterEach(() => vi.unstubAllGlobals())
 
   it('normalizes project summaries and preserves the current workspace when a refresh fails', async () => {
     mocks.getProjects.mockResolvedValue({
@@ -63,13 +70,34 @@ describe('useProjectDirectory', () => {
     expect(directory.projectsLoading.value).toBe(false)
   })
 
-  it('falls back to all assets when a saved project disappears', async () => {
-    const directory = useProjectDirectory()
-    directory.selectProject('missing-project')
+  it('restores each account’s workspace only after verifying a saved project', async () => {
+    const userOne = useProjectDirectory('user-one')
+    userOne.selectProject('project-1')
+    const userTwo = useProjectDirectory('user-two')
+    expect(userTwo.selectedProjectId.value).toBe(ALL_PROJECTS_ID)
+    userTwo.selectProject(UNASSIGNED_PROJECT_ID)
 
+    const directory = useProjectDirectory('user-one')
+    expect(directory.activeProjectId.value).toBe('')
+    mocks.getProjects.mockRejectedValueOnce(new Error('目录暂不可用'))
     await directory.loadProjects()
-
     expect(directory.selectedProjectId.value).toBe(ALL_PROJECTS_ID)
-    expect(directory.isAllProjects.value).toBe(true)
+
+    mocks.getProjects.mockResolvedValueOnce({ data: [{ project: { projectId: 'project-1' } }] })
+    await directory.loadProjects()
+    expect(directory.activeProjectId.value).toBe('project-1')
+    expect(useProjectDirectory('user-two').selectedProjectId.value).toBe(UNASSIGNED_PROJECT_ID)
+  })
+
+  it('forgets a project confirmed missing from the current account’s directory', async () => {
+    const directory = useProjectDirectory('user')
+    directory.selectProject('missing-project')
+    await directory.loadProjects()
+    expect(directory.selectedProjectId.value).toBe(ALL_PROJECTS_ID)
+
+    const reopened = useProjectDirectory('user')
+    mocks.getProjects.mockResolvedValueOnce({ data: [{ project: { projectId: 'missing-project' } }] })
+    await reopened.loadProjects()
+    expect(reopened.isAllProjects.value).toBe(true)
   })
 })

@@ -312,6 +312,7 @@ import {
   useAgentDirectory
 } from '@/composables/agent/useAgentDirectory.js'
 import { useProjectDirectory } from '@/composables/useProjectDirectory.js'
+import { useAuth } from '@/composables/useAuth.js'
 
 const logger = createLogger('AgentManager')
 const INVALID_SESSION_ID = 0
@@ -366,6 +367,7 @@ let sessionLoadToken = 0
 let membershipContextToken = 0
 const CONN_RESULTS_KEY = 'agent_conn_results'
 
+const { currentUser } = useAuth()
 const {
   projects,
   projectsLoading,
@@ -377,7 +379,7 @@ const {
   isAllProjects,
   loadProjects,
   selectProject
-} = useProjectDirectory()
+} = useProjectDirectory(currentUser.value?.userId)
 const selectionDisabled = computed(() => batchBusy.value || loading.value || projectsLoading.value)
 const hostSelection = useHostSelection(hostSelectionDialog, activeProjectId)
 const assignableProjects = computed(() =>

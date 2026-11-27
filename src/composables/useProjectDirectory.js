@@ -16,14 +16,16 @@ const normalizeProjectSummary = (item) => ({
   contentEditable: Boolean(item?.contentEditable)
 })
 
-export function useProjectDirectory() {
+export function useProjectDirectory(userId) {
   const projects = ref([])
   const projectsLoading = ref(false)
   const projectsError = ref('')
   let pendingRequest
-  const selectedProjectId = ref(
-    safeLocalStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY) || ALL_PROJECTS_ID
-  )
+  const storageKey = userId ? `${ACTIVE_PROJECT_STORAGE_KEY}:${userId}` : null
+  const savedProjectId = storageKey ? safeLocalStorage.getItem(storageKey) : null
+  const selectedProjectId = ref(savedProjectId === UNASSIGNED_PROJECT_ID ? UNASSIGNED_PROJECT_ID : ALL_PROJECTS_ID)
+  // 具体项目等当前账号的目录校验通过后再恢复。
+  let projectToRestore = savedProjectId && savedProjectId !== selectedProjectId.value ? savedProjectId : null
 
   const activeProject = computed(
     () => projects.value.find((project) => project.projectId === selectedProjectId.value) || null
@@ -35,8 +37,9 @@ export function useProjectDirectory() {
   )
 
   const selectProject = (projectId) => {
+    projectToRestore = null
     selectedProjectId.value = projectId || ALL_PROJECTS_ID
-    safeLocalStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, selectedProjectId.value)
+    if (storageKey) safeLocalStorage.setItem(storageKey, selectedProjectId.value)
   }
 
   // A failed current read can still use the existing workspace; a superseded read must do nothing.
@@ -53,15 +56,16 @@ export function useProjectDirectory() {
       if (signal.aborted) return false
       if (!Array.isArray(data)) throw new Error('项目目录响应格式异常')
       projects.value = data.map(normalizeProjectSummary)
-      if (focusProjectId && selectionAtStart === selectedProjectId.value
-        && projects.value.some((project) => project.projectId === focusProjectId)) {
-        selectProject(focusProjectId)
-      } else if (
-        selectedProjectId.value !== UNASSIGNED_PROJECT_ID &&
-        selectedProjectId.value !== ALL_PROJECTS_ID &&
-        !projects.value.some((project) => project.projectId === selectedProjectId.value)
-      ) {
-        selectedProjectId.value = ALL_PROJECTS_ID
+      const hasProject = (id) => projects.value.some((project) => project.projectId === id)
+      let nextProjectId = projectToRestore || selectedProjectId.value
+      if (focusProjectId && selectionAtStart === selectedProjectId.value && hasProject(focusProjectId)) {
+        nextProjectId = focusProjectId
+      }
+      if (nextProjectId !== UNASSIGNED_PROJECT_ID && nextProjectId !== ALL_PROJECTS_ID && !hasProject(nextProjectId)) {
+        nextProjectId = ALL_PROJECTS_ID
+      }
+      if (projectToRestore || nextProjectId !== selectedProjectId.value) {
+        selectProject(nextProjectId)
       }
     } catch (error) {
       if (signal.aborted || error?.code === 'SESSION_CHANGED' || error?.response?.status === 401) return false
