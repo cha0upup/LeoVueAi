@@ -132,7 +132,7 @@ it('uses the ids shown in the confirmation if selection changes while it is open
   view.selectRows([{ logId: 'different' }])
   confirmation.resolve(true)
   await pending
-  expect(api.deleteAuditLogsApi).toHaveBeenCalledWith({ logIds: ['a'] })
+  expect(api.deleteAuditLogsApi).toHaveBeenCalledWith(['a'])
 })
 
 it('keeps a failed refresh read-only and does not show deleted rows if reloading fails', async () => {
@@ -159,7 +159,7 @@ it('keeps a failed refresh read-only and does not show deleted rows if reloading
   api.getAuditLogSummaryPageApi.mockRejectedValueOnce(new Error('列表暂不可用'))
   await view.button('删除').onClick()
   await flush()
-  expect(api.deleteAuditLogsApi).toHaveBeenCalledWith({ logIds: ['a'] })
+  expect(api.deleteAuditLogsApi).toHaveBeenCalledWith(['a'])
   expect(view.rows()).toEqual([])
   expect(view.listAlert()).toMatchObject({ title: '列表暂不可用', description: undefined })
 })

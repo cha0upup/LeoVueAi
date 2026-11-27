@@ -658,14 +658,14 @@ const confirmLogDeletion = async (request, title, message) => {
 
 const handleDeleteOne = ({ logId }) => {
   if (!canDeleteRows.value || !logId) return
-  return confirmLogDeletion(() => deleteAuditLogsApi({ logIds: [logId] }),
+  return confirmLogDeletion(() => deleteAuditLogsApi([logId]),
     '删除审计日志', `确定删除日志 ${logId} 吗？此操作不可恢复。`)
 }
 
 const handleDeleteSelected = () => {
   if (!canDeleteRows.value || !selectedLogIds.value.length) return
   const logIds = [...selectedLogIds.value]
-  return confirmLogDeletion(() => deleteAuditLogsApi({ logIds }),
+  return confirmLogDeletion(() => deleteAuditLogsApi(logIds),
     '删除选中日志', `确定删除选中的 ${logIds.length} 条审计日志吗？此操作不可恢复。`)
 }
 

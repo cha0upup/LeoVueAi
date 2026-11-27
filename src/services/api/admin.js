@@ -24,8 +24,8 @@ export function cleanupAuditLogsApi(params) {
   return http.post('/platform/admin/audit-logs/cleanup', params)
 }
 
-export function deleteAuditLogsApi(params) {
-  return http.post('/platform/admin/audit-logs/delete', params)
+export function deleteAuditLogsApi(logIds) {
+  return http.post('/platform/admin/audit-logs/delete', { logIds })
 }
 
 export function deleteFilteredAuditLogsApi(params) {
