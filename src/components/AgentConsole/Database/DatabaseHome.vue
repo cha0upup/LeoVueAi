@@ -532,11 +532,7 @@ const deleteConfig = async (row) => {
 }
 
 onMounted(async () => {
-  try {
-    await sqlEngine.refreshDialectCatalog()
-  } catch {
-    sqlEngine.clearDialectCatalog()
-  }
+  await sqlEngine.refreshDialectCatalog().catch(() => {})
   await loadSavedConfigs()
 })
 

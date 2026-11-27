@@ -241,7 +241,6 @@ export function useDatabaseConfigDialogBase({ form, templates, sessionId }) {
       templates.value = getAllDatabaseTemplates(sqlEngine)
       return templates.value
     } catch (error) {
-      sqlEngine.clearDialectCatalog()
       templates.value = []
       dialectCatalogError.value = error?.message || 'SQL 方言目录加载失败'
       return []

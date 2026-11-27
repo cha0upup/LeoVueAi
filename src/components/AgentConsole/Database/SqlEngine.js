@@ -15,6 +15,8 @@ import {
   testSqlConnectionApi,
   updateSqlRowsApi
 } from '@/services/api/sql.js'
+import { createSessionChangedError, registerSessionCleanup } from '@/services/sessionLifecycle.js'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 
 /**
  * SQL引擎
@@ -30,8 +32,8 @@ class SqlEngine {
   constructor() {
     // ===== 连接管理 =====
     // 方言目录由后端 SqlDialectRegistry 动态加载。
-    this.dbConfigs = {}
-    this.dialectAliases = {}
+    this.dialectRequests = createLatestRequestGuard(['dialects'])
+    this.clearDialectCatalog()
   }
 
   _buildConnectionPayload(connection = {}) {
@@ -92,16 +94,24 @@ class SqlEngine {
     return getSqlDialectsApi()
   }
 
-  async refreshDialectCatalog() {
-    this.clearDialectCatalog()
-    const response = await this.getDialects()
-    if (!this.applyDialectCatalog(response?.data)) {
-      throw new Error('SQL 方言目录为空或格式无效')
-    }
-    return true
+  refreshDialectCatalog() {
+    return this.dialectRequests.coalesce('dialects', async (isCurrent) => {
+      try {
+        const response = await this.getDialects()
+        if (!isCurrent()) throw createSessionChangedError()
+        if (!this.applyDialectCatalog(response?.data)) {
+          throw new Error('SQL 方言目录为空或格式无效')
+        }
+        return true
+      } catch (error) {
+        if (isCurrent()) this.clearDialectCatalog()
+        throw error
+      }
+    })
   }
 
   clearDialectCatalog() {
+    this.dialectRequests.invalidate()
     this.dbConfigs = {}
     this.dialectAliases = {}
   }
@@ -292,5 +302,7 @@ class SqlEngine {
 
 // 创建单例实例
 const sqlEngine = new SqlEngine()
+const unregister = registerSessionCleanup('sql-dialect-catalog', () => sqlEngine.clearDialectCatalog())
+if (import.meta.hot) import.meta.hot.dispose(unregister)
 
 export default sqlEngine

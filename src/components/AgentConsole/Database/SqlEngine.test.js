@@ -1,5 +1,7 @@
 import { reactive, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { resetSessionState } from '@/services/sessionLifecycle.js'
+import { deferred } from '@/test-support/deferred.js'
 
 const apiMocks = vi.hoisted(() => ({
   testSqlConnectionApi: vi.fn(),
@@ -269,9 +271,9 @@ describe('SqlEngine runtime-neutral connections', () => {
     })
   })
 
-  it('starts without a local dialect catalog and exposes templates only after loading', async () => {
+  it('shares the dialect request between the connection list and a configuration dialog', async () => {
     expect(sqlEngine.getSupportedDatabases()).toEqual([])
-    apiMocks.getSqlDialectsApi.mockResolvedValueOnce({
+    const getDialects = apiMocks.getSqlDialectsApi.mockClear().mockResolvedValueOnce({
       data: [
         {
           type: 'dm',
@@ -304,7 +306,11 @@ describe('SqlEngine runtime-neutral connections', () => {
       sessionId: 'session-1'
     })
 
-    expect(await dialog.loadDatabaseTemplates()).toHaveLength(2)
+    const listLoad = sqlEngine.refreshDialectCatalog()
+    const loadedTemplates = await dialog.loadDatabaseTemplates()
+    expect(await listLoad).toBe(true)
+    expect(getDialects).toHaveBeenCalledOnce()
+    expect(loadedTemplates).toHaveLength(2)
     expect(dialog.dialectCatalogError.value).toBe('')
     expect(sqlEngine.normalizeDialect('dameng')).toBe('dm')
     expect(sqlEngine.normalizeDialect('kes')).toBe('kingbasees')
@@ -367,17 +373,46 @@ describe('SqlEngine runtime-neutral connections', () => {
         capabilities: {}
       }
     ])
-    apiMocks.getSqlDialectsApi.mockRejectedValueOnce(new Error('方言目录服务不可用'))
+    const pending = deferred()
+    apiMocks.getSqlDialectsApi.mockReturnValueOnce(pending.promise)
     const form = reactive(createDatabaseConfigForm())
     Object.assign(form, { dialect: 'mysql', host: 'db.internal', port: 3306 })
     const templates = ref([{ value: 'mysql' }])
     const dialog = useDatabaseConfigDialogBase({ form, templates, sessionId: 'session-1' })
 
-    expect(await dialog.loadDatabaseTemplates()).toEqual([])
+    const refreshing = dialog.loadDatabaseTemplates()
+    const dialectsDuringRefresh = sqlEngine.getSupportedDatabases()
+    pending.reject(new Error('方言目录服务不可用'))
+    expect(await refreshing).toEqual([])
+    expect(dialectsDuringRefresh).toEqual([{ type: 'mysql', name: 'MySQL', defaultPort: 3306 }])
     expect(dialog.dialectCatalogError.value).toBe('方言目录服务不可用')
     expect(sqlEngine.getSupportedDatabases()).toEqual([])
     expect(templates.value).toEqual([])
     expect(dialog.isComplete.value).toBe(false)
+  })
+
+  it('reloads the dialect catalog after a login change without letting an old dialog clear it', async () => {
+    const old = deferred()
+    const getDialects = apiMocks.getSqlDialectsApi.mockClear().mockReturnValueOnce(old.promise).mockResolvedValueOnce({
+      data: [{
+        type: 'sqlite', name: 'SQLite', defaultPort: null, aliases: [], connectionModes: ['standard'],
+        variants: [], dataTypes: [], runtimeSupport: {}, capabilities: {}
+      }]
+    })
+    const previous = useDatabaseConfigDialogBase({
+      form: reactive(createDatabaseConfigForm()), templates: ref([]), sessionId: 'previous-session'
+    }).loadDatabaseTemplates()
+
+    resetSessionState()
+    try {
+      const next = sqlEngine.refreshDialectCatalog()
+      expect(getDialects).toHaveBeenCalledTimes(2)
+      await expect(next).resolves.toBe(true)
+    } finally {
+      old.reject(new Error('previous request failed'))
+      await previous
+    }
+    expect(sqlEngine.getDialectName('sqlite')).toBe('SQLite')
   })
 
   it('exposes semantic variants instead of runtime driver variants', () => {
