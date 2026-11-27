@@ -12,6 +12,7 @@ const api = { getProfileApi: vi.fn(), updateProfileApi: vi.fn() }
 const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showError: vi.fn() }))
 vi.mock('@/utils/messageUtils.js', () => messages)
 const validate = vi.fn()
+const confirmAction = vi.fn()
 const initial = {
   userId: 'member', userName: 'Alice', email: 'alice@example.test', phone: '', remark: null, status: 1, accountRevision: 0
 }
@@ -19,6 +20,7 @@ const View = compileClientComponent(new URL('./ProfileDialog.vue', import.meta.u
   '@iconify/vue': { Icon: { render: () => null } },
   '@/services/api/auth.js': api,
   '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration },
+  '@/utils/confirmUtils.js': { confirmAction },
   '@/utils/errorHandler.js': { handleError },
   '@/utils/formUtils.js': { validateForm },
   '@/utils/icons.js': { icons },
@@ -94,6 +96,52 @@ it('hides the form while loading or failed and ignores the response to a closed 
   await flush()
   expect(view.error()).toBeUndefined()
   expect(view.form().model.email).toBe(initial.email)
+})
+
+it('only confirms a dirty close and keeps the draft if the confirmation is dismissed', async () => {
+  const view = mount()
+  await view.open()
+  view.form().model.email = ` ${initial.email} `
+  await view.button('取消').onClick()
+  await flush()
+  expect(confirmAction).not.toHaveBeenCalled()
+  expect(view.dialog().modelValue).toBe(false)
+
+  await view.open()
+  view.form().model.remark = 'Unsaved draft'
+  const confirmation = deferred()
+  confirmAction.mockReturnValueOnce(confirmation.promise)
+  const done = vi.fn()
+  const closing = view.dialog()['before-close'](done)
+  await view.button('取消').onClick()
+  expect(confirmAction).toHaveBeenCalledOnce()
+  expect(view.button('保存资料').disabled).toBe(true)
+  confirmation.resolve(false)
+  await closing
+  expect(done).not.toHaveBeenCalled()
+  expect(view.form().model.remark).toBe('Unsaved draft')
+
+  confirmAction.mockResolvedValueOnce(true)
+  await view.button('取消').onClick()
+  expect(view.dialog().modelValue).toBe(false)
+  expect(view.form()).toBeUndefined()
+})
+
+it('does not let a delayed discard confirmation close a new session’s draft', async () => {
+  const view = mount()
+  await view.open()
+  view.form().model.remark = 'First draft'
+  const confirmation = deferred()
+  confirmAction.mockReturnValueOnce(confirmation.promise)
+  const closing = view.button('取消').onClick()
+
+  resetSessionState()
+  await view.open()
+  view.form().model.remark = 'New draft'
+  confirmation.resolve(true)
+  await closing
+  expect(view.dialog().modelValue).toBe(true)
+  expect(view.form().model.remark).toBe('New draft')
 })
 
 it('skips unchanged values and retains a failed draft for retry without duplicate saves', async () => {

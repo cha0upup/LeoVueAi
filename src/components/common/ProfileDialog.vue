@@ -7,6 +7,7 @@
     :close-on-click-modal="!saving"
     :close-on-press-escape="!saving"
     :show-close="!saving"
+    :before-close="requestClose"
   >
     <div
       v-if="loading && !profile"
@@ -120,7 +121,7 @@
         ref="formRef"
         :model="form"
         :rules="rules"
-        :disabled="saving || loading"
+        :disabled="saving || loading || confirmingClose"
         label-position="top"
         class="profile-form"
       >
@@ -181,8 +182,8 @@
     <template #footer>
       <div class="dialog-footer">
         <el-button
-          :disabled="saving"
-          @click="visible = false"
+          :disabled="saving || confirmingClose"
+          @click="requestClose()"
         >
           取消
         </el-button>
@@ -205,6 +206,7 @@ import { Icon } from '@iconify/vue'
 
 import { getProfileApi, updateProfileApi } from '@/services/api/auth.js'
 import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
+import { confirmAction } from '@/utils/confirmUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { validateForm } from '@/utils/formUtils.js'
 import { icons as iconMap } from '@/utils/icons.js'
@@ -220,6 +222,7 @@ const FIELD_LABELS = { email: '邮箱', phone: '手机号', remark: '备注' }
 const visible = ref(false)
 const loading = ref(false)
 const saving = ref(false)
+const confirmingClose = ref(false)
 const loadError = ref('')
 const saveError = ref('')
 const profileConflict = ref(false)
@@ -241,13 +244,16 @@ const concurrentEdits = computed(() => {
     .map(field => ({ field, value: latest[field] }))
 })
 const roleLabel = computed(() => ROLE_LABELS[profile.value?.privilege] || '当前用户')
-const canSave = computed(() => {
-  if (!visible.value || loading.value || saving.value || profileConflict.value || !profile.value) return false
+const hasChanges = computed(() => {
+  if (!profile.value) return false
   const current = editableFields(profile.value)
   const draft = editableFields(form)
   return Object.keys(current).some(field => current[field] !== draft[field])
 })
+const canSave = computed(() => visible.value && !loading.value && !saving.value && !confirmingClose.value
+  && !profileConflict.value && hasChanges.value)
 let loadRequest
+let closeSequence = 0
 let disposed = false
 
 const rules = {
@@ -315,6 +321,27 @@ const openProfileDialog = () => {
   return loadProfile()
 }
 
+async function requestClose(done) {
+  if (disposed || !visible.value || saving.value || confirmingClose.value) return
+  if (hasChanges.value) {
+    const sequence = ++closeSequence
+    confirmingClose.value = true
+    try {
+      const discard = await confirmAction({
+        title: '放弃资料修改？',
+        message: '当前有未保存的资料，关闭后将丢弃这些修改。',
+        confirmButtonText: '放弃修改',
+        cancelButtonText: '继续编辑'
+      })
+      if (!discard || sequence !== closeSequence) return
+    } finally {
+      if (sequence === closeSequence) confirmingClose.value = false
+    }
+  }
+  done?.()
+  visible.value = false
+}
+
 const useLatestValue = (field, value) => {
   if (saving.value || loading.value) return
   form[field] = value
@@ -353,6 +380,8 @@ const resetDialog = () => {
   loadRequest = undefined
   loading.value = false
   saving.value = false
+  closeSequence++
+  confirmingClose.value = false
   profile.value = null
   loadError.value = ''
   saveError.value = ''
