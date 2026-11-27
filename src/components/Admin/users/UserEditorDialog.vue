@@ -9,12 +9,14 @@
     :close-on-press-escape="!submitting"
   >
     <el-form
+      :id="formId"
       :ref="setFormRef"
       :model="form"
       :rules="rules"
       :disabled="submitting"
       label-width="100px"
       class="user-form"
+      @submit.prevent="emit('submit')"
     >
       <el-form-item
         label="用户名"
@@ -117,9 +119,10 @@
         </el-button>
         <el-button
           type="primary"
+          native-type="submit"
+          :form="formId"
           :disabled="submitting"
           :loading="submitting"
-          @click="$emit('submit')"
         >
           {{ editing ? '更新' : '添加' }}
         </el-button>
@@ -129,10 +132,11 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, useId } from 'vue'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
 
 const visible = defineModel({ type: Boolean, default: false })
+const formId = useId()
 
 const passwordFields = [
   { prop: 'password', label: '密码', placeholder: '请输入密码' },

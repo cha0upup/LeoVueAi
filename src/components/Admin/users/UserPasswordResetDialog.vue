@@ -20,11 +20,13 @@
       />
 
       <el-form
+        :id="formId"
         :ref="setFormRef"
         :model="form"
         :rules="rules"
         :disabled="resetting"
         class="reset-form"
+        @submit.prevent="emit('submit')"
       >
         <el-form-item
           v-for="field in passwordFields"
@@ -54,9 +56,10 @@
         </el-button>
         <el-button
           type="primary"
+          native-type="submit"
+          :form="formId"
           :disabled="resetting"
           :loading="resetting"
-          @click="$emit('submit')"
         >
           确认重置
         </el-button>
@@ -66,10 +69,11 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, useId } from 'vue'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
 
 const visible = defineModel({ type: Boolean, default: false })
+const formId = useId()
 
 const passwordFields = [
   { prop: 'newPassword', label: '新密码', placeholder: '请输入新密码' },

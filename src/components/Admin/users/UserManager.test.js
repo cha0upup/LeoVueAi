@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { h, nextTick, reactive, ref } from 'vue'
-import { compileClientComponent, createSlotStub, findNodes } from '@/test-support/vueComponent.js'
+import { compileClientComponent, createSlotStub, findNode, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
 import { AUTH_FIELD_LIMITS } from '@/constants/app.js'
@@ -97,6 +97,32 @@ beforeEach(() => {
   api.getAllTeamsApi.mockResolvedValue({ data: [{ teamId: 'team', teamName: 'Example' }] })
 })
 afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
+
+it.each(['UserEditorDialog', 'UserPasswordResetDialog'])('%s uses the same form for Enter and the footer button', (name) => {
+  const Dialog = compileClientComponent(new URL(`./${name}.vue`, import.meta.url), {
+    '@/constants/app.js': { AUTH_FIELD_LIMITS }
+  })
+  const renderer = createTestRenderer()
+  const onSubmit = vi.fn()
+  const app = renderer.createApp(Dialog, { modelValue: true, formState: {}, rules: {}, onSubmit })
+  app.component('ElDialog', createSlotStub('ElDialog', ['default', 'footer']))
+  for (const tag of ['ElForm', 'ElFormItem', 'ElInput', 'ElSelect', 'ElOption', 'ElRadioGroup', 'ElRadio', 'ElButton']) {
+    app.component(tag, createSlotStub(tag))
+  }
+  app.mount(renderer.root)
+  apps.push(app)
+
+  const form = findNode(renderer.root, 'ElForm').props
+  const button = findNodes(renderer.root, node => node.type === 'ElButton' && node.props['native-type'] === 'submit')[0]
+  expect(form.id).toBeTruthy()
+  expect(button.props.form).toBe(form.id)
+  expect(button.props.onClick).toBeUndefined()
+
+  const preventDefault = vi.fn()
+  form.onSubmit({ preventDefault })
+  expect(preventDefault).toHaveBeenCalledOnce()
+  expect(onSubmit).toHaveBeenCalledOnce()
+})
 
 it('uses the team link as a removable directory filter without another user request', async () => {
   route.query = { tab: 'users', teamId: 'team' }

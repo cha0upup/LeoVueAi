@@ -64,6 +64,8 @@ async function mount() {
     membersLink: () => nodes('RouterLink')[0]?.props.to,
     change: (type, placeholder, value) => field(type, placeholder)['onUpdate:modelValue'](value),
     field,
+    form: () => nodes('ElForm')[0].props,
+    submit: (event = { preventDefault() {} }) => nodes('ElForm')[0].props.onSubmit(event),
     options: () => nodes('ElOption').map(node => node.props.value),
     rows: () => nodes('ElTable')[0].props.data,
     emptyText: () => nodes('ElTable')[0].props['empty-text'],
@@ -119,14 +121,19 @@ it('searches by the loaded leader and only requests candidates when creating a t
   await nextTick()
   expect(view.options()).toEqual(['candidate'])
   expect(api.getAllUsersApi).not.toHaveBeenCalled()
+  expect(view.button('提交')).toMatchObject({ 'native-type': 'submit', form: view.form().id })
+  await view.submit()
+  expect(api.addTeamApi).not.toHaveBeenCalled()
 
   view.change('ElInput', '请输入团队名称', ' Team B ')
   view.change('ElSelect', '请选择队长', 'candidate')
   await nextTick()
   const saving = deferred()
   api.addTeamApi.mockReturnValue(saving.promise)
-  const submit = view.button('提交').onClick()
-  await view.button('提交').onClick()
+  const preventDefault = vi.fn()
+  const submit = view.submit({ preventDefault })
+  expect(preventDefault).toHaveBeenCalledOnce()
+  await view.submit()
   expect(api.addTeamApi).toHaveBeenCalledExactlyOnceWith({ teamName: 'Team B', leaderId: 'candidate' })
   saving.resolve({ data: null })
   await submit
@@ -164,7 +171,7 @@ it('keeps the team draft and reloads candidates after the selected leader become
   api.getTeamLeaderOptionsApi.mockResolvedValueOnce({ data: [{ userId: 'replacement', userName: 'Eve' }] })
   await nextTick()
 
-  await view.button('提交').onClick()
+  await view.submit()
   expect(api.addTeamApi).toHaveBeenCalledExactlyOnceWith({ teamName: 'New team', leaderId: 'candidate' })
   expect(api.getTeamLeaderOptionsApi).toHaveBeenCalledTimes(2)
   expect(view.field('ElSelect', '请选择队长').modelValue).toBe('')
@@ -174,7 +181,7 @@ it('keeps the team draft and reloads candidates after the selected leader become
 
   view.change('ElSelect', '请选择队长', 'replacement')
   await nextTick()
-  await view.button('提交').onClick()
+  await view.submit()
   expect(api.addTeamApi).toHaveBeenLastCalledWith({ teamName: 'New team', leaderId: 'replacement' })
 })
 
@@ -185,7 +192,7 @@ it('ignores team creation feedback after leaving the page', async () => {
   view.change('ElSelect', '请选择队长', 'candidate')
   const pending = deferred()
   api.addTeamApi.mockReturnValueOnce(pending.promise)
-  const submit = view.button('提交').onClick()
+  const submit = view.submit()
   expect(api.addTeamApi).toHaveBeenCalledOnce()
 
   apps.pop().unmount()

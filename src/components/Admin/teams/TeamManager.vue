@@ -194,10 +194,12 @@
         show-icon
       />
       <el-form
+        :id="formId"
         :model="team"
         :disabled="submitting"
         label-width="100px"
         label-position="left"
+        @submit.prevent="addTeam"
       >
         <el-form-item label="团队名称">
           <el-input
@@ -243,9 +245,10 @@
           </el-button>
           <el-button
             type="primary"
+            native-type="submit"
+            :form="formId"
             :loading="submitting"
             :disabled="!canSubmitTeam"
-            @click="addTeam"
           >
             提交
           </el-button>
@@ -257,7 +260,7 @@
 
 <script setup>
 import PageHeader from '@/components/common/PageHeader.vue'
-import { computed, ref, reactive, onMounted, onScopeDispose, watch } from 'vue'
+import { computed, ref, reactive, onMounted, onScopeDispose, useId, watch } from 'vue'
 import { confirmDelete } from '@/utils/confirmUtils.js'
 import { executeRequest } from '@/utils/apiUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
@@ -282,6 +285,7 @@ const BUILT_IN_TEAM_NAME = '系统管理员'
 
 const { isAdmin, fetchAuth } = useAuth()
 
+const formId = useId()
 const addTeamDialog = ref(false)
 const loading = ref(false)
 const listError = ref('')
