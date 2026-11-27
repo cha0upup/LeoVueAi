@@ -4,16 +4,21 @@
       <el-popover
         v-model:visible="pickerVisible"
         placement="bottom-start"
-        :width="336"
+        width="min(336px, calc(100vw - 24px))"
         trigger="click"
+        role="dialog"
+        title="切换工作区"
+        :disabled="unavailable"
         popper-class="project-picker-popper"
+        @after-enter="focusSearch"
       >
         <template #reference>
           <button
+            ref="triggerButton"
             class="project-trigger"
             type="button"
             aria-label="切换项目工作区"
-            :disabled="loading || disabled"
+            :aria-disabled="unavailable"
           >
             <span
               class="project-trigger__icon"
@@ -36,70 +41,63 @@
           </button>
         </template>
 
-        <div class="project-picker">
-          <div class="project-picker__header">
-            <strong>切换工作区</strong>
+        <div
+          class="project-picker"
+          @keydown.esc="closeByKeyboard"
+        >
+          <div class="project-picker__tools">
+            <el-input
+              ref="searchInput"
+              v-model="query"
+              size="small"
+              clearable
+              aria-label="搜索项目名称、编码或说明"
+              placeholder="搜索项目名称、编码或说明"
+              class="project-picker__search"
+              @keydown.enter="chooseSearchResult"
+            >
+              <template #prefix>
+                <el-icon><Icon :icon="iconMap.search" /></el-icon>
+              </template>
+            </el-input>
             <button
               type="button"
               class="project-picker__create"
-              :disabled="disabled"
+              :disabled="unavailable"
               @click="createProject"
             >
               <el-icon><Icon :icon="iconMap.add" /></el-icon>
               新建
             </button>
           </div>
-          <el-input
-            ref="searchInput"
-            v-model="query"
-            size="small"
-            clearable
-            placeholder="搜索项目名称或编码"
-            class="project-picker__search"
+
+          <p
+            v-if="normalizedQuery && resultCount"
+            class="project-picker__hint"
+            role="status"
           >
-            <template #prefix>
-              <el-icon><Icon :icon="iconMap.search" /></el-icon>
-            </template>
-          </el-input>
+            {{ resultCount === 1 ? '匹配 1 项，按回车切换' : `匹配 ${resultCount} 项，请选择` }}
+          </p>
 
           <div class="project-picker__list">
             <button
-              v-if="matchesAll"
+              v-for="workspace in matchingWorkspaces"
+              :key="workspace.id"
               type="button"
-              class="project-option-card project-option-card--all"
-              :class="{ selected: modelValue === ALL_PROJECTS_ID }"
-              @click="choose(ALL_PROJECTS_ID)"
+              class="project-option-card"
+              :class="[workspace.className, { selected: modelValue === workspace.id }]"
+              :aria-current="modelValue === workspace.id ? 'true' : undefined"
+              @click="choose(workspace.id)"
             >
               <span class="project-option-card__icon">
-                <el-icon><Icon :icon="iconMap.server" /></el-icon>
+                <el-icon><Icon :icon="workspace.icon" /></el-icon>
               </span>
               <span class="project-option-card__body">
-                <strong>全部资产</strong>
-                <small>跨项目查看全部入口主机和活动会话</small>
+                <strong>{{ workspace.title }}</strong>
+                <small>{{ workspace.description }}</small>
               </span>
               <el-icon
-                v-if="modelValue === ALL_PROJECTS_ID"
-                class="selected-check"
-              >
-                <Icon :icon="iconMap.check" />
-              </el-icon>
-            </button>
-            <button
-              v-if="matchesUnassigned"
-              type="button"
-              class="project-option-card project-option-card--inbox"
-              :class="{ selected: modelValue === UNASSIGNED_PROJECT_ID }"
-              @click="choose(UNASSIGNED_PROJECT_ID)"
-            >
-              <span class="project-option-card__icon">
-                <el-icon><Icon :icon="iconMap.inbox" /></el-icon>
-              </span>
-              <span class="project-option-card__body">
-                <strong>待整理主机</strong>
-                <small>尚未归属任何项目的入口主机</small>
-              </span>
-              <el-icon
-                v-if="modelValue === UNASSIGNED_PROJECT_ID"
+                v-if="modelValue === workspace.id"
                 class="selected-check"
               >
                 <Icon :icon="iconMap.check" />
@@ -123,6 +121,7 @@
                   type="button"
                   class="project-option-card"
                   :class="{ archived: group.archived, selected: modelValue === project.projectId }"
+                  :aria-current="modelValue === project.projectId ? 'true' : undefined"
                   @click="choose(project.projectId)"
                 >
                   <span class="project-option-card__icon">
@@ -146,8 +145,9 @@
             </template>
 
             <div
-              v-if="!hasResults"
+              v-if="!resultCount"
               class="project-picker__empty"
+              role="status"
             >
               <el-icon><Icon :icon="iconMap.search" /></el-icon>
               <span>没有匹配的项目</span>
@@ -207,7 +207,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import {
@@ -228,36 +228,35 @@ const emit = defineEmits(['update:modelValue', 'create', 'edit'])
 const iconMap = { ...icons, inbox: 'mdi:inbox-arrow-down-outline' }
 const pickerVisible = ref(false)
 const query = ref('')
+const triggerButton = ref(null)
 const searchInput = ref(null)
+const unavailable = computed(() => props.loading || props.disabled)
 
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase())
-const matches = (project) => {
-  if (!normalizedQuery.value) return true
-  return [project.projectName, project.projectCode, project.description]
-    .filter(Boolean)
-    .some((value) => String(value).toLocaleLowerCase().includes(normalizedQuery.value))
-}
+const matchesQuery = (...terms) => !normalizedQuery.value
+  || terms.some(term => String(term ?? '').toLocaleLowerCase().includes(normalizedQuery.value))
+const workspaceChoices = [
+  {
+    id: ALL_PROJECTS_ID, title: '全部资产', aliases: '全部主机 全局', description: '跨项目查看全部入口主机和活动会话',
+    icon: iconMap.server, className: 'project-option-card--all'
+  },
+  {
+    id: UNASSIGNED_PROJECT_ID, title: '待整理主机', aliases: '未归属项目', description: '尚未归属任何项目的入口主机',
+    icon: iconMap.inbox, className: 'project-option-card--inbox'
+  }
+]
+const matchingWorkspaces = computed(() => workspaceChoices.filter(({ title, aliases }) => matchesQuery(title, aliases)))
+const matchingProjects = computed(() => props.projects.filter(
+  ({ projectName, projectCode, description }) => matchesQuery(projectName, projectCode, description)
+))
 const projectGroups = computed(() => [
   { label: '进行中', archived: false, icon: iconMap.folder },
   { label: '已归档', archived: true, icon: 'mdi:archive-outline' }
 ].map((group) => ({
   ...group,
-  projects: props.projects.filter((project) =>
-    (project.status === 'archived') === group.archived && matches(project)
-  )
+  projects: matchingProjects.value.filter(project => (project.status === 'archived') === group.archived)
 })))
-const matchesUnassigned = computed(
-  () => !normalizedQuery.value || '待整理主机 未归属项目'.includes(normalizedQuery.value)
-)
-const matchesAll = computed(
-  () => !normalizedQuery.value || '全部资产 全部主机 全局'.includes(normalizedQuery.value)
-)
-const hasResults = computed(
-  () =>
-    matchesAll.value ||
-    matchesUnassigned.value ||
-    projectGroups.value.some((group) => group.projects.length > 0)
-)
+const resultCount = computed(() => matchingWorkspaces.value.length + matchingProjects.value.length)
 const currentTitle = computed(() => {
   if (props.activeProject) return props.activeProject.projectName || '未命名项目'
   if (props.modelValue === ALL_PROJECTS_ID) return '全部资产'
@@ -273,24 +272,40 @@ const currentIcon = computed(() => {
   return iconMap.folderOpened
 })
 
-const choose = (projectId) => {
-  if (props.disabled) return
-  emit('update:modelValue', projectId)
+function closeAndFocusTrigger() {
   pickerVisible.value = false
+  triggerButton.value?.focus({ preventScroll: true })
+}
+function choose(projectId) {
+  if (!pickerVisible.value || unavailable.value || !projectId) return
+  closeAndFocusTrigger()
+  if (projectId !== props.modelValue) emit('update:modelValue', projectId)
+}
+function chooseSearchResult(event) {
+  if (event.isComposing || !normalizedQuery.value || resultCount.value !== 1) return
+  event.preventDefault()
+  choose(matchingWorkspaces.value[0]?.id ?? matchingProjects.value[0]?.projectId)
+}
+function closeByKeyboard(event) {
+  event.stopPropagation()
+  if (event.isComposing || !pickerVisible.value) return
+  event.preventDefault()
+  closeAndFocusTrigger()
+}
+function focusSearch() {
+  if (pickerVisible.value && !unavailable.value) searchInput.value?.focus()
 }
 const createProject = () => {
-  if (props.disabled) return
+  if (unavailable.value) return
   pickerVisible.value = false
   emit('create')
 }
 
-watch(pickerVisible, async (visible) => {
-  if (!visible) {
-    query.value = ''
-    return
-  }
-  await nextTick()
-  searchInput.value?.focus?.()
+watch(pickerVisible, (visible) => {
+  if (!visible) query.value = ''
+})
+watch(unavailable, (busy) => {
+  if (busy) pickerVisible.value = false
 })
 </script>
 
@@ -303,7 +318,8 @@ watch(pickerVisible, async (visible) => {
   flex-shrink: 0;
 }
 
-.project-workspace button:disabled {
+.project-workspace button:disabled,
+.project-trigger[aria-disabled="true"] {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -311,7 +327,7 @@ watch(pickerVisible, async (visible) => {
 .project-workspace__meta,
 .project-workspace__row,
 .project-trigger,
-.project-picker__header,
+.project-picker__tools,
 .project-option-card,
 .project-option-group__title {
   display: flex;
@@ -344,6 +360,12 @@ watch(pickerVisible, async (visible) => {
 .project-trigger:hover {
   border-color: color-mix(in srgb, var(--el-color-primary) 45%, var(--el-border-color));
   background: color-mix(in srgb, var(--el-color-primary) 4%, var(--app-card-background));
+}
+
+.project-trigger:focus-visible,
+.project-option-card:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: -2px;
 }
 
 .project-trigger__icon,
@@ -459,18 +481,15 @@ watch(pickerVisible, async (visible) => {
   margin: -4px;
 }
 
-.project-picker__header {
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.project-picker__header strong {
-  font-size: 13px;
+.project-picker__tools {
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .project-picker__create {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 3px;
   border: 0;
   background: transparent;
@@ -481,7 +500,14 @@ watch(pickerVisible, async (visible) => {
 }
 
 .project-picker__search {
-  margin-bottom: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.project-picker__hint {
+  margin: 0 4px 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 
 .project-picker__list {
