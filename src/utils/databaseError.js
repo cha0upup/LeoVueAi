@@ -14,13 +14,9 @@ const DATABASE_ERROR_MESSAGES = Object.freeze({
   COMPONENT_ERROR: '数据库运行时组件发生错误'
 })
 
-export function getDatabaseErrorPayload(error) {
-  const payload = error?.response?.data
-  return payload && typeof payload === 'object' ? payload : {}
-}
-
 export function formatDatabaseError(error, fallback = '数据库操作失败') {
-  const payload = getDatabaseErrorPayload(error)
+  const data = error?.response?.data
+  const payload = data && typeof data === 'object' ? data : {}
   const category = String(payload.errorCategory || '').trim().toUpperCase()
   const categoryMessage = DATABASE_ERROR_MESSAGES[category]
   const detail = payload.msg || error?.message || ''

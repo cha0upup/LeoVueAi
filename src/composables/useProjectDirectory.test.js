@@ -46,9 +46,9 @@ describe('useProjectDirectory', () => {
     }))
     expect(directory.activeProjectId.value).toBe('project-1')
 
-    mocks.getProjects.mockRejectedValueOnce(new Error('目录暂不可用'))
+    mocks.getProjects.mockResolvedValueOnce({ data: [{ projectId: 'legacy-flat' }] })
     expect(await directory.loadProjects()).toBe(true)
-    expect(directory.projectsError.value).toBe('目录暂不可用')
+    expect(directory.projectsError.value).toBe('项目目录响应格式异常')
     expect(directory.projectsLoading.value).toBe(false)
     expect(directory.activeProject.value.projectId).toBe('project-1')
   })

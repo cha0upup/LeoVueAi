@@ -5,6 +5,7 @@ const showError = vi.hoisted(() => vi.fn())
 vi.mock('./messageUtils.js', () => ({ showError }))
 
 import { handleError } from './errorHandler.js'
+import { formatDatabaseError } from './databaseError.js'
 
 describe('handleError', () => {
   beforeEach(() => {
@@ -42,14 +43,14 @@ describe('handleError', () => {
             code: 503,
             msg: 'connection reset',
             errorCategory: 'CONNECTION_ERROR',
-            retryable: true
+            sqlState: '08006'
           }
         }
       },
       { defaultMessage: '加载失败' }
     )
 
-    expect(message).toBe('数据库连接中断，请检查网络和连接配置：connection reset')
+    expect(message).toBe('数据库连接中断，请检查网络和连接配置：connection reset（SQLState: 08006）')
   })
 
   it('shows the supplied tracing reference with the public message', () => {
@@ -59,4 +60,9 @@ describe('handleError', () => {
     expect(message).toBe(`服务器错误：清理审计日志失败（追踪编号：${traceId}）`)
     expect(showError).toHaveBeenCalledWith(message)
   })
+})
+
+it('uses the message or the caller fallback for unclassified database errors', () => {
+  expect(formatDatabaseError({ message: 'socket closed' }, '加载失败')).toBe('socket closed')
+  expect(formatDatabaseError({}, '加载失败')).toBe('加载失败')
 })

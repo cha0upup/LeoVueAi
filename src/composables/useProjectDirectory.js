@@ -8,13 +8,19 @@ export const UNASSIGNED_PROJECT_ID = '__unassigned__'
 export const ALL_PROJECTS_ID = '__all__'
 const ACTIVE_PROJECT_STORAGE_KEY = 'leovue-active-host-project'
 
-const normalizeProjectSummary = (item) => ({
-  ...(item?.project || item || {}),
-  hostCount: Number(item?.hostCount) || 0,
-  activeSessionCount: Number(item?.activeSessionCount) || 0,
-  manageable: Boolean(item?.manageable),
-  contentEditable: Boolean(item?.contentEditable)
-})
+function normalizeProjectSummary(item) {
+  const project = item?.project
+  if (typeof project?.projectId !== 'string' || !project.projectId.trim()) {
+    throw new Error('项目目录响应格式异常')
+  }
+  return {
+    ...project,
+    hostCount: Number(item.hostCount) || 0,
+    activeSessionCount: Number(item.activeSessionCount) || 0,
+    manageable: Boolean(item.manageable),
+    contentEditable: Boolean(item.contentEditable)
+  }
+}
 
 export function useProjectDirectory(userId) {
   const projects = ref([])
