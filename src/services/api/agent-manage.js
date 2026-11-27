@@ -26,8 +26,8 @@ export function saveDatabaseConnectionApi(connectionConfig) {
   return http.post('/platform/agent-manage/database-connections', connectionConfig)
 }
 
-export function getDatabaseConnectionsApi(params) {
-  return http.post('/platform/agent-manage/database-connections/list', params)
+export function getDatabaseConnectionsApi(params, config) {
+  return http.post('/platform/agent-manage/database-connections/list', params, config)
 }
 
 export function deleteDatabaseConnectionApi(params) {

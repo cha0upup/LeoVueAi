@@ -279,19 +279,19 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, toRef } from 'vue'
 import { Icon } from '@iconify/vue'
 import { confirmDelete } from '@/utils/confirmUtils.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import DatabaseConfigDialog from '@/components/AgentConsole/Database/DatabaseConfigDialog.vue'
 import {
-  getDatabaseConnectionsApi,
   deleteDatabaseConnectionApi,
   updateDatabaseConnectionStatusApi
 } from '@/services/api/agent-manage.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { formatDate } from '@/utils/format.js'
 import sqlEngine from './SqlEngine.js'
+import { useDatabaseConnectionList } from './useDatabaseConnectionList.js'
 import {
   DATABASE_MESSAGES,
   getDatabaseConnectionName,
@@ -313,9 +313,8 @@ const props = defineProps({
 
 const emit = defineEmits(['addDataTab'])
 
-const savedConfigs = ref([])
-const savedLoading = ref(true)
-const loadFailed = ref(false)
+const { savedConfigs, savedLoading, loadFailed, loadSavedConfigs } =
+  useDatabaseConnectionList(toRef(props, 'sessionId'))
 const hasConfigs = computed(() => savedConfigs.value.length > 0)
 const testingConnectionIds = ref(new Set())
 const updatingStatusId = ref('')
@@ -355,28 +354,6 @@ const filteredConfigs = computed(() => {
     return content.includes(keyword)
   })
 })
-
-const loadSavedConfigs = async ({ silent = false } = {}) => {
-  if (!props.sessionId) {
-    loadFailed.value = true
-    savedLoading.value = false
-    return
-  }
-
-  if (!silent) savedLoading.value = true
-  loadFailed.value = false
-  try {
-    const resp = await getDatabaseConnectionsApi({
-      sessionId: props.sessionId
-    })
-
-    savedConfigs.value = resp.data || []
-  } catch {
-    loadFailed.value = true
-  } finally {
-    if (!silent) savedLoading.value = false
-  }
-}
 
 const openAddDialog = () => {
   addDialogVisible.value = true
