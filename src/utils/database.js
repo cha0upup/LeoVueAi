@@ -397,7 +397,7 @@ export async function deleteRowsData({
 }
 
 /**
- * 导出表数据为CSV
+ * 创建单表 XLSX 导出任务
  * @param {Object} params - 导出参数
  * @returns {Promise<Object>} 导出任务信息
  */
@@ -424,8 +424,7 @@ export async function exportTableData({
     const response = await sqlEngine.exportTable({
       sessionId,
       connection,
-      objectRef,
-      format: 'xlsx'
+      objectRef
     })
     const task = response?.data || {}
 
@@ -442,7 +441,7 @@ export async function exportTableData({
 }
 
 /**
- * 执行数据库导出
+ * 创建整库 ZIP 导出任务，表数据以 XLSX 保存。
  * @param {Object} params - 导出参数
  * @returns {Promise<Object>} 导出结果
  */
@@ -459,8 +458,7 @@ export async function performDatabaseExport({
     objectRef,
     tableRefs,
     includeStructure: true,
-    includeData: true,
-    format: 'zip'
+    includeData: true
   })
 
   return response?.data || {}

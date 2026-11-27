@@ -69,10 +69,10 @@ describe('database value and request contracts', () => {
   it.each([
     { label: 'table', execute: exportTableData, method: 'exportTable',
       selection: { objectRef: tableRef, tableRows: [{ id: 1 }] },
-      payload: { objectRef: tableRef, format: 'xlsx' } },
+      payload: { objectRef: tableRef } },
     { label: 'database', execute: performDatabaseExport, method: 'exportDatabase',
       selection: { objectRef: namespaceRef, tableRefs },
-      payload: { objectRef: namespaceRef, tableRefs, includeStructure: true, includeData: true, format: 'zip' } }
+      payload: { objectRef: namespaceRef, tableRefs, includeStructure: true, includeData: true } }
   ])('keeps typed references and options in $label export requests', async ({ execute, method, selection, payload }) => {
     const task = { taskId: 'export-task' }
     const request = vi.fn().mockResolvedValue({ data: task })
