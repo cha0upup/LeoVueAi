@@ -60,11 +60,13 @@ async function mount() {
   const field = (type, placeholder) => nodes(type).find(node => node.props.placeholder === placeholder).props
   return {
     button: label => nodes('ElButton').find(node => text(node) === label)?.props,
+    metric: label => nodes('button').find(node => text(node).startsWith(label)).props,
     membersLink: () => nodes('RouterLink')[0]?.props.to,
     change: (type, placeholder, value) => field(type, placeholder)['onUpdate:modelValue'](value),
     field,
     options: () => nodes('ElOption').map(node => node.props.value),
     rows: () => nodes('ElTable')[0].props.data,
+    emptyText: () => nodes('ElTable')[0].props['empty-text'],
     alerts: () => nodes('ElAlert').map(node => node.props.title)
   }
 }
@@ -76,6 +78,30 @@ beforeEach(() => {
   api.getTeamLeaderOptionsApi.mockResolvedValue({ data: [{ userId: 'candidate', userName: 'Bob' }] })
 })
 afterEach(() => { for (const app of apps.splice(0)) app.unmount() })
+
+it('filters teams by leader assignment and combines it with the keyword', async () => {
+  const unassigned = { teamId: 'pending', teamName: 'New team', leaderId: null }
+  api.getAllTeamsApi.mockResolvedValue({ data: [existingTeam, unassigned] })
+  const view = await mount()
+
+  view.metric('已分配队长').onClick()
+  await nextTick()
+  expect(view.rows()).toEqual([existingTeam])
+  view.metric('待分配队长').onClick()
+  await nextTick()
+  expect(view.rows()).toEqual([unassigned])
+  expect(view.metric('待分配队长')['aria-pressed']).toBe(true)
+
+  view.change('ElInput', '搜索团队名称、团队ID、队长', 'alice')
+  await nextTick()
+  expect(view.rows()).toEqual([])
+  expect(view.emptyText()).toBe('没有匹配的团队')
+
+  view.button('清空筛选').onClick()
+  await nextTick()
+  expect(view.rows()).toEqual([existingTeam, unassigned])
+  expect(api.getAllTeamsApi).toHaveBeenCalledOnce()
+})
 
 it('searches by the loaded leader and only requests candidates when creating a team', async () => {
   const view = await mount()

@@ -29,6 +29,14 @@
         </template>
       </el-input>
 
+      <el-button
+        v-if="hasFilters"
+        text
+        @click="clearFilters"
+      >
+        清空筛选
+      </el-button>
+
       <template #actions>
         <el-button
           type="primary"
@@ -47,18 +55,18 @@
       v-if="hasLoadedTeams"
       :columns="3"
     >
-      <article class="metric-card">
-        <span class="metric-label">团队总数</span>
-        <strong class="metric-value">{{ teamData.length }}</strong>
-      </article>
-      <article class="metric-card">
-        <span class="metric-label">已分配队长</span>
-        <strong class="metric-value">{{ assignedLeaderCount }}</strong>
-      </article>
-      <article class="metric-card">
-        <span class="metric-label">待分配队长</span>
-        <strong class="metric-value">{{ unassignedLeaderCount }}</strong>
-      </article>
+      <button
+        v-for="metric in teamMetrics"
+        :key="metric.filter"
+        type="button"
+        class="metric-card"
+        :class="{ 'is-active': leaderFilter === metric.filter }"
+        :aria-pressed="leaderFilter === metric.filter"
+        @click="leaderFilter = metric.filter"
+      >
+        <span class="metric-label">{{ metric.label }}</span>
+        <strong class="metric-value">{{ metric.count }}</strong>
+      </button>
     </StatsStrip>
 
     <AdminWorkspacePanel title="团队列表">
@@ -278,6 +286,7 @@ const addTeamDialog = ref(false)
 const loading = ref(false)
 const listError = ref('')
 const searchKeyword = ref('')
+const leaderFilter = ref('all')
 const team = reactive({ teamName: '', leaderId: '' })
 const teamData = ref([])
 const hasLoadedTeams = ref(false)
@@ -298,23 +307,39 @@ let directoryRequest
 let candidatesRequest
 let disposed = false
 
-const filteredTeams = computed(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase()
-  if (!keyword) return teamData.value
+const keyword = computed(() => searchKeyword.value.trim().toLowerCase())
+const hasFilters = computed(() => Boolean(keyword.value) || leaderFilter.value !== 'all')
+const teamMetrics = computed(() => {
+  const total = teamData.value.length
+  const assigned = teamData.value.filter(({ leaderId }) => leaderId).length
+  return [
+    { filter: 'all', label: '团队总数', count: total },
+    { filter: 'assigned', label: '已分配队长', count: assigned },
+    { filter: 'unassigned', label: '待分配队长', count: total - assigned }
+  ]
+})
 
-  return teamData.value.filter(({ teamId, teamName, leaderId, leaderName }) =>
-    [teamId, teamName, leaderId, leaderName]
-      .some(value => value?.toLowerCase().includes(keyword))
-  )
+const filteredTeams = computed(() => {
+  if (!hasFilters.value) return teamData.value
+  const query = keyword.value
+  const leader = leaderFilter.value
+  return teamData.value.filter(({ teamId, teamName, leaderId, leaderName }) => {
+    if (leader === 'assigned' && !leaderId) return false
+    if (leader === 'unassigned' && leaderId) return false
+    return !query || [teamId, teamName, leaderId, leaderName]
+      .some(value => String(value ?? '').toLowerCase().includes(query))
+  })
 })
 const emptyText = computed(() => {
   if (!hasLoadedTeams.value) return listError.value ? '请刷新后重试' : '正在加载…'
   if (loading.value) return '正在加载…'
-  return searchKeyword.value.trim() ? '没有匹配的团队' : '暂无团队'
+  return hasFilters.value ? '没有匹配的团队' : '暂无团队'
 })
 
-const assignedLeaderCount = computed(() => teamData.value.filter((item) => item.leaderId).length)
-const unassignedLeaderCount = computed(() => teamData.value.length - assignedLeaderCount.value)
+function clearFilters() {
+  searchKeyword.value = ''
+  leaderFilter.value = 'all'
+}
 
 const refreshData = async () => {
   directoryRequest?.abort()
