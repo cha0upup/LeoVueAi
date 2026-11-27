@@ -49,6 +49,7 @@ export async function withLoading(loadingRef, fn) {
  * @param {string|null} [options.errorMessage='操作失败，请稍后重试'] - 错误消息（null则不显示）
  * @param {Function} [options.onSuccess] - 成功回调
  * @param {Function} [options.onError] - 错误回调
+ * @param {Function} [options.isActive] - 请求结束后是否仍应显示提示并执行回调
  * @param {Object} [options.errorMessages] - 状态码 → 文案覆盖映射
  * @returns {Promise}
  */
@@ -58,6 +59,7 @@ export async function executeRequest(requestFn, options = {}) {
     successMessage = null,
     errorMessage = '操作失败，请稍后重试',
     errorMessages,
+    isActive = () => true,
     onSuccess,
     onError
   } = options
@@ -65,6 +67,7 @@ export async function executeRequest(requestFn, options = {}) {
   return withLoading(loadingRef, async () => {
     try {
       const result = await requestFn()
+      if (!isActive()) return result
 
       if (successMessage) {
         showSuccess(successMessage)
@@ -75,6 +78,7 @@ export async function executeRequest(requestFn, options = {}) {
 
       return result
     } catch (error) {
+      if (!isActive()) throw error
       if (errorMessage) {
         handleError(error, {
           defaultMessage: errorMessage,

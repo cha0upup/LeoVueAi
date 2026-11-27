@@ -11,7 +11,7 @@ import { executeRequest, withLoading } from '@/utils/apiUtils.js'
 import { handleError } from '@/utils/errorHandler.js'
 import { formatDate } from '@/utils/format.js'
 import { icons } from '@/utils/icons.js'
-import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
+import { isCurrentSession, resetSessionState, sessionGeneration } from '@/services/sessionLifecycle.js'
 
 const api = Object.fromEntries(['addUserApi', 'deleteUserApi', 'getAllUsersApi', 'getAllTeamsApi',
   'updateUserApi', 'resetUserPasswordApi'].map(name => [name, vi.fn()]))
@@ -174,6 +174,34 @@ it('locks creation during validation and reports a refresh failure separately fr
   expect(view.rows()).toEqual([row])
   expect(view.resultCount()).toBe('筛选结果 1')
   expect(editor()['form-state'].password).toBe('')
+})
+
+it.each(['validation', 'response', 'error'])('ignores account creation after the session changes during %s', async stage => {
+  const view = await mount()
+  view.button('新增用户').onClick()
+  await flush()
+  const editor = () => view.dialog('UserEditorDialog')
+  Object.assign(editor()['form-state'], { userName: 'Draft', password: 'fixture-value', confirmPassword: 'fixture-value' })
+  const pending = deferred()
+  const validate = vi.fn().mockResolvedValue(true)
+  if (stage === 'validation') validate.mockReturnValueOnce(pending.promise)
+  else api.addUserApi.mockReturnValueOnce(pending.promise)
+  editor().onFormReady({ validate })
+  const submission = editor().onSubmit()
+  await flush()
+  expect(api.addUserApi).toHaveBeenCalledTimes(stage === 'validation' ? 0 : 1)
+
+  resetSessionState()
+  await flush()
+  expect(editor().modelValue).toBe(false)
+  expect(editor()['form-state'].password).toBe('')
+  if (stage === 'error') pending.reject(new Error('Previous session response'))
+  else pending.resolve(true)
+  await submission
+  expect(api.addUserApi).toHaveBeenCalledTimes(stage === 'validation' ? 0 : 1)
+  expect(api.getAllUsersApi).toHaveBeenCalledOnce()
+  expect(messages.showSuccess).not.toHaveBeenCalled()
+  expect(messages.showError).not.toHaveBeenCalled()
 })
 
 it('shows the reset target, clears it on cancel, and submits only once for that account', async () => {

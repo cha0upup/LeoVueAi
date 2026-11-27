@@ -623,11 +623,20 @@ watch(resetPasswordVisible, (visible) => {
   resetFormRef.value?.clearValidate?.()
 }, { flush: 'sync' })
 
+watch(sessionGeneration, () => {
+  userDialog.close()
+  resetPasswordDialog.close()
+}, { flush: 'sync' })
+
 const submitUser = () => {
   if (!userDialogVisible.value || editorDisabled.value) return
+  const generation = sessionGeneration.value
+  const target = userDialog.currentItem.value
+  const isActive = () => !disposed && isCurrentSession(generation)
+    && userDialogVisible.value && userDialog.currentItem.value === target
   return withLoading(submitting, async () => {
-    if (!await validateForm(userFormRef) || disposed || !userDialogVisible.value) return
-    const editing = isEdit.value
+    if (!await validateForm(userFormRef) || !isActive()) return
+    const editing = Boolean(target)
     const fields = {
       privilege: userForm.privilege,
       teamId: userForm.teamId,
@@ -641,9 +650,10 @@ const submitUser = () => {
       {
         successMessage: editing ? '用户已更新' : '用户已创建',
         errorMessage: editing ? '更新用户失败' : '创建用户失败',
+        isActive,
         onSuccess: async () => {
           userDialog.close()
-          if (!disposed) await loadUsers()
+          await loadUsers()
         }
       }
     ).catch(() => false)
@@ -691,13 +701,16 @@ const submitResetPassword = () => {
   const target = resetTarget.value
   if (!resetPasswordVisible.value || !target?.userId || actionsDisabled.value) return
   const generation = sessionGeneration.value
+  const isActive = () => !disposed && isCurrentSession(generation)
+    && resetPasswordVisible.value && resetTarget.value === target
   return withLoading(resetting, async () => {
-    if (!await validateForm(resetFormRef) || disposed || !isCurrentSession(generation) || resetTarget.value !== target) return
+    if (!await validateForm(resetFormRef) || !isActive()) return
     const { userId } = target
     const { newPassword } = resetForm
     await executeRequest(() => resetUserPasswordApi({ userId, newPassword }), {
       successMessage: '密码已重置',
       errorMessage: '重置密码失败',
+      isActive,
       onSuccess: resetPasswordDialog.close
     }).catch(() => false)
   })
