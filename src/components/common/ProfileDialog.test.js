@@ -50,7 +50,10 @@ function mount() {
     dialog: () => findNode(renderer.root, 'ElDialog').props,
     form: () => findNode(renderer.root, 'ProfileForm')?.props,
     error: () => findNode(renderer.root, 'ElAlert')?.props.title,
-    conflictText: () => text(findNode(renderer.root, 'ul')),
+    conflictText: () => {
+      const list = findNode(renderer.root, 'ul')
+      return list ? text(list) : ''
+    },
     button: (label) => findNodes(renderer.root, node => node.type === 'ElButton' && text(node) === label)[0].props
   }
 }
@@ -159,7 +162,7 @@ it('requires a fresh version after a conflict and keeps only the edited fields i
   })
 })
 
-it('shows the latest value when both edits touched the same field and can adopt it without saving', async () => {
+it('keeps unresolved conflicts across refreshes and clears the warning when the draft matches', async () => {
   const view = mount()
   await view.open()
   await flush()
@@ -175,12 +178,28 @@ it('shows the latest value when both edits touched the same field and can adopt 
   expect(view.form().model.email).toBe('draft@example.test')
   expect(view.conflictText()).toContain('邮箱的最新值：latest@example.test')
 
+  api.updateProfileApi.mockRejectedValueOnce({ response: { status: 409 } })
+  api.getProfileApi.mockResolvedValueOnce({
+    data: { ...initial, email: 'latest@example.test', remark: 'new server note', accountRevision: 2 }
+  })
+  await view.button('保存资料').onClick()
+  await view.button('读取最新资料').onClick()
+  expect(view.form().model).toMatchObject({ email: 'draft@example.test', remark: 'new server note' })
+  expect(view.conflictText()).toContain('邮箱的最新值：latest@example.test')
+
+  view.form().model.email = ' latest@example.test '
+  await flush()
+  expect(view.conflictText()).toBe('')
+  expect(view.button('保存资料').disabled).toBe(true)
+
+  view.form().model.email = 'draft@example.test'
+  await flush()
   view.button('采用最新邮箱').onClick()
   await flush()
   expect(view.form().model.email).toBe('latest@example.test')
   expect(view.error()).toBeUndefined()
   expect(view.button('保存资料').disabled).toBe(true)
-  expect(api.updateProfileApi).toHaveBeenCalledOnce()
+  expect(api.updateProfileApi).toHaveBeenCalledTimes(2)
 })
 
 it('clears the old profile draft and lets the next session open before stale validation completes', async () => {

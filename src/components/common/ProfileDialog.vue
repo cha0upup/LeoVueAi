@@ -223,7 +223,7 @@ const saving = ref(false)
 const loadError = ref('')
 const saveError = ref('')
 const profileConflict = ref(false)
-const concurrentEdits = ref([])
+const conflictedFields = ref([])
 const formRef = ref(null)
 const profile = shallowRef(null)
 const editableFields = ({ email, phone, remark } = {}) => ({
@@ -232,6 +232,14 @@ const editableFields = ({ email, phone, remark } = {}) => ({
   remark: remark?.trim() ?? ''
 })
 const form = reactive(editableFields())
+const concurrentEdits = computed(() => {
+  if (!profile.value || !conflictedFields.value.length) return []
+  const latest = editableFields(profile.value)
+  const draft = editableFields(form)
+  return conflictedFields.value
+    .filter(field => draft[field] !== latest[field])
+    .map(field => ({ field, value: latest[field] }))
+})
 const roleLabel = computed(() => ROLE_LABELS[profile.value?.privilege] || '当前用户')
 const canSave = computed(() => {
   if (!visible.value || loading.value || saving.value || profileConflict.value || !profile.value) return false
@@ -279,15 +287,16 @@ async function loadProfile() {
       const original = editableFields(previous)
       for (const field of Object.keys(original)) {
         if (draft[field] === original[field]) continue
-        if (merged[field] !== original[field] && merged[field] !== draft[field]) {
-          conflicts.push({ field, value: merged[field] })
+        if (merged[field] !== draft[field]
+          && (merged[field] !== original[field] || conflictedFields.value.includes(field))) {
+          conflicts.push(field)
         }
         merged[field] = draft[field]
       }
     }
     Object.assign(form, merged)
     profile.value = loaded
-    concurrentEdits.value = conflicts
+    conflictedFields.value = conflicts
     saveError.value = ''
     profileConflict.value = false
   } catch (error) {
@@ -309,7 +318,7 @@ const openProfileDialog = () => {
 const useLatestValue = (field, value) => {
   if (saving.value || loading.value) return
   form[field] = value
-  concurrentEdits.value = concurrentEdits.value.filter((entry) => entry.field !== field)
+  conflictedFields.value = conflictedFields.value.filter(entry => entry !== field)
 }
 
 const submitProfile = async () => {
@@ -348,7 +357,7 @@ const resetDialog = () => {
   loadError.value = ''
   saveError.value = ''
   profileConflict.value = false
-  concurrentEdits.value = []
+  conflictedFields.value = []
   Object.assign(form, editableFields())
 }
 
