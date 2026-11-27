@@ -166,7 +166,7 @@ import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { listAllSoftwareApi } from '@/services/api/installed-software.js'
 import { showError, showWarning, showSuccess } from '@/utils/messageUtils.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 
 const props = defineProps({
   sessionId: {
@@ -276,7 +276,7 @@ function sourceTagType(source) {
 }
 
 function handleExport() {
-  exportTsv(displayList.value, 'installed-software', [
+  exportXlsx(displayList.value, 'installed-software', [
     { label: 'name', key: 'name' },
     { label: 'version', key: 'version' },
     { label: 'vendor', key: 'vendor' },

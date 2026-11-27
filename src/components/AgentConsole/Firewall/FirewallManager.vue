@@ -375,7 +375,7 @@ import {
   toggleFirewallApi
 } from '@/services/api/firewall.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 import { sortRowsByText } from '@/utils/dataUtils.js'
 
 const DIRECTION_OPTIONS = { in: '入站 (in)', out: '出站 (out)' }
@@ -553,7 +553,7 @@ function handleSortChange({ prop, order }) {
 }
 
 function handleExport() {
-  exportTsv(filteredRules.value, 'firewall_rules', [
+  exportXlsx(filteredRules.value, 'firewall_rules', [
     { label: 'Name', key: r => r.name || r.ruleName || '' },
     { label: 'Direction', key: 'direction' },
     { label: 'Action', key: 'action' },

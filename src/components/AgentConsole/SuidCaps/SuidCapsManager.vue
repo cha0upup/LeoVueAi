@@ -160,7 +160,7 @@ import {
   listCapabilitiesApi
 } from '@/services/api/suid-caps.js'
 import { showError, showWarning } from '@/utils/messageUtils.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 
 const props = defineProps({
   sessionId: { type: String, required: true }
@@ -252,7 +252,7 @@ function rowClassName({ row }) {
 }
 
 function handleExport() {
-  exportTsv(flatList.value, 'suid-caps', [
+  exportXlsx(flatList.value, 'suid-caps', [
     { label: 'path', key: 'path' },
     { label: 'type', key: 'type' },
     { label: 'capabilities', key: 'capabilities' },

@@ -395,7 +395,7 @@ import {
 } from '@/services/api/docker.js'
 import { execCommandApi } from '@/services/api/agent-node.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import TerminalViewport from '@/components/AgentConsole/terminal/TerminalViewport.vue'
 import DockerInfoDialog from './DockerInfoDialog.vue'
@@ -673,7 +673,7 @@ async function handleRemoveImage(row) {
 function handleExport() {
   const config = getDockerExportConfig(activeTab.value)
   if (!config || currentList.value.length === 0) return
-  exportTsv(currentList.value, config.filename, config.columns)
+  exportXlsx(currentList.value, config.filename, config.columns)
 }
 
 watch(

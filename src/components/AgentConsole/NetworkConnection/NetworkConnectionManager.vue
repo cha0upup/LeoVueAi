@@ -315,7 +315,7 @@ import { Icon } from '@iconify/vue'
 import { listNetworkConnectionsApi, networkConnectionSummaryApi } from '@/services/api/network-connection.js'
 import { showWarning, handleApiError } from '@/utils/messageUtils.js'
 import { useSessionParams } from '@/composables/useSessionParams.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 
 const props = defineProps({
   sessionId: {
@@ -388,7 +388,7 @@ function handleTabChange(tab) {
 }
 
 function handleExport() {
-  exportTsv(filteredConnections.value, `network-connections-${Date.now()}`)
+  exportXlsx(filteredConnections.value, `network-connections-${Date.now()}`)
 }
 
 function stateColor(state) {

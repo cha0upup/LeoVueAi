@@ -367,7 +367,7 @@ import {
   deleteScheduledTaskApi
 } from '@/services/api/scheduled-task.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 import { sortRowsByText } from '@/utils/dataUtils.js'
 
 const props = defineProps({
@@ -509,7 +509,7 @@ function handleSortChange({ prop, order }) {
 }
 
 function handleExport() {
-  exportTsv(filteredTasks.value, 'scheduled-tasks', [
+  exportXlsx(filteredTasks.value, 'scheduled-tasks', [
     { label: 'TaskName', key: 'taskName' },
     { label: 'Type', key: task => task.type || task.scheduleType || '' },
     { label: 'Status', key: 'status' },

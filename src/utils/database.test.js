@@ -69,7 +69,7 @@ describe('database value and request contracts', () => {
   it.each([
     { label: 'table', execute: exportTableData, method: 'exportTable',
       selection: { objectRef: tableRef, tableRows: [{ id: 1 }] },
-      payload: { objectRef: tableRef, format: 'csv' } },
+      payload: { objectRef: tableRef, format: 'xlsx' } },
     { label: 'database', execute: performDatabaseExport, method: 'exportDatabase',
       selection: { objectRef: namespaceRef, tableRefs },
       payload: { objectRef: namespaceRef, tableRefs, includeStructure: true, includeData: true, format: 'zip' } }

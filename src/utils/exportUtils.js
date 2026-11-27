@@ -1,5 +1,7 @@
 import { downloadBlob } from './downloadBlob.js'
 import { executeRequest } from './apiUtils.js'
+import { handleError } from './errorHandler.js'
+import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 
 /**
  * 执行返回 Blob 的导出请求，并统一处理下载、loading 和错误提示。
@@ -40,78 +42,60 @@ export async function exportSelectedArchive(selectedIds, request, filenamePrefix
 }
 
 /**
- * TSV 导出工具
- *
- * 用法一：自动提取列（适合动态 key 场景）
- *   exportTsv(entries.value, 'event-log')
- *
- * 用法二：指定列映射（适合固定字段场景）
- *   exportTsv(rules.value, 'firewall_rules', [
- *     { label: 'Name', key: 'name' },
- *     { label: 'Direction', key: 'direction' },
- *   ])
- *
- * 用法三：指定列映射 + 自定义取值
- *   exportTsv(mounts.value, 'network_mounts', [
- *     { label: 'Local', key: row => row.local || row.mountPoint || '' },
- *   ])
- */
-
-/**
- * @param {Array<Object>} data     要导出的数据行
- * @param {string}        filename 文件名（不含扩展名，自动追加 .tsv）
+ * 导出单工作表。未指定列时，按字段首次出现的顺序生成表头。
+ * @param {Array<Object>} data
+ * @param {string} filename 文件名，可省略 .xlsx 后缀。
  * @param {Array<{label:string, key:string|Function}>} [columns]
- *        可选的列定义。省略则自动从 data 提取所有 key。
- *        key 为字符串时取 row[key]；为函数时调用 key(row)。
+ * @param {Function} [shouldDownload] 工作簿加载完成后判断本次导出是否仍有效。
  */
-export function exportTsv(data, filename, columns) {
-  if (!data || data.length === 0) return
+export async function exportXlsx(data, filename, columns, shouldDownload) {
+  if (!data?.length) return false
 
-  const exportColumns = columns?.length
-    ? columns
-    : [...new Set(data.flatMap((row) => Object.keys(row)))].map((key) => ({ label: key, key }))
-  const header = exportColumns.map((column) => column.label).join('\t')
-  const rows = data.map((row) =>
-    exportColumns.map(({ key }) =>
-      sanitize(typeof key === 'function' ? key(row) : (row[key] ?? ''))
-    ).join('\t')
-  )
-
-  const tsv = header + '\n' + rows.join('\n')
-  downloadBlob(
-    new Blob([tsv], { type: 'text/tab-separated-values;charset=utf-8' }),
-    filename.endsWith('.tsv') ? filename : `${filename}.tsv`
-  )
-}
-
-/** 导出 UTF-8 CSV；BOM 兼容 Excel，保留字段中的逗号、引号和换行。 */
-export function exportCsv(data, filename, columns) {
-  if (!data?.length) return
-
-  const exportColumns = columns?.length
-    ? columns
-    : [...new Set(data.flatMap((row) => Object.keys(row)))].map((key) => ({ label: key, key }))
-  const lines = [exportColumns.map(({ label }) => csvCell(label)).join(',')]
-  for (const row of data) {
-    lines.push(exportColumns.map(({ key }) =>
-      csvCell(typeof key === 'function' ? key(row) : row[key])
-    ).join(','))
+  try {
+    const exportColumns = columns?.length
+      ? columns
+      : [...new Set(data.flatMap(row => Object.keys(row)))].map(key => ({ label: key, key }))
+    const rows = [exportColumns.map(({ label }) => label)]
+    for (const row of data) {
+      rows.push(exportColumns.map(({ key }) => typeof key === 'function' ? key(row) : row[key]))
+    }
+    return await writeWorkbookSpec({ fileName: filename, sheets: [{ name: '数据', rows }] }, shouldDownload)
+  } catch (error) {
+    handleError(error, { defaultMessage: '导出失败' })
+    return false
   }
-  downloadBlob(
-    new Blob(['\uFEFF', lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }),
-    /\.csv$/i.test(filename) ? filename : `${filename}.csv`
-  )
 }
 
-// ────── internal ──────
-
-function csvCell(value) {
-  let text = String(value ?? '')
-  // 页面标题、Banner 等远端文本在表格软件中应作为数据，而非公式执行。
-  if (typeof value === 'string' && /^(?:[\t\r\n]|\s*[=+@-])/.test(text)) text = `'${text}`
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+/** 导出已有工作表结构，供容器等多工作表导出复用。 */
+export async function writeWorkbookSpec({ fileName, sheets }, shouldDownload = () => true) {
+  const generation = sessionGeneration.value
+  const isActive = () => isCurrentSession(generation) && shouldDownload()
+  try {
+    const module = await import('xlsx')
+    if (!isActive()) return false
+    const xlsx = module.default || module
+    const workbook = xlsx.utils.book_new()
+    for (const { name, rows } of sheets) {
+      if (rows.length > 1_048_576 || rows.some(row => row.length > 16_384)) {
+        throw new RangeError('导出范围超过 XLSX 单工作表上限，请缩小筛选范围')
+      }
+      const sheet = xlsx.utils.aoa_to_sheet(rows.map(row => row.map(workbookCell)))
+      xlsx.utils.book_append_sheet(workbook, sheet, name)
+    }
+    const bytes = xlsx.write(workbook, { bookType: 'xlsx', type: 'array' })
+    downloadBlob(new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }), /\.xlsx$/i.test(fileName) ? fileName : `${fileName}.xlsx`)
+    return true
+  } catch (error) {
+    if (!isActive()) return false
+    throw error
+  }
 }
 
-function sanitize(val) {
-  return String(val).replace(/[\t\n\r]/g, ' ')
+function workbookCell(value) {
+  if (value == null) return null
+  // 只传普通值，避免 xlsx 将任意对象当成单元格定义。
+  if (typeof value === 'number' || typeof value === 'boolean') return value
+  return String(value)
 }

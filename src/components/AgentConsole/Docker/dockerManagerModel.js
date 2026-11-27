@@ -2,19 +2,19 @@ export const DOCKER_TAB_CONFIG = Object.freeze({
   containers: Object.freeze({
     label: '容器',
     listKey: 'containers',
-    filename: 'docker-containers.tsv',
+    filename: 'docker-containers.xlsx',
     columns: Object.freeze(['id', 'name', 'image', 'status', 'ports', 'created'])
   }),
   images: Object.freeze({
     label: '镜像',
     listKey: 'images',
-    filename: 'docker-images.tsv',
+    filename: 'docker-images.xlsx',
     columns: Object.freeze(['repository', 'tag', 'id', 'size', 'created'])
   }),
   networks: Object.freeze({
     label: '网络',
     listKey: 'networks',
-    filename: 'docker-networks.tsv',
+    filename: 'docker-networks.xlsx',
     columns: Object.freeze(['id', 'name', 'driver', 'scope'])
   })
 })

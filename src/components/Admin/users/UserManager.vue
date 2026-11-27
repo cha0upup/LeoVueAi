@@ -366,7 +366,7 @@ import {
   resetUserPasswordApi
 } from '@/services/api/admin.js'
 import { showWarning } from '@/utils/messageUtils.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 import { useAuth } from '@/composables/useAuth.js'
 import { isCurrentSession, sessionGeneration } from '@/services/sessionLifecycle.js'
 import AdminToolbar from '@/components/Admin/shared/AdminToolbar.vue'
@@ -715,7 +715,7 @@ const exportUsers = async () => {
 
   if (!confirmed || disposed || !isCurrentSession(generation)) return
 
-  exportTsv(rows, `admin-users-${Date.now()}`, [
+  await exportXlsx(rows, `admin-users-${Date.now()}`, [
     { label: 'User ID', key: 'userId' },
     { label: 'Username', key: 'userName' },
     { label: 'Role', key: 'privilege' },
@@ -725,7 +725,7 @@ const exportUsers = async () => {
     { label: 'Phone', key: 'phone' },
     { label: 'Created At', key: 'createTime' },
     { label: 'Last Login', key: 'lastLoginTime' }
-  ])
+  ], () => !disposed && isCurrentSession(generation))
 }
 
 const canManageUser = (user) => canManageUserForActor(user, actorContext.value)

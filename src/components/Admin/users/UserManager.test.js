@@ -19,7 +19,7 @@ const messages = vi.hoisted(() => ({ showSuccess: vi.fn(), showWarning: vi.fn(),
 vi.mock('@/utils/messageUtils.js', () => messages)
 const confirmAction = vi.fn()
 const confirmDelete = vi.fn()
-const exportTsv = vi.fn()
+const exportXlsx = vi.fn()
 const actor = { currentUser: ref({ userId: 'manager' }), isAdmin: ref(true), isLeader: ref(false),
   passwordMinLength: ref(12), passwordMaxLength: ref(256), fetchAuth: async () => {} }
 const route = reactive({ query: {} })
@@ -44,7 +44,7 @@ const View = compileClientComponent(new URL('./UserManager.vue', import.meta.url
   '@/utils/formUtils.js': formUtils,
   '@/utils/dialogUtils.js': dialogUtils,
   '@/utils/confirmUtils.js': { confirmDelete, confirmAction },
-  '@/utils/exportUtils.js': { exportTsv },
+  '@/utils/exportUtils.js': { exportXlsx },
   '@/services/api/admin.js': api,
   '@/services/sessionLifecycle.js': { isCurrentSession, sessionGeneration },
   '@/composables/useAuth.js': { useAuth: () => actor }
@@ -320,7 +320,7 @@ it('combines directory filters for pagination and exports the complete confirmed
   await flush()
   confirmation.resolve(true)
   await pending
-  expect(exportTsv).toHaveBeenCalledExactlyOnceWith(users.slice(0, 26), expect.any(String), expect.any(Array))
+  expect(exportXlsx).toHaveBeenCalledExactlyOnceWith(users.slice(0, 26), expect.any(String), expect.any(Array), expect.any(Function))
   view.button('清空筛选').onClick()
   await flush()
   expect(view.pagination()['current-page']).toBe(1)

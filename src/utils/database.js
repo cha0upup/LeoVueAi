@@ -425,7 +425,7 @@ export async function exportTableData({
       sessionId,
       connection,
       objectRef,
-      format: 'csv'
+      format: 'xlsx'
     })
     const task = response?.data || {}
 

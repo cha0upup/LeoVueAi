@@ -182,7 +182,7 @@ import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { listProcessesApi, findProcessesApi, killProcessApi } from '@/services/api/process.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 
 const props = defineProps({
   sessionId: {
@@ -306,7 +306,7 @@ function formatMem(kb) {
 }
 
 function handleExport() {
-  exportTsv(processes.value, 'processes', [
+  exportXlsx(processes.value, 'processes', [
     { label: 'PID', key: 'pid' },
     { label: 'PPID', key: 'ppid' },
     { label: 'Name', key: 'name' },

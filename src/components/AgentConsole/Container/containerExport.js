@@ -168,13 +168,3 @@ export const buildAllContextsExportSpec = (contexts, frameworks = []) => {
     ]
   }
 }
-
-export const writeWorkbookSpec = async spec => {
-  const xlsxModule = await import('xlsx')
-  const XLSX = xlsxModule.default || xlsxModule
-  const workbook = XLSX.utils.book_new()
-  spec.sheets.forEach(sheet => {
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(sheet.rows), sheet.name)
-  })
-  XLSX.writeFile(workbook, spec.fileName)
-}

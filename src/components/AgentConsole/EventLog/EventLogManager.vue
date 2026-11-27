@@ -83,7 +83,7 @@ import {
 } from '@/services/api/event-log.js'
 import { showWarning, showInfo, handleApiError } from '@/utils/messageUtils.js'
 import { useSessionParams } from '@/composables/useSessionParams.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 import { createLogger } from '@/utils/logger.js'
 import EventLogControls from './EventLogControls.vue'
 import EventLogDialogs from './EventLogDialogs.vue'
@@ -463,9 +463,9 @@ function handleRowClick(row) {
   showDetailDialog.value = true
 }
 
-// 导出 TSV
+// 导出 XLSX
 function handleExport() {
-  exportTsv(entries.value, `event-log-${Date.now()}`)
+  exportXlsx(entries.value, `event-log-${Date.now()}`)
 }
 
 </script>

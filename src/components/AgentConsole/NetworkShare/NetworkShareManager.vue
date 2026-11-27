@@ -394,7 +394,7 @@ import {
   disconnectNetworkShareApi
 } from '@/services/api/network-share.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 
 const props = defineProps({
   sessionId: {
@@ -546,7 +546,7 @@ async function handleDisconnect(row) {
 
 function handleExport() {
   if (activeTab.value === 'shares') {
-    exportTsv(filteredShares.value, 'network_shares', [
+    exportXlsx(filteredShares.value, 'network_shares', [
       { label: 'Name', key: 'name' },
       { label: 'Path', key: 'path' },
       { label: 'Type', key: 'type' },
@@ -554,7 +554,7 @@ function handleExport() {
       { label: 'Description', key: 'description' }
     ])
   } else {
-    exportTsv(filteredMounts.value, 'network_mounts', [
+    exportXlsx(filteredMounts.value, 'network_mounts', [
       { label: 'Remote', key: 'remote' },
       { label: 'Local', key: m => m.local || m.mountPoint || '' },
       { label: 'Status', key: 'status' },

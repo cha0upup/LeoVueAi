@@ -41,7 +41,7 @@
         <el-button
           :icon="Download"
           :disabled="!tableData.length || loading || exporting || Boolean(loadError)"
-          title="导出本页或已选记录（CSV）"
+          title="导出本页或已选记录（XLSX）"
           @click="handleExport"
         >
           {{ selectedRows.length ? `导出已选 ${selectedRows.length} 项` : '导出本页' }}
@@ -52,7 +52,7 @@
           :icon="Download"
           :loading="exporting"
           :disabled="!total || loading || Boolean(loadError)"
-          :title="hasActiveFilters ? '导出当前筛选条件下的全部结果（CSV）' : '导出当前扫描的全部结果（CSV）'"
+          :title="hasActiveFilters ? '导出当前筛选条件下的全部结果（XLSX）' : '导出当前扫描的全部结果（XLSX）'"
           @click="handleExportAll"
         >
           {{ exporting ? `正在导出 ${exportProgress}/${exportTotal}` : '导出全部' }}
@@ -400,7 +400,7 @@ import { ElMessage } from 'element-plus'
 import { copyTextWithFeedback as copyToClipboard } from '@/utils/clipboard.js'
 import { queryNetworkProbeWorkflowResultsApi } from '@/services/api/scan.js'
 import FingerprintResults from './FingerprintResults.vue'
-import { exportCsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 
 const props = defineProps({
   taskId: {
@@ -612,18 +612,19 @@ function openInBrowser(row) {
 
 function exportEvidence(row) {
   if (!row) return
-  exportCsv([row], `network-evidence-${row.host}-${row.port}`, endpointColumns)
+  exportXlsx([row], `network-evidence-${row.host}-${row.port}`, endpointColumns)
 }
 
-function handleExport() {
+async function handleExport() {
   const rows = selectedRows.value.length > 0 ? selectedRows.value : tableData.value
   if (rows.length === 0) {
     ElMessage.warning('当前没有可导出的记录')
     return
   }
   const scope = selectedRows.value.length ? 'selected' : `page-${pagination.page}`
-  exportCsv(rows, `network-results-${scope}`, endpointColumns)
-  ElMessage.success(`已导出 ${rows.length} 条记录`)
+  if (await exportXlsx(rows, `network-results-${scope}`, endpointColumns)) {
+    ElMessage.success(`已导出 ${rows.length} 条记录`)
+  }
 }
 
 async function handleExportAll() {
@@ -662,8 +663,9 @@ async function handleExportAll() {
       page += 1
     } while (rows.length < exportTotal.value)
 
-    exportCsv(rows, `network-results-${query.taskId}-all`, endpointColumns)
-    ElMessage.success(`已导出 ${rows.length} 条记录`)
+    if (await exportXlsx(rows, `network-results-${query.taskId}-all`, endpointColumns, () => sequence === exportSequence)) {
+      ElMessage.success(`已导出 ${rows.length} 条记录`)
+    }
   } catch (error) {
     if (sequence === exportSequence) ElMessage.error(`导出失败：${error?.message || '请稍后重试'}`)
   } finally {

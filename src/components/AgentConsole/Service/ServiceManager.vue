@@ -388,7 +388,7 @@ import {
   deleteServiceApi
 } from '@/services/api/service-manager.js'
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 import { sortRowsByText } from '@/utils/dataUtils.js'
 
 const SERVICE_CONFIRM_ACTIONS = [
@@ -559,7 +559,7 @@ function handleSortChange({ prop, order }) {
 }
 
 function handleExport() {
-  exportTsv(filteredServices.value, 'services', [
+  exportXlsx(filteredServices.value, 'services', [
     { label: 'ServiceName', key: 'serviceName' },
     { label: 'DisplayName', key: 'displayName' },
     { label: 'Status', key: 'status' },

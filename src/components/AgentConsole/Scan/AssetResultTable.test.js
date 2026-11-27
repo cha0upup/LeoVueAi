@@ -7,7 +7,7 @@ import { deferred } from '@/test-support/deferred.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
 
 const queryResults = vi.fn()
-const exportCsv = vi.fn()
+const exportXlsx = vi.fn()
 const message = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
 vi.mock('@/utils/messageUtils.js', () => ({ showSuccess: message.success, showError: message.error }))
 const icon = { render: () => null }
@@ -15,7 +15,7 @@ const Table = compileClientComponent(new URL('./AssetResultTable.vue', import.me
   '@element-plus/icons-vue': { Search: icon, Filter: icon, Download: icon, Refresh: icon },
   'element-plus': { ElMessage: message },
   '@/services/api/scan.js': { queryNetworkProbeWorkflowResultsApi: queryResults },
-  '@/utils/exportUtils.js': { exportCsv },
+  '@/utils/exportUtils.js': { exportXlsx },
   '@/utils/clipboard.js': { copyTextWithFeedback },
   './FingerprintResults.vue': { default: icon }
 })
@@ -68,6 +68,7 @@ function mount() {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  exportXlsx.mockResolvedValue(true)
   vi.stubGlobal('window', { setTimeout, clearTimeout })
   queryResults.mockResolvedValue(result([endpoint(1), endpoint(2)], 401))
 })
@@ -106,19 +107,19 @@ describe('asset result table interactions', () => {
     expect(view.button('补扫组件 (1)').props.disabled).toBe(true)
   })
 
-  it('exports the current page and selection using CSV and the existing endpoint columns', async () => {
+  it('exports the current page and selection using XLSX and the existing endpoint columns', async () => {
     const view = mount()
     await flush()
-    view.button('导出本页').props.onClick()
-    expect(exportCsv).toHaveBeenLastCalledWith([endpoint(1), endpoint(2)], 'network-results-page-1', expect.any(Array))
-    const columns = exportCsv.mock.calls[0][2]
+    await view.button('导出本页').props.onClick()
+    expect(exportXlsx).toHaveBeenLastCalledWith([endpoint(1), endpoint(2)], 'network-results-page-1', expect.any(Array))
+    const columns = exportXlsx.mock.calls[0][2]
     expect(columns.map((column) => column.label)).toContain('组件')
     expect(columns.find((column) => column.label === 'HTTP 状态码').key({ statusCode: 0 })).toBe(0)
 
     view.table().props.onSelectionChange([endpoint(2)])
     await nextTick()
-    view.button('导出已选 1 项').props.onClick()
-    expect(exportCsv).toHaveBeenLastCalledWith([endpoint(2)], 'network-results-selected', columns)
+    await view.button('导出已选 1 项').props.onClick()
+    expect(exportXlsx).toHaveBeenLastCalledWith([endpoint(2)], 'network-results-selected', columns)
   })
 
   it('fetches every page within the API limit without changing the displayed page or selection', async () => {
@@ -138,7 +139,7 @@ describe('asset result table interactions', () => {
 
     expect(queryResults.mock.calls.map(([request]) => [request.page, request.pageSize])).toEqual([[1, 200], [2, 200], [3, 200]])
     expect(queryResults.mock.calls.every(([request]) => request.taskId === 'task-1' && request.sessionId === 'session-1')).toBe(true)
-    expect(exportCsv).toHaveBeenCalledExactlyOnceWith(rows, 'network-results-task-1-all', expect.any(Array))
+    expect(exportXlsx).toHaveBeenCalledExactlyOnceWith(rows, 'network-results-task-1-all', expect.any(Array), expect.any(Function))
     expect(message.success).toHaveBeenCalledExactlyOnceWith('已导出 401 条记录')
     expect(view.table().props.data).toBe(displayedRows)
     expect(view.pagination().props['current-page']).toBe(3)
@@ -154,7 +155,7 @@ describe('asset result table interactions', () => {
       .mockResolvedValueOnce(result([endpoint(3)], 3, { pageSize: 2, hasMore: false }))
     await view.button('导出全部').props.onClick()
     expect(queryResults.mock.calls.map(([request]) => request.pageSize)).toEqual([200, 2])
-    expect(exportCsv.mock.calls[0][0]).toEqual([endpoint(1), endpoint(2), endpoint(3)])
+    expect(exportXlsx.mock.calls[0][0]).toEqual([endpoint(1), endpoint(2), endpoint(3)])
   })
 
   it('snapshots filters and sorting at export start and reports progress while preventing duplicate exports', async () => {
@@ -193,7 +194,7 @@ describe('asset result table interactions', () => {
   })
 
   it.each(['reject', 'empty', 'truncated', 'malformed'])(
-    'never downloads a partial CSV when a subsequent page is %s and allows retry', async (failure) => {
+    'never downloads a partial workbook when a subsequent page is %s and allows retry', async (failure) => {
       const view = mount()
       await flush()
       const total = failure === 'truncated' ? 3 : 2
@@ -204,14 +205,14 @@ describe('asset result table interactions', () => {
       else queryResults.mockResolvedValueOnce({ data: {} })
       await view.button('导出全部').props.onClick()
       await flush()
-      expect(exportCsv).not.toHaveBeenCalled()
+      expect(exportXlsx).not.toHaveBeenCalled()
       expect(message.success).not.toHaveBeenCalled()
       expect(message.error).toHaveBeenCalledOnce()
       expect(view.button('导出全部').props.loading).toBe(false)
 
       queryResults.mockResolvedValueOnce(result([endpoint(1)]))
       await view.button('导出全部').props.onClick()
-      expect(exportCsv).toHaveBeenCalledOnce()
+      expect(exportXlsx).toHaveBeenCalledOnce()
     }
   )
 
@@ -227,7 +228,7 @@ describe('asset result table interactions', () => {
       await flush()
       response.resolve(result([endpoint(1)]))
       await pending
-      expect(exportCsv).not.toHaveBeenCalled()
+      expect(exportXlsx).not.toHaveBeenCalled()
       expect(message.success).not.toHaveBeenCalled()
       expect(message.error).not.toHaveBeenCalled()
     }
@@ -240,7 +241,7 @@ describe('asset result table interactions', () => {
     expect(view.button('导出全部').props.disabled).toBe(true)
     expect(view.button('导出本页').props.disabled).toBe(true)
     await view.button('导出全部').props.onClick()
-    expect(exportCsv).not.toHaveBeenCalled()
+    expect(exportXlsx).not.toHaveBeenCalled()
   })
 
   it('reports when records disappear before export starts without creating a file', async () => {
@@ -248,7 +249,7 @@ describe('asset result table interactions', () => {
     await flush()
     queryResults.mockResolvedValueOnce(result([]))
     await view.button('导出全部').props.onClick()
-    expect(exportCsv).not.toHaveBeenCalled()
+    expect(exportXlsx).not.toHaveBeenCalled()
     expect(message.warning).toHaveBeenCalledExactlyOnceWith('当前没有可导出的记录')
   })
 })

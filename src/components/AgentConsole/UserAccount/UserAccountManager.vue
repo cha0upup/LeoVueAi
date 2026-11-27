@@ -324,7 +324,7 @@ import {
 } from '@/services/api/user-account.js'
 import { showWarning, handleApiError } from '@/utils/messageUtils.js'
 import { useSessionParams } from '@/composables/useSessionParams.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 import { formatDetailValue } from '@/utils/format.js'
 
 const props = defineProps({
@@ -449,7 +449,7 @@ async function handleQueryDetail(tab, name) {
 }
 
 function handleExport() {
-  exportTsv(currentList.value, `${activeTab.value}-${Date.now()}`)
+  exportXlsx(currentList.value, `${activeTab.value}-${Date.now()}`)
 }
 </script>
 

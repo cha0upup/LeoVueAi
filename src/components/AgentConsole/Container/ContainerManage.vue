@@ -288,6 +288,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 
 import { inspectWebRuntimeApi } from '@/services/api/container.js'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
+import { writeWorkbookSpec } from '@/utils/exportUtils.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import { showError, showSuccess } from '@/utils/messageUtils.js'
 import { copyTextWithFeedback } from '@/utils/clipboard.js'
@@ -302,8 +303,7 @@ import {
 } from './containerManageModel.js'
 import {
   buildAllContextsExportSpec,
-  buildContextExportSpec,
-  writeWorkbookSpec
+  buildContextExportSpec
 } from './containerExport.js'
 
 const props = defineProps({
@@ -416,8 +416,8 @@ const runExport = async spec => {
   const sequence = requestGuard.next('export')
   exporting.value = true
   try {
-    await writeWorkbookSpec(spec)
-    if (!mounted || !requestGuard.isCurrent('export', sequence)) return false
+    const isActive = () => mounted && requestGuard.isCurrent('export', sequence)
+    if (!await writeWorkbookSpec(spec, isActive)) return false
     showSuccess('Java Web Runtime 信息已导出')
     return true
   } catch (exportError) {

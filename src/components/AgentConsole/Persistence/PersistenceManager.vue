@@ -221,7 +221,7 @@ import { Icon } from '@iconify/vue'
 import { listPersistenceApi, queryPersistenceApi } from '@/services/api/persistence.js'
 import { showWarning, handleApiError } from '@/utils/messageUtils.js'
 import { useSessionParams } from '@/composables/useSessionParams.js'
-import { exportTsv } from '@/utils/exportUtils.js'
+import { exportXlsx } from '@/utils/exportUtils.js'
 import { formatDetailValue } from '@/utils/format.js'
 
 const props = defineProps({
@@ -304,7 +304,7 @@ async function handleQuery(row) {
 }
 
 function handleExport() {
-  exportTsv(filteredEntries.value, `persistence-${Date.now()}`)
+  exportXlsx(filteredEntries.value, `persistence-${Date.now()}`)
 }
 
 function typeColor(type) {

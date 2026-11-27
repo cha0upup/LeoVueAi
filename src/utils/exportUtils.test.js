@@ -12,7 +12,7 @@ vi.mock('./downloadBlob.js', () => ({ downloadBlob: mocks.downloadBlob }))
 vi.mock('./errorHandler.js', () => ({ handleError: mocks.handleError }))
 vi.mock('./messageUtils.js', () => ({ showSuccess: mocks.showSuccess }))
 
-import { executeBlobDownload, exportCsv, exportTsv } from './exportUtils.js'
+import { executeBlobDownload, exportXlsx, writeWorkbookSpec } from './exportUtils.js'
 
 beforeEach(() => vi.resetAllMocks())
 
@@ -77,70 +77,60 @@ describe('executeBlobDownload', () => {
   })
 })
 
-describe('exportCsv', () => {
-  it('exports Chinese headers and computed columns with UTF-8 BOM and CSV escaping', async () => {
-    exportCsv([{ title: '中文,含"引号"\r\n下一行', count: 0, active: false }], 'results', [
+async function readWorkbook(blob) {
+  const module = await import('xlsx')
+  const xlsx = module.default || module
+  return xlsx.read(await blob.arrayBuffer(), { type: 'array' })
+}
+
+describe('exportXlsx', () => {
+  it('exports explicit columns with typed values and literal text in the workbook', async () => {
+    await expect(exportXlsx([{ title: '中文,含引号\n下一行', count: -2, active: false }], 'results', [
       { label: '标题', key: 'title' },
       { label: '数量', key: 'count' },
-      { label: '启用', key: (row) => row.active },
+      { label: '启用', key: row => row.active },
+      { label: '备注', key: () => '=备注' },
+      { label: '对象', key: () => ({ label: '说明' }) },
       { label: '缺失', key: 'missing' }
-    ])
+    ])).resolves.toBe(true)
 
     const [blob, filename] = mocks.downloadBlob.mock.calls[0]
-    expect(filename).toBe('results.csv')
-    expect(blob.type).toBe('text/csv;charset=utf-8')
-    expect([...new Uint8Array(await blob.arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
-    await expect(blob.text()).resolves.toBe('标题,数量,启用,缺失\r\n"中文,含""引号""\r\n下一行",0,false,')
+    expect(filename).toBe('results.xlsx')
+    expect(blob.type).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    const sheet = (await readWorkbook(blob)).Sheets['数据']
+    expect(sheet.A2).toMatchObject({ t: 's', v: '中文,含引号\n下一行' })
+    expect(sheet.B2).toMatchObject({ t: 'n', v: -2 })
+    expect(sheet.C2).toMatchObject({ t: 'b', v: false })
+    expect(sheet.D2).toMatchObject({ t: 's', v: '=备注' })
+    expect(sheet.D2.f).toBeUndefined()
+    expect(sheet.E2).toMatchObject({ t: 's', v: '[object Object]' })
+    expect(sheet.F2).toBeUndefined()
   })
 
-  it('infers columns in first-seen order and keeps existing CSV extensions', async () => {
-    exportCsv([{ first: 0, second: false }, { second: 'b', third: 'c' }], 'rows.CSV')
+  it('infers columns in first-seen order and keeps an existing XLSX extension', async () => {
+    await exportXlsx([{ first: 0, second: false }, { second: 'b', third: 'c' }], 'rows.XLSX')
     const [blob, filename] = mocks.downloadBlob.mock.calls[0]
-    expect(filename).toBe('rows.CSV')
-    await expect(blob.text()).resolves.toBe('first,second,third\r\n0,false,\r\n,b,c')
+    expect(filename).toBe('rows.XLSX')
+    const sheet = (await readWorkbook(blob)).Sheets['数据']
+    expect([sheet.A1.v, sheet.B1.v, sheet.C1.v]).toEqual(['first', 'second', 'third'])
+    expect(sheet.C3.v).toBe('c')
   })
 
-  it('exports formula-like text as data without changing numbers or empty cells', async () => {
-    const values = ['=1+1', '+1', '-1', '@SUM(A1)', '  =1+1', '\ttext', '\rtext', '\ntext', -2, null]
-    exportCsv(values.map(value => ({ value })), 'rows')
-
-    const [blob] = mocks.downloadBlob.mock.calls[0]
-    await expect(blob.text()).resolves.toBe([
-      'value', "'=1+1", "'+1", "'-1", "'@SUM(A1)", "'  =1+1", "'\ttext", `"'\rtext"`, `"'\ntext"`, '-2', ''
-    ].join('\r\n'))
-  })
-
-  it('does not start a download for an empty list', () => {
-    exportCsv([], 'rows')
+  it('keeps named sheets and skips a cancelled download', async () => {
+    const spec = { fileName: 'container.xlsx', sheets: [
+      { name: '概览', rows: [['数量'], [1]] },
+      { name: '明细', rows: [['名称'], ['示例']] }
+    ] }
+    await expect(writeWorkbookSpec(spec, () => false)).resolves.toBe(false)
     expect(mocks.downloadBlob).not.toHaveBeenCalled()
-  })
-})
 
-describe('exportTsv', () => {
-  it('shares field rendering for explicit columns and computed values', async () => {
-    exportTsv([{ name: 'a\tb\nc\r', count: 0, active: false }], 'rows', [
-      { label: 'Name', key: 'name' },
-      { label: 'Count', key: 'count' },
-      { label: 'Active', key: (row) => row.active },
-      { label: 'Missing', key: 'missing' }
-    ])
-
-    const [blob, filename] = mocks.downloadBlob.mock.calls[0]
-    expect(filename).toBe('rows.tsv')
-    expect(blob.type).toBe('text/tab-separated-values;charset=utf-8')
-    await expect(blob.text()).resolves.toBe('Name\tCount\tActive\tMissing\na b c \t0\tfalse\t')
+    await writeWorkbookSpec(spec)
+    const [blob] = mocks.downloadBlob.mock.calls[0]
+    expect((await readWorkbook(blob)).SheetNames).toEqual(['概览', '明细'])
   })
 
-  it('collects dynamic columns in first-seen order and aligns missing fields', async () => {
-    exportTsv([{ first: 0, second: false }, { second: 'b', third: 'c' }], 'rows.tsv')
-    const [blob, filename] = mocks.downloadBlob.mock.calls[0]
-
-    expect(filename).toBe('rows.tsv')
-    await expect(blob.text()).resolves.toBe('first\tsecond\tthird\n0\tfalse\t\n\tb\tc')
-  })
-
-  it('does not start a download for an empty list', () => {
-    exportTsv([], 'rows')
+  it('does not start a download for an empty list', async () => {
+    await expect(exportXlsx([], 'rows')).resolves.toBe(false)
     expect(mocks.downloadBlob).not.toHaveBeenCalled()
   })
 })
