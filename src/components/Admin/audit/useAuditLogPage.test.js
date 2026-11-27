@@ -74,18 +74,33 @@ it.each([0, 3])('returns to page one if the page disappeared (%d remaining)', as
   expect(listing.page.value.total).toBe(total)
 })
 
-it('clears stale counts on failure and supports retrying the same filters', async () => {
+it('commits pagination only when loading succeeds and clears old results for a new filter', async () => {
   getAuditLogSummaryPageApi
-    .mockResolvedValueOnce(pageResponse(3))
-    .mockResolvedValueOnce({ data: { logs: [], total: 5 } })
-    .mockResolvedValueOnce(pageResponse(4))
+    .mockResolvedValueOnce(pageResponse(45, [{ logId: 'first' }]))
+    .mockResolvedValueOnce({ data: { logs: [], total: 45 } })
+    .mockResolvedValueOnce(pageResponse(45, [{ logId: 'second' }]))
+    .mockRejectedValueOnce(new Error('切换每页条数失败'))
+    .mockRejectedValueOnce(new Error('查询失败'))
   await listing.applyFilters({ userId: 'user' })
-  await listing.loadPage()
+  const updatedAt = listing.updatedAt.value
+  await listing.changePage(2)
   expect(listing.errorMessage.value).toContain('审计日志响应不完整')
+  expect(listing.currentPage.value).toBe(1)
+  expect(listing.page.value.logs).toEqual([{ logId: 'first' }])
+  expect(listing.updatedAt.value).toBe(updatedAt)
+
+  await listing.changePage(2)
+  expect(getAuditLogSummaryPageApi.mock.lastCall[0]).toEqual({ userId: 'user', limit: 20, offset: 20 })
+  expect(listing.errorMessage.value).toBe('')
+  expect(listing.currentPage.value).toBe(2)
+
+  await listing.changePageSize(50)
+  expect(listing.currentPage.value).toBe(2)
+  expect(listing.pageSize.value).toBe(20)
+  expect(listing.page.value.logs).toEqual([{ logId: 'second' }])
+
+  await listing.applyFilters({ userId: 'other' })
+  expect(listing.currentPage.value).toBe(1)
   expect(listing.page.value).toBeNull()
   expect(listing.updatedAt.value).toBeNull()
-  await listing.loadPage()
-  expect(getAuditLogSummaryPageApi.mock.calls[2][0].userId).toBe('user')
-  expect(listing.errorMessage.value).toBe('')
-  expect(listing.page.value.total).toBe(4)
 })

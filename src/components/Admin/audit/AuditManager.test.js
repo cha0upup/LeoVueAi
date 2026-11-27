@@ -71,6 +71,8 @@ async function mount() {
     closeDetails: () => nodes('ElDialog')[0].props['onUpdate:modelValue'](false),
     detailsAlert: () => nodes('ElAlert')[0]?.props.title,
     editKeyword: value => nodes('ElInput')[0].props['onUpdate:modelValue'](value),
+    rows: () => nodes('ElTable')[0].props.data,
+    listAlert: () => nodes('ElAlert')[0]?.props,
     selectRows: selection => nodes('ElTable')[0].props.onSelectionChange(selection),
     text: () => text(renderer.root)
   }
@@ -131,6 +133,35 @@ it('uses the ids shown in the confirmation if selection changes while it is open
   confirmation.resolve(true)
   await pending
   expect(api.deleteAuditLogsApi).toHaveBeenCalledWith({ logIds: ['a'] })
+})
+
+it('keeps a failed refresh read-only and does not show deleted rows if reloading fails', async () => {
+  const view = await mount()
+  view.editKeyword('sample')
+  await view.button('查询').onClick()
+  view.selectRows([{ logId: 'a' }])
+  api.getAuditLogSummaryPageApi.mockRejectedValueOnce(new Error('刷新失败'))
+
+  await view.button('刷新').onClick()
+  await flush()
+  expect(view.rows()).toEqual([{ logId: 'a' }])
+  expect(view.listAlert().description).toContain('上次成功加载')
+  for (const label of ['删除', '删除选中', '删除筛选']) {
+    expect(view.button(label).disabled).toBe(true)
+    await view.button(label).onClick()
+  }
+  expect(confirmDelete).not.toHaveBeenCalled()
+
+  await view.button('刷新').onClick()
+  await flush()
+  expect(view.button('删除筛选').disabled).toBe(false)
+  confirmDelete.mockResolvedValueOnce(true)
+  api.getAuditLogSummaryPageApi.mockRejectedValueOnce(new Error('列表暂不可用'))
+  await view.button('删除').onClick()
+  await flush()
+  expect(api.deleteAuditLogsApi).toHaveBeenCalledWith({ logIds: ['a'] })
+  expect(view.rows()).toEqual([])
+  expect(view.listAlert()).toMatchObject({ title: '列表暂不可用', description: undefined })
 })
 
 it('retries the same audit record after failed or mismatched responses without reloading the list', async () => {

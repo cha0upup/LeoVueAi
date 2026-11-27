@@ -134,6 +134,11 @@ export function buildAuditFilterParams(filter) {
   return params
 }
 
+export function areAuditFiltersEqual(first, second) {
+  const fields = Object.keys(first)
+  return fields.length === Object.keys(second).length && fields.every(field => first[field] === second[field])
+}
+
 export function getOperationTypeLabel(type) {
   return AUDIT_OPERATION_TYPE_LABELS[type] || type || '-'
 }

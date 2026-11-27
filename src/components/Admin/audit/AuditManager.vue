@@ -241,6 +241,7 @@
       <el-alert
         v-if="errorMessage"
         :title="errorMessage"
+        :description="page ? '仍显示上次成功加载的结果。重新加载成功后可删除日志。' : undefined"
         type="error"
         :closable="false"
         show-icon
@@ -258,6 +259,7 @@
           type="selection"
           width="44"
           fixed="left"
+          :selectable="canSelectLog"
         />
         <el-table-column
           prop="logId"
@@ -388,13 +390,27 @@
         <el-pagination
           :current-page="currentPage"
           :page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
           :pager-count="5"
           :total="page.total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @update:page-size="changePageSize"
+          :disabled="loading"
+          layout="total, slot, prev, pager, next, jumper"
           @update:current-page="changePage"
-        />
+        >
+          <el-select
+            :model-value="pageSize"
+            :disabled="loading"
+            aria-label="每页日志条数"
+            class="audit-page-size"
+            @update:model-value="changePageSize"
+          >
+            <el-option
+              v-for="size in [10, 20, 50, 100]"
+              :key="size"
+              :value="size"
+              :label="`${size} 条/页`"
+            />
+          </el-select>
+        </el-pagination>
       </div>
     </AdminWorkspacePanel>
 
@@ -443,6 +459,7 @@ import AuditLogDetailsDialog from './AuditLogDetailsDialog.vue'
 import { useAuditLogPage } from './useAuditLogPage.js'
 import {
   AUDIT_OPERATION_TYPE_LABELS,
+  areAuditFiltersEqual,
   buildAuditFilterParams,
   createAuditFilter,
   formatAuditTime,
@@ -468,9 +485,7 @@ const filterForm = reactive(createAuditFilter())
 const showAdvancedFilter = ref(false)
 const draftFilters = computed(() => buildAuditFilterParams(filterForm))
 const activeFilterSummary = computed(() => getActiveAuditFilterSummary(appliedFilters.value))
-const filtersDirty = computed(() =>
-  JSON.stringify(draftFilters.value) !== JSON.stringify(appliedFilters.value)
-)
+const filtersDirty = computed(() => !areAuditFiltersEqual(draftFilters.value, appliedFilters.value))
 const statistics = computed(() => ({ ...page.value, updatedAt: updatedAt.value }))
 const emptyText = computed(() => {
   if (loading.value) return '正在查询…'
@@ -614,7 +629,8 @@ const cleanupLoading = ref(false)
 const cleanupDialogVisible = ref(false)
 const cleanupDays = ref(30)
 const canDeleteRows = computed(() => Boolean(page.value)
-  && !loading.value && !deleteLoading.value && !cleanupLoading.value)
+  && !errorMessage.value && !loading.value && !deleteLoading.value && !cleanupLoading.value)
+const canSelectLog = () => canDeleteRows.value
 const canDeleteFiltered = computed(() => canDeleteRows.value && !filtersDirty.value
   && Boolean(page.value?.total) && activeFilterSummary.value.length > 0)
 
@@ -632,7 +648,7 @@ const confirmLogDeletion = async (request, title, message) => {
       errorMessage: '删除审计日志失败',
       onSuccess: async ({ data }) => {
         showSuccess(`已删除 ${data?.deleted ?? 0} 条日志`)
-        if (!disposed) await loadPage()
+        if (!disposed) await loadPage({ keepPrevious: false })
       }
     })
   } finally {
@@ -674,7 +690,7 @@ const confirmCleanup = () => {
     onSuccess: async ({ data }) => {
       showSuccess(`已清理 ${data?.deleted ?? 0} 条旧日志`)
       cleanupDialogVisible.value = false
-      if (!disposed) await loadPage()
+      if (!disposed) await loadPage({ keepPrevious: false })
     }
   })
 }
@@ -819,6 +835,10 @@ onMounted(refreshAll)
   padding: 12px 18px 16px;
   border-top: 1px solid var(--el-border-color-lighter);
   background: var(--el-bg-color-overlay);
+}
+
+.audit-page-size {
+  width: 120px;
 }
 
 @media (max-width: 768px) {

@@ -1,6 +1,7 @@
 import { onScopeDispose, ref, shallowRef } from 'vue'
 import { getAuditLogSummaryPageApi } from '@/services/api/admin.js'
 import { handleError } from '@/utils/errorHandler.js'
+import { areAuditFiltersEqual } from './auditManagerModel.js'
 
 export function useAuditLogPage() {
   const appliedFilters = shallowRef({})
@@ -23,33 +24,34 @@ export function useAuditLogPage() {
     return data
   }
 
-  async function loadPage() {
+  async function loadPage({ pageNumber = currentPage.value, size = pageSize.value, keepPrevious = true } = {}) {
     pending?.abort()
     const request = new AbortController()
     const { signal } = request
     pending = request
     const filters = appliedFilters.value
-    const limit = pageSize.value
-    const offset = (currentPage.value - 1) * limit
+    const offset = (pageNumber - 1) * size
     loading.value = true
     errorMessage.value = ''
+    if (!keepPrevious) {
+      page.value = null
+      updatedAt.value = null
+    }
     try {
-      let data = await fetchPage(filters, limit, offset, signal)
+      let data = await fetchPage(filters, size, offset, signal)
       if (signal.aborted) return
-      if (offset > 0 && offset >= data.total) {
-        // 并发删除可能让原页码失效；回到首页，避免反复追赶最后一页。
-        if (data.total > 0) {
-          data = await fetchPage(filters, limit, 0, signal)
-          if (signal.aborted) return
-        }
-        currentPage.value = 1
+      // 并发删除可能让原页码失效；回到首页，避免反复追赶最后一页。
+      const pageDisappeared = offset > 0 && offset >= data.total
+      if (pageDisappeared && data.total > 0) {
+        data = await fetchPage(filters, size, 0, signal)
+        if (signal.aborted) return
       }
+      currentPage.value = pageDisappeared ? 1 : pageNumber
+      pageSize.value = size
       page.value = data
       updatedAt.value = new Date()
     } catch (error) {
       if (signal.aborted) return
-      page.value = null
-      updatedAt.value = null
       errorMessage.value = handleError(error, {
         defaultMessage: '获取审计日志失败，请重试',
         showMessage: false
@@ -63,24 +65,22 @@ export function useAuditLogPage() {
   }
 
   function applyFilters(filters) {
-    appliedFilters.value = { ...filters }
-    currentPage.value = 1
-    page.value = null
-    updatedAt.value = null
-    return loadPage()
+    const sameFilters = areAuditFiltersEqual(filters, appliedFilters.value)
+    if (!sameFilters) {
+      appliedFilters.value = { ...filters }
+      currentPage.value = 1
+    }
+    return loadPage({ pageNumber: 1, keepPrevious: sameFilters })
   }
 
   function changePage(nextPage) {
     if (nextPage === currentPage.value) return
-    currentPage.value = nextPage
-    return loadPage()
+    return loadPage({ pageNumber: nextPage })
   }
 
   function changePageSize(size) {
     if (size === pageSize.value) return
-    pageSize.value = size
-    currentPage.value = 1
-    return loadPage()
+    return loadPage({ pageNumber: 1, size })
   }
 
   return { appliedFilters, currentPage, pageSize, page, updatedAt, loading, errorMessage,
