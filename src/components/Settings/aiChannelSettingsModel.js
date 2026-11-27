@@ -181,14 +181,6 @@ export function normalizeModelNameForCapability(modelName, providerKey = '') {
     : value
 }
 
-export function capabilityIdentityLabel(model) {
-  if (!model) return ''
-  return (
-    model.capabilityModelName ||
-    normalizeModelNameForCapability(model.model || model.name || '', model.providerKey)
-  )
-}
-
 export function capabilityToForm(row) {
   return {
     modelName: row?.modelName || '',

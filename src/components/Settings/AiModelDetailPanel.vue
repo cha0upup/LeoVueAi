@@ -96,7 +96,7 @@
             来源：{{ capabilitySourceLabel(model.capabilitySource) }}
           </p>
           <p class="muted small">
-            模型键：{{ capabilityIdentityLabel(model) }}
+            模型键：{{ model.capabilityModelName || '—' }}
           </p>
           <p
             v-if="!model.capabilityRecognized"
@@ -216,7 +216,6 @@
 import { computed } from 'vue'
 
 import {
-  capabilityIdentityLabel,
   capabilitySourceLabel,
   effectiveLimitLabel,
   formatNumber,

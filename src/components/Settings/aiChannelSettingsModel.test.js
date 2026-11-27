@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   AI_PROTOCOL,
   buildCapabilityBody,
-  capabilityIdentityLabel,
   defaultPathForProtocol,
   normalizeProtocol,
   normalizeModelNameForCapability,
@@ -83,13 +82,5 @@ describe('aiChannelSettingsModel', () => {
       supportsReasoning: 0,
       supportsParallelToolCalls: 1
     })
-  })
-
-  it('uses the resolved capability identity before deriving one from the model', () => {
-    expect(capabilityIdentityLabel(null)).toBe('')
-    expect(capabilityIdentityLabel({ capabilityModelName: 'official-model', model: 'raw' }))
-      .toBe('official-model')
-    expect(capabilityIdentityLabel({ model: 'openai/gpt-5', providerKey: 'custom' }))
-      .toBe('gpt-5')
   })
 })

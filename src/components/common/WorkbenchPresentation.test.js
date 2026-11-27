@@ -210,9 +210,11 @@ describe('shared workbench presentation', () => {
   ])('keeps %s capability limits available and only collapses known duplicate values', (_label, limits, open) => {
     const view = mount(ModelDetail, { model: {
       id: 1, model: 'example-model', isActive: 1,
-      capabilityContextWindowTokens: 1000, capabilityMaxOutputTokens: 100, ...limits
+      capabilityModelName: 'resolved-model', capabilityContextWindowTokens: 1000,
+      capabilityMaxOutputTokens: 100, ...limits
     } })
     expect(view.nodes('details')[0].props.open).toBe(open)
     expect(text(view.nodes('details')[0])).toContain('1,000')
+    expect(view.nodes('p').map(node => text(node).trim())).toContain('模型键：resolved-model')
   })
 })
