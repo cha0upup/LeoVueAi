@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 
 import { useDatabaseMetadataExplorer } from './useDatabaseMetadataExplorer.js'
 
@@ -24,7 +25,11 @@ describe('useDatabaseMetadataExplorer', () => {
       sqlEngine: { getDatabases, getTables }
     })
 
-    const namespaces = await explorer.loadNamespaces()
+    const [namespaces, concurrentNamespaces] = await Promise.all([
+      explorer.loadNamespaces(), explorer.loadNamespaces()
+    ])
+    expect(getDatabases).toHaveBeenCalledTimes(1)
+    expect(concurrentNamespaces).toEqual(namespaces)
     const tables = await explorer.loadTables(namespaces[0].objectRef)
     await explorer.loadNamespaces()
     await explorer.loadTables(namespaces[0].objectRef)
@@ -38,6 +43,49 @@ describe('useDatabaseMetadataExplorer', () => {
       objectRef: { catalog: '', schema: 'sales', name: 'orders', kind: 'table' }
     }])
     expect(explorer.getTables(namespaces[0].objectRef)).toEqual(tables)
+  })
+
+  it('shares a pending table listing between the tree and export', async () => {
+    const namespaceRef = { kind: 'catalog', catalog: 'sales' }
+    const getTables = vi.fn().mockResolvedValue({ data: { tables: [{
+      name: 'orders', ref: { catalog: 'sales', name: 'orders', kind: 'table' }
+    }] } })
+    const explorer = useDatabaseMetadataExplorer({
+      sessionId: 'session-1', connection: { dialect: 'mysql' }, sqlEngine: { getTables }
+    })
+
+    const [treeTables, exportTables] = await Promise.all([
+      explorer.loadTables(namespaceRef), explorer.loadTables({ ...namespaceRef })
+    ])
+
+    expect(getTables).toHaveBeenCalledTimes(1)
+    expect(treeTables.map(({ name }) => name)).toEqual(['orders'])
+    expect(exportTables).toEqual(treeTables)
+  })
+
+  it('keeps an aborted lookup from filling the cache after reset and reload of the same namespace', async () => {
+    const stale = deferred()
+    const fresh = deferred()
+    const getTables = vi.fn().mockReturnValueOnce(stale.promise).mockReturnValueOnce(fresh.promise)
+    const namespaceRef = { kind: 'catalog', catalog: 'sales' }
+    const explorer = useDatabaseMetadataExplorer({
+      sessionId: 'session-1', connection: { dialect: 'mysql' }, sqlEngine: { getTables }
+    })
+
+    const abandoned = explorer.loadTables(namespaceRef)
+    await Promise.resolve()
+    explorer.reset()
+    expect(getTables.mock.calls[0][0].signal.aborted).toBe(true)
+    const reloaded = explorer.loadTables(namespaceRef)
+
+    stale.resolve({ data: { tables: [{ name: 'obsolete' }] } })
+    expect(await abandoned).toEqual([])
+    expect(explorer.getTables(namespaceRef)).toEqual([])
+    expect(explorer.isTablesLoading(namespaceRef)).toBe(true)
+
+    fresh.resolve({ data: { tables: [{ name: 'orders' }] } })
+    expect((await reloaded).map(({ name }) => name)).toEqual(['orders'])
+    expect(explorer.isTablesLoading(namespaceRef)).toBe(false)
   })
 
   it('refreshes one namespace without keeping its previous table cache', async () => {

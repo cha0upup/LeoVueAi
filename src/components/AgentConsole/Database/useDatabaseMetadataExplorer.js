@@ -1,10 +1,12 @@
-import { getCurrentScope, onScopeDispose, ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, reactive, ref, shallowReactive } from 'vue'
 
 import {
   getDatabaseObjectCacheKey,
   normalizeDatabaseObjectRef
 } from './database-domain.js'
 import { isCanceledDatabaseRequest } from './database-query-status.js'
+
+const NAMESPACE_LIST = Symbol('namespace list')
 
 export function useDatabaseMetadataExplorer({
   sessionId,
@@ -13,131 +15,106 @@ export function useDatabaseMetadataExplorer({
   onError
 }) {
   const namespaces = ref([])
-  const namespacesLoading = ref(false)
-  const tableCache = ref(new Map())
-  const tableLoadingKeys = ref(new Set())
+  const tableCache = reactive(new Map())
+  const requests = shallowReactive(new Map())
+  const namespacesLoading = computed(() => requests.has(NAMESPACE_LIST))
   const treeRevision = ref(0)
   let namespacesLoaded = false
-  let namespaceController = null
-  let namespaceVersion = 0
-  const tableControllers = new Map()
-  const tableVersions = new Map()
 
-  const namespaceKey = (objectRef) => getDatabaseObjectCacheKey({
-    connection,
-    objectRef: normalizeDatabaseObjectRef(objectRef)
-  })
+  const namespaceKey = (objectRef) => getDatabaseObjectCacheKey({ connection, objectRef })
+  const cachedTables = (key) => tableCache.get(key) || []
 
-  const setTablesLoading = (key, loading) => {
-    const next = new Set(tableLoadingKeys.value)
-    if (loading) next.add(key)
-    else next.delete(key)
-    tableLoadingKeys.value = next
+  const startRequest = (key, load) => {
+    const previous = requests.get(key)
+    const controller = new AbortController()
+    const isCurrent = () => requests.get(key) === request
+    const request = {
+      controller,
+      // Register before starting I/O, so overlapping callers can share this promise.
+      promise: Promise.resolve().then(() => load(controller.signal, isCurrent)).finally(() => {
+        if (isCurrent()) requests.delete(key)
+      })
+    }
+    requests.set(key, request)
+    previous?.controller.abort()
+    return request.promise
   }
 
-  const cancelNamespaceRequest = () => {
-    namespaceController?.abort()
-    namespaceController = null
-    namespacesLoading.value = false
-  }
-
-  const cancelTableRequests = () => {
-    for (const controller of tableControllers.values()) controller.abort()
-    tableControllers.clear()
-    tableLoadingKeys.value = new Set()
+  const cancelRequests = () => {
+    const pending = [...requests.values()]
+    requests.clear()
+    for (const { controller } of pending) controller.abort()
   }
 
   const reset = () => {
-    namespaceVersion += 1
-    cancelNamespaceRequest()
-    cancelTableRequests()
-    tableVersions.clear()
-    namespaces.value = []
-    tableCache.value = new Map()
     namespacesLoaded = false
+    cancelRequests()
+    namespaces.value = []
+    tableCache.clear()
     treeRevision.value += 1
   }
 
   const loadNamespaces = async ({ force = false } = {}) => {
-    if (namespacesLoaded && !force) return namespaces.value
-    cancelNamespaceRequest()
-    const controller = new AbortController()
-    namespaceController = controller
-    const requestVersion = ++namespaceVersion
-    namespacesLoading.value = true
-    try {
-      const response = await sqlEngine.getDatabases({
-        sessionId,
-        connection,
-        signal: controller.signal
-      })
-      if (requestVersion !== namespaceVersion) return namespaces.value
-      const items = Array.isArray(response?.data?.databases) ? response.data.databases : []
-      namespaces.value = items.map((item) => ({
-        name: item.name || '',
-        objectRef: normalizeDatabaseObjectRef(item.ref)
-      }))
-      namespacesLoaded = true
-      return namespaces.value
-    } catch (error) {
-      if (!isCanceledDatabaseRequest(error) && requestVersion === namespaceVersion) {
-        onError?.(error, '加载数据库结构失败')
-      }
-      return namespaces.value
-    } finally {
-      if (requestVersion === namespaceVersion) {
-        namespacesLoading.value = false
-        if (namespaceController === controller) namespaceController = null
-      }
+    if (!force) {
+      if (namespacesLoaded) return namespaces.value
+      const pending = requests.get(NAMESPACE_LIST)
+      if (pending) return pending.promise
     }
+
+    return startRequest(NAMESPACE_LIST, async (signal, isCurrent) => {
+      if (!isCurrent()) return namespaces.value
+      try {
+        const response = await sqlEngine.getDatabases({ sessionId, connection, signal })
+        if (!isCurrent()) return namespaces.value
+        const items = Array.isArray(response?.data?.databases) ? response.data.databases : []
+        namespaces.value = items.map((item) => ({
+          name: item.name || '',
+          objectRef: normalizeDatabaseObjectRef(item.ref)
+        }))
+        namespacesLoaded = true
+      } catch (error) {
+        if (isCurrent() && !isCanceledDatabaseRequest(error)) {
+          onError?.(error, '加载数据库结构失败')
+        }
+      }
+      return namespaces.value
+    })
   }
 
-  const getTables = (objectRef) => tableCache.value.get(namespaceKey(objectRef)) || []
-
-  const isTablesLoading = (objectRef) => tableLoadingKeys.value.has(namespaceKey(objectRef))
+  const getTables = (objectRef) => cachedTables(namespaceKey(objectRef))
+  const isTablesLoading = (objectRef) => requests.has(namespaceKey(objectRef))
 
   const loadTables = async (objectRef, { force = false } = {}) => {
     const namespaceRef = normalizeDatabaseObjectRef(objectRef)
-    const key = namespaceKey(namespaceRef)
     if (!namespaceRef.kind || (!namespaceRef.catalog && !namespaceRef.schema)) return []
-    if (tableCache.value.has(key) && !force) return getTables(namespaceRef)
-
-    tableControllers.get(key)?.abort()
-    const controller = new AbortController()
-    tableControllers.set(key, controller)
-    const requestVersion = (tableVersions.get(key) || 0) + 1
-    tableVersions.set(key, requestVersion)
-    setTablesLoading(key, true)
-    try {
-      const response = await sqlEngine.getTables({
-        sessionId,
-        connection,
-        objectRef: namespaceRef,
-        signal: controller.signal
-      })
-      if (tableVersions.get(key) !== requestVersion) return getTables(namespaceRef)
-      const items = Array.isArray(response?.data?.tables) ? response.data.tables : []
-      const tables = items.map((item) => ({
-        name: item.name || '',
-        schema: item.schema || '',
-        comment: item.comment || '',
-        objectRef: normalizeDatabaseObjectRef(item.ref)
-      }))
-      const nextCache = new Map(tableCache.value)
-      nextCache.set(key, tables)
-      tableCache.value = nextCache
-      return tables
-    } catch (error) {
-      if (!isCanceledDatabaseRequest(error) && tableVersions.get(key) === requestVersion) {
-        onError?.(error, `加载 ${namespaceRef.catalog || namespaceRef.schema} 的表列表失败`)
-      }
-      return getTables(namespaceRef)
-    } finally {
-      if (tableVersions.get(key) === requestVersion) {
-        setTablesLoading(key, false)
-        if (tableControllers.get(key) === controller) tableControllers.delete(key)
-      }
+    const key = namespaceKey(namespaceRef)
+    if (!force) {
+      if (tableCache.has(key)) return cachedTables(key)
+      const pending = requests.get(key)
+      if (pending) return pending.promise
     }
+
+    return startRequest(key, async (signal, isCurrent) => {
+      if (!isCurrent()) return cachedTables(key)
+      try {
+        const response = await sqlEngine.getTables({ sessionId, connection, objectRef: namespaceRef, signal })
+        if (!isCurrent()) return cachedTables(key)
+        const items = Array.isArray(response?.data?.tables) ? response.data.tables : []
+        const tables = items.map((item) => ({
+          name: item.name || '',
+          schema: item.schema || '',
+          comment: item.comment || '',
+          objectRef: normalizeDatabaseObjectRef(item.ref)
+        }))
+        tableCache.set(key, tables)
+        return tables
+      } catch (error) {
+        if (isCurrent() && !isCanceledDatabaseRequest(error)) {
+          onError?.(error, `加载 ${namespaceRef.catalog || namespaceRef.schema} 的表列表失败`)
+        }
+        return cachedTables(key)
+      }
+    })
   }
 
   const refreshNamespaces = async () => {
@@ -146,20 +123,12 @@ export function useDatabaseMetadataExplorer({
   }
 
   const refreshTables = async (objectRef) => {
-    const key = namespaceKey(objectRef)
-    const nextCache = new Map(tableCache.value)
-    nextCache.delete(key)
-    tableCache.value = nextCache
+    tableCache.delete(namespaceKey(objectRef))
     treeRevision.value += 1
     return loadTables(objectRef, { force: true })
   }
 
-  if (getCurrentScope()) {
-    onScopeDispose(() => {
-      cancelNamespaceRequest()
-      cancelTableRequests()
-    })
-  }
+  if (getCurrentScope()) onScopeDispose(cancelRequests)
 
   return {
     namespaces,
