@@ -60,8 +60,8 @@
 
       <div class="identity-grid">
         <div class="identity-item">
-          <small>用户名</small>
-          <strong>{{ profile.userName || '-' }}</strong>
+          <small>账号 ID</small>
+          <strong>{{ profile.userId }}</strong>
         </div>
         <div class="identity-item">
           <small>所属团队</small>
@@ -118,12 +118,14 @@
         </ul>
       </div>
       <el-form
+        :id="formId"
         ref="formRef"
         :model="form"
         :rules="rules"
         :disabled="saving || loading || confirmingClose"
         label-position="top"
         class="profile-form"
+        @submit.prevent="submitProfile"
       >
         <div class="form-row">
           <el-form-item
@@ -189,9 +191,10 @@
         </el-button>
         <el-button
           type="primary"
+          native-type="submit"
+          :form="formId"
           :disabled="!canSave"
           :loading="saving"
-          @click="submitProfile"
         >
           保存资料
         </el-button>
@@ -201,7 +204,7 @@
 </template>
 
 <script setup>
-import { computed, onScopeDispose, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, onScopeDispose, reactive, ref, shallowRef, useId, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import { getProfileApi, updateProfileApi } from '@/services/api/auth.js'
@@ -219,6 +222,7 @@ const ROLE_LABELS = {
 }
 const FIELD_LABELS = { email: '邮箱', phone: '手机号', remark: '备注' }
 
+const formId = useId()
 const visible = ref(false)
 const loading = ref(false)
 const saving = ref(false)

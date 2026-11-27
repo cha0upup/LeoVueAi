@@ -51,6 +51,8 @@ function mount() {
     open: vm.openProfileDialog,
     dialog: () => findNode(renderer.root, 'ElDialog').props,
     form: () => findNode(renderer.root, 'ProfileForm')?.props,
+    submit: (event = { preventDefault() {} }) => findNode(renderer.root, 'ProfileForm')?.props.onSubmit(event),
+    identity: () => findNodes(renderer.root, node => node.props.class === 'identity-item').map(text),
     error: () => findNode(renderer.root, 'ElAlert')?.props.title,
     conflictText: () => {
       const list = findNode(renderer.root, 'ul')
@@ -79,7 +81,7 @@ it('hides the form while loading or failed and ignores the response to a closed 
   expect(api.getProfileApi).toHaveBeenCalledOnce()
   expect(view.form()).toBeUndefined()
   expect(view.button('保存资料').disabled).toBe(true)
-  await view.button('保存资料').onClick()
+  await view.submit()
   expect(api.updateProfileApi).not.toHaveBeenCalled()
 
   view.dialog()['onUpdate:modelValue'](false)
@@ -96,6 +98,8 @@ it('hides the form while loading or failed and ignores the response to a closed 
   await flush()
   expect(view.error()).toBeUndefined()
   expect(view.form().model.email).toBe(initial.email)
+  expect(view.identity()).toContain(`账号 ID${initial.userId}`)
+  expect(view.button('保存资料')).toMatchObject({ 'native-type': 'submit', form: view.form().id })
 })
 
 it('only confirms a dirty close and keeps the draft if the confirmation is dismissed', async () => {
@@ -151,7 +155,7 @@ it('skips unchanged values and retains a failed draft for retry without duplicat
   view.form().model.email = ' alice@example.test '
   await flush()
   expect(view.button('保存资料').disabled).toBe(true)
-  await view.button('保存资料').onClick()
+  await view.submit()
   expect(api.updateProfileApi).not.toHaveBeenCalled()
 
   view.form().model.remark = '  draft  '
@@ -159,8 +163,10 @@ it('skips unchanged values and retains a failed draft for retry without duplicat
   api.updateProfileApi.mockRejectedValueOnce(new Error('暂时保存失败'))
   const validation = deferred()
   validate.mockReturnValueOnce(validation.promise)
-  const write = view.button('保存资料').onClick()
-  await view.button('保存资料').onClick()
+  const preventDefault = vi.fn()
+  const write = view.submit({ preventDefault })
+  expect(preventDefault).toHaveBeenCalledOnce()
+  await view.submit()
   await flush()
   expect(validate).toHaveBeenCalledOnce()
   expect(view.form().disabled).toBe(true)
@@ -175,7 +181,7 @@ it('skips unchanged values and retains a failed draft for retry without duplicat
   expect(view.form().model.remark).toBe('draft')
   expect(messages.showSuccess).not.toHaveBeenCalled()
 
-  await view.button('保存资料').onClick()
+  await view.submit()
   await flush()
   expect(api.updateProfileApi.mock.calls).toEqual([[payload], [payload]])
   expect(messages.showSuccess).toHaveBeenCalledExactlyOnceWith('个人资料已更新')
@@ -194,7 +200,7 @@ it('requires a fresh version after a conflict and keeps only the edited fields i
   api.getProfileApi.mockResolvedValueOnce({ data: latest })
   await flush()
 
-  await view.button('保存资料').onClick()
+  await view.submit()
   expect(view.button('保存资料').disabled).toBe(true)
   expect(view.form().model.remark).toBe('My draft')
   expect(view.error()).toBe('账号信息已变化')
@@ -204,7 +210,7 @@ it('requires a fresh version after a conflict and keeps only the edited fields i
   expect(view.error()).toBeUndefined()
   expect(api.updateProfileApi).toHaveBeenCalledOnce()
 
-  await view.button('保存资料').onClick()
+  await view.submit()
   expect(api.updateProfileApi).toHaveBeenLastCalledWith({
     email: latest.email, phone: '', remark: 'My draft', accountRevision: 1
   })
@@ -221,7 +227,7 @@ it('keeps unresolved conflicts across refreshes and clears the warning when the 
   })
   await flush()
 
-  await view.button('保存资料').onClick()
+  await view.submit()
   await view.button('读取最新资料').onClick()
   expect(view.form().model.email).toBe('draft@example.test')
   expect(view.conflictText()).toContain('邮箱的最新值：latest@example.test')
@@ -230,7 +236,7 @@ it('keeps unresolved conflicts across refreshes and clears the warning when the 
   api.getProfileApi.mockResolvedValueOnce({
     data: { ...initial, email: 'latest@example.test', remark: 'new server note', accountRevision: 2 }
   })
-  await view.button('保存资料').onClick()
+  await view.submit()
   await view.button('读取最新资料').onClick()
   expect(view.form().model).toMatchObject({ email: 'draft@example.test', remark: 'new server note' })
   expect(view.conflictText()).toContain('邮箱的最新值：latest@example.test')
@@ -258,7 +264,7 @@ it('clears the old profile draft and lets the next session open before stale val
   const validation = deferred()
   validate.mockReturnValueOnce(validation.promise)
   await flush()
-  const oldSubmit = view.button('保存资料').onClick()
+  const oldSubmit = view.submit()
 
   resetSessionState()
   await flush()
