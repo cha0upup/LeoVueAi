@@ -364,7 +364,9 @@ describe('Agent dialog shared form integration', () => {
     dialog.nodes('ElInput')[0].props['onUpdate:modelValue']('Updated draft')
     const validation = deferred()
     mocks.validate.mockReturnValueOnce(validation.promise)
-    const save = dialog.button('保存').props.onClick
+    const { id, onSubmit } = dialog.node('ElForm').props
+    expect(dialog.button('保存').props).toMatchObject({ 'native-type': 'submit', form: id })
+    const save = () => onSubmit({ preventDefault() {} })
     const pending = save()
     await save()
     expect(mocks.validate).toHaveBeenCalledOnce()
@@ -395,6 +397,47 @@ describe('Agent dialog shared form integration', () => {
       projectId: 'p1', projectName: 'Updated draft', projectCode: '', description: '', permission: 'private'
     })
     expect(dialog.saved).toHaveBeenLastCalledWith(edited)
+  })
+
+  it('skips unchanged saves and protects a draft when closing project settings', async () => {
+    const dialog = mountDialog(ProjectEditorDialog)
+    const project = { projectId: 'p1', projectName: 'First', description: null }
+    const panel = () => dialog.node('ElDialog').props
+    const cancel = () => dialog.button('取消').props.onClick()
+    dialog.vm.open(project)
+    await nextTick()
+    expect(dialog.button('保存').props.disabled).toBe(true)
+    await dialog.node('ElForm').props.onSubmit({ preventDefault() {} })
+    expect(mocks.validate).not.toHaveBeenCalled()
+    await cancel()
+    expect(panel().modelValue).toBe(false)
+    expect(mocks.confirm).not.toHaveBeenCalled()
+
+    dialog.vm.open(project)
+    await nextTick()
+    const form = dialog.node('ElForm').props.model
+    form.description = 'Keep this draft'
+    const done = vi.fn()
+    mocks.confirm.mockResolvedValueOnce(false)
+    await panel()['before-close'](done)
+    expect(done).not.toHaveBeenCalled()
+    expect(panel().modelValue).toBe(true)
+    expect(form.description).toBe('Keep this draft')
+
+    const oldDecision = deferred()
+    mocks.confirm.mockReturnValueOnce(oldDecision.promise)
+    const closing = cancel()
+    dialog.vm.open({ projectId: 'p2', projectName: 'Second' })
+    oldDecision.resolve(true)
+    await closing
+    expect(panel().modelValue).toBe(true)
+    expect(form.projectName).toBe('Second')
+    expect(form.description).toBe('')
+
+    form.description = 'Discard this draft'
+    await cancel()
+    expect(panel().modelValue).toBe(false)
+    expect(mocks.updateProject).not.toHaveBeenCalled()
   })
 
   it('keeps a delete confirmation bound to the project it was opened for', async () => {
