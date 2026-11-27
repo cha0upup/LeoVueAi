@@ -223,11 +223,10 @@ class TaskEngine {
       // 下载任务：调用后端 pause，保留进度并允许恢复
       await downloadEnginePauseApi({ taskId: task.engineTaskId })
     } else if (task.type === TaskType.DB_EXPORT && task.serverTaskId) {
-      task.isPaused = true
-      task.status = TaskStatus.PAUSED
+      const statusBeforePause = task.status
       await pauseSqlExportTaskApi({ taskId: task.serverTaskId })
-      this.emit('taskPaused', task)
-      return
+      // A late acknowledgement must not overwrite a stop or update a removed task.
+      if (task.status !== statusBeforePause || this.getTaskById(taskId) !== task) return
     } else if (task.status !== TaskStatus.DOWNLOADING) {
       return
     }

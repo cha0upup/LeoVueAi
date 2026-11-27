@@ -3,6 +3,7 @@ import { deferred } from '@/test-support/deferred.js'
 import { resetSessionState } from '@/services/sessionLifecycle.js'
 import { taskEngine } from './TaskEngine.js'
 import { downloadEngineProgressApi, downloadEngineStartApi } from '@/services/api/agent-files.js'
+import { pauseSqlExportTaskApi, stopSqlExportTaskApi } from '@/services/api/sql.js'
 import { TaskStatus } from '@/constants/task.js'
 
 vi.hoisted(() => { globalThis.window = {} })
@@ -56,6 +57,51 @@ describe('task engine login scope', () => {
       expect(taskEngine.getTaskById(id)).toMatchObject({ serverTaskId: 'server-export', status, progress: 25 })
     }
   )
+
+  it('changes a database export to paused only after the server accepts the pause', async () => {
+    const id = taskEngine.registerDbExportTask({
+      sessionId: 'session', snapshot: { taskId: 'server-export', status: 'RUNNING' }
+    })
+    const task = taskEngine.getTaskById(id)
+    const onPaused = vi.fn()
+    taskEngine.on('taskPaused', onPaused)
+    const pending = deferred()
+    pauseSqlExportTaskApi.mockReturnValueOnce(pending.promise).mockResolvedValueOnce({})
+
+    const pausing = taskEngine.pauseTask(id)
+    const statusDuringRequest = task.status
+    const failed = expect(pausing).rejects.toThrow('pause rejected')
+    pending.reject(new Error('pause rejected'))
+    await failed
+
+    expect(statusDuringRequest).toBe(TaskStatus.DB_EXPORTING)
+    expect(task).toMatchObject({ status: TaskStatus.DB_EXPORTING, isPaused: false })
+    expect(onPaused).not.toHaveBeenCalled()
+
+    await taskEngine.pauseTask(id)
+    expect(pauseSqlExportTaskApi).toHaveBeenLastCalledWith({ taskId: 'server-export' })
+    expect(task).toMatchObject({ status: TaskStatus.PAUSED, isPaused: true })
+    expect(onPaused).toHaveBeenCalledExactlyOnceWith(task)
+  })
+
+  it('does not overwrite a cancelled database export when a pause completes late', async () => {
+    const id = taskEngine.registerDbExportTask({
+      sessionId: 'session', snapshot: { taskId: 'server-export', status: 'RUNNING' }
+    })
+    const onPaused = vi.fn()
+    taskEngine.on('taskPaused', onPaused)
+    const pending = deferred()
+    pauseSqlExportTaskApi.mockReturnValueOnce(pending.promise)
+    stopSqlExportTaskApi.mockResolvedValueOnce({})
+
+    const pausing = taskEngine.pauseTask(id)
+    await taskEngine.stopTask(id)
+    pending.resolve({})
+    await pausing
+
+    expect(taskEngine.getTaskById(id)).toMatchObject({ status: TaskStatus.CANCELLED, isPaused: false })
+    expect(onPaused).not.toHaveBeenCalled()
+  })
 
   it('releases tasks, upload data and observers when the identity resets', () => {
     const listener = vi.fn()
