@@ -21,7 +21,6 @@
         :rules="rules"
         label-position="top"
         @submit.prevent="submitForm"
-        @keyup.enter="submitForm"
       >
         <el-form-item label="管理员账号">
           <el-input
@@ -66,10 +65,10 @@
         </p>
         <el-button
           type="primary"
+          native-type="submit"
           size="large"
           class="setup-submit"
           :loading="submitting"
-          @click="submitForm"
         >
           {{ submitting ? '正在初始化...' : '完成初始化' }}
         </el-button>

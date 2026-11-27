@@ -37,7 +37,6 @@
         label-position="top"
         class="password-form"
         @submit.prevent="submitForm"
-        @keyup.enter="submitForm"
       >
         <el-form-item
           label="当前密码"
@@ -99,10 +98,10 @@
 
         <el-button
           type="primary"
+          native-type="submit"
           size="large"
           class="submit-button"
           :loading="submitting"
-          @click="submitForm"
         >
           {{ submitting ? '正在修改...' : '修改密码并进入控制台' }}
         </el-button>

@@ -60,7 +60,7 @@ function mount(kind, query = {}) {
     form, formNode, replace, open: vm.openChangePasswordDialog, unmount, button,
     dialog: () => findNode(renderer.root, 'dialog-fixture')?.props,
     fill: () => Object.assign(form, credentials, { confirmPassword: credentials.newPassword }),
-    submit: () => button(kind === 'page' ? '修改密码并进入控制台' : '提交修改').onClick()
+    submit: () => formNode().props.onSubmit({ preventDefault() {} })
   }
 }
 
@@ -83,7 +83,8 @@ describe('required password update page', () => {
     view.fill()
     const validation = deferred()
     calls.validate.mockReturnValueOnce(validation.promise)
-    const submit = view.button('修改密码并进入控制台').onClick
+    expect(view.button('修改密码并进入控制台')['native-type']).toBe('submit')
+    const submit = view.submit
     const pending = submit()
     await submit()
     await flush()
@@ -148,6 +149,8 @@ describe('password update dialog', () => {
     const view = mount('dialog')
     view.open()
     view.fill()
+    await flush()
+    expect(view.button('提交修改')).toMatchObject({ 'native-type': 'submit', form: view.formNode().props.id })
     await view.submit()
     await flush()
     expect(calls.changePassword).toHaveBeenCalledOnce()

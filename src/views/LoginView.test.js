@@ -50,12 +50,13 @@ function mount(query = {}) {
   }
   apps.push(app)
   app.mount(renderer.root)
-  const form = findNode(renderer.root, 'form-fixture').props.model
+  const formNode = findNode(renderer.root, 'form-fixture')
+  const form = formNode.props.model
   form.username = 'fixture-user'
   form.password = ' fixture-password '
   return { form, login, fetchAuth, resetAuth, validate, replace, push, showSuccess, showError,
     root: renderer.root, button: () => findNode(renderer.root, 'ElButton'),
-    submit: () => findNode(renderer.root, 'ElButton').props.onClick(),
+    submit: (event = { preventDefault() {} }) => formNode.props.onSubmit(event),
     unmount: () => { app.unmount(); apps.splice(apps.indexOf(app), 1) } }
 }
 
@@ -64,9 +65,15 @@ const flush = async () => { for (let i = 0; i < 8; i++) await nextTick() }
 describe('login transition', () => {
   it('navigates immediately and keeps loading until navigation finishes before announcing success', async () => {
     const view = mount()
+    expect(view.button().props['native-type']).toBe('submit')
+    expect(view.button().props.onClick).toBeUndefined()
+    expect(findNodes(view.root, node => node.type === 'ElInput').map(node => node.props.autocomplete))
+      .toEqual(['username', 'current-password'])
     const navigation = deferred()
     view.replace.mockReturnValue(navigation.promise)
-    const submission = view.submit()
+    const preventDefault = vi.fn()
+    const submission = view.submit({ preventDefault })
+    expect(preventDefault).toHaveBeenCalledOnce()
     await flush()
     expect(view.login).toHaveBeenCalledExactlyOnceWith({ username: 'fixture-user', password: ' fixture-password ' })
     expect(view.fetchAuth).toHaveBeenCalledExactlyOnceWith({ force: true })

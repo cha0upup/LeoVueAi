@@ -44,12 +44,14 @@
             :model="loginForm"
             :rules="rules"
             class="login-form"
-            @keyup.enter="handleLogin"
+            @submit.prevent="handleLogin"
           >
             <el-form-item prop="username">
               <el-input
                 v-model="loginForm.username"
                 placeholder="请输入用户名"
+                aria-label="用户名"
+                autocomplete="username"
                 :maxlength="AUTH_FIELD_LIMITS.usernameMaxLength"
                 size="large"
                 :disabled="loading"
@@ -66,7 +68,9 @@
               <el-input
                 v-model="loginForm.password"
                 placeholder="请输入密码"
+                aria-label="密码"
                 type="password"
+                autocomplete="current-password"
                 :maxlength="AUTH_FIELD_LIMITS.passwordMaxLength"
                 size="large"
                 :disabled="loading"
@@ -83,10 +87,10 @@
             <el-form-item>
               <el-button
                 type="primary"
+                native-type="submit"
                 size="large"
                 :loading="loading"
                 class="login-button"
-                @click="handleLogin"
               >
                 {{ loading ? '登录中...' : '登录进入工作台' }}
               </el-button>

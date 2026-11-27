@@ -40,7 +40,11 @@ describe('first-deployment setup page', () => {
     apps.push(app)
     await nextTick()
     const form = findNode(renderer.root, 'form-fixture').props
-    const submit = () => findNode(renderer.root, 'button').props.onClick()
+    const submit = () => {
+      const formNode = findNode(renderer.root, 'form-fixture')
+      if (formNode) return formNode.props.onSubmit({ preventDefault() {} })
+      return findNode(renderer.root, 'button').props.onClick()
+    }
     form.model.password = ' chosen-fixture-password '
     form.model.confirmPassword = ' chosen-fixture-password '
     const unmount = () => { app.unmount(); apps.splice(apps.indexOf(app), 1) }
@@ -50,6 +54,8 @@ describe('first-deployment setup page', () => {
 
   it('uses the server policy, submits exact values once and clears them before returning to login', async () => {
     const view = await mount()
+    expect(findNode(view.renderer.root, 'button').props['native-type']).toBe('submit')
+    expect(view.form.onKeyup).toBeUndefined()
     expect(view.form.rules.password[1]).toMatchObject({ min: 12, max: 256 })
     const callback = vi.fn()
     view.form.rules.confirmPassword[1].validator({}, 'chosen-fixture-password', callback)

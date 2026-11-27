@@ -28,6 +28,7 @@
       </div>
 
       <el-form
+        :id="formId"
         ref="formRef"
         :model="form"
         :rules="rules"
@@ -35,7 +36,6 @@
         label-position="top"
         class="password-form"
         @submit.prevent="submitForm"
-        @keyup.enter="submitForm"
       >
         <div class="form-grid">
           <div
@@ -78,8 +78,9 @@
         <el-button
           class="footer-button primary-button"
           type="primary"
+          native-type="submit"
+          :form="formId"
           :loading="submitting"
-          @click="submitForm"
         >
           提交修改
         </el-button>
@@ -89,13 +90,14 @@
 </template>
 
 <script setup>
-import { watch } from 'vue'
+import { useId, watch } from 'vue'
 import { usePasswordChangeForm } from '@/composables/usePasswordChangeForm.js'
 import { sessionGeneration } from '@/services/sessionLifecycle.js'
 import { icons as iconMap } from '@/utils/icons.js'
 import { useDialog } from '@/utils/dialogUtils.js'
 
 const dialog = useDialog()
+const formId = useId()
 const changePasswordVisible = dialog.visible
 const { form, formRef, rules, submitting, passwordMinLength, passwordMaxLength, clear, submitForm } = usePasswordChangeForm({
   canSubmit: () => changePasswordVisible.value,
