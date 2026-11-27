@@ -1,5 +1,6 @@
 import { reactive, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import { deferred } from '@/test-support/deferred.js'
 
 import { useDatabaseTableLoader } from './useDatabaseTableLoader.js'
 
@@ -135,6 +136,39 @@ describe('useDatabaseTableLoader', () => {
       resultBytes: 4096,
       rowCount: 1
     })
+    expect(onError).not.toHaveBeenCalled()
+  })
+
+  it.each(['columns', 'rows'])('ignores a late %s response after the user stops waiting', async (stage) => {
+    const pending = deferred()
+    const columnsResponse = { data: { columns: [{ name: 'id', type: 'INTEGER' }] } }
+    const rowsResponse = { data: { columns: [{ name: 'id' }], rows: [{ id: 7 }], pagination: { total: 1 } } }
+    const waitingForColumns = stage === 'columns'
+    const getTableColumns = vi.fn().mockReturnValue(waitingForColumns ? pending.promise : columnsResponse)
+    const queryTable = vi.fn().mockReturnValue(pending.promise)
+    const onError = vi.fn()
+    const loader = useDatabaseTableLoader({
+      sessionId: 'session-1',
+      connection: { dialect: 'postgresql' },
+      selectedObject: ref({ schema: 'sales', name: 'orders', kind: 'table' }),
+      sqlEngine: { getTableColumns, queryTable },
+      onError
+    })
+
+    const request = loader.loadTableRows()
+    const active = waitingForColumns ? getTableColumns : queryTable
+    await vi.waitFor(() => expect(active).toHaveBeenCalledOnce())
+    loader.cancelActiveRequest()
+    const loadingAfterCancel = loader.loading.value
+    pending.resolve(waitingForColumns ? columnsResponse : rowsResponse)
+
+    await expect(request).resolves.toBe(false)
+    expect(loadingAfterCancel).toBe(false)
+    expect(active.mock.lastCall[0].signal.aborted).toBe(true)
+    expect(queryTable).toHaveBeenCalledTimes(waitingForColumns ? 0 : 1)
+    expect(loader.tableColumns.value).toHaveLength(waitingForColumns ? 0 : 1)
+    expect(loader.tableRows.value).toEqual([])
+    expect(loader.pagination.total).toBe(0)
     expect(onError).not.toHaveBeenCalled()
   })
 })

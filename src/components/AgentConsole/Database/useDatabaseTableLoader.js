@@ -1,6 +1,5 @@
 import { getCurrentScope, onScopeDispose, reactive, ref, watch } from 'vue'
 
-import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { DEFAULT_PAGE_SIZE_SMALL } from '@/utils/database.js'
 import {
   DATABASE_OBJECT_KINDS,
@@ -35,13 +34,14 @@ export function useDatabaseTableLoader({
     resultBytes: 0,
     rowCount: 0
   })
-  const requestGuard = createLatestRequestGuard(['table'])
   const pagination = reactive({ current: 1, pageSize: DEFAULT_PAGE_SIZE_SMALL, total: 0 })
   let activeController = null
 
   const cancelActiveRequest = () => {
-    activeController?.abort()
+    const controller = activeController
     activeController = null
+    loading.value = false
+    controller?.abort()
   }
 
   const resetQueryStatus = () => {
@@ -53,8 +53,6 @@ export function useDatabaseTableLoader({
 
   const invalidate = ({ clearRows = false, clearColumns = false } = {}) => {
     cancelActiveRequest()
-    requestGuard.invalidate(['table'])
-    loading.value = false
     tableColumnsKey.value = ''
     totalQueryKey.value = ''
     if (clearRows) tableRows.value = []
@@ -63,7 +61,7 @@ export function useDatabaseTableLoader({
   }
 
   const resetQuery = () => {
-    requestGuard.invalidate(['table'])
+    cancelActiveRequest()
     orderBy.value = []
     filters.value = []
     totalQueryKey.value = ''
@@ -106,7 +104,6 @@ export function useDatabaseTableLoader({
     cancelActiveRequest()
     const controller = new AbortController()
     activeController = controller
-    const requestVersion = requestGuard.next('table')
     const columnsKey = getDatabaseObjectCacheKey({
       connection,
       objectRef: tableRef
@@ -131,7 +128,7 @@ export function useDatabaseTableLoader({
           objectRef: tableRef,
           signal: controller.signal
         })
-        if (!requestGuard.isCurrent('table', requestVersion)) return false
+        if (activeController !== controller) return false
         const columns = Array.isArray(columnsResponse?.data?.columns)
           ? columnsResponse.data.columns
           : []
@@ -165,7 +162,7 @@ export function useDatabaseTableLoader({
         filters: filters.value,
         signal: controller.signal
       })
-      if (!requestGuard.isCurrent('table', requestVersion)) return false
+      if (activeController !== controller) return false
 
       const data = queryResponse?.data || {}
       tableRows.value = normalizeQueryRows({
@@ -182,14 +179,14 @@ export function useDatabaseTableLoader({
       }
       return true
     } catch (error) {
-      if (!isCanceledDatabaseRequest(error) && requestGuard.isCurrent('table', requestVersion)) {
+      if (activeController === controller && !isCanceledDatabaseRequest(error)) {
         onError?.(error)
       }
       return false
     } finally {
-      if (requestGuard.isCurrent('table', requestVersion)) {
+      if (activeController === controller) {
+        activeController = null
         loading.value = false
-        if (activeController === controller) activeController = null
       }
     }
   }
