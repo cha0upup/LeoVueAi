@@ -90,6 +90,7 @@ const row = { userId: 'member', userName: 'Alice', privilege: 'normal', status: 
 
 beforeEach(() => {
   vi.resetAllMocks()
+  actor.currentUser.value = { userId: 'manager' }
   route.query = { tab: 'users' }
   router.replace.mockImplementation(({ query }) => { route.query = query })
   api.getAllUsersApi.mockResolvedValue({ data: [row] })
@@ -266,6 +267,41 @@ it('does not let an old refresh replace newer rows', async () => {
   stale.resolve({ data: [{ ...row, userName: 'Stale' }] })
   await previous
   expect(view.rows().map(({ userName }) => userName)).toEqual(['Latest'])
+})
+
+it('clears both directories until the new session is identified and ignores the old reads', async () => {
+  const view = await mount()
+  view.search('Alice')
+  expect(view.rows()).toEqual([row])
+  const oldUsers = deferred()
+  const oldTeams = deferred()
+  api.getAllUsersApi.mockReturnValueOnce(oldUsers.promise)
+  api.getAllTeamsApi.mockReturnValueOnce(oldTeams.promise)
+  const refresh = view.button('刷新').onClick()
+
+  resetSessionState()
+  actor.currentUser.value = null
+  await flush()
+  expect(api.getAllUsersApi.mock.lastCall[0].signal.aborted).toBe(true)
+  expect(api.getAllTeamsApi.mock.lastCall[0].signal.aborted).toBe(true)
+  expect(view.rows()).toEqual([])
+  expect(view.optionLabel('团队筛选', 'team')).toBeUndefined()
+  await view.button('刷新').onClick()
+  expect(api.getAllUsersApi).toHaveBeenCalledTimes(2)
+
+  const newest = { ...row, userId: 'new-member', userName: 'New member', teamId: 'new-team' }
+  api.getAllUsersApi.mockResolvedValueOnce({ data: [newest] })
+  api.getAllTeamsApi.mockResolvedValueOnce({ data: [{ teamId: 'new-team', teamName: 'New team' }] })
+  actor.currentUser.value = { userId: 'new-manager' }
+  await flush()
+  expect(view.rows()).toEqual([newest])
+
+  oldUsers.resolve({ data: [row] })
+  oldTeams.resolve({ data: [{ teamId: 'team', teamName: 'Old team' }] })
+  await refresh
+  expect(view.rows()).toEqual([newest])
+  expect(view.optionLabel('团队筛选', 'new-team')).toBe('New team')
+  expect(view.optionLabel('团队筛选', 'team')).toBeUndefined()
 })
 
 it('shows user rows while teams are pending or unavailable, then resolves their team names after refresh', async () => {

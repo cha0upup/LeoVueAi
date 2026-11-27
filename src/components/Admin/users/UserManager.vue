@@ -108,7 +108,7 @@
         <el-button
           type="primary"
           plain
-          :disabled="mutationBusy"
+          :disabled="mutationBusy || waitingForIdentity"
           :loading="loading || teamsLoading"
           @click="refreshData"
         >
@@ -410,6 +410,7 @@ const router = useRouter()
 // 响应式数据
 const loading = ref(false)
 const teamsLoading = ref(false)
+const waitingForIdentity = ref(false)
 const submitting = ref(false)
 const resetting = ref(false)
 const deleting = ref(false)
@@ -583,7 +584,19 @@ const loadTeams = async () => {
   }
 }
 
-const refreshData = () => Promise.all([loadUsers(), loadTeams()])
+const refreshData = () => {
+  if (disposed || waitingForIdentity.value) return
+  return Promise.all([loadUsers(), loadTeams()])
+}
+
+function cancelDirectoryReads() {
+  usersRequest?.abort()
+  teamsRequest?.abort()
+  usersRequest = undefined
+  teamsRequest = undefined
+  loading.value = false
+  teamsLoading.value = false
+}
 
 const openAddDialog = () => {
   if (editorDisabled.value || userDialogVisible.value || resetPasswordVisible.value) return
@@ -624,9 +637,23 @@ watch(resetPasswordVisible, (visible) => {
 }, { flush: 'sync' })
 
 watch(sessionGeneration, () => {
+  waitingForIdentity.value = true
+  cancelDirectoryReads()
+  userData.value = null
+  teams.value = []
+  listError.value = ''
+  teamsError.value = ''
+  Object.assign(filters, defaultFilters)
+  currentPage.value = 1
   userDialog.close()
   resetPasswordDialog.close()
 }, { flush: 'sync' })
+
+watch(currentUser, (user) => {
+  if (!waitingForIdentity.value || !user || (!isAdmin.value && !isLeader.value)) return
+  waitingForIdentity.value = false
+  refreshData()
+})
 
 const submitUser = () => {
   if (!userDialogVisible.value || editorDisabled.value) return
@@ -750,18 +777,20 @@ const getManageDisabledReason = (user) => getManageDisabledReasonForActor(user, 
 const getEditDisabledReason = (user) => getEditDisabledReasonForActor(user, actorContext.value)
 
 onMounted(async () => {
+  const generation = sessionGeneration.value
   try {
     await fetchAuth()
-    if (!disposed) await refreshData()
+    if (isCurrentSession(generation)) await refreshData()
   } catch (error) {
-    if (!disposed) listError.value = handleError(error, { defaultMessage: '初始化用户目录失败', showMessage: false })
+    if (!disposed && isCurrentSession(generation)) {
+      listError.value = handleError(error, { defaultMessage: '初始化用户目录失败', showMessage: false })
+    }
   }
 })
 
 onScopeDispose(() => {
   disposed = true
-  usersRequest?.abort()
-  teamsRequest?.abort()
+  cancelDirectoryReads()
   Object.assign(userForm, createUserForm())
   Object.assign(resetForm, createPasswordResetForm())
 })
