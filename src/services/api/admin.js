@@ -5,7 +5,7 @@ export function getAllUsersApi(options) {
 }
 
 export function getTeamLeaderOptionsApi({ signal } = {}) {
-  return http.get('/platform/admin/users/no-team', { params: { view: 'options' }, signal })
+  return http.get('/platform/admin/users/no-team', { signal })
 }
 
 export function getEnabledUserOptionsApi({ signal } = {}) {
@@ -13,7 +13,7 @@ export function getEnabledUserOptionsApi({ signal } = {}) {
 }
 
 export function getAuditLogSummaryPageApi(params, { signal } = {}) {
-  return http.get('/platform/admin/audit-logs', { params: { ...params, view: 'summary' }, signal })
+  return http.get('/platform/admin/audit-logs', { params, signal })
 }
 
 export function getAuditLogDetailApi(logId, { signal } = {}) {

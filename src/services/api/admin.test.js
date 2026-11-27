@@ -4,11 +4,11 @@ import { getAuditLogDetailApi, getAuditLogSummaryPageApi, getEnabledUserOptionsA
 
 vi.mock('../http.js', () => ({ default: { get: vi.fn() } }))
 
-it('opts in to the audit summary without fetching detail fields', () => {
+it('requests an audit summary page with its filters and offset', () => {
   const { signal } = new AbortController()
   getAuditLogSummaryPageApi({ limit: 20, offset: 40, userId: 'user' }, { signal })
   expect(http.get).toHaveBeenLastCalledWith('/platform/admin/audit-logs', {
-    params: { limit: 20, offset: 40, userId: 'user', view: 'summary' },
+    params: { limit: 20, offset: 40, userId: 'user' },
     signal
   })
 })
@@ -25,10 +25,7 @@ it('requests the complete audit detail only by log id', () => {
 it('requests only the identity fields for leader candidates', () => {
   const { signal } = new AbortController()
   getTeamLeaderOptionsApi({ signal })
-  expect(http.get).toHaveBeenLastCalledWith('/platform/admin/users/no-team', {
-    params: { view: 'options' },
-    signal
-  })
+  expect(http.get).toHaveBeenLastCalledWith('/platform/admin/users/no-team', { signal })
 })
 
 it('requests the enabled account picker instead of full user profiles', () => {

@@ -19,7 +19,7 @@ export function useAuditLogPage() {
     const { data } = await getAuditLogSummaryPageApi({ ...filters, limit, offset }, { signal })
     if (!Array.isArray(data?.logs) || !Number.isSafeInteger(data.total)
       || !Number.isSafeInteger(data.successCount) || !Number.isSafeInteger(data.failedCount)) {
-      throw new Error('审计日志响应不完整，请检查前后端版本是否匹配')
+      throw new Error('审计日志响应不完整，请重试')
     }
     return data
   }
