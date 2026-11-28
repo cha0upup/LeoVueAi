@@ -12,8 +12,8 @@
           <el-icon><Icon :icon="iconMap.session" /></el-icon>
         </span>
         <span>
-          <strong>选择活动会话</strong>
-          <small>{{ agent?.agentName || '当前主机' }} 已有 {{ sessions.length }} 个活动会话</small>
+          <strong>选择操作会话</strong>
+          <small>{{ agent?.agentName || '当前接入节点' }} 已有 {{ sessions.length }} 个活动会话</small>
         </span>
       </div>
     </template>

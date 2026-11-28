@@ -29,7 +29,7 @@ describe('useProjectDirectory', () => {
     mocks.getProjects.mockResolvedValue({
       data: [{
         project: { projectId: 'project-1', projectName: 'Alpha', status: 'active' },
-        hostCount: 4,
+        entryNodeCount: 4,
         activeSessionCount: 2,
         manageable: true,
         contentEditable: true
@@ -41,7 +41,7 @@ describe('useProjectDirectory', () => {
     directory.selectProject('project-1')
 
     expect(directory.activeProject.value).toEqual(expect.objectContaining({
-      projectName: 'Alpha', hostCount: 4, activeSessionCount: 2, manageable: true,
+      projectName: 'Alpha', entryNodeCount: 4, activeSessionCount: 2, manageable: true,
       contentEditable: true
     }))
     expect(directory.activeProjectId.value).toBe('project-1')

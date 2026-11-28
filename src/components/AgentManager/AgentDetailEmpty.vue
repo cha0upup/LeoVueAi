@@ -12,11 +12,11 @@
           @click="emit('add')"
         >
           <el-icon><Icon :icon="iconMap.add" /></el-icon>
-          新增主机
+          新增节点
         </el-button>
         <el-button @click="emit('import')">
           <el-icon><Icon :icon="iconMap.upload" /></el-icon>
-          导入主机
+          导入节点配置
         </el-button>
       </template>
     </EmptyState>
@@ -51,15 +51,15 @@ const props = defineProps({
 const emit = defineEmits(['add', 'import'])
 
 const emptyTitle = computed(() =>
-  props.hasHosts ? '选择一个主机' : props.title || '还没有主机'
+  props.hasHosts ? '选择一个接入节点' : props.title || '还没有接入节点'
 )
 const emptyDescription = computed(() =>
   props.hasHosts
-    ? '从左侧选择一台主机，查看详情并进入控制台。'
+    ? '从左侧选择一个接入节点，查看详情并进入控制台。'
     : props.description ||
       (props.canCreate
-        ? '新增或导入第一台主机后，就可以在这里查看配置、测试连接并进入控制台。'
-        : '当前工作区保留主机与会话信息。')
+        ? '新增或导入一个接入节点后，就可以在这里查看配置、测试连接并进入控制台。'
+        : '当前工作区保留节点与会话信息。')
 )
 </script>
 

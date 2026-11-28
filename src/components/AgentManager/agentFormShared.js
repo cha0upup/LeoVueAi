@@ -12,7 +12,7 @@ export const AGENT_PROXY_OPTIONS = [
 
 export function createAgentDialogRules(options = {}) {
   const {
-    nameRequiredMessage = '请输入主机名称',
+    nameRequiredMessage = AGENT_FORM_RULES.agentName[0].message,
     connLinkPattern = null,
     connLinkPatternMessage = '请输入有效的连接地址',
     requireDisguises = false,

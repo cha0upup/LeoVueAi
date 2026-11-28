@@ -17,12 +17,12 @@
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item
-            label="主机名称"
+            label="节点名称"
             prop="agentName"
           >
             <el-input
               v-model="agent.agentName"
-              placeholder="请输入主机名称"
+              placeholder="请输入节点名称"
               clearable
             />
           </el-form-item>
@@ -34,7 +34,7 @@
           >
             <el-input
               v-model="agent.connLink"
-              placeholder="请输入主机连接地址"
+              placeholder="请输入节点连接地址"
               clearable
             >
               <template #prefix>

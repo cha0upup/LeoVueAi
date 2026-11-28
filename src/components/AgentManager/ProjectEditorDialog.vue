@@ -30,7 +30,7 @@
       <div>
         <strong>{{ form.status === 'archived' ? '项目已归档' : '项目进行中' }}</strong>
         <small>
-          {{ form.status === 'archived' ? '保留已有主机和会话记录，当前工作区按只读方式展示' : '可继续整理主机并创建项目会话' }}
+          {{ form.status === 'archived' ? '保留已有节点与会话，当前工作区按只读方式展示' : '可继续整理节点归属并创建项目会话' }}
         </small>
         <small>归档和恢复只变更状态，其他修改请单独保存。</small>
       </div>
@@ -234,7 +234,7 @@ const emit = defineEmits(['saved'])
 const { isAdmin } = useAuth()
 const permissionOptions = [
   { value: 'private', label: '仅自己', description: '只有项目负责人和管理员可查看与维护', icon: iconMap.lock },
-  { value: 'team', label: '团队协作', description: '同团队成员可查看并整理项目主机', icon: 'mdi:account-group-outline' }
+  { value: 'team', label: '团队协作', description: '同团队成员可查看并整理项目节点', icon: 'mdi:account-group-outline' }
 ]
 const visible = ref(false)
 const editing = ref(false)
@@ -408,7 +408,7 @@ const archive = () => {
   return runAction(async (isCurrent) => {
     const confirmed = await confirmAction({
       title: '归档项目',
-      message: `归档“${projectName}”后将保留项目数据，但项目会停止接收新主机和新会话。`,
+      message: `归档“${projectName}”后将保留项目数据，但项目会停止接收新节点和新会话。`,
       confirmButtonText: '确认归档'
     })
     if (confirmed && isCurrent()) return archiveProjectApi(projectId)
@@ -420,7 +420,7 @@ const remove = () => {
   return runAction(async (isCurrent) => {
     const confirmed = await confirmAction({
       title: '删除项目',
-      message: `删除项目“${projectName}”后，主机资产和会话仍会保留，但项目归属将被解除。此操作不可恢复。`,
+      message: `删除项目“${projectName}”后，接入节点与会话仍会保留，但项目归属将被解除。此操作不可恢复。`,
       confirmButtonText: '确认删除',
       type: 'error'
     })

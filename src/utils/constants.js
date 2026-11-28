@@ -79,8 +79,8 @@ export function createDefaultAgent(overrides = {}) {
  */
 export const AGENT_FORM_RULES = {
   agentName: [
-    { required: true, message: '请输入主机名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '主机名称长度在 2 到 50 个字符', trigger: 'blur' }
+    { required: true, message: '请输入节点名称', trigger: 'blur' },
+    { min: 2, max: 50, message: '节点名称长度在 2 到 50 个字符', trigger: 'blur' }
   ],
   connLink: [{ required: true, message: '请输入连接地址', trigger: 'blur' }],
   protocol: [{ required: true, message: '请选择传输协议', trigger: 'change' }],

@@ -130,8 +130,7 @@
                   <span class="project-option-card__body">
                     <strong>{{ project.projectName || '未命名项目' }}</strong>
                     <small>
-                      {{ project.projectCode ? `${project.projectCode} · ` : '' }}{{ project.hostCount || 0 }}
-                      主机 · {{ project.activeSessionCount || 0 }} 会话
+                      {{ project.projectCode ? `${project.projectCode} · ` : '' }}{{ projectCountsLabel(project) }}
                     </small>
                   </span>
                   <el-icon
@@ -197,7 +196,7 @@
       >
         <i />{{ activeProject.status === 'archived' ? '只读归档' : '进行中' }}
       </span>
-      <span>{{ activeProject.hostCount || 0 }} 主机 · {{ activeProject.activeSessionCount || 0 }} 会话</span>
+      <span>{{ projectCountsLabel(activeProject) }}</span>
       <span
         v-if="!activeProject.contentEditable"
         class="workspace-readonly"
@@ -237,11 +236,11 @@ const matchesQuery = (...terms) => !normalizedQuery.value
   || terms.some(term => String(term ?? '').toLocaleLowerCase().includes(normalizedQuery.value))
 const workspaceChoices = [
   {
-    id: ALL_PROJECTS_ID, title: '全部资产', aliases: '全部主机 全局', description: '跨项目查看全部入口主机和活动会话',
+    id: ALL_PROJECTS_ID, title: '全部资产', aliases: '全部接入节点 全局', description: '跨项目查看接入节点和活动会话',
     icon: iconMap.server, className: 'project-option-card--all'
   },
   {
-    id: UNASSIGNED_PROJECT_ID, title: '待整理主机', aliases: '未归属项目', description: '尚未归属任何项目的入口主机',
+    id: UNASSIGNED_PROJECT_ID, title: '待整理节点', aliases: '未归属项目', description: '尚未归属任何项目的入口节点',
     icon: iconMap.inbox, className: 'project-option-card--inbox'
   }
 ]
@@ -257,20 +256,17 @@ const projectGroups = computed(() => [
   projects: matchingProjects.value.filter(project => (project.status === 'archived') === group.archived)
 })))
 const resultCount = computed(() => matchingWorkspaces.value.length + matchingProjects.value.length)
+const currentWorkspace = computed(() => workspaceChoices.find(workspace => workspace.id === props.modelValue))
 const currentTitle = computed(() => {
   if (props.activeProject) return props.activeProject.projectName || '未命名项目'
-  if (props.modelValue === ALL_PROJECTS_ID) return '全部资产'
-  if (props.modelValue === UNASSIGNED_PROJECT_ID) return '待整理主机'
-  return '项目工作区'
+  return currentWorkspace.value?.title ?? '项目工作区'
 })
 const currentSubtitle = computed(() =>
   props.activeProject?.projectCode || props.activeProject?.description || ''
 )
-const currentIcon = computed(() => {
-  if (props.modelValue === ALL_PROJECTS_ID) return iconMap.server
-  if (props.modelValue === UNASSIGNED_PROJECT_ID) return iconMap.inbox
-  return iconMap.folderOpened
-})
+const currentIcon = computed(() => currentWorkspace.value?.icon ?? iconMap.folderOpened)
+const projectCountsLabel = (project) =>
+  `${project.entryNodeCount || 0} 个入口节点 · ${project.activeSessionCount || 0} 个活动会话`
 
 function closeAndFocusTrigger() {
   pickerVisible.value = false

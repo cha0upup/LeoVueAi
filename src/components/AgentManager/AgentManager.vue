@@ -8,14 +8,14 @@
     <template #list>
       <div class="list-header">
         <div class="list-title-group">
-          <span class="list-kicker">Host Directory</span>
+          <span class="list-kicker">Agent Directory</span>
           <div class="list-title-line">
-            <h2>主机与会话</h2>
+            <h2>接入节点</h2>
             <span class="directory-summary">
-              <span><strong>{{ totalCount }}</strong> 主机</span>
+              <span><strong>{{ totalCount }}</strong> 节点</span>
               <i />
               <span :class="{ 'has-live': liveSessions.length }">
-                <strong>{{ liveSessions.length }}</strong> 会话
+                <strong>{{ liveSessions.length }}</strong> 活动会话
               </span>
             </span>
           </div>
@@ -31,12 +31,12 @@
           @command="handleCreateCommand"
         >
           <el-icon><Icon :icon="iconMap.add" /></el-icon>
-          新增主机
+          新增节点
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="import">
                 <el-icon><Icon :icon="iconMap.upload" /></el-icon>
-                导入主机配置
+                导入节点配置
               </el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -75,7 +75,7 @@
         class="project-context-notice"
       >
         <el-icon><Icon icon="mdi:archive-outline" /></el-icon>
-        <span>归档项目保留主机与会话视图，不再创建新归属或新会话。</span>
+        <span>归档项目保留节点与会话视图，不再创建新归属或新会话。</span>
         <button
           v-if="activeProject.manageable"
           type="button"
@@ -88,7 +88,7 @@
       <div class="filter-row">
         <el-input
           v-model="searchKeyword"
-          placeholder="搜索主机名、地址、会话 ID"
+          placeholder="搜索节点名、地址、会话 ID"
           class="search-input"
           clearable
           size="small"
@@ -121,7 +121,7 @@
           <button
             class="u-icon-btn"
             type="button"
-            aria-label="刷新主机列表"
+            aria-label="刷新节点列表"
             :disabled="loading || sessionsLoading || batchBusy || projectsLoading"
             @click="refresh"
           >
@@ -454,23 +454,23 @@ const currentCacheAvailability = computed(() => {
 const emptyDirectoryCopy = computed(() => {
   if (isAllProjects.value) {
     return {
-      title: '暂无可访问主机',
-      description: '新增或导入第一台入口主机开始管理资产'
+      title: '暂无可访问节点',
+      description: '新增或导入一个接入节点后，即可管理节点与会话'
     }
   }
   if (isUnassignedProject.value) {
     return {
       title: '待整理队列已清空',
-      description: '所有入口主机都已归属项目，也可以在这里继续新增主机'
+      description: '所有入口节点都已归属项目，也可以在这里继续新增节点'
     }
   }
   if (activeProject.value?.status === 'archived') {
-    return { title: '归档项目暂无主机', description: '该项目当前仅保留项目信息与历史上下文' }
+    return { title: '归档项目暂无节点', description: '该项目当前仅保留项目信息与历史上下文' }
   }
   if (!activeProject.value?.contentEditable) {
-    return { title: '项目暂无主机', description: '项目负责人尚未整理入口主机' }
+    return { title: '项目暂无节点', description: '项目负责人尚未整理入口节点' }
   }
-  return { title: '项目暂无主机', description: '新增或导入第一台入口主机开始工作' }
+  return { title: '项目暂无节点', description: '新增或导入一个入口节点后开始工作' }
 })
 
 const buildCacheAvailability = (row, response) => ({
@@ -564,7 +564,7 @@ const getLiveSessions = async () => {
     {
       loadingRef: sessionsLoading,
       successMessage: null,
-      errorMessage: '获取存活会话失败'
+      errorMessage: '获取活动会话失败'
     }
   )
 }
@@ -761,7 +761,7 @@ const createNewSession = async (row) => {
       const connLink = row.connLink
 
       if (sessionId === INVALID_SESSION_ID) {
-        throw new Error('主机初始化失败')
+        throw new Error('创建操作会话失败')
       }
 
       const agentConsoleParams = {
@@ -784,7 +784,7 @@ const createNewSession = async (row) => {
       errorMessage: null,
       onError: async (error) => {
         if (error?.code === 'SESSION_CHANGED' || error?.code === 401) return
-        const message = error?.message || '主机初始化失败'
+        const message = error?.message || '创建操作会话失败'
         // 连接失败时检查是否有本地缓存
         try {
           cacheCheckLoading.value = true
@@ -855,7 +855,7 @@ const enterCacheMode = async (row, checkCache = false) => {
       const cacheResponse = await checkAgentCacheApi(row.agentId)
       cacheAvailability.value = buildCacheAvailability(row, cacheResponse)
       if (!cacheAvailability.value.hasCache) {
-        showWarning('该主机暂无可用缓存，请先成功进入一次实时控制台并完成数据采集')
+        showWarning('该接入节点暂无可用缓存，请先进入实时控制台并完成数据采集')
         return
       }
     }
@@ -878,7 +878,7 @@ const loadProjectMemberships = async (rows = [], contextToken = membershipContex
       ...(response.data || {})
     }
   } catch (error) {
-    if (import.meta.env.DEV) logger.warn('加载主机项目归属失败', error)
+    if (import.meta.env.DEV) logger.warn('加载节点项目归属失败', error)
   }
 }
 
@@ -919,7 +919,7 @@ const getAgents = async () => {
     {
       loadingRef: loading,
       successMessage: null,
-      errorMessage: '获取主机数据失败'
+      errorMessage: '获取接入节点失败'
     }
   )
 }
@@ -982,7 +982,7 @@ const openImportAgentDialog = () => {
   if (!isCurrentWorkspaceWritable.value) {
     showWarning(
       activeProject.value?.status === 'archived'
-        ? '已归档项目不再接收导入主机'
+        ? '已归档项目不再接收导入节点'
         : '当前项目为只读工作区'
     )
     return
@@ -1009,10 +1009,10 @@ const batchExportAgents = () => runBatchAction('export', async () => {
     downloadBlob(new Blob([encoded], { type: 'text/plain' }), filename)
     const dependencyCount = Math.max(0, bundle.agents.length - targets.length)
     showSuccess(dependencyCount
-      ? `已导出 ${targets.length} 台目标主机，并携带 ${dependencyCount} 台祖先依赖`
-      : `已导出 ${targets.length} 台主机`)
+      ? `已导出 ${targets.length} 个所选节点及 ${dependencyCount} 个上级节点的配置`
+      : `已导出 ${targets.length} 个节点的配置`)
   } catch (error) {
-    showError(error?.message || '导出主机配置失败')
+    showError(error?.message || '导出节点配置失败')
   }
 })
 
@@ -1024,7 +1024,7 @@ const openAddAgentDialog = () => {
   if (!isCurrentWorkspaceWritable.value) {
     showWarning(
       activeProject.value?.status === 'archived'
-        ? '已归档项目不再接收新主机'
+        ? '已归档项目不再接收新节点'
         : '当前项目为只读工作区'
     )
     return
@@ -1064,7 +1064,7 @@ const detachFromCurrentProject = () => runBatchAction('detach', async () => {
         targets.map((item) => item.agentId)
       ),
     {
-      message: `确定将选中的 ${targets.length} 台入口主机从项目中移除吗？主机资产本身会继续保留。`,
+      message: `确定移除所选 ${targets.length} 个节点对应的项目归属吗？接入节点及其配置会保留。`,
       successMessage: '已从项目移除',
       errorMessage: '移出项目失败',
       onSuccess: refreshAfterProjectMembershipChange
@@ -1079,9 +1079,9 @@ const openAddChildAgent = (row) => {
 const deleteAgent = async (row) => {
   if (batchBusy.value) return
   await executeDeleteWithConfirm(() => deleteAgentApi({ agentId: row.agentId }), {
-    message: `删除主机“${row.agentName || row.agentId}”将同时删除其全部子节点并关闭相关会话，此操作不可恢复。`,
-    successMessage: '主机删除成功',
-    errorMessage: '主机删除失败',
+    message: `删除接入节点“${row.agentName || row.agentId}”将同时删除其全部子节点并关闭相关会话，此操作不可恢复。`,
+    successMessage: '接入节点已删除',
+    errorMessage: '删除接入节点失败',
     loadingRef: loading,
     onSuccess: () => refresh()
   })
@@ -1102,8 +1102,8 @@ const batchDeleteAgents = () => runBatchAction('delete', async () => {
     return true
   })
   await executeBatchDelete(deletionRoots, (item) => deleteAgentApi({ agentId: item.agentId }), {
-    itemName: '主机',
-    confirmMessage: `确定删除选中的 ${targets.length} 台主机吗？父节点的全部未选中子节点也会一并删除，相关会话将被关闭，此操作不可恢复。`,
+    itemName: '节点',
+    confirmMessage: `确定删除选中的 ${targets.length} 个接入节点吗？父节点的全部未选中子节点也会一并删除，相关会话将被关闭，此操作不可恢复。`,
     loadingRef: loading,
     onSuccess: () => refresh()
   })

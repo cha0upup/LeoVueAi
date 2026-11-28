@@ -16,7 +16,7 @@
               <Icon :icon="iconMap.server" />
             </el-icon>
             <div>
-              <h3>新建主机节点</h3>
+              <h3>新增接入节点</h3>
             </div>
           </div>
         </div>
@@ -78,7 +78,7 @@
             @click="handleSubmit"
           >
             <el-icon><Icon :icon="iconMap.check" /></el-icon>
-            {{ loading ? '添加中...' : '添加主机' }}
+            {{ loading ? '添加中...' : '添加节点' }}
           </el-button>
         </div>
       </div>
@@ -142,7 +142,7 @@ const handleSubmit = async () => {
     () => addAgentApi(buildAgentPayload(), { projectId: props.projectId }),
     {
       loadingRef: loading,
-      successMessage: '主机添加成功！',
+      successMessage: '接入节点已添加',
       errorMessage: '添加失败，请稍后重试',
       onSuccess: () => {
         emit('refresh')

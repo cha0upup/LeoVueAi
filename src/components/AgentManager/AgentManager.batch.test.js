@@ -262,7 +262,7 @@ describe('AgentManager batch workflow', () => {
     await view.toolbar().onDetach()
     expect(mocks.detach).toHaveBeenCalledWith('source', ['host-0'])
     expect(mocks.delete).not.toHaveBeenCalled()
-    expect(mocks.confirm).toHaveBeenCalledWith(expect.stringContaining('主机资产本身会继续保留'), '确认删除', expect.any(Object))
+    expect(mocks.confirm).toHaveBeenCalledWith(expect.stringContaining('接入节点及其配置会保留'), '确认删除', expect.any(Object))
     fixture.project.activeProject.value.contentEditable = false
     await view.select(rows[1])
     await view.toolbar().onDetach()

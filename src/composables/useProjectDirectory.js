@@ -15,7 +15,7 @@ function normalizeProjectSummary(item) {
   }
   return {
     ...project,
-    hostCount: Number(item.hostCount) || 0,
+    entryNodeCount: Number(item.entryNodeCount) || 0,
     activeSessionCount: Number(item.activeSessionCount) || 0,
     manageable: Boolean(item.manageable),
     contentEditable: Boolean(item.contentEditable)

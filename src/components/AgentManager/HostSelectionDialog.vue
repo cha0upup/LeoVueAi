@@ -14,8 +14,8 @@
           <el-icon><Icon :icon="iconMap.server" /></el-icon>
         </span>
         <span>
-          <strong>{{ stage === 'selecting' ? '选择目标后端主机' : '准备连接' }}</strong>
-          <small>{{ context?.agentName || '当前主机' }}</small>
+          <strong>{{ stage === 'selecting' ? '选择后端实例' : '准备连接' }}</strong>
+          <small>{{ context?.agentName || '当前接入节点' }}</small>
         </span>
       </div>
     </template>
@@ -27,14 +27,14 @@
       <el-icon class="host-selection-spinner">
         <Icon :icon="iconMap.loading" />
       </el-icon>
-      <strong>正在识别后端主机...</strong>
+      <strong>正在识别后端实例…</strong>
       <span v-if="currentHostId">当前随机命中：{{ currentHostId }}</span>
       <span>正在获取可用后端实例，请稍候</span>
     </div>
 
     <template v-else-if="stage === 'selecting'">
       <p class="host-selection-hint">
-        已发现 {{ hosts.length }} 台可用后端主机，请选择要进入的实例。
+        该接入节点有 {{ hosts.length }} 个可用后端实例，请选择本次会话要连接的实例。
         <span v-if="discoveredAt">上次识别：{{ discoveredAt }}</span>
       </p>
       <el-radio-group
@@ -71,7 +71,7 @@
       class="host-selection-state is-error"
     >
       <el-icon><Icon :icon="iconMap.warning" /></el-icon>
-      <strong>暂未发现可用后端主机</strong>
+      <strong>暂未发现可用后端实例</strong>
       <span>{{ errorMessage || '请检查连接状态后重试' }}</span>
     </div>
 
@@ -105,7 +105,7 @@
             :disabled="!currentHostId || selectedHostId === currentHostId"
             @click="choose(currentHostId)"
           >
-            进入当前命中主机
+            进入当前实例
           </el-button>
           <el-button
             type="primary"
@@ -205,11 +205,11 @@ const discover = async () => {
       ? '' : (hosts.value[0] || '')
     // 单实例也保留在选择页，但默认勾选第一项，用户仍需明确确认进入。
     selectedHostId.value = hosts.value[0] || ''
-    if (!hosts.value.length) throw new Error('当前暂无可用后端主机')
+    if (!hosts.value.length) throw new Error('当前暂无可用后端实例')
     stage.value = 'selecting'
   } catch (error) {
     stage.value = 'error'
-    errorMessage.value = error?.response?.data?.msg || error?.message || '后端主机识别失败'
+    errorMessage.value = error?.response?.data?.msg || error?.message || '后端实例识别失败'
   } finally {
     loading.value = false
   }

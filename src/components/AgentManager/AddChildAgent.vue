@@ -15,7 +15,7 @@
             <Icon :icon="iconMap.childAgent" />
           </el-icon>
           <div>
-            <h3>添加子节点主机</h3>
+            <h3>添加子节点</h3>
           </div>
         </div>
       </div>
@@ -45,12 +45,12 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item
-              label="主机名称"
+              label="节点名称"
               prop="agentName"
             >
               <el-input
                 v-model="childAgent.agentName"
-                placeholder="请输入子节点主机名称"
+                placeholder="请输入子节点名称"
                 clearable
               />
             </el-form-item>
@@ -62,7 +62,7 @@
             >
               <el-input
                 v-model="childAgent.connLink"
-                placeholder="请输入子节点主机连接地址"
+                placeholder="请输入子节点连接地址"
                 clearable
               />
             </el-form-item>
@@ -365,7 +365,7 @@
           @click="handleSubmit"
         >
           <el-icon><Icon :icon="iconMap.check" /></el-icon>
-          {{ loading ? '添加中...' : '添加子节点主机' }}
+          {{ loading ? '添加中...' : '添加子节点' }}
         </el-button>
       </div>
     </template>
@@ -411,7 +411,7 @@ const parentRuntimeStatus = ref({ status: 'untested', label: '' })
 const childAgent = reactive(createDefaultAgent())
 
 const rules = createAgentDialogRules({
-  nameRequiredMessage: '请输入子节点主机名称',
+  nameRequiredMessage: '请输入子节点名称',
   connLinkPattern: /^https?:\/\/.+/,
   connLinkPatternMessage: '请输入有效的连接地址',
   requireDisguises: true,
@@ -452,7 +452,7 @@ const handleSubmit = async () => {
     },
     {
       loadingRef: loading,
-      successMessage: '子节点主机添加成功！',
+      successMessage: '子节点已添加',
       errorMessage: '添加失败，请稍后重试',
       onSuccess: () => {
         emit('refresh')

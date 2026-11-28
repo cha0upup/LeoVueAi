@@ -473,6 +473,7 @@ describe('Agent dialog shared form integration', () => {
     expect(dialog.node('ElSelect')).toBeNull()
     await dialog.button('确认加入').props.onClick()
     expect(mocks.attachProjectHosts).toHaveBeenCalledExactlyOnceWith('p1', ['host-1', 'host-2'])
+    expect(mocks.showSuccess).toHaveBeenCalledExactlyOnceWith('已将 2 个入口节点加入 目标项目')
     expect(dialog.saved).toHaveBeenCalledExactlyOnceWith('p1')
   })
 })

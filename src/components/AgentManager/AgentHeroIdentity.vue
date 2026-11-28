@@ -12,7 +12,7 @@
         <h2 :title="getHostDisplayName(agent)">
           {{ getHostDisplayName(agent) }}
         </h2>
-        <span class="type-chip">{{ isChildHost(agent) ? '子主机' : '主机' }}</span>
+        <span class="type-chip">{{ isChildHost(agent) ? '子节点' : '入口节点' }}</span>
       </div>
       <div class="identity-address">
         <p :title="agent.connLink">

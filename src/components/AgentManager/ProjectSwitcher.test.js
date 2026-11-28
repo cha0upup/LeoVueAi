@@ -17,10 +17,15 @@ it('focuses the search and switches only on an unambiguous Enter outside composi
   const renderer = createTestRenderer()
   const select = vi.fn()
   const focusSearch = vi.fn()
+  const activeProject = {
+    projectId: 'current', projectName: 'Atlas', projectCode: 'AT-001',
+    entryNodeCount: 3, activeSessionCount: 1, contentEditable: true
+  }
   const app = renderer.createApp(Switcher, {
-    modelValue: ALL_PROJECTS_ID,
+    modelValue: activeProject.projectId,
+    activeProject,
     projects: [
-      { projectId: 'current', projectName: 'Atlas', projectCode: 'AT-001' },
+      activeProject,
       { projectId: 'archived', projectName: 'Atlas Archive', projectCode: 'AT-002', status: 'archived' }
     ],
     'onUpdate:modelValue': select
@@ -38,6 +43,11 @@ it('focuses the search and switches only on an unambiguous Enter outside composi
   app.mount(renderer.root)
   try {
     const findClass = name => findNodes(renderer.root, node => node.props.class === name)[0]
+    const readText = node => [node.text, ...node.children.map(readText)].join('')
+    const statsLabel = '3 个入口节点 · 1 个活动会话'
+    expect(readText(findClass('project-workspace__meta'))).toContain(statsLabel)
+    expect(findNodes(renderer.root, node => node.type === 'small').map(readText))
+      .toContain(`AT-001 · ${statsLabel}`)
     const trigger = findClass('project-trigger')
     trigger.focus = vi.fn()
     const popover = () => findNode(renderer.root, 'ElPopover').props

@@ -16,7 +16,7 @@
               <Icon :icon="iconMap.edit" />
             </el-icon>
             <div>
-              <h3>调整主机配置</h3>
+              <h3>编辑接入节点</h3>
             </div>
           </div>
         </div>
@@ -85,7 +85,7 @@
             @click="handleEdit"
           >
             <el-icon><Icon :icon="iconMap.check" /></el-icon>
-            {{ loading ? '更新中...' : '更新主机' }}
+            {{ loading ? '更新中...' : '保存节点配置' }}
           </el-button>
         </div>
       </div>
@@ -156,7 +156,7 @@ const handleEdit = async () => {
     () => updateAgentApi(buildAgentPayload()),
     {
       loadingRef: loading,
-      successMessage: '主机更新成功！',
+      successMessage: '节点配置已更新',
       errorMessage: '更新失败，请稍后重试',
       onSuccess: () => {
         emit('refresh')

@@ -13,7 +13,7 @@
         </span>
         <span>
           <strong>加入项目</strong>
-          <small>主机资产保持不变，仅增加项目归属</small>
+          <small>只增加项目归属，接入节点配置保持不变</small>
         </span>
       </div>
     </template>
@@ -21,7 +21,7 @@
     <section class="assignment-summary">
       <div>
         <span class="assignment-summary__label">已选择</span>
-        <strong>{{ agents.length }} 个主机节点</strong>
+        <strong>{{ agents.length }} 个接入节点</strong>
       </div>
       <div
         class="assignment-hosts"
@@ -37,7 +37,7 @@
 
     <div class="assignment-section-title">
       <span>选择目标项目</span>
-      <small>子节点自动归并到入口主机，同一入口可加入多个项目</small>
+      <small>子节点按所属入口节点归属项目，同一入口可加入多个项目</small>
     </div>
     <el-input
       ref="searchInput"
@@ -67,7 +67,7 @@
         <span class="assignment-project__body">
           <strong>{{ project.projectName }}</strong>
           <small>
-            {{ project.projectCode || '未设置编码' }} · {{ project.hostCount || 0 }} 台入口主机
+            {{ project.projectCode || '未设置编码' }} · {{ project.entryNodeCount || 0 }} 个入口节点
           </small>
         </span>
       </button>
@@ -77,7 +77,7 @@
       >
         <el-icon><Icon :icon="iconMap.folder" /></el-icon>
         <strong>{{ editableProjects.length ? '没有匹配项目' : '暂无可维护的进行中项目' }}</strong>
-        <small>可先新建项目，再整理主机归属</small>
+        <small>可先新建项目，再整理节点归属</small>
       </div>
     </div>
 
@@ -177,7 +177,7 @@ const save = async () => {
       agents.value.map((item) => item.agentId)
     )
     const changedCount = Number(response.data?.changedCount ?? agents.value.length)
-    showSuccess(`已将 ${changedCount} 台入口主机加入 ${selectedProject.value?.projectName || '项目'}`)
+    showSuccess(`已将 ${changedCount} 个入口节点加入 ${selectedProject.value?.projectName || '项目'}`)
     visible.value = false
     emit('saved', projectId.value)
   } finally {
