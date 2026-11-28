@@ -524,8 +524,7 @@ const openExistingSession = (session) => {
       '',
     connLink: session.connLink,
     cacheMode: Boolean(session.cacheMode),
-    capabilities: Array.isArray(session.capabilities) ? session.capabilities : [],
-    currentHostId: session.currentHostId || ''
+    capabilities: Array.isArray(session.capabilities) ? session.capabilities : []
   }
   emit('open-agent-console', params)
 }

@@ -41,7 +41,7 @@ describe('AgentConsoleHeader connection path semantics', () => {
     expect(view.text()).not.toMatch(/节点|未连接|云端服务器|连接路径|控制服务端/)
     expect(view.find((node) => node.props.class === 'connection-mode-tag')[0].type).toBe('span')
     expect(view.find((node) => node.props['aria-label'] === '控制服务端')).toHaveLength(1)
-    expect(view.find((node) => node.props['aria-label'] === '当前主机 · https://target.test/agent'))
+    expect(view.find((node) => node.props['aria-label'] === '当前接入节点 · https://target.test/agent'))
       .toHaveLength(1)
   })
 
@@ -52,8 +52,8 @@ describe('AgentConsoleHeader connection path semantics', () => {
     expect(view.find((node) => node.props.class?.includes('chain-item--relay'))).toHaveLength(relayCount)
     expect(view.find((node) => node.props.class?.includes('chain-item--target'))).toHaveLength(1)
     const tooltips = view.find((node) => node.type === 'ElTooltip').map((node) => node.props.content)
-    expect(tooltips).toContain('中转主机 1 · relay-1')
-    expect(tooltips).toContain('当前主机 · target')
+    expect(tooltips).toContain('中转节点 1 · relay-1')
+    expect(tooltips).toContain('当前接入节点 · target')
   })
 
   it.each([
@@ -73,11 +73,13 @@ describe('AgentConsoleHeader connection path semantics', () => {
     const view = mount({
       displayConnLinkChain: ['old-relay', 'old-target'],
       connectionPathStatus: 'loading',
-      cacheMode: true
+      cacheMode: true,
+      currentHostId: 'cached-instance'
     })
     expect(view.text()).not.toContain('old-relay')
     expect(view.text()).toContain('读取中…')
     expect(view.text()).toContain('缓存只读')
+    expect(view.find((node) => node.props['aria-label'] === '缓存实例标识 · cached-instance')).toHaveLength(1)
     view.props.displayConnLinkChain = ['target']
     view.props.connectionPathStatus = 'ready'
     await nextTick()
@@ -101,7 +103,7 @@ describe('AgentConsoleHeader connection path semantics', () => {
     const compactId = view.find((node) => node.props.class === 'hostid-summary-id-compact')[0]
     expect(textContent(fullId)).toBe(id)
     expect(textContent(compactId)).toBe('7dbc6b3d…c417')
-    const tooltip = `1.jsp · 主机标识 · ${id}`
+    const tooltip = `1.jsp · 后端实例标识 · ${id}`
     const identifier = view.find((node) => node.props['aria-label'] === tooltip)[0]
     expect(identifier.props.tabindex).toBe('0')
     expect(view.find((node) => node.type === 'ElTooltip').map((node) => node.props.content))
@@ -141,7 +143,7 @@ describe('AgentConsoleHeader connection path semantics', () => {
     const view = mount({ currentHostId: '' })
     expect(view.find((node) => node.props.class === 'hostid-summary-empty').map(textContent))
       .toEqual(['—'])
-    expect(view.find((node) => node.props['aria-label'] === '主机标识暂未获取'))
+    expect(view.find((node) => node.props['aria-label'] === '后端实例标识暂未获取'))
       .toHaveLength(1)
   })
 })

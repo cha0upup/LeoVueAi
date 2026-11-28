@@ -89,13 +89,13 @@
         <template v-else-if="connLink">
           <!-- A known target address alone does not establish a direct path. -->
           <el-tooltip
-            :content="`当前主机连接地址 · ${connLink}；${connectionPathMessage}`"
+            :content="`当前接入节点地址 · ${connLink}；${connectionPathMessage}`"
             placement="top"
             effect="dark"
           >
             <span
               class="chain-item chain-item--pending"
-              :aria-label="`当前主机连接地址 · ${connLink}；${connectionPathMessage}`"
+              :aria-label="`当前接入节点地址 · ${connLink}；${connectionPathMessage}`"
               tabindex="0"
             >
               <el-icon class="link-icon"><Icon :icon="iconMap.server" /></el-icon>
@@ -145,16 +145,16 @@
 
     <div
       class="content-header-card hostid-summary-card"
-      aria-label="主机标识"
+      :aria-label="instanceIdentityLabel"
     >
       <el-tooltip
-        :content="hostIdentityTooltip"
+        :content="instanceIdentityTooltip"
         placement="bottom-end"
         effect="dark"
       >
         <span
           class="hostid-summary-value"
-          :aria-label="hostIdentityTooltip"
+          :aria-label="instanceIdentityTooltip"
           tabindex="0"
         >
           <span class="hostid-summary-label">ID</span>
@@ -238,9 +238,12 @@ const compactHostId = computed(() => {
   return id.length > 18 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id
 })
 
-const hostIdentityTooltip = computed(() => [
+const instanceIdentityLabel = computed(() => props.cacheMode ? '缓存实例标识' : '后端实例标识')
+const instanceIdentityTooltip = computed(() => [
   props.agentName,
-  props.currentHostId ? `主机标识 · ${props.currentHostId}` : '主机标识暂未获取'
+  props.currentHostId
+    ? `${instanceIdentityLabel.value} · ${props.currentHostId}`
+    : `${instanceIdentityLabel.value}暂未获取`
 ].filter(Boolean).join(' · '))
 
 const getChainIcon = (index, totalLength) => {
@@ -253,8 +256,8 @@ const getChainIcon = (index, totalLength) => {
 
 const getChainItemTooltip = (index, link) => {
   const role = index === props.displayConnLinkChain.length - 1
-    ? '当前主机'
-    : `中转主机 ${index + 1}`
+    ? '当前接入节点'
+    : `中转节点 ${index + 1}`
   return `${role} · ${link}`
 }
 </script>

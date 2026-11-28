@@ -13,10 +13,6 @@ export function getConnLinkChainApi(params) {
   return http.post('/platform/session/conn-link-chain', params)
 }
 
-export function getCurrentHostIdApi(params) {
-  return http.post('/platform/session/current-host-id', params)
-}
-
 // ─── 侦察摘要 ─────────────────────────────────────────────────────────────────
 
 export function getReconSummaryApi(params) {

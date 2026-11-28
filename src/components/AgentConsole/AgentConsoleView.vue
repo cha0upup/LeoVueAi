@@ -161,7 +161,7 @@
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue'
 
 import { icons as iconMap } from '@/utils/icons.js'
-import { getConnLinkChainApi, getCurrentHostIdApi } from '@/services/api/sessions.js'
+import { getConnLinkChainApi } from '@/services/api/sessions.js'
 import { getAgentNodeCapabilitiesApi } from '@/services/api/agent-node.js'
 import {
   supportsCapabilityRequirements,
@@ -450,27 +450,20 @@ const fetchConnLinkChain = async (sessionId, isCurrent) => {
   }
 }
 
-const fetchCurrentHostId = async (sessionId, isCurrent) => {
-  try {
-    const response = await getCurrentHostIdApi({ sessionId })
-    if (!isCurrent()) return
-    currentHostId.value = response?.data?.currentHostId || ''
-  } catch {
-    if (isCurrent()) currentHostId.value = ''
-  }
-}
-
 const fetchCapabilities = async (sessionId, isCurrent) => {
   try {
     const response = await getAgentNodeCapabilitiesApi({ sessionId })
     if (!isCurrent()) return
-    const raw = response?.data?.capabilities
+    const data = response?.data
+    const raw = data?.capabilities
     serverCapabilities.value = Array.isArray(raw) ? raw : []
-    agentRuntime.value = response?.data?.runtimeProfile?.runtime || 'java'
-    runtimeProfile.value = response?.data?.runtimeProfile || null
+    agentRuntime.value = data?.runtimeProfile?.runtime || 'java'
+    runtimeProfile.value = data?.runtimeProfile || null
+    currentHostId.value = typeof data?.currentHostId === 'string' ? data.currentHostId : ''
   } catch {
     if (!isCurrent()) return
     serverCapabilities.value = Array.isArray(props.capabilities) ? [...props.capabilities] : []
+    currentHostId.value = ''
   }
 }
 
@@ -497,12 +490,6 @@ const initializeComponent = async () => {
     initStep.value = '获取连接链路…'
     await fetchConnLinkChain(sessionId, isCurrent)
     if (!isCurrent()) return
-
-    if (!props.cacheMode) {
-      initStep.value = '读取主机信息…'
-      await fetchCurrentHostId(sessionId, isCurrent)
-      if (!isCurrent()) return
-    }
 
     initStep.value = ''
     isInitialized.value = true

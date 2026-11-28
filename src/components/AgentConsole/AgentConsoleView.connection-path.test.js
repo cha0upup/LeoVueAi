@@ -62,16 +62,15 @@ describe('AgentConsoleView connection path loading', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() })
-    mocks.capabilities.mockResolvedValue({ data: { capabilities: [] } })
-    mocks.host.mockResolvedValue({ data: { currentHostId: 'host-id' } })
+    mocks.capabilities.mockResolvedValue({ data: { capabilities: [], currentHostId: 'host-id' } })
   })
   afterEach(() => {
     apps.splice(0).forEach((app) => app.unmount())
     vi.unstubAllGlobals()
   })
 
-  function mount() {
-    const props = Vue.reactive({ sessionId: 'one', connLink: 'target' })
+  function mount(overrides = {}) {
+    const props = Vue.reactive({ sessionId: 'one', connLink: 'target', ...overrides })
     const renderer = createTestRenderer()
     const app = renderer.createApp({ render: () => Vue.h(View, props) })
     for (const name of ['ElIcon', 'ElResult', 'ElSkeleton', 'ElButton', 'Icon']) {
@@ -82,15 +81,17 @@ describe('AgentConsoleView connection path loading', () => {
     return { props, header: () => findHeader(renderer.root).props }
   }
 
-  it('shows loading before initialization completes, then displays the server-to-target order', async () => {
+  it.each([false, true])('gets the instance identity before the path completes (cache: %s)', async cacheMode => {
     const request = deferred()
     mocks.chain.mockReturnValueOnce(request.promise)
-    const view = mount()
+    const view = mount({ cacheMode })
     expect(view.header().connectionPathStatus).toBe('loading')
     await vi.waitFor(() => expect(mocks.chain).toHaveBeenCalledOnce())
+    expect(view.header().currentHostId).toBe('host-id')
     request.resolve({ data: { connLinkChain: [' target ', 'relay-two', 'relay-one'] } })
     await vi.waitFor(() => expect(view.header().connectionPathStatus).toBe('ready'))
     expect(view.header().displayConnLinkChain).toEqual(['relay-one', 'relay-two', 'target'])
+    expect(mocks.host).not.toHaveBeenCalled()
   })
 
   it.each([undefined, null, {}, [], [' ', null, 42, {}]].map((raw) => ({ raw })))(
@@ -127,6 +128,9 @@ describe('AgentConsoleView connection path loading', () => {
   it.each(['resolve', 'reject'])('ignores a stale path response after switching sessions (%s)', async (settle) => {
     const first = deferred()
     const second = deferred()
+    mocks.capabilities
+      .mockResolvedValueOnce({ data: { capabilities: [], currentHostId: 'old-instance' } })
+      .mockResolvedValueOnce({ data: { capabilities: [], currentHostId: 'new-instance' } })
     mocks.chain.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
     const view = mount()
     await vi.waitFor(() => expect(mocks.chain).toHaveBeenCalledTimes(1))
@@ -144,5 +148,6 @@ describe('AgentConsoleView connection path loading', () => {
     await Vue.nextTick()
     expect(view.header().displayConnLinkChain).toEqual(['new-target'])
     expect(view.header().connectionPathStatus).toBe('ready')
+    expect(view.header().currentHostId).toBe('new-instance')
   })
 })
