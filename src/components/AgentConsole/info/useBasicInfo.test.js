@@ -26,6 +26,8 @@ it('ignores an older host response while the current request is loading', async 
     .mockReturnValueOnce(newResponse)
   const oldLoad = info.load('old-session')
   const newLoad = info.load('new-session')
+  expect(getBasicInfoApi.mock.calls[0][1]?.signal.aborted).toBe(true)
+  expect(getBasicInfoApi.mock.lastCall[1]?.signal.aborted).toBe(false)
   finishOld({ data: { BasicInfo: { OSInfo: { HostName: 'old' } } } })
   await oldLoad
   expect(info.basicInfo.value).toEqual({})
@@ -41,9 +43,28 @@ it('discards pending errors when the view is disposed', async () => {
   getBasicInfoApi.mockReturnValueOnce(promise)
   const pending = info.load('session')
   scope.stop()
+  expect(getBasicInfoApi.mock.lastCall[1]?.signal.aborted).toBe(true)
   fail(new Error('disconnected'))
   await pending
   expect(handleError).not.toHaveBeenCalled()
   expect(info.error.value).toBe('')
   expect(info.loading.value).toBe(false)
+})
+
+it('shares a pending read and allows an explicit refresh after it completes', async () => {
+  const pending = deferred()
+  getBasicInfoApi.mockReturnValueOnce(pending.promise)
+  const first = info.load('session')
+  const duplicate = info.load('session')
+
+  expect(getBasicInfoApi).toHaveBeenCalledOnce()
+  expect(getBasicInfoApi.mock.lastCall[1]?.signal.aborted).toBe(false)
+  pending.resolve({ data: { BasicInfo: { collectTime: 'first' } } })
+  await Promise.all([first, duplicate])
+  expect(info.basicInfo.value.collectTime).toBe('first')
+
+  getBasicInfoApi.mockResolvedValueOnce({ data: { BasicInfo: { collectTime: 'second' } } })
+  await info.load('session')
+  expect(getBasicInfoApi).toHaveBeenCalledTimes(2)
+  expect(info.basicInfo.value.collectTime).toBe('second')
 })

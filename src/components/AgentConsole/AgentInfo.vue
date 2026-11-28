@@ -9,8 +9,8 @@
                 {{ hostTitle }}
               </h2>
               <StatusIndicator
-                :status="connectionStatus.status"
-                :label="connectionStatus.label"
+                :status="snapshotStatus.status"
+                :label="snapshotStatus.label"
                 compact
               />
               <el-tag
@@ -186,13 +186,12 @@ const lastUpdatedAt = computed(() => {
   const timestamp = basicInfo.value.collectTime || basicInfo.value.saveTime
   return timestamp ? formatDate(timestamp) : ''
 })
-const connectionStatus = computed(() => {
-  if (loading.value) return { status: 'waiting', label: hasInfo.value ? '刷新中' : cacheMode.value ? '读取缓存' : '连接中' }
-  if (error.value) return { status: 'failed', label: hasInfo.value ? '刷新失败' : cacheMode.value ? '缓存读取失败' : '连接失败' }
+const snapshotStatus = computed(() => {
+  if (loading.value) return { status: 'waiting', label: hasInfo.value ? '刷新中' : cacheMode.value ? '读取缓存' : '采集中' }
+  if (error.value) return { status: 'failed', label: hasInfo.value ? '刷新失败' : cacheMode.value ? '缓存读取失败' : '采集失败' }
+  if (!hasInfo.value) return { status: 'unconfigured', label: cacheMode.value ? '暂无快照' : '暂无信息' }
   if (cacheMode.value) return { status: 'offline', label: '缓存快照' }
-  return hasInfo.value
-    ? { status: 'online', label: '已连接' }
-    : { status: 'unconfigured', label: '暂无信息' }
+  return { status: 'success', label: '已采集' }
 })
 const hostTitle = computed(
   () =>

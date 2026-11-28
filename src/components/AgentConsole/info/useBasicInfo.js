@@ -1,34 +1,52 @@
-import { onScopeDispose, ref } from 'vue'
+import { onScopeDispose, ref, shallowRef } from 'vue'
 import { getBasicInfoApi } from '@/services/api/agent-node.js'
 import { handleError } from '@/utils/errorHandler.js'
-import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 
 export function useBasicInfo() {
-  const basicInfo = ref({})
+  const basicInfo = shallowRef({})
   const loading = ref(false)
   const error = ref('')
-  const requests = createLatestRequestGuard(['info'])
+  let session = ''
+  let pending
 
   const reset = () => {
-    requests.invalidate()
+    const previous = pending
+    pending = undefined
+    session = ''
+    previous?.controller.abort()
     basicInfo.value = {}
     loading.value = false
     error.value = ''
   }
 
-  const load = async (sessionId) => {
+  const load = (sessionId) => {
     if (!sessionId) return reset()
-    const sequence = requests.next('info')
-    const isCurrent = () => requests.isCurrent('info', sequence)
+    if (session !== sessionId) {
+      reset()
+      session = sessionId
+    }
+    if (pending) return pending.promise
+
+    const request = { controller: new AbortController(), promise: null }
+    pending = request
+    request.promise = read(sessionId, request)
+    return request.promise
+  }
+
+  const read = async (sessionId, request) => {
+    const { signal } = request.controller
     loading.value = true
     error.value = ''
     try {
-      const response = await getBasicInfoApi({ sessionId })
-      if (isCurrent()) basicInfo.value = response.data.BasicInfo || {}
+      const response = await getBasicInfoApi({ sessionId }, { signal })
+      if (pending === request) basicInfo.value = response.data.BasicInfo || {}
     } catch (cause) {
-      if (isCurrent()) error.value = handleError(cause, { defaultMessage: '获取主机信息失败' })
+      if (pending === request) error.value = handleError(cause, { defaultMessage: '读取实例基础信息失败' })
     } finally {
-      if (isCurrent()) loading.value = false
+      if (pending === request) {
+        pending = undefined
+        loading.value = false
+      }
     }
   }
 

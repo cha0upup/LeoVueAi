@@ -56,8 +56,8 @@ export function execCommandApi(params) {
   return sendTerminalCommand(params)
 }
 
-export function getBasicInfoApi(params) {
-  return http.post('/agent-node/basic-info', params)
+export function getBasicInfoApi(params, { signal } = {}) {
+  return http.post('/agent-node/basic-info', params, { signal })
 }
 
 export function getAgentNodeCapabilitiesApi(params) {
