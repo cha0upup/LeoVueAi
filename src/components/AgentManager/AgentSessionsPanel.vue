@@ -12,15 +12,15 @@
           <el-icon><Icon :icon="iconMap.session" /></el-icon>
         </span>
         <div>
-          <span class="sessions-kicker">Active Sessions</span>
+          <span class="sessions-kicker">Live Sessions</span>
           <h3 id="live-sessions-title">
-            操作会话
+            实时会话
           </h3>
         </div>
       </div>
       <StatusIndicator
         :status="sessions.length ? 'online' : 'offline'"
-        :label="sessions.length ? `${sessions.length} 个活动会话` : '暂无活动会话'"
+        :label="sessions.length ? `${sessions.length} 个实时会话` : '暂无实时会话'"
         compact
       />
     </header>
@@ -28,7 +28,7 @@
     <div
       v-if="sessions.length"
       class="session-list"
-      aria-label="当前接入节点的活动会话"
+      aria-label="当前接入节点的实时会话"
     >
       <div
         class="session-list__head"
@@ -112,8 +112,8 @@
         <el-icon><Icon :icon="iconMap.session" /></el-icon>
       </span>
       <div>
-        <strong>当前接入节点暂无活动会话</strong>
-        <p>新建操作会话后，会在此处显示。</p>
+        <strong>当前接入节点暂无实时会话</strong>
+        <p>建立实时连接后，会话会在此处显示。</p>
       </div>
     </div>
   </section>

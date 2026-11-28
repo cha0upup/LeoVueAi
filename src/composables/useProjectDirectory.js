@@ -17,6 +17,7 @@ function normalizeProjectSummary(item) {
     ...project,
     entryNodeCount: Number(item.entryNodeCount) || 0,
     activeSessionCount: Number(item.activeSessionCount) || 0,
+    cacheSessionCount: Number(item.cacheSessionCount) || 0,
     manageable: Boolean(item.manageable),
     contentEditable: Boolean(item.contentEditable)
   }

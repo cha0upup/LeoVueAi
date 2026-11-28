@@ -129,7 +129,7 @@
                   </span>
                   <span class="project-option-card__body">
                     <strong>{{ project.projectName || '未命名项目' }}</strong>
-                    <small>
+                    <small :title="projectCountsLabel(project)">
                       {{ project.projectCode ? `${project.projectCode} · ` : '' }}{{ projectCountsLabel(project) }}
                     </small>
                   </span>
@@ -265,8 +265,12 @@ const currentSubtitle = computed(() =>
   props.activeProject?.projectCode || props.activeProject?.description || ''
 )
 const currentIcon = computed(() => currentWorkspace.value?.icon ?? iconMap.folderOpened)
-const projectCountsLabel = (project) =>
-  `${project.entryNodeCount || 0} 个入口节点 · ${project.activeSessionCount || 0} 个活动会话`
+const projectCountsLabel = (project) => {
+  const cached = project.cacheSessionCount || 0
+  const live = (project.activeSessionCount || 0) - cached
+  const counts = `${project.entryNodeCount || 0} 个入口节点 · ${live} 个实时会话`
+  return cached ? `${counts} · ${cached} 个缓存会话` : counts
+}
 
 function closeAndFocusTrigger() {
   pickerVisible.value = false

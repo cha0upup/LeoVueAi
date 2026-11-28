@@ -31,6 +31,7 @@ describe('useProjectDirectory', () => {
         project: { projectId: 'project-1', projectName: 'Alpha', status: 'active' },
         entryNodeCount: 4,
         activeSessionCount: 2,
+        cacheSessionCount: 1,
         manageable: true,
         contentEditable: true
       }]
@@ -41,7 +42,7 @@ describe('useProjectDirectory', () => {
     directory.selectProject('project-1')
 
     expect(directory.activeProject.value).toEqual(expect.objectContaining({
-      projectName: 'Alpha', entryNodeCount: 4, activeSessionCount: 2, manageable: true,
+      projectName: 'Alpha', entryNodeCount: 4, activeSessionCount: 2, cacheSessionCount: 1, manageable: true,
       contentEditable: true
     }))
     expect(directory.activeProjectId.value).toBe('project-1')

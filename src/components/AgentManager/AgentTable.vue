@@ -51,7 +51,7 @@
               <span
                 class="node-dot"
                 :class="{ online: getHostSessions(data).length }"
-                :title="getHostSessions(data).length ? '有在线会话' : '无在线会话'"
+                :title="getHostSessions(data).length ? '有实时会话' : '无实时会话'"
               />
             </div>
 
@@ -69,7 +69,7 @@
                   type="warning"
                   class="role-tag"
                 >
-                  子机
+                  子节点
                 </el-tag>
               </div>
               <div class="node-line2">
@@ -102,7 +102,7 @@
             <div class="node-right">
               <StatusIndicator
                 :status="getHostSessions(data).length ? 'online' : 'offline'"
-                :label="getHostSessions(data).length ? `${getHostSessions(data).length} 会话` : '无会话'"
+                :label="getHostSessions(data).length ? `${getHostSessions(data).length} 个实时` : '无实时会话'"
                 compact
               />
               <span
@@ -151,8 +151,8 @@ const props = defineProps({
   selectionDisabled: { type: Boolean, default: false },
   sessionsByAgentId: { type: Object, default: () => ({}) },
   projectMemberships: { type: Object, default: () => ({}) },
-  emptyTitle: { type: String, default: '暂无主机' },
-  emptyDescription: { type: String, default: '添加第一台主机以开始使用控制台' }
+  emptyTitle: { type: String, default: '暂无接入节点' },
+  emptyDescription: { type: String, default: '添加一个接入节点后即可使用控制台' }
 })
 
 const emit = defineEmits(['row-click', 'enter-console', 'toggle-selection', 'visible-agents-change'])

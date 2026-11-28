@@ -19,7 +19,7 @@ it('focuses the search and switches only on an unambiguous Enter outside composi
   const focusSearch = vi.fn()
   const activeProject = {
     projectId: 'current', projectName: 'Atlas', projectCode: 'AT-001',
-    entryNodeCount: 3, activeSessionCount: 1, contentEditable: true
+    entryNodeCount: 3, activeSessionCount: 3, cacheSessionCount: 2, contentEditable: true
   }
   const app = renderer.createApp(Switcher, {
     modelValue: activeProject.projectId,
@@ -44,7 +44,7 @@ it('focuses the search and switches only on an unambiguous Enter outside composi
   try {
     const findClass = name => findNodes(renderer.root, node => node.props.class === name)[0]
     const readText = node => [node.text, ...node.children.map(readText)].join('')
-    const statsLabel = '3 个入口节点 · 1 个活动会话'
+    const statsLabel = '3 个入口节点 · 1 个实时会话 · 2 个缓存会话'
     expect(readText(findClass('project-workspace__meta'))).toContain(statsLabel)
     expect(findNodes(renderer.root, node => node.type === 'small').map(readText))
       .toContain(`AT-001 · ${statsLabel}`)

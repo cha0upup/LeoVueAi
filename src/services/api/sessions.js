@@ -1,5 +1,6 @@
 import http from '../http.js'
 
+// 节点目录可复用的实时会话；缓存会话不在此列表中。
 export function getSessionsApi(params = {}) {
   return http.get('/platform/session/sessions', { params })
 }

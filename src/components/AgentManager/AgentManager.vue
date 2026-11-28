@@ -15,7 +15,7 @@
               <span><strong>{{ totalCount }}</strong> 节点</span>
               <i />
               <span :class="{ 'has-live': liveSessions.length }">
-                <strong>{{ liveSessions.length }}</strong> 活动会话
+                <strong>{{ liveSessions.length }}</strong> 实时会话
               </span>
             </span>
           </div>
@@ -564,7 +564,7 @@ const getLiveSessions = async () => {
     {
       loadingRef: sessionsLoading,
       successMessage: null,
-      errorMessage: '获取活动会话失败'
+      errorMessage: '获取实时会话失败'
     }
   )
 }
