@@ -10,7 +10,7 @@
         </span>
         <div class="assistant-heading">
           <strong>平台 AI</strong>
-          <span>{{ agentReady ? '全平台 · 资源管理与分析' : '全平台 · 初始化中…' }}</span>
+          <span>{{ assistantReady ? '全平台 · 资源管理与分析' : '全平台 · 初始化中…' }}</span>
         </div>
       </div>
       <div class="assistant-actions">
@@ -19,7 +19,7 @@
           class="header-action is-primary"
           aria-label="新建对话"
           title="新建对话"
-          :disabled="!agentReady || creatingThread || historyLoading"
+          :disabled="!assistantReady || creatingThread || historyLoading"
           @click="onCreateThread"
         >
           <el-icon><Icon :icon="icons.plus" /></el-icon>
@@ -46,7 +46,7 @@
       :model-value="activeThreadId"
       :threads="threads"
       :conversation-status="conversationStatus"
-      :loading="!agentReady"
+      :loading="!assistantReady"
       renameable
       @activate="onActivateThread"
       @delete="onDeleteThread"
@@ -80,7 +80,7 @@
           </div>
           <PlatformAiWelcome
             v-if="!messages.length && !historyLoading"
-            :ready="agentReady"
+            :ready="assistantReady"
             @pick-prompt="onPickPrompt"
           />
 
@@ -126,7 +126,7 @@
         ref="composerRef"
         :model-value="draft"
         :sending="composerSending"
-        :ready="agentReady && !historyLoading && !creatingThread"
+        :ready="assistantReady && !historyLoading && !creatingThread"
         :composing="composerComposing"
         :config-id="selectedConfigId"
         :reasoning-effort="reasoningEffort"
@@ -152,7 +152,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { icons } from '@/utils/icons.js'
 import {
   platformAiStartTurnApi,
-  platformAiCreateAgent,
+  platformAiThreadInitializeApi,
   platformAiStopApi,
   platformAiEventsApi,
   platformAiStreamApi,
@@ -220,7 +220,7 @@ const threads = ref([])
 const activeThreadId = ref(null)
 const creatingThread = ref(false)
 const historyLoading = ref(false)
-const agentReady = ref(false)
+const assistantReady = ref(false)
 
 const activeThread = computed(() => {
   return threads.value.find(thread => thread.threadId === activeThreadId.value) || null
@@ -283,7 +283,7 @@ const {
   onComplete: () => {
     if (mounted) fetchThreadsSilently()
   },
-  canSend: () => agentReady.value && !!activeThreadId.value,
+  canSend: () => assistantReady.value && !!activeThreadId.value,
   getExtraParams: (threadId) => ({
     threadId: threadId || activeThreadId.value,
     configId: selectedConfigId.value ?? undefined
@@ -446,8 +446,28 @@ const onActivateThread = async threadId => {
   }
 }
 
+const registerCreatedThread = (info, defaultTitle) => {
+  if (!info?.threadId) return null
+  requestGuard.invalidate(['threads', 'history', 'events', 'activate'])
+  const now = Date.now()
+  const thread = {
+    threadId: info.threadId,
+    title: info.title || defaultTitle,
+    configId: info.configId ?? selectedConfigId.value ?? null,
+    createdAt: now,
+    lastActiveAt: now,
+    messageCount: 0,
+    runStatus: 'idle',
+    executing: false
+  }
+  threads.value = [thread, ...threads.value.filter(item => item.threadId !== info.threadId)]
+  activeThreadId.value = info.threadId
+  setMessages([], info.threadId)
+  return info.threadId
+}
+
 const onCreateThread = async () => {
-  if (!agentReady.value || creatingThread.value || historyLoading.value) return null
+  if (!assistantReady.value || creatingThread.value || historyLoading.value) return null
   if (activeThread.value && !composerSending.value && !waitingForUserInput.value &&
       !activeThread.value.messageCount && !messages.value.length) {
     composerRef.value?.focus()
@@ -457,23 +477,7 @@ const onCreateThread = async () => {
   try {
     const response = await platformAiThreadCreateApi({ title: '新对话', configId: selectedConfigId.value ?? undefined })
     if (!mounted) return null
-    const info = response.data
-    if (!info?.threadId) return null
-    requestGuard.invalidate(['threads', 'history', 'events', 'activate'])
-    const thread = {
-      threadId: info.threadId,
-      title: info.title || '新对话',
-      configId: info.configId ?? selectedConfigId.value ?? null,
-      createdAt: Date.now(),
-      lastActiveAt: Date.now(),
-      messageCount: 0,
-      runStatus: 'idle',
-      executing: false
-    }
-    threads.value = [thread, ...threads.value.filter(item => item.threadId !== info.threadId)]
-    activeThreadId.value = info.threadId
-    setMessages([], info.threadId)
-    return info.threadId
+    return registerCreatedThread(response.data, '新对话')
   } catch (error) {
     if (mounted) showError('创建线程失败：' + (error?.message || '未知错误'))
     return null
@@ -516,7 +520,7 @@ const onSend = async () => {
   if (waitingForUserInput.value) return
   const inputText = draft.value?.trim() || ''
   const text = inputText || (attachments.value.length ? '请阅读并分析附件。' : '')
-  if (!text || !agentReady.value || composerSending.value || sendPreparing.value || historyLoading.value || creatingThread.value) return
+  if (!text || !assistantReady.value || composerSending.value || sendPreparing.value || historyLoading.value || creatingThread.value) return
   sendPreparing.value = true
   try {
     const threadId = activeThreadId.value || await onCreateThread()
@@ -580,7 +584,7 @@ watch(selectedConfigId, async (newId, oldId) => {
   }
   const userRequested = requestedModelSwitchId.value === newId
   requestedModelSwitchId.value = null
-  if (!agentReady.value || !activeThreadId.value || newId === oldId || newId == null) return
+  if (!assistantReady.value || !activeThreadId.value || newId === oldId || newId == null) return
   const threadId = activeThreadId.value
   const sequence = requestGuard.next('config')
   try {
@@ -621,15 +625,14 @@ const initializePlatformAi = async () => {
     if (!mounted || !requestGuard.isCurrent('init', sequence)) return
     await fetchConfigs()
     if (!mounted || !requestGuard.isCurrent('init', sequence)) return
-    let loadedThreads = await fetchThreads()
+    const loadedThreads = await fetchThreads()
     if (!mounted || !requestGuard.isCurrent('init', sequence) || !loadedThreads) return
     if (loadedThreads.length === 0) {
-      await platformAiCreateAgent({ configId: selectedConfigId.value ?? undefined })
+      const response = await platformAiThreadInitializeApi({ configId: selectedConfigId.value ?? undefined })
       if (!mounted || !requestGuard.isCurrent('init', sequence)) return
-      loadedThreads = await fetchThreads()
-      if (!mounted || !requestGuard.isCurrent('init', sequence) || !loadedThreads) return
+      if (!registerCreatedThread(response?.data, '平台 AI')) throw new Error('初始化对话响应缺少 threadId')
     }
-    agentReady.value = true
+    assistantReady.value = true
     const threadId = activeThreadId.value
     if (!threadId) return
     syncSelectedConfigFromThread(threadId)
@@ -666,7 +669,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   mounted = false
-  agentReady.value = false
+  assistantReady.value = false
   requestGuard.invalidate()
   renameSequences.clear()
   document.removeEventListener('visibilitychange', onVisibilityChange)

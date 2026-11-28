@@ -16,7 +16,7 @@ import { chatReasoningOptions } from '@/utils/aiReasoning.js'
  * const { configs, selectedConfigId, fetchConfigs } = useAiChannelSelector()
  * await fetchConfigs()
  * // 新建会话时：
- * platformAiCreateAgent({ configId: selectedConfigId.value || undefined })
+ * platformAiThreadCreateApi({ configId: selectedConfigId.value ?? undefined })
  * ```
  */
 export function useAiChannelSelector({ loadConfigs = listAvailableAiModelsApi } = {}) {

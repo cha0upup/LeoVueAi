@@ -14,13 +14,12 @@ export function listAvailableAiModelsApi() {
 }
 
 /**
- * 初始化平台级 AI Agent（绑定到当前 HTTP Session）
- * 每次打开平台 AI 面板时调用一次即可
+ * 对话列表为空时创建初始线程，返回与手动新建对话相同的摘要。
  * @param {Object} [params]
  * @param {number} [params.configId] - 可选，指定使用的 AI 通道 ID；不传则使用激活通道
  */
-export async function platformAiCreateAgent(params) {
-  return http.post('/platform/ai/createAgent', params || {})
+export function platformAiThreadInitializeApi(params) {
+  return http.post('/platform/ai/thread/initialize', params || {})
 }
 
 /**
