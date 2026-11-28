@@ -209,10 +209,16 @@ const statusFilter = ref('all')
 const searchKeyword = ref('')
 const sortOption = ref('latest')
 const selectedTaskId = ref('')
-const tasks = ref([])
+const localTasks = shallowRef([])
 const serverDownloadTasks = ref([])
 const serverUploadTasks = ref([])
 const serverSqlExportTasks = ref([])
+const tasks = computed(() => buildTaskList({
+  localTasks: localTasks.value,
+  serverDownloadTasks: serverDownloadTasks.value,
+  serverUploadTasks: serverUploadTasks.value,
+  serverSqlExportTasks: serverSqlExportTasks.value
+}))
 const requestGuard = createLatestRequestGuard(['remote', 'refresh'])
 const remoteSyncRequests = new Map()
 let syncTimer = null
@@ -226,7 +232,6 @@ const initialSyncDone = ref(false)
 const lastSyncedAt = ref(0)
 const remoteErrors = ref([])
 const {
-  tasks: scanTasks,
   selectedTaskId: selectedScanTaskId,
   loadError: scanLoadError,
   hasMoreHistory: hasMoreScanHistory,
@@ -327,14 +332,9 @@ function restoreDetailFocus() {
 
 const isCurrentSession = (sessionId) => sessionId === props.sessionId
 
-const rebuildTaskList = (sessionId = props.sessionId) => {
+const refreshLocalTasks = (sessionId = props.sessionId) => {
   if (!sessionId || !isCurrentSession(sessionId)) return
-  tasks.value = buildTaskList({
-    localTasks: taskEngine.getTasksBySession(sessionId),
-    serverDownloadTasks: serverDownloadTasks.value,
-    serverUploadTasks: serverUploadTasks.value,
-    serverSqlExportTasks: serverSqlExportTasks.value
-  })
+  localTasks.value = taskEngine.getTasksBySession(sessionId)
 }
 
 const syncRemoteTasks = (force = false) => {
@@ -360,7 +360,8 @@ const syncRemoteTasks = (force = false) => {
       const snapshots = Array.isArray(result.value?.data?.tasks) ? result.value.data.tasks : []
       source.tasks.value = snapshots.map(source.normalize).filter(task => task.serverTaskId)
     }
-    rebuildTaskList(sessionId)
+    // Some local transfer stages change without emitting an event.
+    refreshLocalTasks(sessionId)
   })()
   remoteSyncRequests.set(sessionId, request)
   request.finally(() => {
@@ -369,7 +370,6 @@ const syncRemoteTasks = (force = false) => {
   return request
 }
 
-watch(scanTasks, () => rebuildTaskList())
 watch(selectedTask, task => {
   selectedScanTaskId.value = task?.type === TaskType.SCAN ? task.taskId : null
 })
@@ -385,10 +385,12 @@ const refreshAll = ({ discover = true } = {}) => {
   ])
     .then(([remote]) => {
       if (!requestGuard.isCurrent('refresh', sequence) || !isCurrentSession(sessionId)) return
-      if (remote.status === 'rejected') remoteErrors.value = ['下载', '上传', '数据库导出']
+      if (remote.status === 'rejected') {
+        remoteErrors.value = ['下载', '上传', '数据库导出']
+        refreshLocalTasks(sessionId)
+      }
       initialSyncDone.value = true
       if (!syncError.value) lastSyncedAt.value = Date.now()
-      rebuildTaskList(sessionId)
     })
     .finally(() => {
       if (refreshRequest.value === request) refreshRequest.value = null
@@ -405,7 +407,7 @@ const resetSessionState = () => {
   lastSyncedAt.value = 0
   remoteErrors.value = []
   selectedTaskId.value = ''
-  tasks.value = []
+  localTasks.value = []
   serverDownloadTasks.value = []
   serverUploadTasks.value = []
   serverSqlExportTasks.value = []
@@ -416,7 +418,7 @@ watch(
   (sessionId) => {
     resetSessionState()
     if (!sessionId) return
-    rebuildTaskList(sessionId)
+    refreshLocalTasks(sessionId)
     refreshAll()
   },
   { immediate: true }
@@ -442,7 +444,7 @@ const removeTask = async (task) => {
     })
     if (task.taskId) taskEngine.removeTaskById(task.taskId)
     await syncScanTasks()
-    rebuildTaskList()
+    refreshLocalTasks()
     showSuccess('任务已删除')
     return
   }
@@ -455,7 +457,6 @@ const removeTask = async (task) => {
     taskEngine.removeTask(task.taskId)
   }
   await syncRemoteTasks(true)
-  rebuildTaskList()
   showSuccess('任务已删除')
 }
 
@@ -527,7 +528,6 @@ const handleTaskAction = async (action, task) => {
     await taskEngine[taskAction.method](task.taskId)
     if (!isCurrentSession(sessionId)) return
     showSuccess(taskAction.message)
-    rebuildTaskList(sessionId)
   } catch (error) {
     if (isCurrentSession(sessionId)) showError(error?.message || '任务操作失败')
   }
@@ -545,7 +545,9 @@ const taskEvents = [
   'taskRetried',
   'taskRemoved'
 ]
-const handleTaskEngineChange = () => rebuildTaskList()
+const handleTaskEngineChange = (task) => {
+  if (task?.sessionId === props.sessionId) refreshLocalTasks(task.sessionId)
+}
 
 onMounted(() => {
   resizeObserver = new ResizeObserver(([entry]) => {
