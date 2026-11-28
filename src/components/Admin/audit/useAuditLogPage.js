@@ -13,7 +13,7 @@ export function useAuditLogPage() {
   const errorMessage = ref('')
   let pending
 
-  onScopeDispose(() => pending?.abort())
+  onScopeDispose(() => pending?.controller.abort())
 
   async function fetchPage(filters, limit, offset, signal) {
     const { data } = await getAuditLogSummaryPageApi({ ...filters, limit, offset }, { signal })
@@ -24,12 +24,20 @@ export function useAuditLogPage() {
     return data
   }
 
-  async function loadPage({ pageNumber = currentPage.value, size = pageSize.value, keepPrevious = true } = {}) {
-    pending?.abort()
-    const request = new AbortController()
-    const { signal } = request
-    pending = request
+  function loadPage({ pageNumber = currentPage.value, size = pageSize.value, keepPrevious = true, force = false } = {}) {
     const filters = appliedFilters.value
+    if (!force && pending?.filters === filters && pending.pageNumber === pageNumber && pending.size === size) {
+      return pending.promise
+    }
+    pending?.controller.abort()
+    const request = { filters, pageNumber, size, controller: new AbortController(), promise: null }
+    pending = request
+    request.promise = readPage(request, keepPrevious)
+    return request.promise
+  }
+
+  async function readPage(request, keepPrevious) {
+    const { filters, pageNumber, size, controller: { signal } } = request
     const offset = (pageNumber - 1) * size
     loading.value = true
     errorMessage.value = ''

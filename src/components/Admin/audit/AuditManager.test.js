@@ -156,10 +156,24 @@ it('keeps a failed refresh read-only and does not show deleted rows if reloading
   await flush()
   expect(view.button('删除筛选').disabled).toBe(false)
   confirmDelete.mockResolvedValueOnce(true)
-  api.getAuditLogSummaryPageApi.mockRejectedValueOnce(new Error('列表暂不可用'))
-  await view.button('删除').onClick()
+  const deletion = deferred()
+  api.deleteAuditLogsApi.mockReturnValueOnce(deletion.promise)
+  const deleting = view.button('删除').onClick()
+  await vi.waitFor(() => expect(api.deleteAuditLogsApi).toHaveBeenCalledWith(['a']))
+
+  const stalePage = deferred()
+  api.getAuditLogSummaryPageApi.mockReturnValueOnce(stalePage.promise)
+    .mockRejectedValueOnce(new Error('列表暂不可用'))
+  const refreshing = view.button('刷新').onClick()
+  const staleSignal = api.getAuditLogSummaryPageApi.mock.lastCall[1].signal
+  deletion.resolve({ data: { deleted: 1 } })
+  try {
+    await vi.waitFor(() => expect(staleSignal.aborted).toBe(true))
+  } finally {
+    stalePage.resolve({ data: { logs: [{ logId: 'a' }], total: 3, successCount: 2, failedCount: 1 } })
+  }
+  await Promise.all([deleting, refreshing])
   await flush()
-  expect(api.deleteAuditLogsApi).toHaveBeenCalledWith(['a'])
   expect(view.rows()).toEqual([])
   expect(view.listAlert()).toMatchObject({ title: '列表暂不可用', description: undefined })
 })

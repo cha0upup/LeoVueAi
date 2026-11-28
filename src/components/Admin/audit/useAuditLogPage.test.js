@@ -37,6 +37,27 @@ it('uses one request per page, with the submitted filters and returned counts', 
   expect(listing.updatedAt.value).toBeInstanceOf(Date)
 })
 
+it('shares an identical in-flight query but starts a fresh read after it settles', async () => {
+  const request = deferred()
+  getAuditLogSummaryPageApi.mockReturnValueOnce(request.promise).mockResolvedValue(pageResponse(0))
+
+  const first = listing.applyFilters({ status: 'FAILED', userId: 'user' })
+  const repeated = listing.applyFilters({ userId: 'user', status: 'FAILED' })
+  try {
+    expect(getAuditLogSummaryPageApi).toHaveBeenCalledOnce()
+    expect(getAuditLogSummaryPageApi.mock.lastCall[1].signal.aborted).toBe(false)
+    expect(repeated).toBe(first)
+  } finally {
+    request.resolve(pageResponse(1, [{ logId: 'fixture' }], 0, 1))
+  }
+  await repeated
+  expect(listing.page.value.logs).toEqual([{ logId: 'fixture' }])
+
+  await listing.loadPage()
+  expect(getAuditLogSummaryPageApi).toHaveBeenCalledTimes(2)
+  expect(listing.page.value.total).toBe(0)
+})
+
 it('aborts superseded requests and ignores stale results and errors', async () => {
   const first = deferred()
   const second = deferred()

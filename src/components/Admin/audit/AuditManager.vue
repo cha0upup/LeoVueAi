@@ -554,7 +554,7 @@ const handleAuditModeChange = async (mode) => {
     errorMessage: '更新审计模式失败',
     onSuccess: async ({ data }) => {
       applyAuditModeData(data, data?.mode || mode)
-      if (!disposed) await loadPage()
+      if (!disposed) await loadPage({ force: true })
     }
   })
   if (!result) auditMode.value = previousMode
@@ -648,7 +648,7 @@ const confirmLogDeletion = async (request, title, message) => {
       errorMessage: '删除审计日志失败',
       onSuccess: async ({ data }) => {
         showSuccess(`已删除 ${data?.deleted ?? 0} 条日志`)
-        if (!disposed) await loadPage({ keepPrevious: false })
+        if (!disposed) await loadPage({ keepPrevious: false, force: true })
       }
     })
   } finally {
@@ -690,7 +690,7 @@ const confirmCleanup = () => {
     onSuccess: async ({ data }) => {
       showSuccess(`已清理 ${data?.deleted ?? 0} 条旧日志`)
       cleanupDialogVisible.value = false
-      if (!disposed) await loadPage({ keepPrevious: false })
+      if (!disposed) await loadPage({ keepPrevious: false, force: true })
     }
   })
 }
