@@ -257,7 +257,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { icons as iconMap } from '@/utils/icons.js'
 import { downloadBlob } from '@/utils/downloadBlob.js'
@@ -357,12 +357,13 @@ const {
 } = useAgentSelection(visibleAgents)
 const testingAgentIds = ref([])
 const liveSessions = ref([])
-const sessionsLoading = ref(false)
+const liveSessionsRequest = shallowRef(null)
+const sessionsLoading = computed(() => liveSessionsRequest.value !== null)
 const activeSessionId = ref('')
 const deletingSessionIds = ref([])
 const projectMemberships = ref({})
 const loadedAgentsById = new Map()
-const workspaceReads = createLatestRequestGuard(['agents', 'sessions', 'cacheAvailability'])
+const workspaceReads = createLatestRequestGuard(['agents', 'cacheAvailability'])
 let sessionRefreshTimer = null
 let membershipContextToken = 0
 const CONN_RESULTS_KEY = 'agent_conn_results'
@@ -524,16 +525,19 @@ const openExistingSession = (session) => {
   emit('open-agent-console', params)
 }
 
-const getLiveSessions = async () => {
-  const requestToken = workspaceReads.next('sessions')
+const getLiveSessions = () => {
+  liveSessionsRequest.value?.abort()
+  const request = new AbortController()
+  liveSessionsRequest.value = request
+  const { signal } = request
+  const isActive = () => liveSessionsRequest.value === request
   const requestedProjectId = activeProjectId.value
   const requestedUnassigned = isUnassignedProject.value
-  await executeRequest(
-    () => getSessionsApi(requestedProjectId ? { projectId: requestedProjectId } : {}),
+  return executeRequest(
+    () => getSessionsApi(requestedProjectId ? { projectId: requestedProjectId } : {}, { signal }),
     {
-      loadingRef: sessionsLoading,
       errorMessage: '获取实时会话失败',
-      isActive: () => workspaceReads.isCurrent('sessions', requestToken),
+      isActive,
       onSuccess: ({ data }) => {
         const sessions = data || []
         liveSessions.value = (requestedUnassigned
@@ -549,7 +553,11 @@ const getLiveSessions = async () => {
         }
       }
     }
-  )
+  ).catch((error) => {
+    if (!signal.aborted) throw error
+  }).finally(() => {
+    if (isActive()) liveSessionsRequest.value = null
+  })
 }
 
 const deleteLiveSession = async (session) => {
@@ -1092,6 +1100,8 @@ const refresh = async ({ reloadProjects = true, focusProjectId } = {}) => {
 const invalidateWorkspaceReads = () => {
   workspaceReads.invalidate()
   membershipContextToken += 1
+  liveSessionsRequest.value?.abort()
+  liveSessionsRequest.value = null
 }
 
 watch(selectedProjectId, () => {
@@ -1112,7 +1122,7 @@ onMounted(() => {
   refresh()
   sessionRefreshTimer = window.setInterval(() => {
     if (document.visibilityState === 'visible' && !sessionsLoading.value) {
-      getLiveSessions()
+      return getLiveSessions().catch(() => { /* 请求已提示错误，下一轮继续轮询。 */ })
     }
   }, 15000)
 })

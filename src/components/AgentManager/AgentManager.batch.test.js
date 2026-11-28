@@ -103,13 +103,15 @@ describe('AgentManager batch workflow', () => {
     app.mount(renderer.root)
     apps.push(app)
     const node = name => findNode(renderer.root, name)
+    const refreshButton = () => findNodes(renderer.root, node => node.props?.['aria-label'] === '刷新节点列表')[0].props
     await vi.waitFor(() => expect(node('AgentTable').props.agents).toHaveLength(6))
     await nextTick()
     return {
       node,
       toolbar: () => node('AgentBatchToolbar').props,
       table: () => node('AgentTable').props,
-      refresh: () => findNodes(renderer.root, node => node.props?.['aria-label'] === '刷新节点列表')[0].props.onClick(),
+      refreshButton,
+      refresh: () => refreshButton().onClick(),
       select: async agent => { node('AgentTable').props.onToggleSelection(agent, true); await nextTick() }
     }
   }
@@ -322,7 +324,7 @@ describe('AgentManager batch workflow', () => {
     expect(view.table().agents).toEqual([])
   })
 
-  it('ignores a previous workspace session error after switching', async () => {
+  it('retires a previous workspace session read without blocking the new workspace', async () => {
     const view = await mount()
     const sessions = deferred()
     mocks.sessions.mockReturnValueOnce(sessions.promise)
@@ -332,12 +334,34 @@ describe('AgentManager batch workflow', () => {
       expect(view.table().loading).toBe(false)
     })
 
+    const previousSignal = mocks.sessions.mock.lastCall[1]?.signal
     view.node('ProjectSwitcher').props['onUpdate:modelValue']('destination')
-    sessions.reject(new Error('旧工作区会话读取失败'))
+    try {
+      await vi.waitFor(() => expect(view.refreshButton().disabled).toBe(false))
+      expect(previousSignal?.aborted).toBe(true)
+    } finally {
+      sessions.reject(new Error('旧工作区会话读取失败'))
+    }
     await pendingRefresh
 
-    expect(mocks.sessions).toHaveBeenLastCalledWith({ projectId: 'destination' })
+    expect(mocks.sessions).toHaveBeenLastCalledWith({ projectId: 'destination' },
+      { signal: expect.objectContaining({ aborted: false }) })
     expect(mocks.showError).not.toHaveBeenCalled()
+  })
+
+  it('handles periodic session refresh errors and keeps polling', async () => {
+    const view = await mount()
+    vi.stubGlobal('document', { visibilityState: 'visible' })
+    const poll = window.setInterval.mock.lastCall[0]
+    mocks.sessions.mockRejectedValueOnce(new Error('会话刷新失败'))
+
+    await expect(poll()).resolves.toBeUndefined()
+    expect(mocks.showError).toHaveBeenCalledExactlyOnceWith('会话刷新失败')
+
+    await poll()
+    expect(mocks.sessions).toHaveBeenCalledTimes(3)
+    await nextTick()
+    expect(view.refreshButton().disabled).toBe(false)
   })
 
   it('passes selected hosts to project assignment and clears selection on workspace change', async () => {
