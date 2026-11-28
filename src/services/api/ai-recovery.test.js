@@ -4,8 +4,19 @@ import { useAiChat } from '@/composables/ai/useAiChat.js'
 const { post } = vi.hoisted(() => ({ post: vi.fn() }))
 vi.mock('../http.js', () => ({ default: { post } }))
 
-import { platformAiEventsApi } from './platform-ai.js'
-import { nodeAiThreadEventsApi } from './node-ai.js'
+import { platformAiEventsApi, platformAiMessagesApi } from './platform-ai.js'
+import { nodeAiThreadEventsApi, nodeAiThreadMessagesApi } from './node-ai.js'
+
+it.each([
+  ['/platform/ai/messages', platformAiMessagesApi, {}],
+  ['/agent-node/ai/thread/messages', nodeAiThreadMessagesApi, { sessionId: 'session-1' }]
+])('passes the history cancellation signal in HTTP config (%s)', (endpoint, readHistory, scope) => {
+  post.mockReset()
+  const { signal } = new AbortController()
+  const params = { ...scope, threadId: 'thread-1', beforeSequence: 80, limit: 50 }
+  readHistory(params, { signal })
+  expect(post).toHaveBeenCalledExactlyOnceWith(endpoint, params, { signal })
+})
 
 describe.each([
   ['platform', platformAiEventsApi, '/platform/ai/events', {}],

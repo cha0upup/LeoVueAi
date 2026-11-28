@@ -329,8 +329,8 @@ const {
 const { recordPage, hasOlderMessages, loadingOlder, loadOlderMessages, forgetHistory } = useAiHistory({
   getConversationKey: () => activeThreadId.value,
   getScopeKey: () => props.sessionId,
-  loadPage: ({ threadId, scopeKey, beforeSequence, offset, limit }) =>
-    nodeAiThreadMessagesApi({ sessionId: scopeKey, threadId, beforeSequence, offset, limit }),
+  loadPage: ({ threadId, scopeKey, beforeSequence, limit }, options) =>
+    nodeAiThreadMessagesApi({ sessionId: scopeKey, threadId, beforeSequence, limit }, options),
   onPrepend: (records, threadId) => prependMessages(mapPersistedMessages(records), threadId),
   getScrollElement: () => scrollbarRef.value?.wrapRef,
   onError: error => showError('加载更早消息失败：' + (error?.message || '未知错误'))

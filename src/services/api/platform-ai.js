@@ -75,8 +75,8 @@ export function platformAiStreamApi(params) {
  * @param {number} [params.limit]
  * @param {number} [params.beforeSequence] - 向前翻页游标，优先于 offset
  */
-export function platformAiMessagesApi(params) {
-  return http.post('/platform/ai/messages', params || {})
+export function platformAiMessagesApi(params, { signal } = {}) {
+  return http.post('/platform/ai/messages', params || {}, { signal })
 }
 
 // ── 线程管理 ──────────────────────────────────────────────────────────────

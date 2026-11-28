@@ -294,8 +294,8 @@ const {
 
 const { recordPage, hasOlderMessages, loadingOlder, loadOlderMessages, forgetHistory } = useAiHistory({
   getConversationKey: () => activeThreadId.value,
-  loadPage: ({ threadId, beforeSequence, offset, limit }) =>
-    platformAiMessagesApi({ threadId, beforeSequence, offset, limit }),
+  loadPage: ({ threadId, beforeSequence, limit }, options) =>
+    platformAiMessagesApi({ threadId, beforeSequence, limit }, options),
   onPrepend: (records, threadId) => prependMessages(mapPersistedMessages(records, { includeSubtasks: true }), threadId),
   getScrollElement: () => scrollbarRef.value?.wrapRef,
   onError: error => showError('加载更早消息失败：' + (error?.message || '未知错误'))
