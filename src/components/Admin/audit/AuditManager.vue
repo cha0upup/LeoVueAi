@@ -513,7 +513,10 @@ const clearFilterItem = (field) => {
   return applyFilters(filters)
 }
 
-const operationTypes = ref(Object.keys(AUDIT_OPERATION_TYPE_LABELS))
+const localOperationTypes = Object.keys(AUDIT_OPERATION_TYPE_LABELS)
+const serverOperationTypes = shallowRef(null)
+const operationTypes = computed(() => serverOperationTypes.value ?? localOperationTypes)
+let pendingOperationTypes
 const defaultAuditModeOptions = [
   { value: 'on', label: '开启' },
   { value: 'write', label: '关闭低风险读操作' },
@@ -560,13 +563,20 @@ const handleAuditModeChange = async (mode) => {
   if (!result) auditMode.value = previousMode
 }
 
-const loadOperationTypes = async () => {
+const readOperationTypes = async () => {
   try {
     const { data } = await getAuditLogOperationTypesApi()
-    if (Array.isArray(data)) operationTypes.value = data
+    if (!disposed && Array.isArray(data)) serverOperationTypes.value = data
   } catch {
     // 服务不可用时仍可按本地已知类型筛选。
   }
+}
+
+const loadOperationTypes = () => {
+  // 字典随服务端版本发布；页面内只在读取失败时重试。
+  if (disposed || serverOperationTypes.value !== null) return
+  pendingOperationTypes ??= readOperationTypes().finally(() => { pendingOperationTypes = undefined })
+  return pendingOperationTypes
 }
 
 const refreshAll = () => Promise.all([fetchAuditMode(), loadOperationTypes(), loadPage()])

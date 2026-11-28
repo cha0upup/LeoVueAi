@@ -104,6 +104,7 @@ it('keeps drafts out of refresh and filter deletion, then submits only the confi
   expect(view.text()).toContain('筛选已编辑')
   await view.button('刷新').onClick()
   expect(api.getAuditLogSummaryPageApi.mock.lastCall[0]).not.toHaveProperty('keyword')
+  expect(api.getAuditLogOperationTypesApi).toHaveBeenCalledOnce()
   await view.button('查询').onClick()
   await nextTick()
   expect(view.button('删除筛选').disabled).toBe(false)
@@ -120,6 +121,21 @@ it('keeps drafts out of refresh and filter deletion, then submits only the confi
   await pending
   expect(api.deleteFilteredAuditLogsApi).toHaveBeenCalledWith({ keyword: 'first', confirm: 'DELETE' })
   expect(messages.showSuccess).toHaveBeenCalledWith('已删除 0 条日志')
+})
+
+it('retries unavailable operation types and shares the in-flight retry', async () => {
+  const request = deferred()
+  api.getAuditLogOperationTypesApi.mockRejectedValueOnce(new Error('目录暂不可用'))
+    .mockReturnValueOnce(request.promise)
+  const view = await mount()
+  expect(api.getAuditLogOperationTypesApi).toHaveBeenCalledOnce()
+
+  const first = view.button('刷新').onClick()
+  await flush()
+  const second = view.button('刷新').onClick()
+  request.resolve({ data: ['TEST'] })
+  await Promise.all([first, second])
+  expect(api.getAuditLogOperationTypesApi).toHaveBeenCalledTimes(2)
 })
 
 it('uses the ids shown in the confirmation if selection changes while it is open', async () => {
