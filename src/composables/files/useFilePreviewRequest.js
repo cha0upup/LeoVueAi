@@ -1,21 +1,24 @@
-import { computed, ref } from 'vue'
+import { computed, shallowRef } from 'vue'
 
 // 打开、刷新和编码切换共用一个请求生命周期。
 export function useFilePreviewRequest() {
-  const operation = ref(null)
-  let generation = 0
+  const operation = shallowRef(null)
 
   const reset = () => {
-    generation += 1
+    const previous = operation.value
     operation.value = null
+    previous?.controller.abort()
   }
 
   const run = async (kind, action) => {
-    const sequence = ++generation
-    const isCurrent = () => sequence === generation
-    operation.value = kind
+    const previous = operation.value
+    const controller = new AbortController()
+    const current = { kind, controller }
+    const isCurrent = () => operation.value === current
+    operation.value = current
+    previous?.controller.abort()
     try {
-      return await action(isCurrent)
+      return await action({ isCurrent, signal: controller.signal })
     } finally {
       if (isCurrent()) operation.value = null
     }
@@ -25,9 +28,9 @@ export function useFilePreviewRequest() {
     run,
     reset,
     isPreviewLoading: computed(
-      () => operation.value === 'preview' || operation.value === 'refresh'
+      () => operation.value?.kind === 'preview' || operation.value?.kind === 'refresh'
     ),
-    isRefreshing: computed(() => operation.value === 'refresh'),
-    isEncoding: computed(() => operation.value === 'encoding')
+    isRefreshing: computed(() => operation.value?.kind === 'refresh'),
+    isEncoding: computed(() => operation.value?.kind === 'encoding')
   }
 }

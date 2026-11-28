@@ -1,4 +1,4 @@
-import { ref, toRaw } from 'vue'
+import { computed, ref, shallowRef, toRaw } from 'vue'
 import { previewFileChunkApi } from '@/services/api/agent-files.js'
 import { createBase64StreamDecoder } from './useFileEncoding.js'
 
@@ -11,10 +11,18 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
   const isLargeFileMode = ref(false)
   const totalFileSize = ref(0)
   const loadedOffset = ref(0)
-  const isLoadingChunk = ref(false)
+  const pendingChunk = shallowRef(null)
+  const isLoadingChunk = computed(() => pendingChunk.value !== null)
   const scrollDisposer = ref(null)
   let loadGeneration = 0
   let decodeChunk = null
+
+  const invalidateChunks = () => {
+    loadGeneration += 1
+    const previous = pendingChunk.value
+    pendingChunk.value = null
+    previous?.abort()
+  }
 
   const resolveNextOffset = (payload, currentOffset) => {
     const nextOffset = Number(payload?.nextOffset)
@@ -30,23 +38,25 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
   const loadNextChunk = async (sessionId, filePath, getEditorFn) => {
     if (isLoadingChunk.value || loadedOffset.value >= totalFileSize.value) return
 
-    const generation = loadGeneration
-    isLoadingChunk.value = true
+    const controller = new AbortController()
+    const { signal } = controller
+    const offset = loadedOffset.value
+    pendingChunk.value = controller
     try {
       const response = await previewFileChunkApi({
         sessionId,
         path: filePath,
-        offset: loadedOffset.value,
+        offset,
         size: CHUNK_SIZE
-      })
-      if (generation !== loadGeneration) return
+      }, { signal })
+      if (signal.aborted) return
 
       const result = response.data
       if (!result || !result.data) {
         throw new Error('文件内容提前结束，请刷新后重试')
       }
 
-      const nextOffset = resolveNextOffset(result, loadedOffset.value)
+      const nextOffset = resolveNextOffset(result, offset)
       const editor = getEditorFn()
       const model = editor && toRaw(editor).getModel()
       if (!model) return
@@ -72,9 +82,9 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
         loadedOffset.value = totalFileSize.value
       }
     } catch (error) {
-      if (generation === loadGeneration) onChunkError?.(error)
+      if (!signal.aborted) onChunkError?.(error)
     } finally {
-      if (generation === loadGeneration) isLoadingChunk.value = false
+      if (pendingChunk.value === controller) pendingChunk.value = null
     }
   }
 
@@ -114,7 +124,7 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
    * @returns {string} 解码后的首片文本内容
    */
   const initLargeFileMode = (responseData) => {
-    loadGeneration += 1
+    invalidateChunks()
     decodeChunk = createBase64StreamDecoder(currentEncoding.value)
     isLargeFileMode.value = true
 
@@ -127,7 +137,7 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
   }
 
   const resetLargeFile = () => {
-    loadGeneration += 1
+    invalidateChunks()
     decodeChunk = null
     if (scrollDisposer.value) {
       scrollDisposer.value.dispose()
@@ -136,7 +146,6 @@ export function useLargeFile({ currentEncoding, onChunkError }) {
     isLargeFileMode.value = false
     totalFileSize.value = 0
     loadedOffset.value = 0
-    isLoadingChunk.value = false
   }
 
   return {

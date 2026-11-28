@@ -41,11 +41,13 @@ describe('file preview loading', () => {
     const loader = useFileLoader(useFileEncoding())
     const request = useFilePreviewRequest()
     const refresh = () =>
-      request.run('refresh', (isCurrent) => loader.loadFile('s', '/file.txt', { isCurrent }))
+      request.run('refresh', ({ signal }) => loader.loadFile('s', '/file.txt', { signal }))
 
     const oldLoad = refresh()
     await refresh()
     const newLoad = refresh()
+    expect(previewFileApi.mock.calls[0][1]?.signal.aborted).toBe(true)
+    expect(previewFileApi.mock.lastCall[1]?.signal.aborted).toBe(false)
     stale.resolve(response('stale'))
     expect(await oldLoad).toBeNull()
     expect(loader.fileContent.value).toBe('current')
@@ -80,10 +82,11 @@ describe('file preview loading', () => {
     const loader = useFileLoader(encoding)
     const request = useFilePreviewRequest()
     await loader.loadFile('s', '/file.txt')
-    const load = request.run('encoding', (isCurrent) =>
-      loader.loadFile('s', '/file.txt', { encoding: 'utf-8-bom', isCurrent })
+    const load = request.run('encoding', ({ signal }) =>
+      loader.loadFile('s', '/file.txt', { encoding: 'utf-8-bom', signal })
     )
     request.reset()
+    expect(previewFileApi.mock.lastCall[1]?.signal.aborted).toBe(true)
     pending.resolve(response('stale'))
     expect(await load).toBeNull()
     expect(loader.fileContent.value).toBe('original')

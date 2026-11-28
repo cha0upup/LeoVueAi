@@ -75,12 +75,12 @@ export function uploadFileChunkApi(params) {
   return http.post('/agent-node/file/upload-chunk', params)
 }
 
-export function previewFileApi(params) {
-  return http.post('/agent-node/file/preview', params)
+export function previewFileApi(params, { signal } = {}) {
+  return http.post('/agent-node/file/preview', params, { signal })
 }
 
-export function previewFileChunkApi(params) {
-  return http.post('/agent-node/file/preview-chunk', params)
+export function previewFileChunkApi(params, { signal } = {}) {
+  return http.post('/agent-node/file/preview-chunk', params, { signal })
 }
 
 export function editFileApi(params) {

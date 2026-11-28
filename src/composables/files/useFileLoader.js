@@ -99,7 +99,8 @@ export function useFileLoader({
    */
   const loadFile = async (sessionId, filePath, options = {}) => {
     const generation = ++loadGeneration
-    const isCurrent = () => generation === loadGeneration && (options.isCurrent?.() ?? true)
+    const { signal } = options
+    const isCurrent = () => generation === loadGeneration && !signal?.aborted
     let encoding = options.encoding ?? currentEncoding.value
     let response
     try {
@@ -107,7 +108,7 @@ export function useFileLoader({
         sessionId,
         path: filePath,
         encoding
-      })
+      }, { signal })
     } catch (error) {
       if (!isCurrent()) return null
       throw error

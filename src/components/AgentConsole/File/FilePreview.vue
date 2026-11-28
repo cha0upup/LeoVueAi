@@ -353,12 +353,12 @@ const switchPreviewEncoding = async (encoding, confirmation, successMessage) => 
     return false
   }
   const target = currentPreviewTarget()
-  return previewRequest.run('encoding', async (isCurrent) => {
+  return previewRequest.run('encoding', async ({ isCurrent, signal }) => {
     try {
       if (!(await confirmAction(confirmation)) || !isCurrent()) return false
       const result = await loadFile(target.sessionId, target.filePath, {
         encoding,
-        isCurrent
+        signal
       })
       if (!result || !isCurrent()) return false
       fileSize.value = resolvePreviewFileSize(result.responseData)
@@ -486,7 +486,7 @@ const preView = async (
     return false
   }
 
-  return previewRequest.run(operation, async (isCurrent) => {
+  return previewRequest.run(operation, async ({ isCurrent, signal }) => {
     // 新预览意图会替代编码切换，即使随后取消，也应保留当前内容的实际编码。
     currentEncoding.value = activeDisplayEncoding.value
     try {
@@ -503,9 +503,7 @@ const preView = async (
       sessionId.value = target.sessionId
       filePath.value = target.filePath
       preViewVisible.value = true
-      const result = await loadFile(target.sessionId, target.filePath, {
-        isCurrent
-      })
+      const result = await loadFile(target.sessionId, target.filePath, { signal })
       if (!result || !isCurrent()) return false
       fileSize.value = resolvePreviewFileSize(result.responseData)
 

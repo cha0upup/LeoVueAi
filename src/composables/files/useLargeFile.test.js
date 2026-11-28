@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { previewFileChunkApi } from '@/services/api/agent-files.js'
+import { deferred } from '@/test-support/deferred.js'
 import { useLargeFile } from './useLargeFile.js'
 
 vi.mock('@/services/api/agent-files.js', () => ({
@@ -8,7 +9,7 @@ vi.mock('@/services/api/agent-files.js', () => ({
 }))
 
 describe('useLargeFile', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { previewFileChunkApi.mockReset() })
 
   it('decodes Chinese and emoji split across multiple chunks without replacement characters', async () => {
     const bytes = new TextEncoder().encode('中😀文')
@@ -53,6 +54,38 @@ describe('useLargeFile', () => {
     }))
     expect(applyEdits.mock.calls[0][0][0].text).toBe('中')
     expect(largeFile.loadedOffset.value).toBe(3)
+  })
+
+  it('cancels the old chunk without ending the next file’s load', async () => {
+    const stale = deferred()
+    const latest = deferred()
+    previewFileChunkApi.mockReturnValueOnce(stale.promise).mockReturnValueOnce(latest.promise)
+    const onChunkError = vi.fn()
+    const largeFile = useLargeFile({ currentEncoding: ref('utf-8'), onChunkError })
+    const applyEdits = vi.fn()
+    const getEditor = () => ({
+      getModel: () => ({ getLineCount: () => 1, getLineMaxColumn: () => 2, applyEdits })
+    })
+    const start = (text) => largeFile.initLargeFileMode({ size: 2, data: btoa(text), nextOffset: 1 })
+    start('a')
+    const oldLoad = largeFile.loadNextChunk('s', '/old.txt', getEditor)
+    largeFile.resetLargeFile()
+    expect(previewFileChunkApi.mock.lastCall[1]?.signal.aborted).toBe(true)
+
+    start('x')
+    const newLoad = largeFile.loadNextChunk('s', '/new.txt', getEditor)
+    stale.resolve({ data: { data: btoa('b'), nextOffset: 2 } })
+    await oldLoad
+    expect(largeFile.isLoadingChunk.value).toBe(true)
+    expect(largeFile.loadedOffset.value).toBe(1)
+    expect(applyEdits).not.toHaveBeenCalled()
+
+    latest.resolve({ data: { data: btoa('y'), nextOffset: 2 } })
+    await newLoad
+    expect(applyEdits.mock.calls[0][0][0].text).toBe('y')
+    expect(largeFile.loadedOffset.value).toBe(2)
+    expect(largeFile.isLoadingChunk.value).toBe(false)
+    expect(onChunkError).not.toHaveBeenCalled()
   })
 
   it('reports a missing offset without consuming the chunk or guessing its position', async () => {
