@@ -279,13 +279,19 @@ function useStatsRequest(request, defaultMessage) {
   let pending
   let resultParams
 
-  onScopeDispose(() => pending?.abort())
+  onScopeDispose(() => pending?.controller.abort())
 
-  async function run(params) {
-    pending?.abort()
-    const current = new AbortController()
+  function run(params) {
+    if (pending && pending.params === params) return pending.promise
+    pending?.controller.abort()
+    const current = { params, controller: new AbortController(), promise: null }
     pending = current
-    const { signal } = current
+    current.promise = load(current)
+    return current.promise
+  }
+
+  async function load(current) {
+    const { params, controller: { signal } } = current
     loading.value = true
     if (resultParams !== params) result.value = null
     error.value = ''

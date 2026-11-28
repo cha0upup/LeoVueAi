@@ -69,6 +69,29 @@ it('trims subject searches and refreshes the submitted ID independently of the d
   expect(view.text()).toContain('member')
 })
 
+it('shares a pending subject query but fetches again on a later refresh', async () => {
+  const pending = deferred()
+  api.getAuditUserStatisticsApi.mockReturnValueOnce(pending.promise)
+  const view = await mount()
+  const input = () => view.input('用户')
+
+  input()['onUpdate:modelValue'](' member ')
+  const first = input().onKeyup({ key: 'Enter' })
+  input()['onUpdate:modelValue']('member')
+  const second = input().onKeyup({ key: 'Enter' })
+
+  expect(api.getAuditUserStatisticsApi).toHaveBeenCalledOnce()
+  expect(api.getAuditUserStatisticsApi.mock.lastCall[1].signal.aborted).toBe(false)
+  pending.resolve({ data: { totalOperations: 25, recentOperations: 2 } })
+  await Promise.all([first, second])
+  await flush()
+  expect(view.text()).toContain('总操作数25')
+
+  await view.button('刷新').onClick()
+  expect(api.getAuditUserStatisticsApi).toHaveBeenCalledTimes(2)
+  expect(view.text()).toContain('总操作数10')
+})
+
 it('keeps prior results on a failed refresh but does not show them for a new subject', async () => {
   const view = await mount()
   const input = () => view.input('用户')
