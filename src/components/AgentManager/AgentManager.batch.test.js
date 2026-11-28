@@ -1,10 +1,11 @@
 /* eslint-disable vue/one-component-per-file -- Fixture children expose the actual manager's UI events. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref, watch } from 'vue'
-import { compileClientComponent, createSlotStub, findNode } from '@/test-support/vueComponent.js'
+import { compileClientComponent, createSlotStub, findNode, findNodes } from '@/test-support/vueComponent.js'
 import { createTestRenderer } from '@/test-support/vueRenderer.js'
 import { deferred } from '@/test-support/deferred.js'
 import { icons } from '@/utils/icons.js'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import { useAgentDirectory, buildAgentUpdatePayload, normalizeAgentList } from '@/composables/agent/useAgentDirectory.js'
 import { useAgentSelection } from '@/composables/agent/useAgentSelection.js'
 import { executeRequest } from '@/utils/apiUtils.js'
@@ -44,6 +45,7 @@ const eventView = name => defineComponent({
 const modules = {
   '@iconify/vue': { Icon: nullView },
   '@/utils/icons.js': { icons },
+  '@/utils/latestRequestGuard.js': { createLatestRequestGuard },
   '@/utils/downloadBlob.js': { downloadBlob: mocks.download },
   '@/utils/apiUtils.js': { executeRequest },
   '@/utils/confirmUtils.js': { executeDeleteWithConfirm, executeBatchDelete },
@@ -107,6 +109,7 @@ describe('AgentManager batch workflow', () => {
       node,
       toolbar: () => node('AgentBatchToolbar').props,
       table: () => node('AgentTable').props,
+      refresh: () => findNodes(renderer.root, node => node.props?.['aria-label'] === '刷新节点列表')[0].props.onClick(),
       select: async agent => { node('AgentTable').props.onToggleSelection(agent, true); await nextTick() }
     }
   }
@@ -292,6 +295,49 @@ describe('AgentManager batch workflow', () => {
     request.resolve({ data: [{ agentId: 'old-child', parentAgentId: 'host-0' }] })
     await pending
     expect(resolve).toHaveBeenCalledExactlyOnceWith([])
+  })
+
+  it('clears the previous workspace rows and sessions even if the next directory read fails', async () => {
+    const oldSession = { agentId: 'host-0', sessionId: 'old-session' }
+    mocks.sessions.mockResolvedValueOnce({ data: [oldSession] })
+    const view = await mount()
+    expect(view.table()['sessions-by-agent-id']).toEqual({ 'host-0': [oldSession] })
+
+    const agents = deferred()
+    const sessions = deferred()
+    mocks.agents.mockReturnValueOnce(agents.promise)
+    mocks.sessions.mockReturnValueOnce(sessions.promise)
+    view.node('ProjectSwitcher').props['onUpdate:modelValue']('destination')
+    await nextTick()
+
+    try {
+      expect(view.table().agents).toEqual([])
+      expect(view.table()['sessions-by-agent-id']).toEqual({})
+    } finally {
+      agents.reject(new Error('新工作区读取失败'))
+      sessions.resolve({ data: [] })
+    }
+
+    await vi.waitFor(() => expect(mocks.showError).toHaveBeenCalledExactlyOnceWith('新工作区读取失败'))
+    expect(view.table().agents).toEqual([])
+  })
+
+  it('ignores a previous workspace session error after switching', async () => {
+    const view = await mount()
+    const sessions = deferred()
+    mocks.sessions.mockReturnValueOnce(sessions.promise)
+    const pendingRefresh = view.refresh()
+    await vi.waitFor(() => {
+      expect(mocks.sessions).toHaveBeenCalledTimes(2)
+      expect(view.table().loading).toBe(false)
+    })
+
+    view.node('ProjectSwitcher').props['onUpdate:modelValue']('destination')
+    sessions.reject(new Error('旧工作区会话读取失败'))
+    await pendingRefresh
+
+    expect(mocks.sessions).toHaveBeenLastCalledWith({ projectId: 'destination' })
+    expect(mocks.showError).not.toHaveBeenCalled()
   })
 
   it('passes selected hosts to project assignment and clears selection on workspace change', async () => {

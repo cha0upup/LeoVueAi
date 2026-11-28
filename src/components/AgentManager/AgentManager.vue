@@ -266,6 +266,7 @@ import { executeDeleteWithConfirm, executeBatchDelete } from '@/utils/confirmUti
 import { showError, showSuccess, showWarning } from '@/utils/messageUtils.js'
 import { createLogger } from '@/utils/logger.js'
 import { safeLocalStorage } from '@/utils/browserStorage.js'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard.js'
 import {
   getAgentsApi,
   deleteAgentApi,
@@ -361,9 +362,8 @@ const activeSessionId = ref('')
 const deletingSessionIds = ref([])
 const projectMemberships = ref({})
 const loadedAgentsById = new Map()
+const workspaceReads = createLatestRequestGuard(['agents', 'sessions', 'cacheAvailability'])
 let sessionRefreshTimer = null
-let agentLoadToken = 0
-let sessionLoadToken = 0
 let membershipContextToken = 0
 const CONN_RESULTS_KEY = 'agent_conn_results'
 
@@ -409,13 +409,7 @@ const connectionTestResults = ref(
 const cacheCheckResult = ref(null) // { hasCache, saveTime } | null
 const cacheCheckLoading = ref(false)
 const cacheAvailabilityLoading = ref(false)
-const cacheAvailability = ref({
-  agentId: '',
-  checked: false,
-  hasCache: false,
-  saveTime: null
-})
-let cacheAvailabilityRequestToken = 0
+const cacheAvailability = ref(null)
 
 const sessionsByAgentId = computed(() => {
   return liveSessions.value.reduce((groups, session) => {
@@ -445,10 +439,11 @@ const currentAgentSessions = computed(() => {
 })
 
 const currentCacheAvailability = computed(() => {
-  if (cacheAvailability.value.agentId !== currentAgent.value?.agentId) {
-    return { checked: false, hasCache: false, saveTime: null }
+  const status = cacheAvailability.value
+  if (status && status.agentId === currentAgent.value?.agentId) {
+    return status
   }
-  return cacheAvailability.value
+  return { checked: false, hasCache: false, saveTime: null }
 })
 
 const emptyDirectoryCopy = computed(() => {
@@ -482,19 +477,19 @@ const buildCacheAvailability = (row, response) => ({
 
 const loadCacheAvailability = async (row) => {
   if (!row?.agentId) return null
-  const requestToken = ++cacheAvailabilityRequestToken
+  const requestToken = workspaceReads.next('cacheAvailability')
   cacheAvailabilityLoading.value = true
   try {
     const response = await checkAgentCacheApi(row.agentId)
     const status = buildCacheAvailability(row, response)
-    if (requestToken === cacheAvailabilityRequestToken) {
+    if (workspaceReads.isCurrent('cacheAvailability', requestToken)) {
       cacheAvailability.value = status
     }
     return status
   } catch {
     return null
   } finally {
-    if (requestToken === cacheAvailabilityRequestToken) {
+    if (workspaceReads.isCurrent('cacheAvailability', requestToken)) {
       cacheAvailabilityLoading.value = false
     }
   }
@@ -530,40 +525,29 @@ const openExistingSession = (session) => {
 }
 
 const getLiveSessions = async () => {
-  const requestToken = ++sessionLoadToken
+  const requestToken = workspaceReads.next('sessions')
   const requestedProjectId = activeProjectId.value
   const requestedUnassigned = isUnassignedProject.value
   await executeRequest(
-    async () => {
-      const response = await getSessionsApi(
-        requestedProjectId ? { projectId: requestedProjectId } : {}
-      )
-      if (
-        requestToken !== sessionLoadToken ||
-        requestedProjectId !== activeProjectId.value ||
-        requestedUnassigned !== isUnassignedProject.value
-      ) {
-        return response
-      }
-      const sessions = requestedUnassigned
-        ? (response.data || []).filter((session) => !session?.projectId)
-        : response.data || []
-      liveSessions.value = sessions
-        .slice()
-        .sort(
+    () => getSessionsApi(requestedProjectId ? { projectId: requestedProjectId } : {}),
+    {
+      loadingRef: sessionsLoading,
+      errorMessage: '获取实时会话失败',
+      isActive: () => workspaceReads.isCurrent('sessions', requestToken),
+      onSuccess: ({ data }) => {
+        const sessions = data || []
+        liveSessions.value = (requestedUnassigned
+          ? sessions.filter((session) => !session?.projectId)
+          : sessions.slice()
+        ).sort(
           (a, b) =>
             Number(b.lastActiveTime || b.updateTime || 0) -
             Number(a.lastActiveTime || a.updateTime || 0)
         )
-      if (!liveSessions.value.some((session) => session.sessionId === activeSessionId.value)) {
-        activeSessionId.value = ''
+        if (!liveSessions.value.some((session) => session.sessionId === activeSessionId.value)) {
+          activeSessionId.value = ''
+        }
       }
-      return response
-    },
-    {
-      loadingRef: sessionsLoading,
-      successMessage: null,
-      errorMessage: '获取实时会话失败'
     }
   )
 }
@@ -882,43 +866,32 @@ const loadProjectMemberships = async (rows = [], contextToken = membershipContex
 }
 
 const getAgents = async () => {
-  const requestToken = ++agentLoadToken
+  const requestToken = workspaceReads.next('agents')
   const requestedProjectId = activeProjectId.value
   const requestedUnassigned = isUnassignedProject.value
   const requestedAll = isAllProjects.value
   await executeRequest(
-    async () => {
-      const resp = requestedAll
-        ? await getAgentsApi()
-        : requestedUnassigned
-          ? await getUnassignedAgentsApi()
-          : await getProjectAgentsApi(requestedProjectId)
-      if (
-        requestToken !== agentLoadToken ||
-        requestedProjectId !== activeProjectId.value ||
-        requestedUnassigned !== isUnassignedProject.value ||
-        requestedAll !== isAllProjects.value
-      ) {
-        return resp
-      }
-      allAgents.value = normalizeAgentList(resp.data || [])
-      loadedAgentsById.clear()
-      currentAgent.value =
-        allAgents.value.find((item) => item.agentId === currentAgent.value?.agentId) ||
-        allAgents.value[0] ||
-        null
-      if (currentAgent.value) loadCacheAvailability(currentAgent.value)
-      membershipContextToken += 1
-      projectMemberships.value = {}
-      if (requestedAll) {
-        loadProjectMemberships(allAgents.value, membershipContextToken)
-      }
-      return resp
+    () => {
+      if (requestedAll) return getAgentsApi()
+      if (requestedUnassigned) return getUnassignedAgentsApi()
+      return getProjectAgentsApi(requestedProjectId)
     },
     {
       loadingRef: loading,
-      successMessage: null,
-      errorMessage: '获取接入节点失败'
+      errorMessage: '获取接入节点失败',
+      isActive: () => workspaceReads.isCurrent('agents', requestToken),
+      onSuccess: ({ data }) => {
+        allAgents.value = normalizeAgentList(data || [])
+        loadedAgentsById.clear()
+        currentAgent.value =
+          allAgents.value.find((item) => item.agentId === currentAgent.value?.agentId) ||
+          allAgents.value[0] ||
+          null
+        if (currentAgent.value) loadCacheAvailability(currentAgent.value)
+        membershipContextToken += 1
+        projectMemberships.value = {}
+        if (requestedAll) loadProjectMemberships(allAgents.value, membershipContextToken)
+      }
     }
   )
 }
@@ -1034,9 +1007,6 @@ const openAddAgentDialog = () => {
 const handleProjectChange = (projectId) => {
   if (batchBusy.value || !projectId || projectId === selectedProjectId.value) return
   selectProject(projectId)
-  currentAgent.value = null
-  activeSessionId.value = ''
-  projectMemberships.value = {}
   refresh({ reloadProjects: false })
 }
 
@@ -1119,6 +1089,25 @@ const refresh = async ({ reloadProjects = true, focusProjectId } = {}) => {
   await Promise.allSettled([getAgents(), getLiveSessions()])
 }
 
+const invalidateWorkspaceReads = () => {
+  workspaceReads.invalidate()
+  membershipContextToken += 1
+}
+
+watch(selectedProjectId, () => {
+  invalidateWorkspaceReads()
+  loadedAgentsById.clear()
+  allAgents.value = []
+  liveSessions.value = []
+  currentAgent.value = null
+  activeSessionId.value = ''
+  projectMemberships.value = {}
+  testConnResult.value = null
+  cacheCheckResult.value = null
+  cacheAvailability.value = null
+  cacheAvailabilityLoading.value = false
+}, { flush: 'sync' })
+
 onMounted(() => {
   refresh()
   sessionRefreshTimer = window.setInterval(() => {
@@ -1129,6 +1118,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  invalidateWorkspaceReads()
   if (sessionRefreshTimer) {
     window.clearInterval(sessionRefreshTimer)
     sessionRefreshTimer = null
